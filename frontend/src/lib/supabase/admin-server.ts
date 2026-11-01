@@ -92,9 +92,9 @@ export async function savePendingRegistration(params: {
   username: string;
   audienceKind: "organization_type" | "persona_type";
   audienceValue: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const admin = getAdminClient();
-  const { error } = await admin.rpc("pending_registration_save", {
+  const { data, error } = await admin.rpc("pending_registration_save", {
     p_user_id: params.userId,
     p_username: params.username,
     p_audience_kind: params.audienceKind,
@@ -102,7 +102,11 @@ export async function savePendingRegistration(params: {
   });
   if (error) {
     console.error(`Failed to stage pending registration for ${params.userId}: ${error.message}`);
+    return false;
   }
+  // true = the 30-minute username lease is held (20261028090003). false never
+  // changes the caller's response: the name is re-asked after verification.
+  return data === true;
 }
 
 /**
@@ -225,7 +229,7 @@ export async function deleteCraftsmanPasswordUser(userId: string): Promise<boole
 }
 
 /** Durable shared phone-auth limiter. Only service_role can consume buckets. */
-export async function consumePhoneAuthLimit(action: "sign-in" | "sign-up", ipKey: string, phoneKey: string): Promise<boolean> {
+export async function consumePhoneAuthLimit(action: "sign-in" | "sign-up" | "email-resend", ipKey: string, phoneKey: string): Promise<boolean> {
   const { data, error } = await getAdminClient().rpc("phone_auth_consume_limit", {
     p_action: action, p_ip_key: ipKey, p_phone_key: phoneKey,
   });
@@ -271,26 +275,50 @@ export async function saveVerifiedBirthDate(userId: string, birthDate: string): 
 // ---------------------------------------------------------------------------
 export type PhoneChallenge = { id: string; phoneE164: string; codeHash: string; attempts: number; expiresAt: string; consumedAt: string | null };
 
-/** How many sign-up codes this number was sent since `sinceIso`. Throws on a lookup failure. */
-export async function countRecentPhoneChallenges(e164: string, sinceIso: string): Promise<number> {
-  const { count, error } = await getAdminClient()
-    .from("phone_verification_challenges")
-    .select("id", { count: "exact", head: true })
-    .eq("phone_e164", e164)
-    .gte("created_at", sinceIso);
-  if (error) throw new Error(`phone challenge count failed (code ${error.code ?? "unknown"})`);
-  return count ?? 0;
+export type IssueChallengeResult = "issued" | "rate_limited" | "budget_exhausted";
+
+/**
+ * Atomically reserves one send: inside ONE database transaction (serialized by an advisory lock) it checks the number's
+ * hourly cap and the global rolling-24h budget and inserts the challenge only within both. Concurrent requests cannot
+ * overshoot. Throws on a failure; an unexpected answer counts as a failure.
+ */
+export async function issuePhoneChallenge(row: {
+  id: string;
+  phoneE164: string;
+  codeHash: string;
+  expiresAt: string;
+  perNumberHourlyLimit: number;
+  dailyLimit: number;
+}): Promise<IssueChallengeResult> {
+  const { data, error } = await getAdminClient().rpc("phone_challenge_issue", {
+    p_id: row.id,
+    p_phone_e164: row.phoneE164,
+    p_code_hash: row.codeHash,
+    p_expires_at: row.expiresAt,
+    p_phone_hourly_limit: row.perNumberHourlyLimit,
+    p_daily_limit: row.dailyLimit,
+  });
+  if (error) throw new Error(`phone challenge issue failed (code ${error.code ?? "unknown"})`);
+  if (data !== "issued" && data !== "rate_limited" && data !== "budget_exhausted") throw new Error("phone challenge issue failed (code unexpected)");
+  return data;
 }
 
-export async function insertPhoneChallenge(row: { id: string; phoneE164: string; codeHash: string; expiresAt: string }): Promise<void> {
-  const { error } = await getAdminClient().from("phone_verification_challenges").insert({
-    id: row.id,
-    purpose: "sign_up",
-    phone_e164: row.phoneE164,
-    code_hash: row.codeHash,
-    expires_at: row.expiresAt,
-  });
-  if (error) throw new Error(`phone challenge insert failed (code ${error.code ?? "unknown"})`);
+/** Stamps the moment Meta accepted the message (the billable event; accepted is not delivered). */
+export async function markPhoneChallengeSent(id: string): Promise<void> {
+  const { error } = await getAdminClient().rpc("phone_challenge_mark_sent", { p_id: id });
+  if (error) throw new Error(`phone challenge stamp failed (code ${error.code ?? "unknown"})`);
+}
+
+/**
+ * Records that ownership of `e164` was proven by a WhatsApp code, through the service-role-only definer function
+ * phone_sign_up_mark_verified (profiles has no direct service_role UPDATE, by design). The database requires a sign-up
+ * code for exactly that number to have been consumed moments ago and only marks the user's current primary number.
+ * Returns false when the proof does not hold.
+ */
+export async function markPhoneVerified(userId: string, e164: string): Promise<boolean> {
+  const { data, error } = await getAdminClient().rpc("phone_sign_up_mark_verified", { p_user_id: userId, p_e164: e164 });
+  if (error) throw new Error(`phone verification save failed (code ${error.code ?? "unknown"})`);
+  return data === true;
 }
 
 export async function deletePhoneChallenge(id: string): Promise<void> {

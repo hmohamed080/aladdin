@@ -21,8 +21,8 @@ const m = vi.hoisted(() => ({
   limit: vi.fn(),
   send: vi.fn(),
   phoneTaken: vi.fn(),
-  countRecent: vi.fn(),
-  insert: vi.fn(),
+  issue: vi.fn(),
+  stamp: vi.fn(),
   remove: vi.fn(),
   load: vi.fn(),
   attempt: vi.fn(),
@@ -30,17 +30,20 @@ const m = vi.hoisted(() => ({
   createUser: vi.fn(),
   deleteUser: vi.fn(),
   birthday: vi.fn(),
+  verified: vi.fn(),
+  limit2: vi.fn(),
+  enabled: vi.fn(),
 }));
 vi.mock("@/lib/supabase/server", () => ({
   getServerSupabase: async () => ({ auth: { getUser: m.getUser, signInWithPassword: m.signInWithPassword, signOut: m.signOut }, rpc: m.rpc }),
 }));
 vi.mock("@/server/auth/turnstile", () => ({ verifyTurnstileToken: m.siteverify, clientIpFrom: () => null, turnstileHostnamesFrom: () => [] }));
 vi.mock("@/server/auth/phone-auth-limit", () => ({ phoneAuthLimit: m.limit }));
-vi.mock("@/server/auth/whatsapp-otp", () => ({ sendWhatsAppCode: m.send }));
+vi.mock("@/server/auth/whatsapp-otp", () => ({ sendWhatsAppCode: m.send, dailySendLimit: m.limit2, sendingEnabledFor: m.enabled }));
 vi.mock("@/lib/supabase/admin-server", () => ({
   isCanonicalPhoneTaken: m.phoneTaken,
-  countRecentPhoneChallenges: m.countRecent,
-  insertPhoneChallenge: m.insert,
+  issuePhoneChallenge: m.issue,
+  markPhoneChallengeSent: m.stamp,
   deletePhoneChallenge: m.remove,
   loadPhoneChallenge: m.load,
   recordPhoneChallengeAttempt: m.attempt,
@@ -48,6 +51,7 @@ vi.mock("@/lib/supabase/admin-server", () => ({
   createPhoneSignUpUser: m.createUser,
   deleteCraftsmanPasswordUser: m.deleteUser,
   saveVerifiedBirthDate: m.birthday,
+  markPhoneVerified: m.verified,
 }));
 
 import { requestPhoneSignUp, resendPhoneSignUpCode, verifyPhoneSignUp } from "./phone-sign-up";
@@ -84,7 +88,7 @@ async function run<T>(fn: () => Promise<T>): Promise<T | string> {
 
 /** The code the server generated, as handed to the WhatsApp sender. */
 const sentCode = () => m.send.mock.calls.at(-1)?.[1] as string;
-const insertedRow = () => m.insert.mock.calls.at(-1)?.[0] as { id: string; codeHash: string; expiresAt: string };
+const insertedRow = () => m.issue.mock.calls.at(-1)?.[0] as { id: string; codeHash: string; expiresAt: string };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -94,14 +98,17 @@ beforeEach(() => {
   m.limit.mockResolvedValue("allowed");
   m.send.mockResolvedValue("sent");
   m.phoneTaken.mockResolvedValue(false);
-  m.countRecent.mockResolvedValue(0);
-  m.insert.mockResolvedValue(undefined);
+  m.issue.mockResolvedValue("issued");
+  m.stamp.mockResolvedValue(undefined);
   m.remove.mockResolvedValue(undefined);
   m.attempt.mockResolvedValue(true);
   m.consume.mockResolvedValue(true);
   m.createUser.mockResolvedValue({ ok: true, userId: "u-new" });
   m.deleteUser.mockResolvedValue(true);
   m.birthday.mockResolvedValue(undefined);
+  m.verified.mockResolvedValue(true);
+  m.limit2.mockReturnValue(20);
+  m.enabled.mockReturnValue(true);
   m.signInWithPassword.mockResolvedValue({ error: null });
   m.signOut.mockResolvedValue({ error: null });
   m.rpc.mockImplementation(async (name: string) => (name === "username_available" ? { data: true, error: null } : { data: null, error: null }));
@@ -161,7 +168,7 @@ describe("requestPhoneSignUp", () => {
     expect((await requestPhoneSignUp(form(), PHONE)).code).toBe("authPasswordPreview.error.phoneExists");
     m.rpc.mockResolvedValueOnce({ data: false, error: null });
     expect((await requestPhoneSignUp(form(), PHONE)).code).toBe("registration.error.usernameUnavailable");
-    m.countRecent.mockResolvedValueOnce(5);
+    m.issue.mockResolvedValueOnce("rate_limited");
     expect((await requestPhoneSignUp(form(), PHONE)).code).toBe("authPasswordPreview.error.rateLimited");
     expect(m.send).not.toHaveBeenCalled();
   });
@@ -171,6 +178,30 @@ describe("requestPhoneSignUp", () => {
     expect((await requestPhoneSignUp(form(), PHONE)).code).toBe("authPasswordPreview.error.whatsappUnavailable");
     expect(m.remove).toHaveBeenCalledWith(insertedRow().id);
     expect(cookieJar.has("psu")).toBe(false);
+  });
+
+  it("sends nothing once the daily message budget is spent, and bills nothing", async () => {
+    m.issue.mockResolvedValueOnce("budget_exhausted");
+    expect(await requestPhoneSignUp(form(), PHONE)).toMatchObject({ ok: false, code: "authPasswordPreview.error.whatsappUnavailable" });
+    expect(m.send).not.toHaveBeenCalled();
+    expect(m.stamp).not.toHaveBeenCalled();
+  });
+
+  it("reserves the budget in the database with the configured limits, then stamps the accepted message", async () => {
+    await startSignUp();
+    expect(m.issue).toHaveBeenCalledWith(expect.objectContaining({ phoneE164: "+201012345678", perNumberHourlyLimit: 5, dailyLimit: 20 }));
+    expect(m.stamp).toHaveBeenCalledWith(insertedRow().id);
+    // The challenge lives 5 minutes, matching the expiry printed in the approved template.
+    expect(Date.parse(insertedRow().expiresAt) - Date.now()).toBeLessThanOrEqual(5 * 60 * 1000);
+  });
+
+  it("fails closed, reserving nothing, when the number is not allowed or no limit is configured", async () => {
+    m.enabled.mockReturnValueOnce(false);
+    expect((await requestPhoneSignUp(form(), PHONE)).code).toBe("authPasswordPreview.error.whatsappUnavailable");
+    m.limit2.mockReturnValueOnce(null);
+    expect((await requestPhoneSignUp(form(), PHONE)).code).toBe("authPasswordPreview.error.whatsappUnavailable");
+    expect(m.issue).not.toHaveBeenCalled();
+    expect(m.send).not.toHaveBeenCalled();
   });
 
   it("never creates a second account for a signed-in person", async () => {
@@ -193,7 +224,22 @@ describe("verifyPhoneSignUp", () => {
     expect(m.rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "business", p_account_type: "supplier" });
     expect(m.rpc).toHaveBeenCalledWith("profile_set_username", { p_username: "mona.adel" });
     expect(m.birthday).toHaveBeenCalledWith("u-new", "1990-05-17");
+    // The proof of the verified number is recorded server-side, for exactly that number, never from the form.
+    expect(m.verified).toHaveBeenCalledWith("u-new", "+201012345678");
     expect(cookieJar.has("psu")).toBe(false);
+  });
+
+  it("rolls the account back when the verification proof cannot be recorded", async () => {
+    const code = await startSignUp();
+    m.verified.mockResolvedValue(false);
+    expect((await verifyPhoneSignUp(verifyForm(code))).code).toBe("authPasswordPreview.error.verifyFailed");
+    expect(m.deleteUser).toHaveBeenCalledWith("u-new");
+  });
+
+  it("never records a verification before the right code was entered", async () => {
+    const code = await startSignUp();
+    await verifyPhoneSignUp(verifyForm(code === "000000" ? "111111" : "000000"));
+    expect(m.verified).not.toHaveBeenCalled();
   });
 
   it("counts a wrong code and creates nothing", async () => {
@@ -251,7 +297,9 @@ describe("resendPhoneSignUpCode", () => {
     expect(await resendPhoneSignUpCode(data)).toMatchObject({ ok: true });
     expect(m.siteverify).toHaveBeenLastCalledWith("token-c", expect.objectContaining({ expectedAction: "sign-up-resend" }));
     expect(insertedRow().id).not.toBe(first);
-    expect(m.remove).toHaveBeenCalledWith(first);
+    // The old row stays (consumed) so the send caps keep counting it; a resend loop cannot dodge them.
+    expect(m.consume).toHaveBeenCalledWith(first);
+    expect(m.remove).not.toHaveBeenCalled();
   });
 
   it("asks to start again without a pending sign-up", async () => {

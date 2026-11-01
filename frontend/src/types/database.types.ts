@@ -3821,6 +3821,7 @@ export type Database = {
           expires_at: string
           id: string
           phone_e164: string
+          provider_accepted_at: string | null
           purpose: string
         }
         Insert: {
@@ -3831,6 +3832,7 @@ export type Database = {
           expires_at: string
           id?: string
           phone_e164: string
+          provider_accepted_at?: string | null
           purpose: string
         }
         Update: {
@@ -3841,6 +3843,7 @@ export type Database = {
           expires_at?: string
           id?: string
           phone_e164?: string
+          provider_accepted_at?: string | null
           purpose?: string
         }
         Relationships: []
@@ -9444,7 +9447,7 @@ export type Database = {
         Returns: {
           audience_kind: Database["public"]["Enums"]["activity_audience_kind"]
           audience_value: string
-          username: string
+          username: string | null
         }[]
       }
       pending_registration_save: {
@@ -9455,7 +9458,23 @@ export type Database = {
           p_user_id: string
           p_username: string
         }
-        Returns: undefined
+        Returns: boolean
+      }
+      phone_challenge_issue: {
+        Args: {
+          p_code_hash: string
+          p_daily_limit: number
+          p_expires_at: string
+          p_id: string
+          p_phone_e164: string
+          p_phone_hourly_limit: number
+        }
+        Returns: string
+      }
+      phone_challenge_mark_sent: { Args: { p_id: string }; Returns: boolean }
+      phone_sign_up_mark_verified: {
+        Args: { p_e164: string; p_user_id: string }
+        Returns: boolean
       }
       phone_auth_consume_limit: {
         Args: { p_action: string; p_ip_key: string; p_phone_key: string }

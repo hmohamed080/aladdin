@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { readAuthIdentifierSecret, readPublicEnv } from "@/lib/env";
 import { consumePhoneAuthLimit } from "@/lib/supabase/admin-server";
 import { clientIpFrom } from "./turnstile";
-export async function phoneAuthLimit(action: "sign-in" | "sign-up", phone: string, headers: {
+export async function phoneAuthLimit(action: "sign-in" | "sign-up" | "email-resend", phone: string, headers: {
     get(name: string): string | null;
 }): Promise<"allowed" | "limited" | "unavailable"> {
     try {

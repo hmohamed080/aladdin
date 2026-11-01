@@ -2,6 +2,7 @@ import { PasswordSignUpForm } from "@/features/auth-password-preview/sign-up-for
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
 import { sanitizeNext } from "@/server/auth/next";
 import { oauthAvailability } from "@/server/auth/entry-oauth";
+import { pendingRegistrationEmail } from "@/server/actions/auth-password-preview";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
       initialAccountType={initialAccountType}
       next={safe.startsWith("/auth/invite/") ? safe : undefined}
       providers={providers}
+      hasPendingRegistration={(await pendingRegistrationEmail()) !== null}
     />
   );
 }

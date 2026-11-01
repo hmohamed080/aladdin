@@ -4,9 +4,9 @@ vi.mock("server-only", () => ({}));
 const env = vi.hoisted(() => ({ whatsapp: {} as Record<string, string | undefined>, appEnv: "staging" }));
 vi.mock("@/lib/env", () => ({ readWhatsAppEnv: () => env.whatsapp, readPublicEnv: () => ({ NEXT_PUBLIC_APP_ENV: env.appEnv }) }));
 
-import { sendWhatsAppCode } from "./whatsapp-otp";
+import { dailySendLimit, recipientAllowed, sendWhatsAppCode, sendingEnabledFor } from "./whatsapp-otp";
 
-const configured = { WHATSAPP_ACCESS_TOKEN: "token", WHATSAPP_PHONE_NUMBER_ID: "1234567890", WHATSAPP_OTP_TEMPLATE: "aladdin_login_code" };
+const configured = { WHATSAPP_ACCESS_TOKEN: "token", WHATSAPP_PHONE_NUMBER_ID: "1234567890", WHATSAPP_OTP_TEMPLATE: "aladdin_otp", WHATSAPP_OTP_LANGUAGE: "ar", WHATSAPP_ALLOWED_RECIPIENTS: "+201012345678, +201099999999" };
 const reply = (status: number, body: unknown = {}) => vi.fn(async () => new Response(JSON.stringify(body), { status }));
 
 beforeEach(() => {
@@ -29,7 +29,7 @@ describe("sendWhatsAppCode", () => {
       to: "201012345678",
       type: "template",
       template: {
-        name: "aladdin_login_code",
+        name: "aladdin_otp",
         language: { code: "ar" },
         components: [
           { type: "body", parameters: [{ type: "text", text: "123456" }] },
@@ -62,5 +62,57 @@ describe("sendWhatsAppCode", () => {
       expect(String(message)).not.toContain("123456");
       expect(String(message)).not.toContain("201012345678");
     }
+  });
+});
+
+describe("template language", () => {
+  it("uses the configured language for every locale (the approved template is Arabic only)", async () => {
+    const fetcher = reply(200);
+    await sendWhatsAppCode("+201012345678", "123456", "en", fetcher as never);
+    const [, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).template.language.code).toBe("ar");
+  });
+});
+
+describe("recipient allowlist", () => {
+  it("refuses a number that is not on the list without calling Meta", async () => {
+    const fetcher = reply(200);
+    expect(await sendWhatsAppCode("+201055555555", "123456", "ar", fetcher as never)).toBe("unavailable");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("fails closed with no list, in every environment including production", async () => {
+    env.whatsapp = { ...configured, WHATSAPP_ALLOWED_RECIPIENTS: undefined };
+    for (const appEnv of ["staging", "production"]) {
+      env.appEnv = appEnv;
+      const fetcher = reply(200);
+      expect(await sendWhatsAppCode("+201012345678", "123456", "ar", fetcher as never)).toBe("unavailable");
+      expect(fetcher).not.toHaveBeenCalled();
+    }
+    expect(recipientAllowed("+20100", "")).toBe(false);
+    expect(recipientAllowed("+20100", " +20100 ,")).toBe(true);
+    expect(recipientAllowed("+20101", "+20100")).toBe(false);
+  });
+});
+
+describe("send limits", () => {
+  it("needs both an allowed number and a daily limit, in every environment", () => {
+    env.whatsapp = { ...configured, WHATSAPP_DAILY_SEND_LIMIT: 20 as never };
+    expect(sendingEnabledFor("+201012345678")).toBe(true);
+    expect(sendingEnabledFor("+201055555555")).toBe(false);
+    env.whatsapp = { ...configured };
+    expect(dailySendLimit()).toBeNull();
+    expect(sendingEnabledFor("+201012345678")).toBe(false);
+    env.appEnv = "production";
+    expect(sendingEnabledFor("+201012345678")).toBe(false);
+  });
+
+  it("uses a generous default only for local, token-less development", () => {
+    env.whatsapp = {};
+    env.appEnv = "local";
+    expect(dailySendLimit()).toBe(1000);
+    expect(sendingEnabledFor("+201012345678")).toBe(true);
+    env.appEnv = "staging";
+    expect(dailySendLimit()).toBeNull();
   });
 });

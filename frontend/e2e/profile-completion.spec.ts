@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { test, expect, type Page, type APIRequestContext, type BrowserContext } from "@playwright/test";
 import { fillBirthDate, IDENTITIES, reachLanding, messageIdsFor, readNewOtp, selectAccountType, signIn, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline } from "./helpers/auth";
 
@@ -15,6 +16,11 @@ test.beforeEach(async ({ page }) => {
  * reload persistence, neutral duplicate), avatar crop/upload/replace/cancel.
  */
 
+const DB = process.env.E2E_DB_CONTAINER ?? "supabase_db_aladdin";
+/** Test-fixture SQL against the local stack only (see installer-profile-completion.spec.ts). */
+function sql(query: string): string {
+  return execFileSync("docker", ["exec", "-i", DB, "psql", "-U", "postgres", "-d", "postgres", "-qAt", "-v", "ON_ERROR_STOP=1"], { input: query }).toString().trim();
+}
 const STRONG_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
 
 /**
@@ -212,14 +218,25 @@ test.describe("Direct entry after registration", () => {
     const emailB = uniqueEmail("raceb");
     await fillSignUp(pageA, emailA, shared, TRADESPEOPLE);
     const seenA = await submitSignUp(pageA, request, emailA);
+
+    // A's unconfirmed registration holds a lease on the name (20261028090003):
+    // while it is active, B is told the name is taken and gets no account.
+    await fillSignUp(pageB, emailB, shared, TRADESPEOPLE);
+    await expect(pageB.getByText(/this username is taken|اسم المستخدم هذا مستخدم بالفعل/i)).toBeVisible({ timeout: 10_000 });
+    expect(sql(`select count(*) from auth.users where email = '${emailB}'`)).toBe("0");
+
+    // A lease lasts 30 minutes. Stand in for that wait by backdating A's lease
+    // (test fixture only); the name is then free for B.
+    expect(sql(`update app.pending_registrations set username_reserved_at = now() - interval '31 minutes'
+                 where user_id = (select id from auth.users where email = '${emailA}') returning 1`)).toBe("1");
     await fillSignUp(pageB, emailB, shared, TRADESPEOPLE);
     const seenB = await submitSignUp(pageB, request, emailB);
 
     // B verifies first and claims the name; A's claim now collides.
     await verify(pageB, request, emailB, seenB);
     await reachLanding(pageB, /\/home(\/|$|\?)/);
-    // Both passed the Step-1 pre-flight (it is not a reservation); the
-    // post-OTP claim is the authority, so A — verifying second — collides.
+    // A's lease has expired, so the post-OTP claim decides: B claimed the
+    // name first, so A — verifying second — collides.
     await verify(pageA, request, emailA, seenA);
     await pageA.waitForURL(/\/auth\/finish-registration\?reason=username_unavailable/, { waitUntil: "commit" });
     const noLongerAvailable = /no longer available|لم يعد متاحًا/;

@@ -15,6 +15,7 @@ vi.mock("@/server/actions/auth-password-preview", () => ({
   recoveryFlowEmail: () => recoveryFlowEmail(),
   requireRecoverySession: () => requireRecoverySession(),
   consumeRecoverySuccess: () => consumeRecoverySuccess(),
+  pendingRegistrationEmail: async () => null,
 }));
 
 // The canonical pages are thin route boundaries over the tested password
