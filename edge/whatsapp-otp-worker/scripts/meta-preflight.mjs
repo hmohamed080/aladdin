@@ -44,6 +44,47 @@ export function evaluateSender(p, requestedId) {
   return { checks, ok: Object.values(checks).every(Boolean), display_suffix: String(p?.display_phone_number ?? "").replace(/\D/g, "").slice(-4) || null, quality: p?.quality_rating ?? null };
 }
 
+/**
+ * Sanitized shape of a template button: enums and booleans only, NEVER the raw URL, text or code. Meta documents the creation schema as
+ * type "OTP" + otp_type, but a retrieved approved template can come back with the button NORMALIZED to type "URL" whose url is Meta's own
+ * authentication-OTP URL (https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code_expiration_minutes=N&code=otp{{1}}). That is the same
+ * Copy Code button (and why the send payload addresses it as sub_type "url", index 0). Evidence required before a URL button counts:
+ * https, host whatsapp.com, path /otp/code/, otp_type=COPY_CODE explicitly, a {{1}} code placeholder, and (when present) the expiry equals ours.
+ * Any other URL button, and anything ONE_TAP / ZERO_TAP, is refused.
+ */
+export function describeButton(b) {
+  const out = { type: typeof b?.type === "string" ? b.type.slice(0, 20) : null, otp_type: typeof b?.otp_type === "string" ? b.otp_type.slice(0, 20) : null, url: { present: false } };
+  if (typeof b?.url === "string") {
+    const u = { present: true, parsed: false, https: false, host_is_whatsapp: false, path_is_otp_code: false, otp_type_param: null, has_code_placeholder: false, expiry_param_minutes: null };
+    try {
+      const url = new URL(b.url.replace(/\{\{1\}\}/g, "PLACEHOLDER1"));
+      u.parsed = true;
+      u.https = url.protocol === "https:";
+      u.host_is_whatsapp = /^(www\.)?whatsapp\.com$/.test(url.hostname);
+      u.path_is_otp_code = /^\/otp\/code\/?$/.test(url.pathname);
+      const t = url.searchParams.get("otp_type");
+      u.otp_type_param = t && /^[A-Z_]{1,20}$/.test(t) ? t : t ? "other" : null;
+      u.has_code_placeholder = /PLACEHOLDER1/.test(url.searchParams.get("code") ?? "");
+      const m = url.searchParams.get("code_expiration_minutes");
+      u.expiry_param_minutes = m && /^\d{1,3}$/.test(m) ? Number(m) : null;
+    } catch { /* leave parsed=false */ }
+    out.url = u;
+  }
+  return out;
+}
+
+/** True only for the two verified representations of an Authentication Copy Code button. */
+export function isCopyCodeButton(b) {
+  const d = describeButton(b);
+  if (d.type === "OTP") return d.otp_type === "COPY_CODE";
+  if (d.type === "URL") {
+    const u = d.url;
+    return u.present && u.parsed && u.https && u.host_is_whatsapp && u.path_is_otp_code && u.otp_type_param === "COPY_CODE" && u.has_code_placeholder
+      && (u.expiry_param_minutes === null || u.expiry_param_minutes === EXPECTED_EXPIRY_MINUTES);
+  }
+  return false;
+}
+
 export function evaluateTemplate(list, { name = "aladdin_otp", language = "ar" } = {}) {
   const t = (list?.data ?? []).find((x) => x?.name === name && x?.language === language);
   const comps = Array.isArray(t?.components) ? t.components : [];
@@ -59,11 +100,11 @@ export function evaluateTemplate(list, { name = "aladdin_otp", language = "ar" }
     // is the Copy Code send contract. ONE_TAP / ZERO_TAP need Android package + signature-hash parameters the Worker never sends, so a template
     // with one of those would pass a looser check yet fail or mis-render on a handset: refused on purpose.
     has_exactly_one_button: buttons.length === 1,
-    button_is_copy_code: buttons.length === 1 && buttons[0].type === "OTP" && buttons[0].otp_type === "COPY_CODE",
+    button_is_copy_code: buttons.length === 1 && isCopyCodeButton(buttons[0]),
     // The template tells the person the code expires in N minutes (FOOTER.code_expiration_minutes). It must equal the authority's code lifetime.
     expiry_matches_authority: footer?.code_expiration_minutes === EXPECTED_EXPIRY_MINUTES,
   };
-  return { checks, ok: Object.values(checks).every(Boolean), status: t?.status ?? null, category: t?.category ?? null, expiry_minutes: footer?.code_expiration_minutes ?? null };
+  return { checks, ok: Object.values(checks).every(Boolean), status: t?.status ?? null, category: t?.category ?? null, expiry_minutes: footer?.code_expiration_minutes ?? null, button_diagnostic: buttons.slice(0, 3).map(describeButton) };
 }
 
 /** The sender id pinned in wrangler.jsonc (non-secret). Null if unreadable. */

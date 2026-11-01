@@ -214,3 +214,63 @@ test("read-only and quiet: GETs only, nothing sensitive printed, missing or malf
   assert.equal(await run({ WHATSAPP_ACCESS_TOKEN: TOKEN, WHATSAPP_PHONE_NUMBER_ID: SENDER, WHATSAPP_ACCOUNT_ID: "x" }, never, () => {}), 2);
   assert.equal(n, 0);
 });
+
+// ---- Copy Code button: creation schema (OTP/COPY_CODE) vs Meta's normalized retrieval form (URL to whatsapp.com/otp/code) ----
+const META_URL = "https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code_expiration_minutes=5&code=otp{{1}}";
+const urlBtn = (url: string) => ({ type: "URL", text: "Copy code", url });
+const tplWith = (button: unknown) => evaluateTemplate({ data: [{ ...goodTemplate.data[0], components: comps({ buttons: [button] }) }] });
+
+test("a retrieved approved template may carry the Copy Code button as type URL to Meta's authentication OTP URL: accepted", () => {
+  const t = tplWith(urlBtn(META_URL));
+  assert.equal(t.checks.button_is_copy_code, true); assert.equal(t.ok, true);
+  assert.equal(tplWith(urlBtn("https://whatsapp.com/otp/code?otp_type=COPY_CODE&code=otp{{1}}")).checks.button_is_copy_code, true); // no expiry param, bare host, no trailing slash
+  assert.equal(tplWith({ type: "OTP", otp_type: "COPY_CODE" }).checks.button_is_copy_code, true);                                    // creation schema still accepted
+});
+
+test("arbitrary URL buttons and look-alikes are NOT Copy Code: other host, http, wrong path, missing/other otp_type, ONE_TAP/ZERO_TAP, wrong expiry, no placeholder", () => {
+  const bad = [
+    "https://example.com/otp/code/?otp_type=COPY_CODE&code=otp{{1}}",
+    "https://www.whatsapp.com.evil.example/otp/code/?otp_type=COPY_CODE&code=otp{{1}}",
+    "https://evil.example/?u=https://www.whatsapp.com/otp/code/&otp_type=COPY_CODE&code=otp{{1}}",
+    "http://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp{{1}}",
+    "https://www.whatsapp.com/other/path/?otp_type=COPY_CODE&code=otp{{1}}",
+    "https://www.whatsapp.com/otp/code/?code=otp{{1}}",                                      // otp_type absent: insufficient evidence
+    "https://www.whatsapp.com/otp/code/?otp_type=ONE_TAP&code=otp{{1}}",
+    "https://www.whatsapp.com/otp/code/?otp_type=ZERO_TAP&code=otp{{1}}",
+    "https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code_expiration_minutes=10&code=otp{{1}}",
+    "https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE",                                  // no code placeholder
+    "not a url",
+  ];
+  for (const u of bad) assert.equal(tplWith(urlBtn(u)).checks.button_is_copy_code, false, u);
+  assert.equal(tplWith({ type: "URL", text: "x" }).checks.button_is_copy_code, false);        // URL button with no url at all
+  assert.equal(tplWith({ type: "OTP", otp_type: "ONE_TAP" }).checks.button_is_copy_code, false);
+  assert.equal(tplWith({ type: "PHONE_NUMBER", phone_number: "+201012345678" }).checks.button_is_copy_code, false);
+  // two buttons is still not one
+  assert.equal(evaluateTemplate({ data: [{ ...goodTemplate.data[0], components: comps({ buttons: [urlBtn(META_URL), urlBtn(META_URL)] }) }] }).checks.has_exactly_one_button, false);
+});
+
+test("the button diagnostic is sanitized: enums and booleans, never the raw url, text or code placeholder", () => {
+  const t = tplWith(urlBtn(META_URL));
+  const d = t.button_diagnostic[0];
+  assert.equal(d.type, "URL"); assert.equal(d.otp_type, null);
+  assert.deepEqual(d.url, { present: true, parsed: true, https: true, host_is_whatsapp: true, path_is_otp_code: true, otp_type_param: "COPY_CODE", has_code_placeholder: true, expiry_param_minutes: 5 });
+  const text = JSON.stringify(t);
+  for (const s of ["whatsapp.com", "://", "Copy code", "otp{{1}}", "code=otp"]) assert.ok(!text.includes(s), "diagnostic leaked " + s);
+  // a hostile url yields a diagnostic with no echo of it
+  const hostile = JSON.stringify(tplWith(urlBtn("https://evil.example/path?otp_type=COPY_CODE&secret=abc123")).button_diagnostic);
+  assert.ok(!hostile.includes("evil") && !hostile.includes("abc123"));
+  assert.equal(tplWith({ type: "OTP", otp_type: "COPY_CODE" }).button_diagnostic[0].url.present, false);
+});
+
+test("end to end: an account whose template comes back with the URL-form Copy Code button is ready_for_pilot", async () => {
+  const urlTemplate = { data: [{ ...goodTemplate.data[0], components: comps({ buttons: [urlBtn(META_URL)] }) }] };
+  const r = await runIt(env(), graph({ template: urlTemplate }));
+  assert.equal(r.code, 0); assert.equal(r.report.ready_for_pilot, true);
+  assert.equal(r.report.template.button_diagnostic[0].type, "URL");
+  assert.ok(!r.text.includes("whatsapp.com"));
+});
+
+test("the Worker send payload is unchanged: the button is addressed as sub_type url, index 0 (matches the URL-form button Meta retrieves)", () => {
+  const p = buildMetaPayload("+201012345678", "123456", "aladdin_otp", "ar") as { template: { components: Array<{ type: string; sub_type?: string; index?: string }> } };
+  assert.deepEqual(p.template.components.map((c) => [c.type, c.sub_type, c.index]), [["body", undefined, undefined], ["button", "url", "0"]]);
+});
