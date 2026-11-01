@@ -64,8 +64,12 @@ function graph(opts: { debugTargets?: string[]; types?: Record<string, string>; 
   const owns = opts.owns ?? { [WABA]: [SENDER] };
   const fetchImpl = (async (url: string, init: RequestInit) => {
     urls.push(url);
-    assert.equal(init.method, "GET");
     const path = url.replace("https://graph.facebook.com/v25.0/", "");
+    // the token must never be in a URL; only the opt-in introspection may POST, and then with the token in the BODY
+    assert.ok(!url.includes(TOKEN), "token leaked into a URL");
+    assert.equal((init.headers as Record<string, string>).authorization, `Bearer ${TOKEN}`);
+    if (path.startsWith("debug_token")) { assert.equal(init.method, "POST"); assert.equal(path, "debug_token"); assert.ok(String(init.body).includes("input_token=")); }
+    else assert.equal(init.method, "GET");
     const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
     if (path.startsWith("debug_token")) return opts.debugStatus && opts.debugStatus !== 200 ? json(opts.debugStatus, {}) : json(200, { data: { granular_scopes: [{ scope: "whatsapp_business_management", target_ids: opts.debugTargets ?? [WABA] }, { scope: "business_management", target_ids: [BUSINESS] }] } });
     const id = path.split(/[?/]/)[0]!;
@@ -82,7 +86,8 @@ function graph(opts: { debugTargets?: string[]; types?: Record<string, string>; 
   return { urls, fetchImpl };
 }
 const env = (over: Record<string, string> = {}) => ({ WHATSAPP_ACCESS_TOKEN: TOKEN, WHATSAPP_PHONE_NUMBER_ID: SENDER, ...over });
-const runIt = async (e: Record<string, string>, g: ReturnType<typeof graph>) => { const out: string[] = []; const code = await run(e, g.fetchImpl, (l: string) => out.push(l)); return { code, text: out.join("\n"), report: out.length ? JSON.parse(out[out.length - 1]!.startsWith("{") ? out[out.length - 1]! : "{}") : {} }; };
+const optIn = { META_PREFLIGHT_RESOLVE_FROM_TOKEN: "1" };
+const runIt = async (e: Record<string, string>, g: ReturnType<typeof graph>, pinned: string | null = SENDER) => { const out: string[] = []; const code = await run(e, g.fetchImpl, (l: string) => out.push(l), pinned); return { code, text: out.join("\n"), report: out.length ? JSON.parse(out[out.length - 1]!.startsWith("{") ? out[out.length - 1]! : "{}") : {} }; };
 
 test("candidate ids: the supplied id first, then the token's own WhatsApp grants (not unrelated scopes), de-duplicated and numeric only", () => {
   const ids = candidateIds(WABA, { data: { granular_scopes: [{ scope: "whatsapp_business_management", target_ids: [WABA, OTHER_WABA] }, { scope: "business_management", target_ids: [BUSINESS] }, { scope: "whatsapp_business_messaging", target_ids: ["not-numeric"] }] } });
@@ -92,7 +97,7 @@ test("candidate ids: the supplied id first, then the token's own WhatsApp grants
 
 test("the #100 case: a phone-number id given as the 'business account' is detected as the wrong node type and the real WABA is resolved from the token's own grants", async () => {
   const g = graph();
-  const r = await runIt(env({ WHATSAPP_BUSINESS_ACCOUNT_ID: SENDER }), g);
+  const r = await runIt(env({...optIn,  WHATSAPP_BUSINESS_ACCOUNT_ID: SENDER }), g);
   assert.equal(r.code, 0);
   assert.equal(r.report.waba.resolved, true);
   assert.equal(r.report.waba.source, "token_granted_target");
@@ -105,7 +110,7 @@ test("the #100 case: a phone-number id given as the 'business account' is detect
 });
 
 test("works with no id supplied at all (resolved from the token), and with the correct WABA supplied", async () => {
-  assert.equal((await runIt(env(), graph())).report.waba.source, "token_granted_target");
+  assert.equal((await runIt(env(optIn), graph())).report.waba.source, "token_granted_target");
   const s = await runIt(env({ WHATSAPP_BUSINESS_ACCOUNT_ID: WABA }), graph());
   assert.equal(s.code, 0); assert.equal(s.report.waba.source, "supplied_id"); assert.equal(s.report.waba.supplied_id_was_waba, true);
 });
@@ -113,24 +118,24 @@ test("works with no id supplied at all (resolved from the token), and with the c
 test("a WABA that does not OWN the sender is rejected (another WABA's template is not evidence); the right one is chosen among several", async () => {
   const types = { [SENDER]: "WhatsAppBusinessPhoneNumber", [WABA]: "WhatsAppBusinessAccount", [OTHER_WABA]: "WhatsAppBusinessAccount", [BUSINESS]: "Business" };
   const g = graph({ debugTargets: [OTHER_WABA, WABA], types, owns: { [OTHER_WABA]: [], [WABA]: [SENDER] } });
-  const r = await runIt(env({ WHATSAPP_BUSINESS_ACCOUNT_ID: OTHER_WABA }), g);
+  const r = await runIt(env({...optIn,  WHATSAPP_BUSINESS_ACCOUNT_ID: OTHER_WABA }), g);
   assert.equal(r.code, 0); assert.equal(r.report.waba.id_suffix, WABA.slice(-4));
   assert.equal(r.report.waba.candidates_checked.find((c: { id_suffix: string }) => c.id_suffix === OTHER_WABA.slice(-4)).owns_sender, false);
-  const none = await runIt(env(), graph({ debugTargets: [OTHER_WABA], types, owns: { [OTHER_WABA]: [] } }));
+  const none = await runIt(env(optIn), graph({ debugTargets: [OTHER_WABA], types, owns: { [OTHER_WABA]: [] } }));
   assert.equal(none.code, 1); assert.equal(none.report.waba.resolved, false); assert.match(none.report.waba.hint, /whatsapp_business_management/);
   assert.equal(none.report.template.skipped, "no verified WABA");
 });
 
 test("when the token cannot introspect itself and the supplied id is not a WABA: not ready, no template call, a clear hint", async () => {
   const g = graph({ debugStatus: 400 });
-  const r = await runIt(env({ WHATSAPP_BUSINESS_ACCOUNT_ID: SENDER }), g);
+  const r = await runIt(env({...optIn,  WHATSAPP_BUSINESS_ACCOUNT_ID: SENDER }), g);
   assert.equal(r.code, 1); assert.equal(r.report.waba.resolved, false);
   assert.equal(g.urls.filter((u) => u.includes("message_templates")).length, 0);
 });
 
 test("an incompatible template (ONE_TAP) on a correctly resolved WABA is not ready", async () => {
   const g = graph({ template: { data: [{ ...goodTemplate.data[0], components: comps({ buttons: [{ type: "OTP", otp_type: "ONE_TAP" }] }) }] } });
-  const r = await runIt(env(), g);
+  const r = await runIt(env(optIn), g);
   assert.equal(r.code, 1); assert.equal(r.report.template.checks.button_is_copy_code, false);
 });
 
@@ -143,4 +148,27 @@ test("read-only and quiet: GETs only to graph.facebook.com, nothing sensitive pr
   assert.equal(n, 0);
   assert.equal(await run({ WHATSAPP_ACCESS_TOKEN: TOKEN, WHATSAPP_PHONE_NUMBER_ID: "abc" }, (async () => { n++; return new Response("{}"); }) as unknown as typeof fetch, () => {}), 2);
   assert.equal(n, 0);
+});
+
+test("default: the token is never sent to debug_token; the WABA id is verified by node type and ownership instead", async () => {
+  const g = graph();
+  const r = await runIt(env({ WHATSAPP_BUSINESS_ACCOUNT_ID: WABA }), g);
+  assert.equal(r.code, 0);
+  assert.equal(g.urls.filter((u) => u.includes("debug_token")).length, 0);
+  assert.ok(g.urls.every((u) => !u.includes(TOKEN)));
+  const noId = await runIt(env(), graph());
+  assert.equal(noId.code, 1); assert.match(noId.report.waba.hint, /WHATSAPP_BUSINESS_ACCOUNT_ID/);
+});
+
+test("sender id: must be a phone-number NODE and equal the id pinned in wrangler.jsonc; a phone number or a WABA id is refused", async () => {
+  const ok = await runIt(env({ WHATSAPP_BUSINESS_ACCOUNT_ID: WABA }), graph());
+  assert.equal(ok.report.sender_id.is_phone_number_node, true); assert.equal(ok.report.sender_id.matches_repo_config, true);
+  // repo pins a different id than the one the owner's live sender has -> not ready, both suffixes shown
+  const mismatch = await runIt(env({ WHATSAPP_BUSINESS_ACCOUNT_ID: WABA }), graph(), "999999999999999");
+  assert.equal(mismatch.code, 1); assert.equal(mismatch.report.sender_id.matches_repo_config, false); assert.equal(mismatch.report.sender_id.repo_config_suffix, "9999");
+  // the id given is actually a WABA -> wrong node type
+  const g = graph({ types: { [SENDER]: "WhatsAppBusinessAccount", [WABA]: "WhatsAppBusinessAccount" }, owns: { [WABA]: [SENDER] } });
+  const wrongType = await runIt(env({ WHATSAPP_BUSINESS_ACCOUNT_ID: WABA }), g);
+  assert.equal(wrongType.code, 1); assert.equal(wrongType.report.sender_id.is_phone_number_node, false);
+  assert.ok(!mismatch.text.includes(SENDER));
 });

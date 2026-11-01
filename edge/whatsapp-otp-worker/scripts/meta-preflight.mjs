@@ -13,9 +13,18 @@
 // `debug_token`), asks Graph what TYPE each node is (`?metadata=1`), keeps only WhatsAppBusinessAccount nodes, and then requires that the WABA
 // actually OWNS the sender (`/{waba}/phone_numbers` contains it). Only that verified WABA is used for the template lookup.
 //
+// TOKEN HANDLING: the token travels ONLY in the Authorization header (never in a URL, query string or log line). By default the script does NOT
+// call `debug_token` (which needs the token as `input_token`): give it the WABA id (Business settings > Accounts > WhatsApp accounts) in
+// WHATSAPP_BUSINESS_ACCOUNT_ID and it verifies type + ownership. Token introspection is opt-in (META_PREFLIGHT_RESOLVE_FROM_TOKEN=1) and sends
+// `input_token` in a POST form body, still never in a URL.
+//
+// SENDER ID: it also proves WHATSAPP_PHONE_NUMBER_ID is a WhatsApp phone-number NODE (not the phone number itself, not a WABA) and that it equals
+// the id pinned in wrangler.jsonc, so a wrong id in the repository blocks the deploy instead of surprising it.
+//
 // Answers: is the sender a LIVE, connected, verified business number; is `aladdin_otp` an APPROVED AUTHENTICATION template in Arabic with
 // exactly one COPY_CODE button (the shape the Worker's payload fills) and an expiry equal to the authority's code lifetime (5 minutes).
-import { pathToFileURL } from "node:url";
+import { readFileSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const GRAPH = "https://graph.facebook.com";
 const VERSION = "v25.0";
@@ -56,6 +65,14 @@ export function evaluateTemplate(list, { name = "aladdin_otp", language = "ar" }
   return { checks, ok: Object.values(checks).every(Boolean), status: t?.status ?? null, category: t?.category ?? null, expiry_minutes: footer?.code_expiration_minutes ?? null };
 }
 
+/** The sender id pinned in wrangler.jsonc (non-secret). Null if unreadable. */
+export function configuredSenderId() {
+  try {
+    const raw = readFileSync(fileURLToPath(new URL("../wrangler.jsonc", import.meta.url)), "utf8");
+    return JSON.parse(raw).vars?.WHATSAPP_PHONE_NUMBER_ID ?? null;
+  } catch { return null; }
+}
+
 const tail4 = (id) => String(id).slice(-4);
 /** Candidate ids, in order: the supplied one, then every target the token was granted for WhatsApp management/messaging. De-duplicated. */
 export function candidateIds(suppliedId, debugData) {
@@ -65,7 +82,7 @@ export function candidateIds(suppliedId, debugData) {
   return [...new Set([suppliedId, ...granted].filter((x) => /^\d{5,30}$/.test(String(x ?? ""))))];
 }
 
-export async function run(env, fetchImpl = fetch, log = console.log) {
+export async function run(env, fetchImpl = fetch, log = console.log, pinned = configuredSenderId()) {
   const need = ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"].filter((k) => !env[k]);
   if (need.length) { log("NOT RUN - missing: " + need.join(", ") + ". Nothing was called."); return 3; }
   const supplied = env.WHATSAPP_BUSINESS_ACCOUNT_ID;
@@ -75,18 +92,35 @@ export async function run(env, fetchImpl = fetch, log = console.log) {
     /^\d+\?metadata=1&fields=id$/,                              // what TYPE of node is this id
     /^\d+\/phone_numbers\?fields=id$/,                          // which senders a WABA owns
     /^\d+\/message_templates\?name=aladdin_otp&fields=[a-z_,]+$/, // WABA nodes only
-    /^debug_token\?input_token=[A-Za-z0-9_|.\-]+$/,             // the token's own granted targets (read-only introspection)
   ];
   const get = async (path) => {
     if (!ALLOWED.some((re) => re.test(path))) throw new Error("REFUSED: not an allowed read-only call");
     const r = await fetchImpl(`${GRAPH}/${VERSION}/${path}`, { method: "GET", headers: { authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}` } });
     return { status: r.status, data: await r.json().catch(() => null) };
   };
+  // Opt-in only. The token to inspect goes in the POST BODY, never in the URL.
+  const introspect = async () => {
+    const r = await fetchImpl(`${GRAPH}/${VERSION}/debug_token`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`, "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ input_token: env.WHATSAPP_ACCESS_TOKEN }).toString(),
+    });
+    return { status: r.status, data: await r.json().catch(() => null) };
+  };
 
   const sender = await get(`${env.WHATSAPP_PHONE_NUMBER_ID}?fields=display_phone_number,status,account_mode,code_verification_status,name_status,quality_rating`);
+  const senderNode = await get(`${env.WHATSAPP_PHONE_NUMBER_ID}?metadata=1&fields=id`);
+  const senderType = senderNode.status === 200 ? String(senderNode.data?.metadata?.type ?? "unknown") : `http_${senderNode.status}`;
+  const senderId = {
+    is_phone_number_node: senderType === "WhatsAppBusinessPhoneNumber",
+    node_type: senderType,
+    id_suffix: tail4(env.WHATSAPP_PHONE_NUMBER_ID),
+    repo_config_suffix: pinned ? tail4(pinned) : null,
+    matches_repo_config: pinned === env.WHATSAPP_PHONE_NUMBER_ID,
+  };
 
   // ---- resolve and validate the WABA ----
-  const debug = await get(`debug_token?input_token=${env.WHATSAPP_ACCESS_TOKEN}`).catch(() => ({ status: 0, data: null }));
+  const debug = env.META_PREFLIGHT_RESOLVE_FROM_TOKEN === "1" ? await introspect().catch(() => ({ status: 0, data: null })) : { status: 0, data: null };
   const candidates = candidateIds(supplied, debug.status === 200 ? debug.data : null);
   const checked = [];
   let wabaId = null;
@@ -107,7 +141,7 @@ export async function run(env, fetchImpl = fetch, log = console.log) {
     source: wabaId ? (wabaId === supplied ? "supplied_id" : "token_granted_target") : null,
     candidates_checked: checked,
     supplied_id_was_waba: supplied ? checked.find((c) => c.supplied)?.is_waba ?? false : null,
-    hint: wabaId ? null : "No WhatsApp Business Account that owns this sender could be resolved. The token needs whatsapp_business_management access to the WABA that owns the sender (Business settings > System users > assign the WABA asset).",
+    hint: wabaId ? null : "No WhatsApp Business Account that owns this sender could be resolved. Set WHATSAPP_BUSINESS_ACCOUNT_ID to the WABA id (Business settings > Accounts > WhatsApp accounts). The token needs whatsapp_business_management access to the WABA that owns the sender (Business settings > System users > assign the WABA asset).",
   };
 
   const tpl = wabaId
@@ -116,10 +150,11 @@ export async function run(env, fetchImpl = fetch, log = console.log) {
   const report = {
     read_only: true,
     sender: sender.status === 200 ? evaluateSender(sender.data) : { ok: false, http: sender.status },
+    sender_id: senderId,
     waba,
     template: wabaId ? (tpl.status === 200 ? evaluateTemplate(tpl.data) : { ok: false, http: tpl.status }) : { ok: false, skipped: "no verified WABA" },
   };
-  report.ready_for_pilot = report.sender.ok === true && waba.resolved && report.template.ok === true;
+  report.ready_for_pilot = report.sender.ok === true && senderId.is_phone_number_node && senderId.matches_repo_config && waba.resolved && report.template.ok === true;
   log(JSON.stringify(report, null, 2));
   return report.ready_for_pilot ? 0 : 1;
 }
