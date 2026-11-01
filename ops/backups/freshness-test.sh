@@ -96,5 +96,20 @@ if [ $? -eq 0 ]; then pass=$((pass+1)); echo "PASS  R2 originals without a media
 newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)"; s3 s3api delete-object --bucket "$b" --key "$DAY/$NAME.json" >/dev/null
 expect alarm "an unreadable snapshot manifest raises the alarm (R2 coverage unknown)" "$b" "manifest"
 
+# Alarm drill: a healthy snapshot checked with a limit it cannot meet must raise the alarm AND take the alert path
+# (the email request), without touching any backup. A stub curl records the request; nothing is sent anywhere.
+mkdir -p "$T/stub"; printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "%s/curl.log"\nexit 0\n' "$T" > "$T/stub/curl"; chmod +x "$T/stub/curl"
+newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)"
+: > "$T/curl.log"
+ENVX="PATH=$T/stub:$PATH RESEND_API_KEY=re_dummy ALERT_EMAIL=owner@example.test MAX_AGE_HOURS=0" expect alarm "drill: a healthy snapshot against an impossible age limit raises the alarm" "$b" "h old"
+grep -q "api.resend.com/emails" "$T/curl.log" && grep -q "owner@example.test" "$T/curl.log"
+if [ $? -eq 0 ]; then pass=$((pass+1)); echo "PASS  drill: the alert email request goes to ALERT_EMAIL"; else fail=$((fail+1)); echo "FAIL  drill: no alert email request"; fi
+grep -q "re_dummy" <<< "$(BACKUP_BUCKET="$b" env PATH="$T/stub:$PATH" RESEND_API_KEY=re_dummy ALERT_EMAIL=owner@example.test MAX_AGE_HOURS=0 bash "$HERE/freshness.sh" 2>&1)"
+if [ $? -ne 0 ]; then pass=$((pass+1)); echo "PASS  drill: the API key never reaches the log"; else fail=$((fail+1)); echo "FAIL  drill: the API key leaked to the log"; fi
+: > "$T/curl.log"
+ENVX="PATH=$T/stub:$PATH RESEND_API_KEY=re_dummy ALERT_EMAIL=owner@example.test" expect quiet "drill: the same snapshot at the normal limit is quiet" "$b"
+if [ ! -s "$T/curl.log" ]; then pass=$((pass+1)); echo "PASS  drill: a quiet check sends no email"; else fail=$((fail+1)); echo "FAIL  drill: an email went out on a healthy check"; fi
+ENVX="PATH=$T/stub:$PATH" ENVX="PATH=$T/stub:$PATH MAX_AGE_HOURS=0" expect alarm "drill: with no email configured the alarm still fails the run" "$b" "h old"
+
 echo "freshness-test: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

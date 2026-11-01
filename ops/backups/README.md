@@ -215,6 +215,34 @@ Rollback: set `ACCEPTANCE_BACKUP_SCHEDULE=off`. Nothing else runs on its own.
 
 `restore-test.sh` starts a throwaway local Supabase stack and refuses to restore (exit 2, "STACK MISMATCH") unless its Auth/Storage columns equal the backed-up project's. The stack comes from the pinned CLI (`RESTORE_SUPABASE_CLI_VERSION`, now 2.119.0: gotrue v2.197.0, storage-api v1.79.28, postgres 17.11.0.002), which reproduces Acceptance's managed schema (SCIM, MFA recovery codes, one-time-token expiry, storage versioning and bucket lifecycle). 2.110.0 (gotrue v2.193.0, storage-api v1.66.4) did not. When Supabase upgrades the hosted Auth/Storage, the guard fails again by design: bump the pin to the CLI whose `pkg/config/templates/Dockerfile` images match, never weaken the guard. `restore-pin-test.sh` pins both.
 
+## Acceptance activation runbook (automatic backups)
+
+Nothing below happens without the owner's separate approval for each step. The `aladdin-backups` repo stays inactive until step 2.
+
+**Before activation (done offline, in CI):** `target-guard-test.sh` (a Production-shaped URL with dummy credentials, the wrong bucket, endpoint or Supabase URL stop every script before any tool runs), `plan-test.sh`, `freshness-test.sh` (including the alert path), `restore-pin-test.sh`.
+
+**Activation**
+1. Confirm the manual milestone above, `ACCEPTANCE_BACKUP_SCHEDULE=off`, `PRODUCTION_BACKUP_ENABLED=false`, and that the `ALERT_EMAIL` variable and `RESEND_API_KEY` secret are set in `backup-check-acceptance` (owner, dashboard only).
+2. Rebuild with `bash ops/backups/build-repo.sh <aladdin-backups checkout> --scheduled`, review the diff (only `schedule:` blocks differ), push to `main`.
+3. Run the alarm drill once (below) and confirm the email arrives.
+4. Set the repository variable `ACCEPTANCE_BACKUP_SCHEDULE=daily`. The next 01:30 Cairo run is the first scheduled snapshot.
+
+**Alarm drill (does not touch any backup):** Actions, "Backup freshness", Run workflow, `max_age_hours` = 1. The snapshot is older than 1 h, so the run must FAIL with "newest database backup is N h old" and an email must arrive at `ALERT_EMAIL`. The input can only lower the limit (`plan.sh` refuses 26 or more). Then run it again with the input empty: it must pass.
+
+**Seven-night acceptance criteria (all must hold, otherwise stop and report):**
+- Seven consecutive Cairo nights each have exactly one `db/acceptance/daily/` snapshot taken between 01:30 and 04:00 Cairo, each with a complete `.r2media.json` (`"complete":true`, `copy_failures` 0, `excluded_retired` counts present).
+- The freshness workflow ran on each of the seven mornings (07:00 or 08:00 Cairo) and was green; its run summary lists `acceptance` as checked.
+- Any retry firings (02:30 and 03:30 Cairo) did nothing when the snapshot was complete (log: "no new snapshot today").
+- Snapshot sizes stay within a factor of two night to night; no run log contains an object key, bucket name or user id.
+- One monthly-style restore test (manual, newest snapshot) passes in the middle of the trial.
+- No unexpected cost: stored bytes and operation counts in the Cloudflare dashboard stay within the estimate in this README.
+
+**Monitoring:** the freshness email is the primary signal (it does not depend on anyone watching GitHub). GitHub's own failed-run notification is the second signal. Once a week the owner glances at the freshness run list: seven green runs, none skipped. A scheduled freshness run with the Acceptance schedule off prints "NOTHING WAS CHECKED" in its summary, so that case never looks like a pass.
+
+**Notification recommendation:** native GitHub Actions notifications alone are not enough. They go only to the person who last edited the schedule, depend on that person's notification settings, and say nothing when a run never starts (a dropped or disabled schedule). Minimum reliable setup: (1) the freshness workflow's own Resend email (already built, tested, fails closed), (2) GitHub failed-workflow notifications left on as a backup, (3) the weekly glance above. A dead-man's switch from an outside monitoring service would close the last gap (a freshness run that never happens) and is optional.
+
+**Rollback:** set `ACCEPTANCE_BACKUP_SCHEDULE=off` (nothing else runs on its own; freshness then checks nothing and says so). To stop even the workflow triggers, rebuild without `--scheduled`. Existing snapshots stay until their lifecycle expiry; revoke the two tokens to cut access.
+
 ## Restoring for real
 
 The restore test is a rehearsal of exactly this, run every month.

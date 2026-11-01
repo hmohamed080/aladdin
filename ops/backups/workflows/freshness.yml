@@ -6,6 +6,12 @@ on:
   schedule:
     - cron: "0 5 * * *"        # 07:00 Cairo in winter, 08:00 in summer: always hours after the 01:30 backup
   workflow_dispatch:
+    inputs:
+      max_age_hours:
+        description: "Alarm drill only: a LOWER age limit in hours (for example 1) so a healthy backup trips the alarm and the alert path is exercised. Leave empty for a normal check."
+        type: string
+        required: false
+        default: ""
 permissions:
   contents: read
 jobs:
@@ -19,9 +25,15 @@ jobs:
       - id: plan
         env:
           EVENT: ${{ github.event_name }}
+          INPUT_MAX_AGE_HOURS: ${{ inputs.max_age_hours }}
           PRODUCTION_BACKUP_ENABLED: ${{ vars.PRODUCTION_BACKUP_ENABLED }}
           ACCEPTANCE_BACKUP_SCHEDULE: ${{ vars.ACCEPTANCE_BACKUP_SCHEDULE }}
-        run: echo "targets=$(bash backup/plan.sh freshness)" >> "$GITHUB_OUTPUT"
+        run: |
+          targets="$(bash backup/plan.sh freshness)"
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+          # Never let "nothing to check" look like a pass: say it in the run summary.
+          if [ "$targets" = "[]" ]; then echo "NOTHING WAS CHECKED: no project is scheduled (ACCEPTANCE_BACKUP_SCHEDULE=${ACCEPTANCE_BACKUP_SCHEDULE:-off}, Production not enabled)." | tee -a "$GITHUB_STEP_SUMMARY"; fi
+          echo "Checking: $targets" >> "$GITHUB_STEP_SUMMARY"
 
   check:
     needs: plan

@@ -83,5 +83,17 @@ check "a hosted label with another bucket is refused" "$(lib acceptance check_su
 check "Production writes need the activation switch" "$(lib production require_production_go "")" refused
 check "Acceptance writes do not" "$(lib acceptance require_production_go "")" ok
 
+# Alarm drill: a manual freshness run may only LOWER the age limit.
+fresh() { env -i PATH="$PATH" "$@" bash "$HERE/plan.sh" freshness 2>/dev/null || echo ERROR; }
+check "drill: a lower limit applies to a manual Acceptance check" "$(fresh EVENT=workflow_dispatch INPUT_MAX_AGE_HOURS=1)" '[{"label":"acceptance","max_age_hours":1}]'
+check "drill: a lower limit also applies on a weekly schedule" "$(fresh EVENT=workflow_dispatch ACCEPTANCE_BACKUP_SCHEDULE=weekly INPUT_MAX_AGE_HOURS=24)" '[{"label":"acceptance","max_age_hours":24}]'
+check "drill: the limit cannot be raised" "$(fresh EVENT=workflow_dispatch INPUT_MAX_AGE_HOURS=26)" ERROR
+check "drill: the limit cannot be raised far above" "$(fresh EVENT=workflow_dispatch INPUT_MAX_AGE_HOURS=999)" ERROR
+check "drill: zero is refused" "$(fresh EVENT=workflow_dispatch INPUT_MAX_AGE_HOURS=0)" ERROR
+check "drill: non-numbers are refused" "$(fresh EVENT=workflow_dispatch INPUT_MAX_AGE_HOURS=1h)" ERROR
+check "drill: scheduled runs ignore the input" "$(fresh EVENT=schedule ACCEPTANCE_BACKUP_SCHEDULE=daily INPUT_MAX_AGE_HOURS=1)" '[{"label":"acceptance","max_age_hours":26}]'
+check "scheduled freshness with the Acceptance schedule off checks nothing (and the workflow says so)" "$(fresh EVENT=schedule)" '[]'
+check "manual freshness with the schedule off still checks Acceptance" "$(fresh EVENT=workflow_dispatch)" '[{"label":"acceptance","max_age_hours":26}]'
+
 echo "plan-test: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

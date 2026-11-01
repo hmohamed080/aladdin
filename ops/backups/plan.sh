@@ -10,6 +10,7 @@
 #   INPUT_LABEL, INPUT_CONFIRM  manual runs: the chosen project, and for Production the typed confirmation
 #   PRODUCTION_BACKUP_ENABLED   "true" only after the owner's Production activation GO
 #   ACCEPTANCE_BACKUP_SCHEDULE  off (default) | daily (the Acceptance trial) | weekly (Sundays, Cairo)
+#   INPUT_MAX_AGE_HOURS         manual freshness only: a LOWER age limit (1-25) for the alarm drill; never raises it
 #   NOW                         optional UTC time for tests, e.g. 2026-10-29T23:30:00Z
 #
 # Scheduled backups fire at 22:30, 23:30, 00:30 and 01:30 UTC. Only a run whose Cairo hour is 01-03 counts, so
@@ -51,6 +52,16 @@ case "$mode:${EVENT:-}" in
     [ "$production" = true ] && labels+=('{"label":"production","max_age_hours":26}') ;;
   *) echo "unknown mode or event: $mode ${EVENT:-}" >&2; exit 1 ;;
 esac
+# Alarm drill: a manual freshness run may tighten the age limit (so a healthy, real snapshot trips the alarm and the
+# alert path can be seen working) but never loosen it. Scheduled runs ignore it.
+if [ "$mode" = freshness ] && [ "${EVENT:-}" = workflow_dispatch ] && [ -n "${INPUT_MAX_AGE_HOURS:-}" ]; then
+  case "$INPUT_MAX_AGE_HOURS" in ''|*[!0-9]*|0*) echo "max_age_hours must be a whole number from 1 up" >&2; exit 1;; esac
+  for i in "${!labels[@]}"; do
+    limit="$(sed -n 's/.*"max_age_hours":\([0-9]*\).*/\1/p' <<< "${labels[$i]}")"
+    [ "$INPUT_MAX_AGE_HOURS" -lt "$limit" ] || { echo "max_age_hours may only be lowered (below $limit)" >&2; exit 1; }
+    labels[i]="${labels[$i]/\"max_age_hours\":$limit/\"max_age_hours\":$INPUT_MAX_AGE_HOURS}"
+  done
+fi
 if [ "$mode" = backup ]; then
   printf '['; first=1; for l in "${labels[@]}"; do [ $first = 1 ] || printf ','; printf '"%s"' "$l"; first=0; done; echo ']'
 else
