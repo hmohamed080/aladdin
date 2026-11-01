@@ -6,6 +6,7 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 export LC_ALL=C AWS_ACCESS_KEY_ID=testkey AWS_SECRET_ACCESS_KEY=testsecret AWS_DEFAULT_REGION=auto AWS_PAGER=""
+export R2_MEDIA_BACKUP=1
 export R2_ENDPOINT="${R2_ENDPOINT:-http://127.0.0.1:8333}" BACKUP_LABEL=local-test
 T="$(mktemp -d)"; SRC="diag-src-$(date +%s)"; DST="diag-dst-$(date +%s)"; export BACKUP_BUCKET="$DST"
 s3() { aws --endpoint-url "$R2_ENDPOINT" "$@"; }

@@ -29,10 +29,11 @@ newbucket() {
   head -c 300 /dev/urandom > "$T/blob"
   s3 s3api put-object --bucket "$b" --key "$DAY/$NAME.tar.age" --body "$T/blob" >/dev/null
   s3 s3api put-object --bucket "$b" --key "$DAY/$NAME.media.tsv.age" --body "$T/blob" >/dev/null
-  printf '{"label":"local-test","r2_media_records":0}' > "$T/manifest"
+  printf '{"label":"local-test","storage_objects":3,"r2_media_records":0}' > "$T/manifest"
   s3 s3api put-object --bucket "$b" --key "$DAY/$NAME.json" --body "$T/manifest" >/dev/null
 }
 put_record() { printf '%s' "$2" > "$T/rec"; s3 s3api put-object --bucket "$1" --key "$DAY/$NAME.media.json" --body "$T/rec" >/dev/null; }
+put_manifest() { printf '{"label":"local-test","storage_objects":%s,"r2_media_records":%s,"r2_required_originals":%s}' "$2" "$3" "$3" > "$T/manifest"; s3 s3api put-object --bucket "$1" --key "$DAY/$NAME.json" --body "$T/manifest" >/dev/null; }
 put_r2_record() { printf '%s' "$2" > "$T/rec"; s3 s3api put-object --bucket "$1" --key "$DAY/$NAME.r2media.json" --body "$T/rec" >/dev/null
   s3 s3api put-object --bucket "$1" --key "$DAY/$NAME.r2media.tsv.age" --body "$T/blob" >/dev/null; }
 # expect <quiet|alarm> <description> <bucket> [alarm text to find]
@@ -83,15 +84,15 @@ if [ $? -ne 0 ]; then pass=$((pass+1)); echo "PASS  CHECK_MEDIA=0 does not hide 
 
 # The independent R2 media backup (R2_MEDIA_BACKUP=1) has its own record, checked just as strictly.
 export ENVX="R2_MEDIA_BACKUP=1"
-newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)"; put_r2_record "$b" "$(record true 0 3 3)";   expect quiet "with R2 media on, complete records of both kinds keep the alarm quiet" "$b"
-newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)";                                                expect alarm "with R2 media on, a missing r2media record raises the alarm" "$b" "r2media record"
-newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)"; put_r2_record "$b" "$(record false 1 3 2)";    expect alarm "with R2 media on, an incomplete r2media record raises the alarm" "$b" "incomplete"
-newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)"; put_r2_record "$b" 'garbage';                   expect alarm "with R2 media on, a malformed r2media record raises the alarm" "$b" "not valid JSON"
+newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)"; put_r2_record "$b" "$(record true 0 3 3)"; put_manifest "$b" 3 3;   expect quiet "with R2 media on, complete records of both kinds keep the alarm quiet" "$b"
+newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)"; put_manifest "$b" 3 3;                                                expect alarm "with R2 media on, a missing r2media record raises the alarm" "$b" "r2media record"
+newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)"; put_manifest "$b" 3 3; put_r2_record "$b" "$(record false 1 3 2)";    expect alarm "with R2 media on, an incomplete r2media record raises the alarm" "$b" "incomplete"
+newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)"; put_manifest "$b" 3 3; put_r2_record "$b" 'garbage';                   expect alarm "with R2 media on, a malformed r2media record raises the alarm" "$b" "not valid JSON"
 unset ENVX
 # R2 originals exist but nothing backs them up: the manifest says so (a warning here; an alarm for Production).
-newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)"; printf '{"label":"local-test","r2_media_records":4}' > "$T/manifest"
+newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)"; printf '{"label":"local-test","storage_objects":3,"r2_media_records":4}' > "$T/manifest"
 s3 s3api delete-object --bucket "$b" --key "$DAY/$NAME.json" >/dev/null; s3 s3api put-object --bucket "$b" --key "$DAY/$NAME.json" --body "$T/manifest" >/dev/null 2>&1
-out="$(BACKUP_BUCKET="$b" bash "$HERE/freshness.sh" 2>&1)"; grep -q "no independent R2 media backup" <<< "$out"
+out="$(BACKUP_BUCKET="$b" bash "$HERE/freshness.sh" 2>&1)"; grep -q "no independent copy of them" <<< "$out"
 if [ $? -eq 0 ]; then pass=$((pass+1)); echo "PASS  R2 originals without a media backup are reported"; else fail=$((fail+1)); echo "FAIL  R2 originals without a media backup are reported"; fi
 newbucket; b="$B"; put_record "$b" "$(record true 0 3 3)"; s3 s3api delete-object --bucket "$b" --key "$DAY/$NAME.json" >/dev/null
 expect alarm "an unreadable snapshot manifest raises the alarm (R2 coverage unknown)" "$b" "manifest"

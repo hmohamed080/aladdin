@@ -23,6 +23,11 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"
 check_target
 require_production_go
+if [ "${R2_MEDIA_BACKUP:-0}" != 1 ]; then
+  # The workflow always runs this step; off is fine only when the snapshot requires no R2 originals.
+  require_media_not_needed r2 R2_MEDIA_BACKUP
+  log "R2 media backup is off (R2_MEDIA_BACKUP is not 1) and the snapshot requires none: nothing to do"; exit 0
+fi
 require_env BACKUP_STATE_DIR BACKUP_DB_URL AGE_RECIPIENTS R2_SOURCE_ENDPOINT R2_SOURCE_BUCKET R2_SOURCE_ACCESS_KEY_ID R2_SOURCE_SECRET_ACCESS_KEY
 check_db_url "$BACKUP_DB_URL"
 [ "$R2_SOURCE_BUCKET" != "$BACKUP_BUCKET" ] || die "the media bucket and the backup bucket must be different buckets"

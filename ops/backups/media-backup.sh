@@ -22,7 +22,11 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"
 check_target
 require_production_go
-[ "${LEGACY_MEDIA_BACKUP:-0}" = 1 ] || { log "legacy Supabase media backup is off (LEGACY_MEDIA_BACKUP is not 1): nothing to do"; exit 0; }
+if [ "${LEGACY_MEDIA_BACKUP:-0}" != 1 ]; then
+  # Off is fine only when the snapshot requires no Supabase Storage files: a Production snapshot that does fails here.
+  require_media_not_needed legacy LEGACY_MEDIA_BACKUP
+  log "legacy Supabase media backup is off (LEGACY_MEDIA_BACKUP is not 1) and the snapshot requires none: nothing to do"; exit 0
+fi
 require_env BACKUP_STATE_DIR BACKUP_DB_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY AGE_RECIPIENTS
 check_db_url "$BACKUP_DB_URL"; check_supabase_url "$SUPABASE_URL"; check_service_key "$SUPABASE_SERVICE_ROLE_KEY"
 [ -s "$BACKUP_STATE_DIR/db.env" ] || die "run db-backup.sh first: no snapshot in $BACKUP_STATE_DIR"

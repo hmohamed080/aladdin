@@ -21,14 +21,14 @@ def good(**changes):
     return record
 
 
-def check(text, label="production", snapshot=NAME, kind="production"):
+def check(text, label="production", snapshot=NAME, kind="production", expected=None):
     """The findings for a media.json holding `text` (str), a record (dict) or None for a missing file."""
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, "media.json")
         if text is not None:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text if isinstance(text, str) else json.dumps(text))
-        out = subprocess.run([sys.executable, "-I", os.path.join(HERE, "media-record.py"), path, label, snapshot, kind],
+        out = subprocess.run([sys.executable, "-I", os.path.join(HERE, "media-record.py"), path, label, snapshot, kind] + ([] if expected is None else [str(expected)]),
                              capture_output=True, text=True)
         assert out.returncode == 0, out.stderr
         return [line.split(" ", 1) for line in out.stdout.splitlines()]
@@ -88,6 +88,12 @@ class Record(unittest.TestCase):
     def test_incomplete_fails_and_says_why(self):
         found = problems(good(complete=False, missing=1, backed_up=2))
         self.assertTrue(any("incomplete: 1 missing" in t for t in found), found)
+
+    def test_expected_count_must_match(self):
+        self.assertEqual(problems(good(), expected=3), [])
+        self.assertTrue(any("covers 3 files but the snapshot requires 4" in t for t in problems(good(), expected=4)))
+        self.assertTrue(problems(good(objects=2, backed_up=2), expected=3))   # partial coverage
+        self.assertEqual(problems(good(objects=0, backed_up=0), expected=0), [])   # legitimately empty
 
     def test_another_label_or_snapshot_fails(self):
         self.assertTrue(problems(good(label="acceptance")))

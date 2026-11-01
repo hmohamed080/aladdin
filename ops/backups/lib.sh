@@ -201,13 +201,13 @@ r2_copy_key() { echo "media/$BACKUP_LABEL/r2/${2:-$(r2_generation)}/objects/$1.a
 # Fails CLOSED: a missing, unreadable, malformed or incomplete record, or a missing inventory, is a "P" line.
 # $3 is the record kind: "media" (Supabase Storage files, default) or "r2media" (originals hosted in R2).
 media_findings() {
-  local prefix="$1" name="$2" kind="${3:-media}" tmp len out; tmp="$(mktemp)"
+  local prefix="$1" name="$2" kind="${3:-media}" expected="${4:-}" tmp len out; tmp="$(mktemp)"
   if ! s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.$kind.json" "$tmp" >/dev/null 2>&1; then
     rm -f "$tmp"; echo "P no readable $kind record for $name in $prefix (its $kind step did not finish)"; return 0
   fi
   len="$(s3 s3api head-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.$kind.tsv.age" --query ContentLength --output text 2>/dev/null || true)"
   case "$len" in ''|*[!0-9]*) echo "P no $kind inventory for $name in $prefix";; 0) [ "$kind" = r2media ] || echo "P no $kind inventory for $name in $prefix";; esac
-  if out="$(python3 "$LIB_DIR/media-record.py" "$tmp" "$BACKUP_LABEL" "$name" "$BACKUP_LABEL")"; then
+  if out="$(python3 "$LIB_DIR/media-record.py" "$tmp" "$BACKUP_LABEL" "$name" "$BACKUP_LABEL" $expected)"; then
     [ -z "$out" ] || echo "$out"
   else
     echo "P the media record of $name in $prefix could not be checked"
@@ -215,22 +215,64 @@ media_findings() {
   rm -f "$tmp"
 }
 
-# 0 when snapshot $1 is stored in every given prefix and each holds a valid, complete media record for it.
-# Only "P" findings count: an alarm a new snapshot cannot fix (Production media in R2) must not cause endless retries.
+# What a snapshot REQUIRES, not what is switched on. The counts come from the snapshot's own manifest (its
+# storage.objects rows and eligible R2 records, from the dump), so a Production snapshot with media can never look
+# complete because a switch is off, whatever storage the files sit in now (Supabase Storage, R2 or both while moving).
+#   P  the snapshot's media is not provably backed up; a new snapshot can fix it (record missing/invalid/incomplete/
+#      covers a different number of files, or the manifest itself is unreadable)
+#   A  Production: required media is not backed up because its backup is switched off (alarm, retries cannot fix)
+#   W  the same for any other project (a warning)
+# A count of 0 needs no record (legitimately empty: the dump of that snapshot holds none). A record that exists
+# for a switched-on kind is checked anyway. CHECK_MEDIA / CHECK_R2_MEDIA override the switches for tests.
+media_coverage() {
+  local prefix="$1" name="$2" tmp counts kind n on level desc rk sw; tmp="$(mktemp)"
+  if ! s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.json" "$tmp" >/dev/null 2>&1 \
+      || ! counts="$(python3 "$LIB_DIR/media-coverage.py" "$tmp" 2>/dev/null)"; then
+    rm -f "$tmp"; echo "P the snapshot manifest of $name in $prefix cannot be read, so which media it requires is unknown"; return 0
+  fi
+  rm -f "$tmp"
+  while read -r kind n; do
+    case "$kind" in
+      legacy) rk=media; on="${CHECK_MEDIA:-${LEGACY_MEDIA_BACKUP:-0}}"; desc="Supabase Storage files"; sw=LEGACY_MEDIA_BACKUP;;
+      r2) rk=r2media; on="${CHECK_R2_MEDIA:-${R2_MEDIA_BACKUP:-0}}"; desc="R2 originals"; sw=R2_MEDIA_BACKUP;;
+      *) echo "P unexpected coverage line: $kind"; continue;;
+    esac
+    if [ "$on" != 0 ]; then
+      media_findings "$prefix" "$name" "$rk" "$n"
+    elif [ "$n" -gt 0 ]; then
+      level=W; [ "$BACKUP_LABEL" != production ] || level=A
+      echo "$level the snapshot requires $n $desc and no independent copy of them is being made ($sw is off)"
+    fi
+  done <<< "$counts"
+}
+
+# 0 when snapshot $1 is stored in every given prefix and the media it requires is backed up there (see
+# media_coverage). P and A both mean not done (a Production snapshot is never skipped as complete while required media is uncovered).
 snapshot_done() {
   local name="$1" p found; shift
   for p in "$@"; do
     s3 s3api head-object --bucket "$BACKUP_BUCKET" --key "$p/$name.tar.age" >/dev/null 2>&1 || return 1
-    if [ "${LEGACY_MEDIA_BACKUP:-0}" = 1 ]; then
-      found="$(media_findings "$p" "$name")"
-      if grep -q '^P ' <<< "$found"; then return 1; fi
-    fi
-    if [ "${R2_MEDIA_BACKUP:-0}" = 1 ]; then
-      found="$(media_findings "$p" "$name" r2media)"
-      if grep -q '^P ' <<< "$found"; then return 1; fi
-    fi
+    found="$(media_coverage "$p" "$name")"
+    # P: a new snapshot may fix it. A (Production, required media with its backup switched off): not complete either,
+    # so a retry never skips it as "done"; the next snapshot's backup job fails on it again, loudly.
+    if grep -q '^[PA] ' <<< "$found"; then return 1; fi
   done
   return 0
+}
+
+# The media step of this job, run when that step's backup is switched off: a Production snapshot that requires
+# files of this kind must never end as a successful backup. $1 = legacy|r2, $2 = the switch's name.
+require_media_not_needed() {
+  local kind="$1" sw="$2" n=0 f
+  [ "$BACKUP_LABEL" = production ] || return 0
+  [ -s "${BACKUP_STATE_DIR:-/nonexistent}/db.env" ] || die "run db-backup.sh first: no snapshot in ${BACKUP_STATE_DIR:-?}"
+  # shellcheck disable=SC1091
+  . "$BACKUP_STATE_DIR/db.env"
+  [ "${SKIPPED:-0}" != 1 ] || return 0
+  case "$kind" in legacy) f=objects.tsv;; r2) f=r2-objects.tsv;; esac
+  [ -f "$BACKUP_STATE_DIR/$f" ] || die "the snapshot's $kind media list is missing, so its media coverage is unknown"
+  n="$(wc -l < "$BACKUP_STATE_DIR/$f" | tr -d ' ')"
+  [ "$n" -eq 0 ] || die "the Production snapshot requires $n $kind media files and $sw is off: a database-only backup is not a complete backup. Switch it on (owner decision) and the next run takes a new snapshot"
 }
 
 # age encryption to every public recipient in AGE_RECIPIENTS (space or newline separated).

@@ -108,6 +108,16 @@ Keys never contain names. Database files are named by label and time, and media 
 
 R2's durability is not a second copy: a deleted or overwritten object is gone. `r2-media-backup.sh` therefore copies every verified R2 original (`media_storage_locations`, provider r2) into the project's own backup bucket, a different bucket from the media bucket, read through a read-only token (`R2_MEDIA_BACKUP=1`). Until it is switched on, every snapshot records `r2_media_records_not_covered`; the freshness alarm fails for Production when that number is above 0 and only warns for Acceptance.
 
+### Media coverage fails closed (Production)
+
+What a snapshot REQUIRES comes from its own manifest (`<snapshot>.json`: `storage_objects` = Supabase Storage files, `r2_required_originals` = R2 originals that must be copied; both counted from the dump), never from a switch (`media-coverage.py`, `media_coverage` in `lib.sh`):
+
+- **Switch off but required** -> `A` (Production alarm) / `W` (other projects). Freshness fails; the Production backup job itself fails at its media step (`require_media_not_needed`); the retry does not skip such a snapshot as done; the restore test does not pick it. A database-only Production backup is never complete.
+- **Switch on** -> the record must exist, be valid and complete, have its inventory stored, and cover **exactly** the required number of files (`media-record.py ... <expected>`); partial coverage, missing copies and integrity mismatches are `P`.
+- **Legitimately empty** (the dump holds no such files) needs no record and passes. An unreadable or malformed manifest is `P`: unknown is never "nothing to back up".
+- Works for Supabase Storage, R2 and mixed transitional states (each kind is judged on its own count). Nothing here switches a backup on or changes any storage setting; `media-coverage-test.sh` (44 checks) covers each provider, mixed, both switches off, partial and empty.
+- The R2 step of the workflow now always runs (it exits quietly when off and nothing is required).
+
 ### Retired originals (removed on purpose)
 
 An original a user replaced or removed is deleted from R2 by the app, so it cannot be copied and does not need to be. One rule, `r2-eligibility.sql`, decides which verified R2 locations a backup must hold; `snapshot-objects.py` applies the same rule to the dump, `r2-media-backup.sh` to the live database and `media-verify.sh` to the restored one, and `r2-eligibility-test.sh` proves the three agree. A location is **retired** only when ALL hold: exactly one canonical row exists for it (`avatar_uploads`, `portfolio_items`, `professional_certificates`, `product_images`, `organization_images`) and its state is `deleted`; that row's owner equals the location's owner; no other canonical row in any namespace uses the key; no other location resolves to the same physical key; nothing active points at it (`profiles.avatar_media_id` or `cover_media_id`, `organizations.logo_media_id`). `cleaned_at` is NOT used as evidence either way. Anything else, including a missing, duplicate, pending or unknown row, stays **required** and fails the backup if its bytes are missing, unreadable, refused (403) or different from the recorded sha256.

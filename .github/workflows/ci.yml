@@ -197,6 +197,9 @@ jobs:
           "$RUNNER_TEMP/s3/bin/moto_server" -p 8333 >"$RUNNER_TEMP/moto.log" 2>&1 &
           for _ in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:8333/ && break; sleep 1; done
           echo "$RUNNER_TEMP/shim" >> "$GITHUB_PATH"
+      - name: Media coverage fails closed (Supabase Storage, R2, mixed, partial, empty; switches off)
+        env: { AWS_ACCESS_KEY_ID: testkey, AWS_SECRET_ACCESS_KEY: testsecret }
+        run: bash ops/backups/media-coverage-test.sh
       - name: Freshness alarm fails closed
         env: { AWS_ACCESS_KEY_ID: testkey, AWS_SECRET_ACCESS_KEY: testsecret }
         run: bash ops/backups/freshness-test.sh

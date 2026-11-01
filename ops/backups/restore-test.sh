@@ -45,9 +45,11 @@ pick_snapshot() {
   for k in $(s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "db/$BACKUP_LABEL/daily/" \
       --query "reverse(sort_by(Contents[?ends_with(Key, '.tar.age')] || \`[]\`, &LastModified))[:15].Key" --output text | tr '\t' '\n' | grep -v '^None$'); do
     ok=1
-    for kind in "${KINDS[@]}"; do
-      if grep -q '^P ' <<< "$(media_findings "${k%/*}" "$(basename "$k" .tar.age)" "$kind")"; then ok=0; fi
-    done
+    # What the snapshot requires, not what is switched on; a Production snapshot whose required media was not
+    # backed up (A) cannot be restored with its files either.
+    cov="$(media_coverage "${k%/*}" "$(basename "$k" .tar.age)")"
+    if grep -q '^P ' <<< "$cov"; then ok=0; fi
+    if [ "$BACKUP_LABEL" = production ] && grep -q '^A ' <<< "$cov"; then ok=0; fi
     if [ "$ok" = 1 ]; then KEY="$k"; return 0; fi
     SKIPPED_NEWER=$((SKIPPED_NEWER+1))
   done

@@ -57,35 +57,17 @@ else
     read -r _ _ prev <<< "$(head -1 <<< "$DB")"
     [ $((size * 2)) -ge "$prev" ] || problems+=("newest database backup is $size bytes, less than half of the previous $prev")
   fi
-  # Legacy Supabase-Storage files (opt-in, being retired) and R2-hosted originals each have their own record.
-  kinds=()
-  [ "${CHECK_MEDIA:-${LEGACY_MEDIA_BACKUP:-0}}" = 0 ] || kinds+=(media)
-  [ "${CHECK_R2_MEDIA:-${R2_MEDIA_BACKUP:-0}}" = 0 ] || kinds+=(r2media)
-  for kind in "${kinds[@]}"; do
-    if ! found="$(media_findings "${key%/*}" "$(basename "$key" .tar.age)" "$kind")"; then
-      problems+=("the $kind record of the newest snapshot could not be checked ($key)")
-    fi
-    while IFS= read -r line; do
-      case "$line" in
-        "") ;;
-        "P "*|"A "*) problems+=("${line#? }");;
-        "W "*) warnings+=("${line#? }");;
-        *) problems+=("unexpected result of the $kind record check: $line");;
-      esac
-    done <<< "${found:-}"
-  done
-  # R2 media records exist but nothing backs them up: never silent. Read from the snapshot's small plain manifest.
-  if [ "${CHECK_R2_MEDIA:-${R2_MEDIA_BACKUP:-0}}" = 0 ]; then
-    manifest="$(mktemp)"
-    if ! s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "${key%.tar.age}.json" "$manifest" >/dev/null 2>&1 \
-        || ! r2n="$(python3 -c 'import json,sys; print(int(json.load(open(sys.argv[1]))["r2_media_records"]))' "$manifest" 2>/dev/null)"; then
-      rm -f "$manifest"
-      problems+=("the snapshot manifest of $key cannot be read, so R2 media coverage is unknown")
-    elif rm -f "$manifest"; [ "$r2n" -gt 0 ]; then
-      msg="$r2n media records live in R2 and no independent R2 media backup is switched on (R2_MEDIA_BACKUP)"
-      if [ "$BACKUP_LABEL" = production ]; then problems+=("$msg"); else warnings+=("$msg"); fi
-    fi
-  fi
+  # Media: what THIS snapshot requires (its own manifest, from the dump), not what is switched on. A Production
+  # snapshot with Supabase Storage files or R2 originals and no independent copy of them is an alarm; so is a
+  # record that is missing, invalid, incomplete or covers another number of files. Empty inventories pass.
+  while IFS= read -r line; do
+    case "$line" in
+      "") ;;
+      "P "*|"A "*) problems+=("${line#? }");;
+      "W "*) warnings+=("${line#? }");;
+      *) problems+=("unexpected result of the media coverage check: $line");;
+    esac
+  done <<< "$(media_coverage "${key%/*}" "$(basename "$key" .tar.age)")"
 fi
 [ "${#warnings[@]}" -eq 0 ] || printf 'warning (%s): %s\n' "$BACKUP_LABEL" "${warnings[@]}"
 

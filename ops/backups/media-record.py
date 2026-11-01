@@ -2,7 +2,7 @@
 """Strict check of a snapshot's media record (<snapshot>.media.json). One validator for every reader:
 the freshness alarm, the scheduled backup's "is today's snapshot already done?" test and the restore test.
 
-  python3 media-record.py <media.json> <label> <snapshot-name> [production|other]
+  python3 media-record.py <media.json> <label> <snapshot-name> [production|other] [expected-objects]
 
 Prints one line per finding and exits 0 when it ran:
   "P <text>"  the snapshot's media backup is not (provably) complete: a new snapshot supersedes it,
@@ -31,7 +31,7 @@ def no_duplicates(pairs):
     return out
 
 
-def findings(path, label, snapshot, kind):
+def findings(path, label, snapshot, kind, expected=None):
     try:
         size = os.path.getsize(path)
     except OSError as e:
@@ -85,6 +85,8 @@ def findings(path, label, snapshot, kind):
         bad(f"the media record contradicts itself: {backed_up} backed up + {missing} missing is not {objects} objects")
     if record["complete"] != (missing == 0 and failures == 0):
         bad("the media record contradicts itself: its 'complete' does not match its missing and failure counts")
+    if expected is not None and objects != expected:
+        bad(f"the media record covers {objects} files but the snapshot requires {expected}")
     if not record["complete"]:
         bad(f"the snapshot's media backup is incomplete: {missing} missing, {failures} copy failures")
     if problems:
@@ -97,8 +99,13 @@ def findings(path, label, snapshot, kind):
 
 def main(argv):
     if len(argv) < 4:
-        sys.exit("usage: media-record.py <media.json> <label> <snapshot-name> [production|other]")
-    for level, text in findings(argv[1], argv[2], argv[3], argv[4] if len(argv) > 4 else ""):
+        sys.exit("usage: media-record.py <media.json> <label> <snapshot-name> [production|other] [expected-objects]")
+    expected = None
+    if len(argv) > 5:
+        if not argv[5].isdigit():
+            sys.exit("the expected object count must be a whole number")
+        expected = int(argv[5])
+    for level, text in findings(argv[1], argv[2], argv[3], argv[4] if len(argv) > 4 else "", expected):
         print(level, text)
 
 

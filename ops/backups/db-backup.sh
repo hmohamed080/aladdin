@@ -88,6 +88,7 @@ grep -q '^public\.users:' "$B/rowcounts.txt" || die "the data dump has no public
 # The media list of this exact snapshot, for the media step (it holds only public keys, so it cannot read the archive).
 R2_ROWS="$(python3 "$HERE/snapshot-objects.py" "$B/data.sql" "$WORK/objects.tsv" "$WORK/r2-objects.tsv" "$WORK/r2-excluded.json")" || die "cannot read the media list from the dump"
 SNAP_OBJECTS="$(wc -l < "$WORK/objects.tsv" | tr -d ' ')"
+R2_REQUIRED="$(wc -l < "$WORK/r2-objects.tsv" | tr -d ' ')"  # originals a media backup must copy (retired ones excluded)
 DRIFT="$(join -t: -a1 -e0 -o 0,1.2,2.2 <(sort "$B/rowcounts-live.txt") "$B/rowcounts.txt" | awk -F: '$2!=$3' | wc -l | tr -d ' ')"
 ( cd "$B" && sha256sum -- * > SHA256SUMS )
 
@@ -96,7 +97,7 @@ age_encrypt "$WORK/$NAME.tar" "$WORK/$NAME.tar.age"
 SUM="$(sha256 "$WORK/$NAME.tar.age")"; BYTES="$(wc -c < "$WORK/$NAME.tar.age" | tr -d ' ')"
 TABLES="$(wc -l < "$B/rowcounts.txt" | tr -d ' ')"; ROWS="$(awk -F: '{s+=$2} END {print s+0}' "$B/rowcounts.txt")"
 cat > "$WORK/$NAME.json" <<JSON
-{"label":"$BACKUP_LABEL","project_ref":"$REF","taken_utc":"$STAMP","storage_objects":$SNAP_OBJECTS,"r2_media_records":$R2_ROWS,"file":"$NAME.tar.age","sha256":"$SUM","bytes":$BYTES,
+{"label":"$BACKUP_LABEL","project_ref":"$REF","taken_utc":"$STAMP","storage_objects":$SNAP_OBJECTS,"r2_media_records":$R2_ROWS,"r2_required_originals":$R2_REQUIRED,"file":"$NAME.tar.age","sha256":"$SUM","bytes":$BYTES,
  "tar_sha256":"$(sha256 "$WORK/$NAME.tar")","migrations":$(wc -l < "$B/history.txt" | tr -d ' '),"latest_migration":"$(tail -1 "$B/history.txt")",
  "tables":$TABLES,"rows":$ROWS,"tables_with_live_drift":$DRIFT,"users":$(grep '^public\.users:' "$B/rowcounts.txt" | cut -d: -f2),
  "parts_sha256":"$(sha256 "$B/SHA256SUMS")","kit_sha256":"$(cat "$KIT"/security-tail.sql "$KIT"/schema-fingerprint.sql | sha256sum | cut -d' ' -f1)"}
