@@ -103,23 +103,16 @@ describe("detail and the requester side", () => {
   });
 });
 
-describe("reference image signing", () => {
-  const sign = vi.fn(async (keys: string[]) => ({ data: keys.map((k) => ({ path: k, signedUrl: `https://signed/${k}`, error: null })), error: null }));
-
-  it("another workspace's images are signed only after the ACTIVE workspace is granted them", async () => {
-    const { supabase, calls } = stub({ rpc: { data: ["k"], error: null }, storage: { createSignedUrls: sign } });
+describe("reference image URLs", () => {
+  it("maps each distinct key to the authorized application media URL, scoped to the viewing workspace", async () => {
+    const { supabase, calls } = stub({});
     const urls = await signRequestImageUrls(supabase, ["k", null, "k"], { orgId: ORG });
-    expect(calls[0]).toEqual(["rpc", "request_image_access_grant", { p_org_id: ORG, p_keys: ["k"] }, undefined]);
-    expect(urls.get("k")).toBe("https://signed/k");
+    expect(urls.size).toBe(1);
+    expect(urls.get("k")).toBe(`/api/media/request?key=k&workspace=${ORG}`);
+    expect(calls).toEqual([]); // no grant table, no Storage call: authorization happens per request in the database
   });
-
-  it("signs nothing when the grant is refused; the requester's own images never ask for one", async () => {
-    const refused = stub({ rpc: { data: null, error: { code: "42501", message: "not a member of this organization" } }, storage: { createSignedUrls: sign } });
-    sign.mockClear();
-    expect((await signRequestImageUrls(refused.supabase, ["k"], { orgId: "org-x" })).size).toBe(0);
-    expect(sign).not.toHaveBeenCalled();
-    const own = stub({ storage: { createSignedUrls: sign } });
-    await signRequestImageUrls(own.supabase, ["k"]);
-    expect(own.calls.some((c) => c[0] === "rpc")).toBe(false);
+  it("the requester's own images carry no workspace", async () => {
+    const { supabase } = stub({});
+    expect((await signRequestImageUrls(supabase, ["k"])).get("k")).toBe("/api/media/request?key=k");
   });
 });

@@ -11,11 +11,6 @@ import { describe, expect, it } from "vitest";
 const SRC = join(__dirname, "..", "..");
 const ALLOWED: Record<string, string> = {
   "server/storage/supabase-provider.ts": "the legacy provider itself (reads and deletes of existing objects; writes closed once R2 is on)",
-  "server/actions/business-verification.ts": "compliance documents, kept in Supabase Storage by decision (not application media)",
-  "app/business-verification/file/[orgId]/[fileName]/route.ts": "compliance document read",
-  "features/business-verification/owner-panel.tsx": "compliance document upload",
-  "server/actions/purchase-requests.ts": "PENDING DECISION: purchase-request photos still on Supabase Storage",
-  "server/queries/purchase-requests.ts": "PENDING DECISION: purchase-request photo reads",
   "lib/storage/browser-upload.ts": "uploads with a server-issued grant; the server refuses to issue a Supabase grant once R2 is on",
 };
 
@@ -34,6 +29,6 @@ describe("Supabase Storage access", () => {
     expect(users.filter((file) => !(file in ALLOWED))).toEqual([]);
   });
   it("lists no caller that no longer exists", () => {
-    expect(Object.keys(ALLOWED).filter((file) => !users.includes(file) && file !== "lib/storage/browser-upload.ts")).toEqual([]);
+    expect(Object.keys(ALLOWED).filter((file) => !users.includes(file))).toEqual([]);
   });
 });

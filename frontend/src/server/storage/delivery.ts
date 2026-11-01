@@ -49,7 +49,10 @@ export async function deliverMedia(client: SupabaseClient, namespace: MediaNames
     }));
     // No upstream ETag, Location, token, Set-Cookie or cache headers are forwarded.
     return new Response(bounded, { headers: { ...MEDIA_NO_STORE, "content-type": before.contentType,
-      "content-disposition": "inline", "content-security-policy": "sandbox" } });
+      "content-disposition": "inline",
+      // Verification documents are PDFs reviewers must view in the browser's PDF viewer, which a sandbox CSP blocks
+      // (the previous route sent none). Their type is verified from the stored bytes and nosniff is set.
+      ...(namespace === "verification" ? {} : { "content-security-policy": "sandbox" }) } });
   } catch {
     await upstream?.body?.cancel().catch(() => undefined);
     return mediaNotFound();

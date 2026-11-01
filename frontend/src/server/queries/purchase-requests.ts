@@ -3,7 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { sanitizeSearchTerm } from "@/server/queries/sales";
-import { REQUEST_IMAGE_BUCKET } from "@/lib/storage/request-images";
+import { applicationMediaUrl } from "@/lib/storage/media-url";
 import {
   parseRequestDetail,
   parseRequestItems,
@@ -123,33 +123,21 @@ export async function listResponsesForRequester(supabase: DB, requestId: string)
 // Reference images
 // ---------------------------------------------------------------------------
 /**
- * A signed URL cannot be revoked, so its lifetime bounds how long access ended by a cancellation, a retarget or a
- * suspended membership can still be used. Pages are rendered per request, so a few minutes is ample.
- */
-const SIGNED_URL_SECONDS = 300;
-
-/**
- * Key -> signed URL, signed with the CALLER's identity (no service role). The requester's own images sign
- * directly. Another workspace's images need a permission minted for the ACTIVE workspace first (pass
- * `viewer`); the database grants it only while the workspace can still read the request, and re-checks on
- * every use. A key that cannot be signed is simply absent.
+ * Key -> application media URL. The bytes are served by `/api/media/request`, which authorizes the
+ * caller (and, for another workspace, that workspace's CURRENT right to read the request) on every
+ * request and before and after the fetch, so there is no URL that outlives a cancellation, a retarget or
+ * a suspended membership, and no grant table to maintain. Legacy Supabase-stored photos and new R2 ones
+ * share this one URL; the provider is chosen per object by the database. A key the caller may not read
+ * simply fails to load (the image falls back to its placeholder).
  */
 export async function signRequestImageUrls(
-  supabase: DB,
+  _supabase: DB,
   keys: readonly (string | null | undefined)[],
   viewer?: { orgId: string },
 ): Promise<Map<string, string>> {
-  const unique = [...new Set(keys.filter((k): k is string => Boolean(k)))];
   const out = new Map<string, string>();
-  if (unique.length === 0) return out;
-  if (viewer) {
-    for (let i = 0; i < unique.length; i += 60) {
-      const { error } = await supabase.rpc("request_image_access_grant", { p_org_id: viewer.orgId, p_keys: unique.slice(i, i + 60) });
-      if (error) return out;
-    }
+  for (const key of new Set(keys.filter((k): k is string => Boolean(k)))) {
+    out.set(key, applicationMediaUrl("request", key, viewer?.orgId ?? null));
   }
-  const { data, error } = await supabase.storage.from(REQUEST_IMAGE_BUCKET).createSignedUrls(unique, SIGNED_URL_SECONDS);
-  if (error || !data) return out;
-  for (const entry of data) if (entry.path && entry.signedUrl && !entry.error) out.set(entry.path, entry.signedUrl);
   return out;
 }
