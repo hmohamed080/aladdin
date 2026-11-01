@@ -37,12 +37,29 @@ describe("craftsman read-only sections", () => {
     expect(screen.getAllByRole("img", { name: /Profile photo|Private file/ }).length).toBeGreaterThan(0);
   });
 
-  it("portfolio lists projects and certificates as details + placeholders, never <img>/<video>/<a href=file>", () => {
+  it("portfolio WITHOUT private-media links (delivery off) lists details + placeholders, never <img>/<video>/<a href=file>", () => {
     const { container } = wrap(<PortfolioSection data={portfolio} />);
     expect(screen.getByText("Villa kitchen")).toBeTruthy();
     expect(screen.getByText("Electrical safety")).toBeTruthy();
     expect(container.querySelector("img, video, source, iframe, embed, object, a[href]")).toBeNull();
-    expect(screen.getAllByRole("img", { name: "Private file — not shown in this view" }).length).toBe(3);
+    expect(screen.getAllByRole("img").length).toBe(3); // the neutral placeholders (role=img divs), one per file
+    expect(screen.getByText(/not displayed in View-As yet/)).toBeTruthy();
+  });
+
+  it("portfolio WITH authorized links shows the image and a document link; the video stays a placeholder; no storage key is rendered", () => {
+    const media = { i: "https://media.example.test/a/portfolio_item/original?t=T1", c: "https://media.example.test/a/certificate/original?t=T2" };
+    const { container } = wrap(<PortfolioSection data={portfolio} media={media} />);
+    const img = container.querySelector("img")!;
+    expect(img.getAttribute("src")).toBe(media.i);
+    expect(img.getAttribute("referrerpolicy")).toBe("no-referrer");
+    expect(container.querySelectorAll("img").length).toBe(1); // the certificate is a pdf: a link, not an image
+    const link = container.querySelector("a[href]")!;
+    expect(link.getAttribute("href")).toBe(media.c);
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(container.querySelector("video, source, iframe, embed, object")).toBeNull();
+    expect(screen.getAllByRole("img", { name: /Private file/ }).length).toBe(2); // the video and the pdf's file icon (its link sits beside it)
+    expect(container.innerHTML).not.toMatch(/object_key|object_path|\.(jpg|png|pdf)["'?]/i);
+    expect(screen.getByText(/short-lived, audited link/)).toBeTruthy();
   });
 
   it("work, points and reviews render the subject's rows", () => {

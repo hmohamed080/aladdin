@@ -26,6 +26,7 @@ function authority(): MediaAuthority {
   return {
     async authorizePrivate() { return null; },
     async authorizePublic() { return null; },
+    async authorizeViewAs() { return null; },
     async authorizeVideo(r) {
       calls.video++;
       calls.requests.push({ viewer: r.viewer, expiresAt: r.expiresAt });

@@ -1,6 +1,7 @@
 import { isUuid, parseTicketKeys, verifyTicket, VARIANTS } from "./ticket";
 import type { ByteCacheLike, Env, ExecutionContextLike, MediaAuthority, MediaGrant } from "./types";
 import { handleVideo } from "./video";
+import { VIEW_AS_NAMESPACE, verifyViewAsTicket } from "./view-as-ticket";
 
 // Content types the application accepts per namespace (frontend/src/lib/storage/media-policy.ts).
 const TYPES: Record<string, readonly string[]> = {
@@ -142,6 +143,7 @@ export type HandlerDeps = {
 /**
  * Routes:
  *   /m/<ns>/<variant>?t=<ticket>   private (Mode P): ticket + database authorization
+ *   /a/<kind>/<variant>?t=<ticket> Admin View-As (separate ticket type, off by default): database re-validates every request
  *   /c/<ns>/<id>/<variant>         conditional public (Mode C): database eligibility
  *   /v/<videoId>/<file>[?t=]       video playlists, segments and posters (video.ts)
  * Every request reaches the database; nothing about authorization is cached here.
@@ -181,6 +183,18 @@ export function createHandler(deps: HandlerDeps) {
         if (!grant) { log("authz", "m"); return notFound(); }
         return await serve(request, env, ctx, deps.cache?.() ?? null, grant, false);
       }
+      if (parts.length === 4 && parts[1] === "a" && env.VIEW_AS_ROUTES === "on") {
+        const [, , kind, variant] = parts as [string, string, string, string];
+        const tickets = url.searchParams.getAll("t");
+        if ([...url.searchParams.keys()].some((k) => k !== "t") || tickets.length !== 1) { log("route", "a"); return notFound(); }
+        const claims = await verifyViewAsTicket(tickets[0]!, keysFor(env), Math.floor(deps.now() / 1000));
+        if (!claims || claims.kind !== kind || claims.var !== variant) { log("ticket", "a"); return notFound(); }
+        authority = deps.authority(env);
+        const grant = parseGrant(await authority.authorizeViewAs({ kind: claims.kind, record: claims.rid, variant: claims.var,
+          admin: claims.adm, session: claims.sid, subject: claims.subj, expiresAt: claims.exp }), VIEW_AS_NAMESPACE[claims.kind]);
+        if (!grant) { log("authz", "a"); return notFound(); }
+        return await serve(request, env, ctx, deps.cache?.() ?? null, grant, false);
+      }
       if (parts.length === 5 && parts[1] === "c" && env.PUBLIC_ROUTES === "on") {
         const [, , namespace, id, variant] = parts as [string, string, string, string, string];
         if (!PUBLIC_NAMESPACES.includes(namespace) || !isUuid(id) || !(VARIANTS as readonly string[]).includes(variant)
@@ -193,7 +207,7 @@ export function createHandler(deps: HandlerDeps) {
       log("route", "-");
       return notFound();
     } catch {
-      log("error", parts[1] === "c" ? "c" : "m");
+      log("error", parts[1] === "c" ? "c" : parts[1] === "a" ? "a" : "m");
       return notFound();
     } finally {
       if (authority) ctx.waitUntil(authority.close().catch(() => undefined));

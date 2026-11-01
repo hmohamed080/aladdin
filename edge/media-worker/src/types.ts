@@ -33,6 +33,8 @@ export interface Env {
    * decided by the database on every request; only bytes are cached.
    */
   EDGE_CACHE?: string;
+  /** "on" enables /a (Admin View-As private media). Anything else disables it; the default is OFF. */
+  VIEW_AS_ROUTES?: string;
   /** "on" enables /v (video). Anything else disables it. */
   VIDEO_ROUTES?: string;
   /** Comma-separated app origins allowed to fetch playlists and segments (hls.js uses fetch/XHR). */
@@ -54,6 +56,10 @@ export interface MediaAuthority {
     viewer: string; session: string; workspace: string | null; expiresAt: number;
   }): Promise<unknown>;
   authorizePublic(request: { namespace: string; id: string; variant: string }): Promise<unknown>;
+  /** Admin View-As: the database re-validates the Admin, the Auth session, the view session and the record-to-owner link. */
+  authorizeViewAs(request: {
+    kind: string; record: string; variant: string; admin: string; session: string; subject: string; expiresAt: number;
+  }): Promise<unknown>;
   /** Video: viewer/session/workspace/expiresAt are null for anonymous requests. */
   authorizeVideo(request: {
     video: string; viewer: string | null; session: string | null; workspace: string | null; expiresAt: number | null;

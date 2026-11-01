@@ -1,0 +1,37 @@
+{
+ "comment": "Shared HMAC View-As ticket vectors for edge/media-worker/src/view-as-ticket.ts and frontend/src/server/view-as/media-ticket.ts. Generated independently with Python hmac. Test-only keys.",
+ "keys": {
+  "k1": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+ },
+ "now": 1792310400,
+ "valid": [
+  {
+   "kid": "k1",
+   "claims": {
+    "v": 1,
+    "kind": "portfolio_item",
+    "rid": "ea300000-0000-4000-8000-000000000001",
+    "var": "original",
+    "adm": "55555555-5555-4555-8555-555555555555",
+    "sid": "ea000000-0000-4000-8000-000000000001",
+    "subj": "71000006-0000-4000-8000-000000000006",
+    "exp": 1792310490
+   },
+   "ticket": "k1.eyJ2IjoxLCJraW5kIjoicG9ydGZvbGlvX2l0ZW0iLCJyaWQiOiJlYTMwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDEiLCJ2YXIiOiJvcmlnaW5hbCIsImFkbSI6IjU1NTU1NTU1LTU1NTUtNDU1NS04NTU1LTU1NTU1NTU1NTU1NSIsInNpZCI6ImVhMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMSIsInN1YmoiOiI3MTAwMDAwNi0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDYiLCJleHAiOjE3OTIzMTA0OTB9.TiOKsNl945YPJXnm1VYXYSwipUaXQc461D2mUtGqAiQ"
+  },
+  {
+   "kid": "k1",
+   "claims": {
+    "v": 1,
+    "kind": "certificate",
+    "rid": "ea300000-0000-4000-8000-000000000002",
+    "var": "original",
+    "adm": "55555555-5555-4555-8555-555555555555",
+    "sid": "ea000000-0000-4000-8000-000000000001",
+    "subj": "71000006-0000-4000-8000-000000000006",
+    "exp": 1792310490
+   },
+   "ticket": "k1.eyJ2IjoxLCJraW5kIjoiY2VydGlmaWNhdGUiLCJyaWQiOiJlYTMwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDIiLCJ2YXIiOiJvcmlnaW5hbCIsImFkbSI6IjU1NTU1NTU1LTU1NTUtNDU1NS04NTU1LTU1NTU1NTU1NTU1NSIsInNpZCI6ImVhMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMSIsInN1YmoiOiI3MTAwMDAwNi0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDYiLCJleHAiOjE3OTIzMTA0OTB9.-_bAdHxq_Tw7HDc6CEmULH7TKQawLWrSpAGkhC2MbNo"
+  }
+ ]
+}

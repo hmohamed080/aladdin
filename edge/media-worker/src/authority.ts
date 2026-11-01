@@ -16,6 +16,11 @@ export function postgresAuthority(connectionString: string): MediaAuthority {
         ${r.viewer}::uuid, ${r.session}::uuid, ${r.workspace}::uuid, to_timestamp(${r.expiresAt}::double precision)) as g`;
       return rows[0]?.g ?? null;
     },
+    async authorizeViewAs(r) {
+      const rows = await sql`select public.media_edge_view_as_authorize(${r.kind}, ${r.record}::uuid, ${r.variant},
+        ${r.admin}::uuid, ${r.session}::uuid, ${r.subject}::uuid, to_timestamp(${r.expiresAt}::double precision)) as g`;
+      return rows[0]?.g ?? null;
+    },
     async authorizePublic(r) {
       const rows = await sql`select public.media_edge_public(${r.namespace}, ${r.id}::uuid, ${r.variant}) as g`;
       return rows[0]?.g ?? null;

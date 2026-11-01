@@ -44,6 +44,19 @@ export function MediaPlaceholder({ label }: { label?: string }) {
   );
 }
 
+/**
+ * A private file of the viewed account. `src` is a short-lived, per-request-authorized link from the media-edge Worker (Stage 4), or
+ * null/absent while delivery is off, in which case the neutral placeholder stays. Never a storage key, never a public URL.
+ */
+export function PrivateImage({ src, label }: { src: string | undefined; label: string }) {
+  if (!src) return <MediaPlaceholder label={label} />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- the link is an authorized, expiring Worker URL; optimisation would re-fetch it unauthenticated
+    <img src={src} alt={label} loading="lazy" decoding="async" referrerPolicy="no-referrer"
+      className="h-16 w-16 shrink-0 rounded-md border object-cover" />
+  );
+}
+
 export function ViewAsNav({ userId, kind }: { userId: string; kind: ViewAsKind }) {
   const { t } = useI18n();
   const pathname = usePathname();
@@ -195,11 +208,13 @@ export function ProfileSection({ data }: { data: ProfileData }) {
   );
 }
 
-export function PortfolioSection({ data }: { data: PortfolioData }) {
+/** `media` maps a record id (portfolio item / certificate) to its authorized link; empty while private media delivery is off. */
+export function PortfolioSection({ data, media = {} }: { data: PortfolioData; media?: Record<string, string> }) {
   const { t, locale } = useI18n();
+  const delivering = Object.keys(media).length > 0;
   return (
     <div className="flex flex-col gap-lg">
-      <p className="text-label text-fg-muted">{t("admin.viewAs.mediaPlaceholderHint")}</p>
+      <p className="text-label text-fg-muted">{t(delivering ? "admin.viewAs.mediaPrivateHint" : "admin.viewAs.mediaPlaceholderHint")}</p>
       <section className="flex flex-col gap-md">
         <SectionTitle>{t("admin.viewAs.f.projects")}</SectionTitle>
         {data.projects.length === 0 ? <StatePanel title={t("admin.viewAs.empty")} /> : null}
@@ -214,7 +229,7 @@ export function PortfolioSection({ data }: { data: PortfolioData }) {
             <div className="mt-2 flex flex-wrap gap-2" aria-label={t("admin.viewAs.f.items")}>
               {p.items.map((i) => (
                 <div key={i.id} className="flex items-center gap-2 rounded-md border px-2 py-1">
-                  <MediaPlaceholder />
+                  {i.kind === "image" ? <PrivateImage src={media[i.id]} label={i.title ?? t("admin.viewAs.f.image")} /> : <MediaPlaceholder />}
                   <span className="text-label text-fg-muted">{i.kind === "video" ? t("admin.viewAs.f.video") : t("admin.viewAs.f.image")}{i.title ? ` · ${i.title}` : ""}</span>
                 </div>
               ))}
@@ -228,12 +243,17 @@ export function PortfolioSection({ data }: { data: PortfolioData }) {
         {data.certificates.map((c) => (
           <Card key={c.id}>
             <div className="flex items-start gap-md">
-              <MediaPlaceholder />
+              {c.kind === "image" ? <PrivateImage src={media[c.id]} label={c.title} /> : <MediaPlaceholder />}
               <dl className="grid min-w-0 flex-1 grid-cols-1 gap-md tablet:grid-cols-4">
                 <Field label={t("admin.viewAs.f.certificates")}>{c.title}</Field>
                 <Field label={t("admin.viewAs.f.issuer")}>{c.issuer ?? dash(t)}</Field>
                 <Field label={t("admin.viewAs.f.issued")}>{formatDate(c.issuedOn, locale)}</Field>
                 <Field label={t("admin.viewAs.f.expires")}>{formatDate(c.expiresOn, locale)}</Field>
+                {c.kind === "pdf" && media[c.id] ? (
+                  <Field label={t("admin.viewAs.f.certificates")}>
+                    <a href={media[c.id]} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" className="text-accent underline">{t("admin.viewAs.openDocument")}</a>
+                  </Field>
+                ) : null}
               </dl>
             </div>
           </Card>

@@ -861,6 +861,9 @@ export const en = {
       empty: "Nothing here yet.",
       mediaPlaceholder: "Private file — not shown in this view",
       mediaPlaceholderHint: "Images, videos and certificate files are not displayed in View-As yet. Only their details are shown.",
+      mediaPrivateHint: "Images and certificate files are private. They load through a short-lived, audited link while this view is open. Videos show details only.",
+      openDocument: "Open document",
+      mediaUnavailable: "File unavailable",
       masked: "Masked",
       f: {
         status: "Account status",
