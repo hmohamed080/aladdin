@@ -8,6 +8,7 @@ import { LanguageSwitch } from "@/components/layout/switchers";
 import { useI18n } from "@/lib/i18n/context";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
 import styles from "./landing-header.module.css";
+import { BRAND } from "@/lib/assets/registry";
 
 const content = {
   ar: {
@@ -66,7 +67,7 @@ export function LandingHeader({ anchorBase = "", active = "home" }: { anchorBase
       <a className={styles.brand} href={`${anchorBase}#landing-top`} aria-label="Aladdin">
         {/* Drawn at most 80x72 CSS px (`.brand img`), so `sizes` lets the browser pick a small file instead of the
             1920 px one. No `priority`: the hero image, not the logo, is the LCP element. */}
-        <Image src="/preview/landing/aladdin-logo-2026.png" alt="" width={720} height={773} sizes="80px" />
+        <Image src={BRAND.logo2026} alt="" width={720} height={773} sizes="80px" />
       </a>
       <Button ref={menu} className={styles.menu} variant="ghost" aria-label={t.menu} aria-expanded={open} aria-controls="preview-navigation" onClick={() => setOpen(!open)}>
         {open ? <XIcon size={20} /> : <MenuIcon size={20} />}<span>{t.menu}</span>

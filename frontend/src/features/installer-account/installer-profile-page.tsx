@@ -37,6 +37,7 @@ import type { Locale } from "@/lib/i18n/locales";
 import { cn } from "@/lib/ui/cn";
 import { saveInstallerProfileAction, type InstallerProfileResult } from "@/server/actions/installer-profile";
 import type { PortfolioProject } from "@/server/queries/portfolio-projects";
+import { MediaAvatar } from "@/components/media/media-fallbacks";
 
 /** The approved specialty list (design values) and the catalogue trade each one saves as. */
 const TRADE_KEY_BY_SPECIALTY: Record<string, string> = {
@@ -592,12 +593,7 @@ function MobileProfileSummary({ locale, percent, completedStepIds, name, avatarU
     <section aria-label={ar ? "ملخص اكتمال الملف" : "Profile completion summary"} className="rounded-md border border-strong bg-surface p-md shadow-card tablet:hidden">
       <div className="flex items-center gap-md">
         <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-pill border-2 border-accent-solid bg-surface-2">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not a static asset
-            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="grid h-full w-full place-items-center text-title font-bold text-fg">{Array.from(name.trim())[0]?.toLocaleUpperCase() ?? "?"}</span>
-          )}
+          <MediaAvatar src={avatarUrl} name={name} className="text-title" />
         </span>
         <div className="min-w-0">
           <p className="truncate text-body-lg font-bold text-fg"><bdi dir="auto">{name}</bdi></p>

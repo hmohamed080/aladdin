@@ -30,7 +30,7 @@ describe("landing preview", () => {
     const images = [...container.querySelectorAll("img")];
     expect(images.length).toBeGreaterThan(0);
     for (const image of images) {
-      expect(decodeURIComponent(image.getAttribute("src") ?? "")).toContain("/preview/landing/");
+      expect(decodeURIComponent(image.getAttribute("src") ?? "")).toMatch(/\/(preview\/landing|assets\/pages\/landing|brand)\//);
     }
     expect(container.querySelector("footer")).toBeInTheDocument();
     expect(container.querySelectorAll('#brands img')).toHaveLength(9);

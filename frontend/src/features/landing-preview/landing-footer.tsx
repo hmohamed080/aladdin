@@ -5,6 +5,7 @@ import { HelpIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
 import { landingBlockContent } from "./landing-block-content";
 import styles from "./landing-footer.module.css";
+import { BRAND } from "@/lib/assets/registry";
 
 export function LandingFooter({ anchorBase = "" }: { anchorBase?: string } = {}) {
   const { locale } = useI18n();
@@ -17,7 +18,7 @@ export function LandingFooter({ anchorBase = "" }: { anchorBase?: string } = {})
     <footer className={styles.footer} data-landing-preview-part="Footer">
       <div className={styles.columns}>
         <div className={styles.brand}>
-          <Image src="/preview/landing/aladdin-logo-2026.png" alt="Aladdin" width={720} height={773} sizes="80px" className={styles.logo} />
+          <Image src={BRAND.logo2026} alt="Aladdin" width={720} height={773} sizes="80px" className={styles.logo} />
           <p>{t.footerDescription}</p>
         </div>
         {columns.map((column) => <nav key={column.title} aria-label={column.title}>

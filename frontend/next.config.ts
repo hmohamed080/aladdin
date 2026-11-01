@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 import { SECURITY_HEADERS } from "./src/lib/security/response-headers";
+import { MOVED_ASSET_REDIRECTS } from "./src/lib/assets/registry";
 
 // Set by open-next.config.ts `buildCommand` for the Cloudflare Workers build only.
 // That build swaps the image engine (sharp cannot load in workerd) so the Worker
@@ -54,6 +55,8 @@ const nextConfig: NextConfig = {
       // The Admin dashboard was reviewed under /admin/preview; it now owns the Admin routes.
       { source: "/admin/preview", destination: "/admin", permanent: true },
       { source: "/admin/preview/:path*", destination: "/admin/:path*", permanent: true },
+      // Static artwork that moved under /assets/pages/landing keeps its old URLs.
+      ...MOVED_ASSET_REDIRECTS.map((r) => ({ ...r, permanent: true })),
     ];
   },
 };

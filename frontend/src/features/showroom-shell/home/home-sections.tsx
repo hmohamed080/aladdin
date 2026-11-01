@@ -3,13 +3,14 @@ import type { ComponentType, ReactNode } from "react";
 import type { Locale } from "@/lib/i18n/locales";
 import { Badge } from "@/components/ui/primitives";
 import { seriesAt, type Series } from "@/components/ui/charts";
-import { BadgeCheckIcon, ChevronRightIcon, PackageIcon } from "@/components/ui/icons";
+import { BadgeCheckIcon, ChevronRightIcon } from "@/components/ui/icons";
 import { ProductMedia } from "@/features/commerce/product-media";
 import { catalogCategoryLabel } from "@/features/showroom-shell/products/labels";
 import { cn } from "@/lib/ui/cn";
 import { formatCompactMoneyFine, formatCount, formatDate, formatMoney, formatPercent } from "@/lib/ui/format";
 import type { CategorySpend, IncomingQuotation } from "@/server/queries/showroom-home";
 import type { CatalogRow } from "@/server/queries/commerce";
+import { MediaThumb } from "@/components/media/media-fallbacks";
 
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -179,12 +180,7 @@ export function IncomingQuotations({ rows, imageUrls, locale, t, href }: {
         <li key={q.id}>
           <Link href={href(q.id)} className={cn("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-md border bg-surface-2/30 px-2.5 py-2 transition-colors hover:bg-surface-2/60", focusRing)} data-testid="quote-row">
             <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-sm bg-surface-2 text-fg-muted">
-              {q.productId && imageUrls[q.productId] ? (
-                // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
-                <img src={imageUrls[q.productId]} alt="" width={44} height={44} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-              ) : (
-                <PackageIcon size={18} />
-              )}
+              <MediaThumb src={q.productId ? imageUrls[q.productId] : null} />
             </span>
             <span className="flex min-w-0 flex-1 basis-40 flex-col">
               <span className="truncate text-body font-semibold text-fg" dir="auto">{q.supplierName}</span>

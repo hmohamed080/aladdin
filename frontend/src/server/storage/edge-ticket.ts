@@ -153,3 +153,34 @@ export async function publicEdgeSources(client: SupabaseClient, namespace: "port
   }
   return out;
 }
+
+/**
+ * A fresh edge URL for an image whose ticket expired (a tab left open, a lazily loaded image).
+ *
+ * The stale ticket proves nothing: only its object, variant and workspace are read from it, and the
+ * CALLER's own session is then authorized again through the same resolver as any other read. A
+ * deleted, unpublished or no-longer-shared object, a signed-out caller or a URL from another origin
+ * all yield null, which the UI treats as genuinely unavailable.
+ */
+export async function refreshEdgeMediaUrl(client: SupabaseClient, staleUrl: string): Promise<string | null> {
+  const config = edgeConfig();
+  if (!config || typeof staleUrl !== "string" || staleUrl.length > 4096) return null;
+  try {
+    const url = new URL(staleUrl);
+    if (url.origin !== config.origin) return null;
+    const route = /^\/m\/([a-z]+)\/(original|thumb|card|full)$/.exec(url.pathname);
+    const ticket = url.searchParams.get("t")?.split(".");
+    if (!route || ticket?.length !== 3) return null;
+    const claims = JSON.parse(Buffer.from(ticket[1]!, "base64url").toString("utf8")) as Partial<TicketClaims>;
+    const namespace = route[1] as MediaNamespace;
+    if (claims.ns !== namespace || typeof claims.k !== "string" || claims.k.length > 1024) return null;
+    const workspace = typeof claims.ws === "string" && UUID.test(claims.ws) ? claims.ws : null;
+    const media = await resolveMedia(client, namespace, claims.k, "read", workspace);
+    if (media.state !== "ready" || media.provider !== "r2" || (!isOrganizationMedia(namespace) && !media.owner)) return null;
+    const next = await privateMediaUrl(client, namespace, claims.k, "r2", { workspace, variant: route[2] as EdgeVariant });
+    // Without a verified session `privateMediaUrl` degrades to the app-proxy URL: not a refresh.
+    return next.startsWith(`${config.origin}/m/`) ? next : null;
+  } catch {
+    return null;
+  }
+}
