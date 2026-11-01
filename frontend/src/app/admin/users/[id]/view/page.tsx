@@ -1,13 +1,17 @@
 import { requireAdminRoute } from "@/server/authorization/admin";
+import { getServerSupabase } from "@/lib/supabase/server";
 import { requireViewAs } from "@/server/view-as/guard";
-import { ViewAsLanding } from "@/features/admin-view-as/view-as-landing";
+import { craftsmanViewAsReader } from "@/server/view-as/readers";
+import { DashboardSection } from "@/features/admin-view-as/craftsman-sections";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function ViewAsLandingPage({ params }: { params: Promise<{ id: string }> }) {
+/** Admin View-As — craftsman dashboard (read-only). The gate is re-established here: layouts are not re-run on soft navigation. */
+export default async function ViewAsDashboardPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAdminRoute("/admin/users");
   const { id } = await params;
   const session = await requireViewAs(id);
-  return <ViewAsLanding kind={session.kind} />;
+  const reader = craftsmanViewAsReader(await getServerSupabase(), session.subjectUserId);
+  return <DashboardSection data={await reader.dashboard()} />;
 }

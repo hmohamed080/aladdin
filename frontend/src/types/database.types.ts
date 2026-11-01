@@ -8107,6 +8107,12 @@ export type Database = {
         Returns: boolean
       }
       admin_view_as_end_all: { Args: never; Returns: number }
+      admin_view_craftsman_dashboard: { Args: { p_subject: string }; Returns: Json }
+      admin_view_craftsman_points: { Args: { p_limit?: number; p_subject: string }; Returns: Json }
+      admin_view_craftsman_portfolio: { Args: { p_subject: string }; Returns: Json }
+      admin_view_craftsman_profile: { Args: { p_subject: string }; Returns: Json }
+      admin_view_craftsman_reviews: { Args: { p_limit?: number; p_subject: string }; Returns: Json }
+      admin_view_craftsman_work: { Args: { p_limit?: number; p_subject: string }; Returns: Json }
       apply_account_upgrade: {
         Args: { p_verification_id: string }
         Returns: undefined
