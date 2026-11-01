@@ -1,6 +1,6 @@
 # Daily alarm: fails, and emails the owner, when a backup is missing, late, suspiciously small, or its media
-# step did not finish complete. Covers Acceptance whenever ACCEPTANCE_BACKUP_SCHEDULE is daily or weekly (the
-# trial included) and Production once PRODUCTION_BACKUP_ENABLED is "true" (backup/plan.sh).
+# step did not finish complete. Covers Acceptance on schedule whenever ACCEPTANCE_BACKUP_SCHEDULE is daily or weekly (the
+# trial included); a MANUAL run always covers Acceptance, even with the schedule off. Production once PRODUCTION_BACKUP_ENABLED is "true" (backup/plan.sh).
 name: Backup freshness
 on:
   schedule:

@@ -3,7 +3,7 @@
 # offline (plan-test.sh). Prints one JSON array for the job matrix, or fails with the reason.
 #
 #   plan.sh backup      ["acceptance","production"] (subset)
-#   plan.sh freshness   [{"label":"acceptance","max_age_hours":26}, ...]
+#   plan.sh freshness   [{"label":"acceptance","max_age_hours":26}, ...]  (scheduled: per switches; manual: Acceptance always)
 #
 # Environment (repository variables in aladdin-backups, set by the owner):
 #   EVENT                       schedule | workflow_dispatch
@@ -41,8 +41,13 @@ case "$mode:${EVENT:-}" in
         labels+=(production) ;;
       *) echo "choose acceptance or production" >&2; exit 1 ;;
     esac ;;
-  freshness:schedule|freshness:workflow_dispatch)
+  freshness:schedule)
     case "$schedule" in daily) labels+=('{"label":"acceptance","max_age_hours":26}');; weekly) labels+=('{"label":"acceptance","max_age_hours":194}');; esac
+    [ "$production" = true ] && labels+=('{"label":"production","max_age_hours":26}') ;;
+  freshness:workflow_dispatch)
+    # A manual check always covers Acceptance, even while its schedule is off (the first manual backup and restore
+    # test happen before any schedule exists); it only reads the bucket. Production only once activated.
+    case "$schedule" in weekly) labels+=('{"label":"acceptance","max_age_hours":194}');; *) labels+=('{"label":"acceptance","max_age_hours":26}');; esac
     [ "$production" = true ] && labels+=('{"label":"production","max_age_hours":26}') ;;
   *) echo "unknown mode or event: $mode ${EVENT:-}" >&2; exit 1 ;;
 esac

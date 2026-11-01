@@ -55,6 +55,11 @@ check "bad Acceptance schedule: refused" "$(plan EVENT=schedule ACCEPTANCE_BACKU
 fresh() { env -i PATH="$PATH" "$@" bash "$HERE/plan.sh" freshness 2>/dev/null || echo ERROR; }
 check "freshness: nothing before any activation" "$(fresh EVENT=schedule)" '[]'
 check "freshness: the Acceptance trial is watched daily" "$(fresh EVENT=schedule ACCEPTANCE_BACKUP_SCHEDULE=daily)" '[{"label":"acceptance","max_age_hours":26}]'
+check "freshness: a manual check covers Acceptance although its schedule is off" "$(fresh EVENT=workflow_dispatch)" '[{"label":"acceptance","max_age_hours":26}]'
+check "freshness: a manual check never adds Production before activation" "$(fresh EVENT=workflow_dispatch ACCEPTANCE_BACKUP_SCHEDULE=off PRODUCTION_BACKUP_ENABLED=false)" '[{"label":"acceptance","max_age_hours":26}]'
+check "freshness: a manual check adds Production once activated" "$(fresh EVENT=workflow_dispatch PRODUCTION_BACKUP_ENABLED=true)" '[{"label":"acceptance","max_age_hours":26},{"label":"production","max_age_hours":26}]'
+check "freshness: a manual check follows a weekly Acceptance schedule" "$(fresh EVENT=workflow_dispatch ACCEPTANCE_BACKUP_SCHEDULE=weekly)" '[{"label":"acceptance","max_age_hours":194}]'
+check "freshness: the SCHEDULED check still does nothing while Acceptance is off" "$(fresh EVENT=schedule ACCEPTANCE_BACKUP_SCHEDULE=off)" '[]'
 check "freshness: weekly Acceptance allows 8 days" "$(fresh EVENT=schedule ACCEPTANCE_BACKUP_SCHEDULE=weekly PRODUCTION_BACKUP_ENABLED=true)" \
   '[{"label":"acceptance","max_age_hours":194},{"label":"production","max_age_hours":26}]'
 
