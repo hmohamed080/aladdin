@@ -32,8 +32,8 @@ begin
   end if;
 end;
 $$;
-revoke all on function app.assert_assigned_reviewer(public.verifications) from public, anon, service_role;
-grant execute on function app.assert_assigned_reviewer(public.verifications) to authenticated;
+-- Internal only: called from the SECURITY DEFINER apply functions below (which run as the owner), never by a client role.
+revoke all on function app.assert_assigned_reviewer(public.verifications) from public, anon, authenticated, service_role;
 comment on function app.assert_assigned_reviewer(public.verifications) is 'Internal guard shared by the verification apply RPCs: refuses the subject of the request and any admin who is not the assigned reviewer. Mirrors the confirm path of review_approve.';
 
 create or replace function public.apply_account_upgrade(p_verification_id uuid)
