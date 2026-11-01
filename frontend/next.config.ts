@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { NextConfig } from "next";
-import { SECURITY_HEADERS } from "./src/lib/security/response-headers";
+import { SECURITY_HEADERS, VIEW_AS_HEADERS } from "./src/lib/security/response-headers";
 
 // Set by open-next.config.ts `buildCommand` for the Cloudflare Workers build only.
 // That build swaps the image engine (sharp cannot load in workerd) so the Worker
@@ -31,7 +31,12 @@ const nextConfig: NextConfig = {
 
   // Baseline security headers on every response, on Vercel and on Workers (security audit 2026-10-22).
   async headers() {
-    return [{ source: "/:path*", headers: [...SECURITY_HEADERS] }];
+    return [
+      { source: "/:path*", headers: [...SECURITY_HEADERS] },
+      // Admin View-As: private account data, never cached, indexed or referred (docs/admin/ADMIN_VIEW_AS_ARCHITECTURE.md §9).
+      { source: "/admin/users/:id/view/:path*", headers: [...VIEW_AS_HEADERS] },
+      { source: "/admin/users/:id/view", headers: [...VIEW_AS_HEADERS] },
+    ];
   },
 
   // Compatibility for links shared while the installer phone + password pages
