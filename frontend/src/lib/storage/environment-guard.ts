@@ -1,3 +1,5 @@
+import { ENVIRONMENT_MANIFEST, type EnvironmentIdentity } from "./environment-manifest";
+
 /**
  * Fail-closed environment isolation for media storage.
  *
@@ -11,8 +13,8 @@
  */
 export type MediaAppEnv = "local" | "staging" | "production";
 
-export const PRODUCTION_SUPABASE_REF = "kkpkgjrweysgvhvkhzun";
-export const ACCEPTANCE_SUPABASE_REF = "nxossqhdfltcqdwvbewi";
+export const PRODUCTION_SUPABASE_REF = ENVIRONMENT_MANIFEST.production.supabaseRef;
+export const ACCEPTANCE_SUPABASE_REF = ENVIRONMENT_MANIFEST.staging.supabaseRef;
 
 /** Words that mark a resource as non-Production. Production resources carry none of them. */
 const NON_PRODUCTION_MARKERS = ["acceptance", "preview", "staging", "local", "test", "dev"];
@@ -34,34 +36,58 @@ export function supabaseRefFromUrl(url: string | undefined): string | null {
 }
 
 export type MediaEnvironmentInput = {
-  appEnv: MediaAppEnv;
+  accountId?: string | undefined;
+  appEnv: MediaAppEnv | undefined;
   supabaseUrl: string | undefined;
   privateBucket: string | undefined;
   publicBucket?: string | undefined;
   siteBucket?: string | undefined;
 };
 
-/** Returns every reason this configuration is unsafe; an empty list means safe to use R2. */
-export function mediaEnvironmentProblems(input: MediaEnvironmentInput): string[] {
+/**
+ * Returns every reason this configuration is unsafe; an empty list means safe to use R2.
+ * Exact identity first (project ref, account, bucket names from the manifest), markers second.
+ */
+export function mediaEnvironmentProblems(input: MediaEnvironmentInput,
+  manifest: Record<"production" | "staging", EnvironmentIdentity> = ENVIRONMENT_MANIFEST): string[] {
   const problems: string[] = [];
   const ref = supabaseRefFromUrl(input.supabaseUrl);
-  const buckets: Array<[string, string | undefined]> = [
-    ["R2_PRIVATE_BUCKET", input.privateBucket],
-    ["R2_PUBLIC_BUCKET", input.publicBucket],
-    ["R2_SITE_BUCKET", input.siteBucket],
+  const slots: Array<["private" | "public" | "site", string, string | undefined]> = [
+    ["private", "R2_PRIVATE_BUCKET", input.privateBucket],
+    ["public", "R2_PUBLIC_BUCKET", input.publicBucket],
+    ["site", "R2_SITE_BUCKET", input.siteBucket],
   ];
-  for (const [label, name] of buckets) {
+  const appEnv = input.appEnv ?? "local";
+  const identity = appEnv === "local" ? null : manifest[appEnv];
+  for (const [slot, label, name] of slots) {
     if (!name) continue;
     if (/backup/i.test(name)) problems.push(`${label} must not be a backup bucket`);
-    if (input.appEnv === "production" && isNonProductionName(name)) problems.push(`${label} names a non-Production resource in Production`);
-    if (input.appEnv === "staging" && !isNonProductionName(name)) problems.push(`${label} looks like a Production bucket outside Production`);
+    if (appEnv === "production" && isNonProductionName(name)) problems.push(`${label} names a non-Production resource in Production`);
+    if (appEnv === "staging" && !isNonProductionName(name)) problems.push(`${label} looks like a Production bucket outside Production`);
+    if (identity) {
+      const approved = identity.buckets[slot];
+      if (approved === null) problems.push(`${label} has no approved bucket for this environment yet`);
+      else if (name !== approved) problems.push(`${label} is not the approved bucket for this environment`);
+      if (identity.backupBuckets.includes(name)) problems.push(`${label} is a backup target`);
+    }
   }
-  const named = buckets.filter(([, name]) => name).map(([, name]) => name!);
+  const named = slots.filter(([, , name]) => name).map(([, , name]) => name!);
   if (new Set(named).size !== named.length) problems.push("media buckets must all be different");
-  if (input.appEnv === "production") {
-    if (ref !== PRODUCTION_SUPABASE_REF) problems.push("Production must use the Production Supabase project");
-  } else if (ref === PRODUCTION_SUPABASE_REF) {
-    problems.push("only Production may use the Production Supabase project");
+
+  if (identity) {
+    if (ref !== identity.supabaseRef) problems.push("the Supabase project is not the approved one for this environment");
+    if (identity.r2AccountId === null) {
+      // Production must pin its account; Acceptance may run unpinned until the owner supplies it.
+      if (appEnv === "production") problems.push("the Cloudflare account is not pinned for Production");
+    } else if (input.accountId !== identity.r2AccountId) {
+      problems.push("the Cloudflare account is not the approved one for this environment");
+    }
+    // The other environment's account/projects are never acceptable.
+    const other = appEnv === "production" ? manifest.staging : manifest.production;
+    if (ref === other.supabaseRef) problems.push("another environment's Supabase project");
+    if (other.r2AccountId && input.accountId === other.r2AccountId && identity.r2AccountId !== other.r2AccountId) problems.push("another environment's Cloudflare account");
+  } else if (ref === manifest.production.supabaseRef || ref === manifest.staging.supabaseRef) {
+    problems.push("local runs must not use a hosted Supabase project");
   }
   return problems;
 }

@@ -16,10 +16,14 @@ const set = (appEnv: string, bucket: string, ref: string, extra: Record<string, 
 beforeEach(() => set("staging", "aladdin-r2-acceptance-20261011-private", ACCEPTANCE_SUPABASE_REF));
 
 describe("R2 client refuses the wrong environment", () => {
-  it("works for a consistent Acceptance and Production setup", () => {
+  it("works for the approved Acceptance setup", () => {
     expect(() => new CloudflareR2StorageProvider("avatar")).not.toThrow();
+  });
+  it("refuses a look-alike Acceptance bucket and any Production use until approved", () => {
+    set("staging", "evil-acceptance-copy", ACCEPTANCE_SUPABASE_REF);
+    expect(() => new CloudflareR2StorageProvider("avatar")).toThrow("media environment refused");
     set("production", "aladdin-media-production-private", PRODUCTION_SUPABASE_REF);
-    expect(() => new CloudflareR2StorageProvider("avatar")).not.toThrow();
+    expect(() => new CloudflareR2StorageProvider("avatar")).toThrow("media environment refused");
   });
   it("refuses an Acceptance bucket from Production, and a Production bucket from Acceptance", () => {
     set("production", "aladdin-r2-acceptance-20261011-private", PRODUCTION_SUPABASE_REF);
