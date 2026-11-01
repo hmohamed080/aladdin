@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Real concurrency proof for the WhatsApp send budget (20261101090001): N parallel
+# Real concurrency proof for the WhatsApp send budget (20261102090001): N parallel
 # phone_challenge_issue calls against a limit of K must insert exactly K rows.
 source "$(dirname "${BASH_SOURCE[0]}")/lib/db_target.sh"
 db_target_require

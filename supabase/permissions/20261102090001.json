@@ -1,5 +1,5 @@
 {
- "version": "20261101090001",
+ "version": "20261102090001",
  "source": "20261029090002 contract plus three service_role-only definer functions for WhatsApp sign-up (public.phone_challenge_issue, public.phone_challenge_mark_sent, public.phone_sign_up_mark_verified); signatures for timestamptz verified by the supabase-rls CI replay",
  "publicRPCs": [
   "public.invitation_lookup(text)",
