@@ -74,6 +74,11 @@ Every protection above is either unchanged in R2 or ported. The R2 phone verific
 | Frontend `tsc --noEmit` | one pre-existing, unrelated error: `edge/media-worker` cannot find `postgres` (that package's `node_modules` is not installed in any local worktree; no media-worker file was touched) |
 | **Not run locally** (left to CI, B2) | pgTAP and the RLS replay, the RC2 upgrade path, the phone E2E and R1 matrix, the Worker E2E rig, the 2 local-integration suites, Auth CAPTCHA and Showroom E2E |
 
+## Owner decisions after review (2026-11-02)
+- **D1 accepted:** the atomic global rolling-24h budget stays, with conservative accounting (every claimed attempt and Meta failure counts). The limit must be **Admin-configurable without a deploy**; see the [Admin settings plan](WHATSAPP_OTP_ADMIN_SETTINGS_PLAN.md). The env-var form in this candidate is interim. The Production initial value is proposed in the [Production release plan](WHATSAPP_OTP_PRODUCTION_RELEASE_PLAN.md), not hardcoded.
+- **D2 decided:** the legacy table is **not** kept indefinitely. Its forward-only DROP stays in `supabase/proposals/` and is tracked as mandatory follow-up RF-001 ([issue #135](https://github.com/hmohamed080/aladdin/issues/135), [RELEASE_FOLLOWUPS.md](../operations/RELEASE_FOLLOWUPS.md)), checked by CI.
+- **D3 decided:** #116's superseded changes are treated as contained in the reconciled stack. **The original #116 stays open until the final combined PR is merged.**
+
 ## What is deferred
 Pushing, retargeting #127, running the mandatory CI, and everything in the Production preparation: each needs its own approval.
 
