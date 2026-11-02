@@ -6,8 +6,8 @@ import { useI18n } from "@/lib/i18n/context";
 import { Button, LabeledField, Select, SubmitButton, Textarea } from "@/components/ui/controls";
 import { InlineError, InlineSuccess } from "@/components/ui/primitives";
 import { TrashIcon, UploadIcon } from "@/components/ui/icons";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
-import { BV_ALLOWED_TYPES, BV_BUCKET, BV_DOC_TYPES, BV_MAX_DRAFTS, BV_NOTE_MAX, validateBvFile, type BvDocType } from "@/lib/business-verification/contract";
+import { uploadWithGrant } from "@/lib/storage/browser-upload";
+import { BV_ALLOWED_TYPES, BV_DOC_TYPES, BV_MAX_DRAFTS, BV_NOTE_MAX, validateBvFile, type BvDocType } from "@/lib/business-verification/contract";
 import { confirmBvUploadAction, removeBvDocumentAction, requestBvUploadAction, submitBvAction } from "@/server/actions/business-verification";
 import type { FormState } from "@/server/actions/sales-forms";
 import type { BvDocument } from "@/server/queries/business-verification";
@@ -60,9 +60,8 @@ export function BvOwnerPanel({
     try {
       const ticket = await requestBvUploadAction({ orgId, docType, contentType: file.type, sizeBytes: file.size, fileName: file.name });
       if (!ticket.ok) throw new Error(ticket.code);
-      const supabase = createBrowserSupabaseClient();
-      const { error: uploadError } = await supabase.storage.from(BV_BUCKET).upload(ticket.key, file, { contentType: file.type, upsert: false });
-      if (uploadError) throw new Error("businessVerification.errors.upload");
+      try { await uploadWithGrant(ticket.grant, file); }
+      catch { throw new Error("businessVerification.errors.upload"); }
       const confirmed = await confirmBvUploadAction(ticket.key);
       if (!confirmed.ok) throw new Error(confirmed.code);
       setNotice(t("businessVerification.owner.uploaded"));

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PackageIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/ui/cn";
+import { isRefreshableMediaUrl, refreshMediaUrl } from "@/lib/media/refresh-url";
 import { GRID_IMAGE_SIZES, variantSrc, variantSrcSet, type MediaUse, type MediaVariantUrls } from "@/lib/media/image-variants";
 
 /**
@@ -60,12 +61,17 @@ export function ProductMedia({
   }, [src]);
 
   async function refresh() {
-    if (retried || !current || !current.includes("/storage/v1/object/sign/")) {
+    const edge = current !== null && isRefreshableMediaUrl(current);
+    if (retried || !current || (!edge && !current.includes("/storage/v1/object/sign/"))) {
       setCurrent(null);
       return;
     }
     setRetried(true);
     try {
+      if (edge) {
+        setCurrent(await refreshMediaUrl(current));
+        return;
+      }
       const { refreshProductImageUrlAction } = await import("@/server/actions/product-image-refresh");
       const scope = window.location.pathname.startsWith("/home") ? "personal" : "workspace";
       setCurrent(await refreshProductImageUrlAction(current, scope));

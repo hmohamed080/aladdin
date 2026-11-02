@@ -84,6 +84,43 @@ jobs:
       - name: Run pgTAP tenant-isolation / RLS tests
         run: pnpm exec supabase test db
 
+      - name: Held R2-only Storage write closure closes every application bucket, and its rollback restores the exact policies
+        run: |
+          run_sql() { docker exec -i supabase_db_aladdin psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q; }
+          { echo "begin;"; cat supabase/activation/r2-only-storage-write-closure.sql supabase/activation/verify-closure.sql; echo "rollback;"; } | run_sql
+          {
+            echo "begin;"
+            echo "create temp table before_closure as select policyname, cmd, roles::text r, qual, with_check from pg_policies where schemaname='storage' and tablename='objects';"
+            cat supabase/activation/r2-only-storage-write-closure.sql supabase/activation/r2-only-storage-write-closure-rollback.sql
+            echo "do \$\$ begin if exists (select policyname, cmd, roles::text, qual, with_check from pg_policies where schemaname='storage' and tablename='objects' except select * from before_closure) or exists (select * from before_closure except select policyname, cmd, roles::text, qual, with_check from pg_policies where schemaname='storage' and tablename='objects') then raise exception 'rollback did not restore the exact policies'; end if; end \$\$;"
+            echo "rollback;"
+          } | run_sql
+
+      - name: Held legacy-media reset is safe (protected evidence, R2 keys, replaced objects), complete, idempotent and fully rolled back
+        run: |
+          run_sql() { docker exec -i supabase_db_aladdin psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q; }
+          { echo "begin;"; cat supabase/activation/legacy-media-reset.sql supabase/activation/verify-legacy-media-reset.sql; echo "rollback;"; } | run_sql
+          {
+            echo "begin;"
+            cat supabase/activation/legacy-media-reset.sql supabase/activation/legacy-media-reset-rollback.sql
+            echo "do \$\$ begin"
+            echo "  if exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname like 'media\\_reset\\_%' or p.proname = 'media_is_r2') then raise exception 'rollback left reset functions behind'; end if;"
+            echo "  if to_regclass('public.media_reset_journal') is null then raise exception 'rollback removed the journal'; end if;"
+            echo "end \$\$;"
+            echo "rollback;"
+          } | run_sql
+
+      - name: Held verification-evidence R2 adoption only adopts verified submitted evidence, keeps every Supabase copy, and rolls back
+        run: |
+          run_sql() { docker exec -i supabase_db_aladdin psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q; }
+          { echo "begin;"; cat supabase/activation/bv-evidence-r2-adoption.sql supabase/activation/verify-bv-evidence-r2-adoption.sql; echo "rollback;"; } | run_sql
+          {
+            echo "begin;"
+            cat supabase/activation/bv-evidence-r2-adoption.sql supabase/activation/bv-evidence-r2-adoption-rollback.sql
+            echo "do \$\$ begin if exists (select 1 from pg_proc where proname like 'bv\\_evidence\\_%') then raise exception 'rollback left adoption functions behind'; end if; end \$\$;"
+            echo "rollback;"
+          } | run_sql
+
       - name: Verify authoritative business-phone metadata matches the application
         run: node scripts/test-business-phone-parity.mjs --container supabase_db_aladdin --database postgres
 
@@ -98,6 +135,12 @@ jobs:
 
       - name: Prove the installer phone-change journal (and its coexistence with secondary phones) under simultaneous requests
         run: bash supabase/tests/installer_phone_change_concurrency_test.sh
+
+      - name: Prove pending-registration username leases and claims serialize per name
+        run: bash supabase/tests/registration_username_lease_concurrency_test.sh
+
+      - name: Prove the global phone-verification send budget holds under parallel requests
+        run: bash supabase/tests/phone_send_budget_concurrency_test.sh
 
       - name: Prove repeatability (second clean reset + tests)
         run: |

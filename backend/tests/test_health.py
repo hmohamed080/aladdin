@@ -1,7 +1,7 @@
 """Health, public-route-mounting, and configuration tests for the backend.
 
-The routing tests pin the PUBLIC contract (`/api/backend/...`) that the Vercel
-Services rewrite forwards unchanged — see ADR-0009 and `app.main.API_PREFIX`.
+The routing tests pin the PUBLIC contract (`/api/backend/...`) that the web app's
+`BACKEND` binding forwards unchanged — see ADR-0022 and `app.main.API_PREFIX`.
 """
 
 from __future__ import annotations

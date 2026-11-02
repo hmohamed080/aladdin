@@ -6,6 +6,7 @@ import { ArrowUpRightIcon } from "@/components/ui/icons";
 import { Reveal } from "@/components/ui/reveal";
 import { useI18n } from "@/lib/i18n/context";
 import styles from "./landing-v2-final-cta.module.css";
+import { LANDING } from "@/lib/assets/registry";
 
 const content = {
   ar: {
@@ -44,7 +45,7 @@ export function LandingV2FinalCta() {
     <section className={styles.section} data-landing-v2-part="FinalCta">
       <div className={styles.scene}>
         <Image
-          src="/landing-v2/sections/final-cta-scene.png"
+          src={LANDING.finalCtaScene}
           alt=""
           fill
           sizes="100vw"

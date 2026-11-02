@@ -4,7 +4,7 @@
 --   * Exactly the approved values exist: five personal personas and six business types. The retired
 --     interior_designer / trainer / trainee personas and the wholesaler organization type are gone.
 --   * Subtypes: Showroom 4, Supplier 2 (distributor + wholesaler), Manufacturer 2, Importer 2,
---     Engineer 1 (finishing); Contractor, Craftsman and Personal carry none; Sales has staff roles only.
+--     Engineer 2 (civil engineer, architect; the placeholder finishing retired by 20261029090002); Contractor, Craftsman and Personal carry none; Sales has staff roles only.
 --   * The database refuses a subtype on the wrong account (trigger) as well as the RPCs do.
 --   * Wholesaler is valid only under Supplier.
 --   * The business registration track cannot open contractor_company or a retired value.
@@ -15,7 +15,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(47);
+select plan(48);
 
 update auth.users set email_confirmed_at = now() where email_confirmed_at is null;
 
@@ -49,8 +49,8 @@ select is((select array_agg(key order by sort_order) from public.activities wher
   array['paint_manufacturer','decor_manufacturer'], 'Manufacturer has exactly two subtypes');
 select is((select array_agg(key order by sort_order) from public.activities where organization_type = 'importer'),
   array['decor_supplies_importer','paint_importer'], 'Importer has exactly two subtypes');
-select is((select array_agg(key) from public.activities where persona_type = 'engineer'),
-  array['finishing'], 'Engineer has exactly one subtype: finishing');
+select is((select array_agg(key order by sort_order) from public.activities where persona_type = 'engineer' and is_active),
+  array['civil_engineer','architect'], 'Engineer has exactly two active subtypes: civil engineer and architect');
 select is((select count(*)::int from public.activities
             where organization_type in ('design_office','contractor_company')
                or persona_type in ('contractor','installer_technician','end_consumer')),
@@ -93,7 +93,8 @@ set local request.jwt.claims = :'delta';
 select lives_ok(format($f$select public.organization_activities_set(%L::uuid, array['distributor','wholesaler'])$f$, :'orgS'),
   'a Supplier may be both distributor and wholesaler');
 set local request.jwt.claims = :'engineer';
-select lives_ok($$ select public.user_activities_set(array['finishing']) $$, 'an Engineer may take Finishing');
+select lives_ok($$ select public.user_activities_set(array['civil_engineer']) $$, 'an Engineer may take Civil engineer');
+select throws_ok($$ select public.user_activities_set(array['finishing']) $$, '22023', null, 'the retired Finishing is no longer offered');
 select throws_ok($$ select public.user_activities_set(array['sales_rep']) $$, '22023', null, 'an Engineer cannot take a Sales staff role');
 
 -- E. Registration: the business track is limited to approved businesses ------------------------------

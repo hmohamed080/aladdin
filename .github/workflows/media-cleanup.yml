@@ -1,0 +1,91 @@
+# Scheduled / manual cleanup of media records the application deleted (R2 only; a legacy Supabase object is never touched).
+# DISABLED BY DEFAULT: every project's repository variable ({ACCEPTANCE,PRODUCTION}_MEDIA_CLEANUP) is "off" until the owner sets it.
+# What a run may do is decided by scripts/media-cleanup-plan.mjs (tested offline): see its header for the gates. Secrets live in the
+# GitHub environments media-cleanup-acceptance / media-cleanup-production (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, R2_ACCOUNT_ID,
+# R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PRIVATE_BUCKET); none exist yet, so no run can reach a hosted project today.
+# Retries: every row is retired, deleted, read back and only then completed, so a failed row is simply picked up by the next run;
+# a failed run exits non-zero and shows red. A BV document attached to a submission is evidence and is never a candidate.
+name: Media cleanup
+on:
+  schedule:
+    - cron: "15 2 * * *"
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "Which project"
+        type: choice
+        options: [acceptance, production]
+        default: acceptance
+      execute:
+        description: "Delete for real (default: dry run, counts only)"
+        type: boolean
+        default: false
+      confirm:
+        description: 'Production execute only: type "clean up production media"'
+        type: string
+        required: false
+        default: ""
+permissions:
+  contents: read
+concurrency:
+  group: media-cleanup
+  cancel-in-progress: false
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      targets: ${{ steps.plan.outputs.targets }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_LABEL: ${{ inputs.label }}
+          INPUT_EXECUTE: ${{ inputs.execute }}
+          INPUT_CONFIRM: ${{ inputs.confirm }}
+          ACCEPTANCE_MEDIA_CLEANUP: ${{ vars.ACCEPTANCE_MEDIA_CLEANUP }}
+          PRODUCTION_MEDIA_CLEANUP: ${{ vars.PRODUCTION_MEDIA_CLEANUP }}
+          PRODUCTION_BACKUP_ENABLED: ${{ vars.PRODUCTION_BACKUP_ENABLED }}
+        run: |
+          targets="$(node scripts/media-cleanup-plan.mjs)"
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+          echo "Targets in this run: $targets" >> "$GITHUB_STEP_SUMMARY"
+
+  cleanup:
+    needs: plan
+    if: needs.plan.outputs.targets != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.plan.outputs.targets) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: media-cleanup-${{ matrix.target.label }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Enable pnpm (corepack, pinned to packageManager)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - name: Cleanup (${{ matrix.target.label }}, execute=${{ matrix.target.execute }})
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_PRIVATE_BUCKET: ${{ secrets.R2_PRIVATE_BUCKET }}
+          PROJECT: ${{ matrix.target.project }}
+          EXECUTE: ${{ matrix.target.execute }}
+        run: |
+          args=(cleanup --project "$PROJECT" --limit 50)
+          [ "$EXECUTE" = true ] && args+=(--execute)
+          node scripts/media-storage.mjs "${args[@]}"

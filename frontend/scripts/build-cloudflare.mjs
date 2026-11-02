@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Builds the app for Cloudflare Workers (OpenNext) without changing the Vercel build.
+ * Builds the app for Cloudflare Workers (OpenNext) without changing the plain `next build`.
  *
- * The one source difference between the two hosts is the middleware runtime:
- *   * Vercel Services cannot host Edge output, so `src/middleware.ts` declares
- *     `runtime = "nodejs"` (the Vercel build, `next build --webpack`, is untouched).
+ * The one source difference between the two builds is the middleware runtime:
+ *   * `src/middleware.ts` declares `runtime = "nodejs"` for the plain
+ *     `next build --webpack` (CI and local), which stays untouched.
  *   * On Workers, Node.js middleware is experimental and unsupported by OpenNext
  *     and Cloudflare; Edge middleware is the supported path. The middleware only
  *     uses WebCrypto, fetch and cookies, so it is Edge-compatible as written.
@@ -37,7 +37,7 @@ try {
 }
 
 // Static-asset headers (Workers Static Assets `_headers`). Hashed build files never
-// change, so browsers and the edge may keep them for a year, as Vercel serves them.
+// change, so browsers and the edge may keep them for a year.
 if (status === 0) {
   writeFileSync(fileURLToPath(new URL("../.open-next/assets/_headers", import.meta.url)), [
     "/_next/static/*",

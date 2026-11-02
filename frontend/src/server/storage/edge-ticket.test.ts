@@ -4,7 +4,7 @@ vi.mock("./media", () => ({ resolveMedia: vi.fn() }));
 import vectors from "../../../../edge/media-worker/test/ticket-vectors.json";
 // The Worker's own verifier: app-minted tickets must verify there, byte for byte.
 import { parseTicketKeys, verifyTicket } from "../../../../edge/media-worker/src/ticket";
-import { edgeConfig, mintTicket, privateMediaUrl, publicMediaUrl, publicPortfolioSource, readableMediaUrl, ticketExpiry, type TicketClaims } from "./edge-ticket";
+import { edgeConfig, mintTicket, privateMediaUrl, publicMediaUrl, refreshEdgeMediaUrl, publicPortfolioSource, readableMediaUrl, ticketExpiry, type TicketClaims } from "./edge-ticket";
 import { resolveMedia } from "./media";
 import { storageEnvSchema } from "@/lib/env/storage";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -87,6 +87,18 @@ describe("URL switch", () => {
     expect((await verifyTicket(ticketOf(personal), workerKeys, vectors.now))?.ws).toBeNull();
   });
 
+  it("flag on: a request photo ticket carries the viewing workspace; a verification ticket never does", async () => {
+    enableEdge();
+    const c = client(viewer);
+    const now = vectors.now * 1000;
+    const req = await privateMediaUrl(c, "request", PRODUCT, "r2", { workspace: WS, nowMs: now });
+    expect(req.startsWith("https://media.example.test/m/request/original?t=")).toBe(true);
+    expect((await verifyTicket(ticketOf(req), workerKeys, vectors.now))?.ws).toBe(WS);
+    const doc = await privateMediaUrl(c, "verification", KEY, "r2", { workspace: WS, nowMs: now });
+    expect(doc.startsWith("https://media.example.test/m/verification/original?t=")).toBe(true);
+    expect((await verifyTicket(ticketOf(doc), workerKeys, vectors.now))?.ws).toBeNull();
+  });
+
   it("flag on without a verified session falls back to the proxy (which then refuses)", async () => {
     enableEdge();
     expect(await privateMediaUrl(client(null), "certificate", KEY, "r2")).toBe(`/api/media/certificate?key=${encodeURIComponent(KEY)}`);
@@ -138,5 +150,43 @@ describe("edge settings fail fast only when enabled", () => {
     ["origin with path", { MEDIA_EDGE_ORIGIN: "https://media.example.test/m" }],
   ])("refuses %s", (_, change) => {
     expect(() => storageEnvSchema.parse({ ...on, ...change })).toThrow();
+  });
+});
+
+describe("refreshing an expired edge URL", () => {
+  const session = { sub: VIEWER, session_id: SESSION, role: "authenticated", exp: vectors.now + 3600 };
+  const ready = { provider: "r2", contentType: "image/png", reserved: true, state: "ready", owner: VIEWER };
+  async function stale() {
+    enableEdge();
+    vi.mocked(resolveMedia).mockResolvedValue(ready as never);
+    return privateMediaUrl(client(session), "avatar", KEY, "r2", { variant: "thumb", nowMs: 0 });
+  }
+  it("re-authorizes the caller and issues a fresh URL for the same object and variant", async () => {
+    const old = await stale();
+    const next = await refreshEdgeMediaUrl(client(session), old);
+    expect(next).toMatch(/^https:\/\/media\.example\.test\/m\/avatar\/thumb\?t=/);
+    expect(next).not.toBe(old);
+    expect(vi.mocked(resolveMedia)).toHaveBeenLastCalledWith(expect.anything(), "avatar", KEY, "read", null);
+  });
+  it("returns null when the caller may no longer read it, is signed out, or the object is gone", async () => {
+    const old = await stale();
+    vi.mocked(resolveMedia).mockRejectedValueOnce(new Error("media unavailable"));
+    expect(await refreshEdgeMediaUrl(client(session), old)).toBeNull();
+    vi.mocked(resolveMedia).mockResolvedValue({ ...ready, state: "deleted" } as never);
+    expect(await refreshEdgeMediaUrl(client(session), old)).toBeNull();
+    vi.mocked(resolveMedia).mockResolvedValue(ready as never);
+    // A signed-out caller would only get the app-proxy URL, which is not a refreshed edge URL.
+    expect(await refreshEdgeMediaUrl(client(null), old)).toBeNull();
+  });
+  it("refuses foreign origins, garbage and tampered namespaces without touching the database", async () => {
+    const old = await stale();
+    vi.mocked(resolveMedia).mockClear();
+    expect(await refreshEdgeMediaUrl(client(session), old.replace("media.example.test", "evil.example"))).toBeNull();
+    expect(await refreshEdgeMediaUrl(client(session), old.replace("/m/avatar/", "/m/portfolio/"))).toBeNull();
+    expect(await refreshEdgeMediaUrl(client(session), "not a url")).toBeNull();
+    expect(vi.mocked(resolveMedia)).not.toHaveBeenCalled();
+  });
+  it("does nothing while edge delivery is off", async () => {
+    expect(await refreshEdgeMediaUrl(client(session), "https://media.example.test/m/avatar/thumb?t=a.b.c")).toBeNull();
   });
 });

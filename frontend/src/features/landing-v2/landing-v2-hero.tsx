@@ -7,6 +7,7 @@ import { ArrowUpRightIcon, GlobeIcon } from "@/components/ui/icons";
 import { LanguageSwitch } from "@/components/layout/switchers";
 import { useI18n } from "@/lib/i18n/context";
 import styles from "./landing-v2-hero.module.css";
+import { BRAND, LANDING } from "@/lib/assets/registry";
 
 const content = {
   ar: {
@@ -111,7 +112,7 @@ export function LandingV2Hero() {
               or regenerated. Original `background-2.png` (1672×941) is
               untouched on disk for instant rollback. */}
           <Image
-            src="/landing-v2/hero/background-2-new-trimmed.png"
+            src={LANDING.heroBackground}
             alt=""
             width={1728}
             height={735}
@@ -125,7 +126,7 @@ export function LandingV2Hero() {
           data-landing-v2-part="BrandCap"
         >
           <Image
-            src="/brand/aladdin-logo.png"
+            src={BRAND.logo}
             alt="Aladdin"
             width={684}
             height={643}

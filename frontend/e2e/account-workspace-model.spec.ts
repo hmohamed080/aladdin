@@ -1,5 +1,5 @@
-import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
-import { registerWithPassword, signIn, IDENTITIES } from "./helpers/auth";
+import { test, expect, type Page, type Locator, type APIRequestContext } from "@playwright/test";
+import { answerBusinessContactIfAsked, pickBusinessActivity, registerWithPassword, signIn, IDENTITIES } from "./helpers/auth";
 
 /**
  * Pilot Account & Workspace Model — targeted acceptance.
@@ -64,15 +64,19 @@ async function createBusiness(page: Page, name: string, branch: string, opts: { 
     await page.locator("#bactivity").selectOption("decor_showroom");
     await page.locator("#bphone").fill(`10${String(Date.now()).slice(-8)}`);
   }
+  if (!opts.showroom) await pickBusinessActivity(page);
   await next();
   if (opts.orgType) {
     await expect(page.getByRole("heading", { name: /what kind of business/i })).toBeVisible();
     await page.getByText(opts.orgType).first().click();
+    // Each business type answers its own activity list.
+    await pickBusinessActivity(page);
     await next();
   }
   await page.locator("#bgov").selectOption("cairo");
   await page.locator("#bcity").selectOption("maadi");
   await next();
+  await answerBusinessContactIfAsked(page);
   await page.locator("#bbranch").fill(branch);
   await next();
   await expect(page.getByRole("heading", { name: /review and create/i })).toBeVisible();
@@ -96,9 +100,39 @@ async function signOutFromAccountMenu(page: Page) {
 }
 const workplaceMenu = (page: Page) => page.locator('[data-testid="workplace-menu"]:visible').first();
 
+/**
+ * Opens a menu whose trigger is a toggle (`aria-expanded`), deterministically.
+ *
+ * Why not "click until the menu is visible": a press that lands before React has hydrated the trigger is not
+ * lost, React replays it once the trigger hydrates. A retry loop that clicks again in the same window therefore
+ * toggles the menu OPEN and then CLOSED again, so the menu is visible for an instant and gone by the next
+ * assertion (the failure seen in CI as "menu absent from the snapshot while the trigger is present"). A single
+ * press before hydration can equally be lost (the invite and revocation journeys). So: wait until the trigger
+ * itself carries React's props (its handler is attached), press exactly once, and let `aria-expanded` — the
+ * application's own state — be the source of truth. No timeout is widened and no assertion is weakened.
+ */
+async function openToggleMenu(trigger: Locator, menu: Locator) {
+  // One attempt = verify the CURRENT trigger node is hydrated, press only if the menu is not already open, then wait
+  // for the application's own state. A press can still be lost when the page swaps the trigger node under us (a
+  // client navigation finishing right after sign-in or registration); the next attempt then sees the NEW, fresh
+  // node with aria-expanded=false and presses once on it. A press is never repeated on a node that already opened,
+  // so the open-then-closed double toggle cannot recur.
+  await expect(async () => {
+    await expect(trigger).toBeVisible({ timeout: 2_000 });
+    const hydrated = await trigger.evaluate((el) => Object.keys(el).some((key) => key.startsWith("__reactProps$")));
+    expect(hydrated, "the menu trigger has hydrated (its handler is attached)").toBe(true);
+    if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click({ timeout: 2_000 });
+    await expect(trigger).toHaveAttribute("aria-expanded", "true", { timeout: 2_000 });
+  }).toPass({ intervals: [250, 500, 1_000], timeout: 20_000 });
+  await expect(menu).toBeVisible();
+}
+
 async function openSwitcher(page: Page) {
-  await switcher(page).click();
-  await expect(page.locator('[data-testid="workspace-menu"]:visible').first()).toBeVisible();
+  await openToggleMenu(switcher(page), page.locator('[data-testid="workspace-menu"]:visible').first());
+}
+
+async function openWorkplaceSwitcher(page: Page) {
+  await openToggleMenu(workplaceSwitcher(page), workplaceMenu(page));
 }
 
 test.describe("1 — new business registration", () => {
@@ -229,7 +263,7 @@ test.describe("7 — invitation regression", () => {
     await page.goto("/home");
     await expect(page.getByTestId("workspace-switcher")).toHaveCount(0);
     await page.goto("/b2b");
-    await workplaceSwitcher(page).click();
+    await openWorkplaceSwitcher(page);
     const menu = workplaceMenu(page);
     await expect(menu.getByRole("menuitem", { name: /Nile Finishing Supplies/ })).toHaveCount(1);
     await expect(menu.getByRole("menuitem", { name: /Karim|^Personal$/ })).toHaveCount(1);
@@ -246,7 +280,7 @@ test.describe("6 — revoked membership", () => {
     // Karim (the Cairo branch rep) belongs to exactly one organization.
     await signIn(page, request, IDENTITIES.branchLimited, /\/(home|b2b)(\/|$)/);
     await page.goto("/b2b");
-    await workplaceSwitcher(page).click();
+    await openWorkplaceSwitcher(page);
     await expect(workplaceMenu(page).getByRole("menuitem", { name: /Nile Finishing Supplies/ })).toBeVisible();
     await page.keyboard.press("Escape");
     await signOutFromAccountMenu(page);
@@ -304,6 +338,11 @@ test.describe("bilingual + responsive — changed surfaces", () => {
   }) => {
     await prefs(page, "ar", "light");
     await signIn(page, request, "hana@example.test", /\/b2b(\/|$)/);
+    // Hana owns a showroom: `/b2b` is only a hop. After a client-side sign-in the URL reads `/b2b` first and the
+    // server redirect to the showroom workspace replaces the whole page a moment later. A menu opened in that gap
+    // is destroyed by the redirect (the failure seen in CI: heading found, next assertion finds no menu). Wait for
+    // the destination before touching the header.
+    await page.waitForURL(/\/showroom(\/|$)/);
 
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await openSwitcher(page);

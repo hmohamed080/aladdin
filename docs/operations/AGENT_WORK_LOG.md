@@ -1,4 +1,68 @@
+## 2026-11-01 — WhatsApp OTP Phase C preparation interrupted by an accidental sign-up; restored to OFF (no message)
+
+**Done:** pushed the Phase B docs commit `53525515` to draft PR #127; applied the pilot limits (`1 / 1 / '1 hour'`, originals `5 / 6 / '1 minute'`); owner ran the signed preflight (PASS, delivery OFF); C3 switched the DB and frontend ON with Worker delivery OFF; the owner's accidental *Create Account* at 14:47:04Z produced one `delivery_failed` challenge; all switches restored OFF at 14:50Z.
+
+**Evidence and findings:** see the incident section of the [Phase C plan](../security/WHATSAPP_OTP_PHASE_C_PILOT_PLAN.md#preparation-incident-and-findings--2026-11-01-c4-attempt-no-message-sent) (F1 resend countdown, F2 "code sent" wording, F3 read-only C4). No code changed.
+
+**Hosted state:** Worker unchanged (`6eb9364d`, delivery `false`); no message; Production, Auth providers and `main` untouched; C5 not approved. Earliest repeat of C3/C4: after 15:47:04Z.
+
+## 2026-11-01 — WhatsApp OTP Phase B executed and closed on Acceptance; Phase C prepared (no real message)
+
+**Goal:** execute the approved Phase B (dormant migrations, integrated preview build, one failing-by-design dry run), return to a fully OFF state, and prepare Phase C for separate approval.
+
+**Done:** B0 fresh read-only inspection (197/199, only the two target migrations missing, project identity matched) using the Supabase CLI token read in a child process from Windows Credential Manager (never printed). Owner linked the CLI and ran the dry run and the plain `db push`; 199/199 afterwards, authority objects present, switches `false|false|off`, no change to Auth settings, the 13 disputed function rights, alias census or phone flags, new RPCs `service_role`-only. B4 workflow run 41310152606 on `b29a3169`; B5 seven `PHONE_*` secrets (new HMAC keyring and cookie secret generated and piped without display; signing secret entered by the owner). B6 UI checks by the owner. B7 switches/flags ON, B8 owner sign-up reached the code screen (plus one owner-requested resend): 2 challenges both `delivery_failed`, 0 grants, `auth.users` 13 → 13, D1 journal 0 rows, no message. B9 everything OFF again and verified.
+
+**Evidence:** [Phase B results](../security/WHATSAPP_OTP_PHASE_A_CLOSURE_AND_PHASE_B_PLAN.md#phase-b--actual-results-closed) and [JSON](evidence/whatsapp-otp/phase-b-results-20261101.json).
+
+**Findings:** the Worker has no per-recipient quota (a new `delivery_id` per start/resend); the database limits are the throttle, and the Phase B challenges count toward `signup_phone_hourly` for an hour. Config-limit changes are not written to the audit log (only the three switches are). Phone accounts are alias-domain Auth users; `phone_signup_attach` sets `profiles.phone_verified_at`.
+
+**Not verified / open:** hosted authentication paths were not exercised; the Worker 503 is inferred; app-flag secret values cannot be read back. Phase C is prepared in [WHATSAPP_OTP_PHASE_C_PILOT_PLAN.md](../security/WHATSAPP_OTP_PHASE_C_PILOT_PLAN.md) and not approved.
+
+**Hosted state:** two migrations applied to Acceptance; frontend preview redeployed with secrets; Worker, Production, Auth providers and `main` unchanged; no merge; no real WhatsApp message.
+
+**Validation:** docs-only commit; internal links checked (see commit).
+
+## 2026-11-01 — WhatsApp OTP Phase A closed; Acceptance Phase B prepared (no hosted writes)
+
+**Goal:** close the isolated Acceptance WhatsApp OTP Worker phase with deployment and rollback evidence, then prepare a read-only, approval-ready Phase B for the Acceptance app/database without changing hosted state.
+
+**Phase A evidence:** Worker `aladdin-whatsapp-otp-preview` active version `6eb9364d-aa89-4e30-9005-a516ac0cd29f` (100%), code version `3e02b69b-865f-4eb1-854a-d22f7359a8dd`; the two later versions are secret-only changes. Bindings: `IDEMPOTENCY_DB` → D1 `da65d5e4-8344-4078-9c2d-8a4bb4907f79`; `OTP_SIGNING_SECRET` and `WHATSAPP_ACCESS_TOKEN` → Secrets Store `acfaa67f391e499db6fde398022f50ce`; `OTP_ALLOWED_RECIPIENTS` present. Vars: `OTP_ENVIRONMENT=acceptance`, `OTP_RECIPIENT_MODE=allowlist`, `WHATSAPP_DELIVERY_ENABLED=false`, Graph `v25.0`, template `aladdin_otp`, language `ar`, sender `1415528588305492`. Only trigger is the `workers.dev` URL; `routes: []`; zero routes on the `aladdindecore.com` zone; no custom domain. Signed preflight: `ok:true`, all five bindings/allowlist checks true, `delivery_enabled:false`, `environment:acceptance`, `allowlist_entries:1`. Rollback: `6dffc68b` (previous secret state) or `3e02b69b` (code, then re-apply signing secret and allowlist).
+
+**Read-only Acceptance inspection:** project `nxossqhdfltcqdwvbewi`; 197 applied / 199 repo; latest `20261029090002`; only `20261030090001` and `20261030090002` missing; no applied-not-in-repo; no out-of-order; `plain_push_possible:true`. Auth phone provider OFF, Send SMS hook OFF, before-user-created hook OFF, CAPTCHA ON, Google/Facebook ON. Alias users 0; profiles with phone 4 / verified 0; legacy challenge table approx. 0 rows; authority objects absent. The 13 disputed functions keep `service_role:false`, `anon:false`, `authenticated:true`. The general `permission_diff` shows 108 paired type-qualification renderings, not an EXECUTE delta.
+
+**Local rehearsal:** rebuilt the isolated stack `aladdin_r2acc` to the exact 197-version history, then ran `supabase/tests/r2/acceptance_order_rehearsal.sh`: pre-state matched, plain `db push` (no `--include-all`, no repair) applied exactly the two in order, existing email and phone-alias accounts/passwords/profiles/old history rows unchanged, switches `false|false|off`, alias guard deferred/inert, a new alias sign-up still allowed at `off`, second push up to date. **PASS.**
+
+**Files:** new [Phase A closure and Phase B plan](../security/WHATSAPP_OTP_PHASE_A_CLOSURE_AND_PHASE_B_PLAN.md); updated [activation steps](../security/WHATSAPP_OTP_ACCEPTANCE_ACTIVATION.md), [RUNTIME_STATE](RUNTIME_STATE.md), [implementation log](WHATSAPP_OTP_IMPLEMENTATION_LOG.md); corrected `supabase/tests/r2/acceptance_order_rehearsal.sh` and added the `R2_HOLD_BACK` rehearsal option to `supabase/tests/r2/stack.sh`.
+
+**Hosted state:** no Supabase migration, Auth configuration, frontend deploy, Worker delivery change, WhatsApp message, merge or Production change was made. Phase B is blocked on explicit owner approval; Phase C needs a separate approval for one real message.
+
+**Next:** owner reviews and approves Phase B only, then the sequence in the plan runs with delivery still OFF; Phase C remains separate.
+
 ## 2026-10-26 — Owner Sales delegation capabilities (Stage 6 finding, Option A)
+
+## 2026-10-28 — WhatsApp OTP security hardening on Draft PR #114
+
+**Changes:** Added D1 atomic webhook-id claim journal (SHA-256 event hashes only, no OTP or phone storage), no-retry provider semantics, fail-closed DB failure handling and mandatory Acceptance phone allowlist. Added migration SQL and GitHub security test workflow. Kept Meta Token in owner-created Cloudflare Secrets Store and sender ID as non-secret preview var.
+
+**Evidence:** Dedicated `WhatsApp OTP Transport CI` workflow run #2 `40684963776` succeeded for TypeScript and mocked test suite; no live D1/Meta verification performed. Full project CI remains unverified.
+
+**Hosted state:** Acceptance & Production Supabase unchanged; no Send SMS Hook; no Cloudflare D1 provisioned, no Worker deployed; delivery flag stays false; no messages sent in this work session.
+
+**Next gate:** Owner-provisioned isolated Acceptance D1 (no Production), migration applied and bind configured, real D1 replay tests, identity strategy review. Owner approval required for any deployment, Hook activation or live send.
+
+
+## 2026-10-28 — WhatsApp OTP transport preparation (draft, unmerged)
+
+**Goal:** Prepare Supabase Auth → signed HTTP Hook → isolated Cloudflare transport → Meta WhatsApp without altering existing auth flows or production.
+
+**Read-only inventory:** Verified Production and Acceptance Supabase projects and Cloudflare frontend/backend preview workers. GitHub connected repo `hmohamed080/aladdin`. Current General = Email + Password with Email OTP; installer/showroom Phone + Password uses synthetic alias and Supabase Phone Auth off.
+
+**Changes (feature branch only):** Created `feat/whatsapp-otp-transport-20261028`. Added isolated `edge/whatsapp-otp-worker/` (signature verification, bounded validation, Arabic Meta Copy Code send, delivery OFF) and proposed ADR-0025.
+
+**Validation:** Local Worker prototype `tsc --noEmit` PASS and 7 mock tests PASS; GitHub branch full CI not yet run. No real provider sends during preparation.
+
+**Open gates:** Meta System User credential, verified phone identity/enrollment plan, durable replay/idempotency, QA auth rate limits/CAPTCHA, English template as needed, Preview deployment approval, hosted Hook activation approval. **No Production modifications, no Hook enabled.**
+
 
 - Finding (Stage 6 Step 2, Acceptance): a showroom owner created by `app.organization_create_owned` holds `org.manage` and the pilot `sales.opportunity.*` keys but not `sales.read/write/assign/manage`, so `membership_set_capabilities` (no-escalation) refuses the Sales Rep and Sales Manager presets (`frontend/src/lib/org/roles.ts`).
 - Owner decision 2026-10-26: permanent product fix, no one-off DB grant.
@@ -7084,3 +7148,132 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Stage 12 on owner GO (17:40Z): Custom Domains `aladdindecore.com` and `www` on `aladdin-frontend-production`; the apex CNAME to `cc39f6c51d632b81.vercel-dns-017.com` was deleted to allow it. Owner reports no errors after ~35 min. Routes are not listed in `wrangler.jsonc` (the deploy token has no zone permission; wrangler leaves dashboard domains alone).
 - Team preview: `aladdin-frontend-preview.bstalent9.workers.dev` behind Cloudflare Access (All traffic; policies `Aladdin team` Allow by email, `GitHub preview smoke` Service Auth). The preview smoke check sends `CF_ACCESS_CLIENT_ID/SECRET` (environment `cloudflare-preview`).
 - **Unfinished / owner steps:** add the One-time PIN login method so teammates without a Cloudflare account can sign in; monitor (stage 13, proposed 7 days) before any Vercel change; the stage 12 rollback (detach domains, re-add the apex CNAME DNS only) stays ready; DMARC record is a separate later task; merge PR #110.
+
+## 2026-10-28 — Vercel retired, Resend live, hosted CAPTCHA on
+
+- Owner chose to retire Vercel at once (ADR-0024). #110 and #111 merged; the owner deleted the Vercel project, uninstalled its GitHub app and removed its DNS rows. Rollback is a Cloudflare Worker version rollback only.
+- Resend: domain `aladdindecore.com` verified (DKIM, SPF, MX). Worker secret `RESEND_API_KEY` plus `EMAIL_FROM` and `APP_PUBLIC_ORIGIN` on both Workers (also in `wrangler.jsonc`). A test email was delivered, and the installer contact-email verification flow worked on aladdindecore.com. Dashboard variable edits only upload a version: they go live after **Promote version**.
+- `next.aladdindecore.com` removed (Worker domain, Turnstile, Supabase redirect, repo). Cloudflare DMARC Management enabled (`p=none`).
+- Supabase Auth CAPTCHA protection (Turnstile) turned ON by the owner on Acceptance and Production. Checked: a token-less or fake-token password grant answers `captcha_failed` on both; the owner's browser smoke test (email sign-in, installer sign-in, forgot password) passed. Rollback: switch it off in the dashboard.
+- Follow-up (same day, PR #113): `backend/app/config.py` no longer reads `VERCEL_ENV`; comments, env examples, current guides and the privacy policy (Cloudflare + Resend named) updated; historical records keep their Vercel mentions.
+- **Unfinished:** DMARC can tighten after a few weeks of clean reports.
+
+### 2026-10-28 — Landing page 2026 and one sign-in design (branch `feat/landing-2026`, from `main` 586389e)
+
+- Context: PR #99 (public Marketplace) was closed after conflicts and dropped. The owner restarted from `main` and asked to bring back **only** the landing page work from that branch, with every Marketplace link showing "coming soon".
+- Landing: 2026 logo; four-colour palette scoped to the landing (`styles/brand-2026.module.css`, `tokens.css` untouched, so #93 stays the separate site-wide palette change); header account-type menu → `/auth/sign-up?type=<key>`; Marketplace navbar link; home Marketplace section on sample data (labelled preview); `/marketplace` is a coming-soon page. Not ported: cart, Marketplace pages, DB, favicon, `/sign-in` showroom route.
+- Sign-in / sign-up: the showroom page composition became `features/entry-auth/auth-stage`, now used by the `/auth` layout, the showroom pages and the installer pages. `?type=` only pre-selects an open account type (shown as the badge); the server action still validates it. `CraftsmanAuthShell` is no longer mounted.
+- `next` redirect check: every entry page and server action passes `next` through `sanitizeNext` (internal allowlisted paths only, no `//host`), so `?next=%2Fb2b` cannot redirect off-site.
+- Release order (owner rule): acceptance Supabase + Cloudflare preview first; Production only after verification and an explicit owner GO.
+- **Unfinished:** preview/acceptance check of this branch; decide whether to close #93; installer pages lost their worksite imagery (owner may want a per-type photo).
+
+### 2026-10-28 — Instagram-style sign-in and sign-up (branch `claude/project-thread-1bi6x0`, PR #113)
+
+- Owner asked: sign-in like Instagram ("Mobile number, username or email"), centred Instagram-like sign-up without the photo, birthday and username, no password-rule list or consent checkboxes, Google/Facebook visible, and the "Craftsman? / Showroom phone sign-in" links and routes removed. Owner decisions: mobile sign-up for **every** account type, verified by WhatsApp; provider **Meta WhatsApp Cloud API**.
+- Built ([ADR-0025](../decisions/ADR-0025-one-field-sign-in-whatsapp-sign-up.md)): `lib/auth/sign-in-identifier.ts`, server-side username/phone → auth email (`resolveSignInEmail`) behind the phone limiter; `server/auth/phone-sign-up.ts` + `whatsapp-otp.ts` (HMAC codes in `public.phone_verification_challenges`, sealed cookie, account created only after the code); `users.birth_date` (18+, private); general Google/Facebook callback; auth pages restyled with an Instagram-style card (sign-in keeps the photo; sign-up is centred without it, owner correction); four phone routes deleted with permanent redirects; sign-out always to `/auth/sign-in`; privacy policy names WhatsApp and the birthday.
+- Assumption sent to the owner: birthday required, 18+, private.
+- **Unfinished:** apply the migration to Acceptance (approval asked), owner adds the WhatsApp template and two Worker secrets, owner enables Google/Facebook on Acceptance, preview check, then merge #113 and production on the owner's GO (migration first). Google/Facebook sign-ups have no birthday yet (finish-registration could ask). Phone Forgot Password still deferred.
+
+### 2026-10-28 — "Complete your account" onboarding (same branch, PR #113)
+
+- Owner asked for onboarding for every account collecting phone, location (governorate, town) and category, reusing what existing onboarding already holds. Owner clarified category = the installer specialties list (`public.trades`), for all accounts.
+- Built ([ADR-0026](../decisions/ADR-0026-account-basics-onboarding.md)): migration `20261028090002_account_basics.sql` (profile location columns, `public.user_specialties`, `account_basics_set`, `my_account_basics`), permission contract, pgTAP `117_account_basics_test.sql`, `/onboarding/basics` page and form, redirects in `postSessionRedirect`, `entryLandingPath` and `/onboarding`, E2E helpers complete the screen automatically.
+- **Unfinished:** pgTAP not run locally (no Docker; CI runs it); migration needs the Acceptance approval; phone collected here is unverified.
+
+### 2026-10-28 — Interrupted registration recovery and pending-username lease (branch `claude/registration-resume`, from `claude/project-thread-1bi6x0` cfd9fe12)
+
+- Owner asked: let a person with an unfinished email registration get a new code without re-entering the password, and stop two unconfirmed registrations from both choosing the same username. Root cause with evidence, tests, docs, PR; Acceptance first; nothing to Production without GO.
+- Root cause (evidence in `docs/frontend/auth-password-preview.md` §Interrupted registration): SMTP 535 with a deleted Resend key (Production `/recover` 15:21/15:35 UTC, fixed 15:36), a 2/hour project email limit on Acceptance until custom SMTP (14:59:59 UTC), GoTrue's per-address interval (429), CAPTCHA failures, and the app keeping the code step only in React state. Verified locally: a repeat `signUp()` for an unconfirmed address keeps the FIRST password and metadata.
+- Built: migration `20261028090003_registration_username_lease.sql` (30-minute non-renewable username lease on `app.pending_registrations`, per-name advisory lock shared with `profile_set_username`, `username_available` honours leases, `email-resend` limiter action) + permission contract; `/auth/continue-registration`; `reg_email` httpOnly routing cookie; server throttle on resend; entry links on sign-in/sign-up.
+- Tests: pgTAP `118_registration_username_lease_test.sql` (44/44 locally), two-session `registration_username_lease_concurrency_test.sh` (PASS locally, added to CI), Vitest action + component tests.
+- **Unfinished:** the WhatsApp/phone sign-up does not take a lease; Acceptance is missing PR #113's `20261028090002` too (ordering note for whoever pushes migrations).
+
+### 2026-10-29 — Onboarding steps and a specialty list per account type (PR #113, migration `20261029090002`)
+
+- Owner, from Preview testing: specialties from a dropdown; phone / location / specialties as onboarding steps, not a separate page ("Steps inside onboarding"); a Showroom must not see the installer specialties; then gave the lists per account type.
+- Built ([ADR-0026 amendment](../decisions/ADR-0026-account-basics-onboarding.md)): step wizard for `/onboarding/basics`; business registrations answer inside business setup (phone step when missing, business activity for every business type with a list); Engineer list Civil engineer / Architect in `public.activities`; `user_specialties` dropped; a professional's first location seeds their service area; refused saves no longer clear the governorate; sign-up never shows a raw validator message.
+- Local: pgTAP 145 files pass, permission gate PASS 694, migration policy clean (reviewed drop), vitest all pass, tsc and lint clean (warnings only, pre-existing).
+- **Unfinished:** apply `20261029090002` to Acceptance (needs the owner's own-words approval; device runs `supabase db push --linked`), redeploy Preview and re-test; lists for Sales Team, Contractor and Personal later; clean up test accounts +t1/+t2/+t3.
+
+## 2026-10-31 — R2: registration integrated with the phone verification authority (Draft PR, nothing merged or applied)
+- Branch `integration/unified-registration-r2-20261031` = #116 (on #113) + #119→#125 + #124, no conflicts (disjoint files). `phone-sign-up.ts` now uses `start/verify/attach` of the authority and creates the Auth user only with its grant; retired `whatsapp-otp.ts`, the grant-less creators and the legacy challenge helpers; forward-only migration `20261031090001` drops `public.phone_verification_challenges`; permission contract regenerated (711).
+- Local evidence: pgTAP 148 files / 6651 tests pass; R1 security matrix 6 cells clean on the combined tree; phone sign-up E2E (outbox) passes on desktop and mobile; interim `before_user_created` hook probe 31/31 on GoTrue v2.193.0 and v2.197.0 × confirmations on/off. Details and open items: `docs/security/PHONE_SIGNUP_R2_INTEGRATION.md`, `…_INTERIM_ALIAS_HOOK.md`, `…_AUTH_HARDENING_RECOMMENDATIONS.md`.
+- **Unfinished / needs the owner:** hosted clearance record (Worker secrets unverified), taken-number UX decision, the window in which phone sign-up is unavailable, hook / leaked-password / redirect-allow-list approvals, GitHub Actions runs (§7 of the R2 doc), merge order. Not done: any hosted change, any real message.
+
+## 2026-10-31 (round 2) — R2 after the owner's review: nothing approved for merge/deploy/activation
+- Owner decisions: neutral code-screen copy kept (+ "Already have an account? Sign in"); no unplanned loss of phone registration → phased plan (`docs/security/PHONE_SIGNUP_R2_RELEASE_PLAN.md`); hook, leaked-password and redirect changes prepared only; merge only on a green final candidate.
+- Done: contract-step DROP moved out of `supabase/migrations` (a migration cannot be guaranteed to wait for the compatible app); B1 + R1 permission contracts reconciled (GitHub `supabase-rls` found the gap); five unit failures resolved (proved not R2 on a #116 baseline worktree); installer profile-completion failure investigated (dev-mode timeout + spec drift vs ADR-0026), fixed; dedicated `PHONE_SIGNUP_COOKIE_SECRET` + AEAD binding; `weak_password` UI handling; exact redirect allow-list comparison + `--only migrations` in the inspection tool; hook runbook + rollback drill; new workflow `phone-signup-security.yml`.
+- GitHub (head `9a0b1430`): CI, supabase-rls, Auth CAPTCHA E2E, Showroom RC2 E2E, Phone sign-up security — all green.
+- **Unfinished / needs the owner:** hosted clearance record; exact hosted migration history (read-only run by someone holding the token); real redirect allow-list values; plan support for Auth Hooks / leaked-password protection; delivery adapter (activation); approvals for Acceptance hook/migrations. No hosted change, no real message, no merge.
+### 2026-10-29 — Phase 1 backups and IDs-only R2 keys (branch `claude/project-thread-yjnwej`)
+
+- Owner decisions: "Start Phase 1" on the backup plan (audit and plan: Claude Doc "R2 media and backups", 2026-10-28), then "Use stable IDs only, with separate user (`u/`) and organization (`o/`) namespaces … Existing keys must remain valid." [ADR-0027](../decisions/ADR-0027-r2-id-keys-and-backups.md).
+- Backups: `ops/backups/` (db-backup, media-backup, restore-test, freshness, selftest, build-repo, three workflows, R2 lock and lifecycle rules, runbook README). The jobs run from a separate private repo `aladdin-backups` so their secrets stay out of this repo's workflows. Local proof: `selftest.sh` 17/17 against a local stack and a SeaweedFS S3 stand-in, exact restore (schema fingerprint, every table's row count, media sha256).
+- Keys: migration `20261029120001` adds the immutable `media_storage_locations.storage_key`, minted by trigger for new backend R2 reservations; `app.media_edge_grant` returns it; service-role `media_storage_object` serves the app (`media.ts`, `delivery.ts`, `r2-provider.ts`) and the cleanup command in `scripts/media-storage.mjs` (which now also deletes variants). The media Worker accepts ids-only keys only in the namespace's own folder. pgTAP `104_media_id_storage_keys_test.sql` (37 checks); full suite 6,370 green.
+- Local testing note: the selftest seeds two Storage files and removes them on exit; files left in local Storage break `100_historical_media_purge_test.sql` test 48.
+- **Unfinished / owner steps:** review and merge the PR; the backup setup steps in `ops/backups/README.md`; Acceptance run; then a separate Production GO. Push `20261029120001` to Acceptance, then Production, before R2 uploads are switched on anywhere. Follow-ups: video keys under `u/`/`o/` if video ships; an R2 source for the media copy once Production media is on R2.
+
+
+- 2026-10-29 17:22Z follow-up (owner review of #118):
+  - **Numbering.** Renumbered to migration `20261029120001` and ADR-0027, because #113 holds `20261029090001` and `20261029090002` (both on Acceptance) and ADR-0025/0026. The WhatsApp OTP branch also uses ADR-0025; that branch needs its own renumbering.
+  - **Permissions.** New permission contract `20261029120001.json` with exactly three reviewed additions. Once #113 merges, merge `main` into #118 and regenerate this contract from the combined replay, because the gate reads only the newest contract.
+  - **Workflows.** Rebuilt around `plan.sh`/`plan-test.sh`:
+    - a matrix decided by a plan job (`matrix` is not available in a job-level `if`);
+    - a Production switch plus a typed confirmation, checked again in the scripts;
+    - two cron firings for Cairo daylight saving.
+  - **Labels.** Each label is pinned to its project ref, database host, Supabase URL, service-key claim and bucket.
+  - **Snapshots.** Each snapshot's media inventory comes from its own dump and is stored next to it (same lock and expiry). Media copies are locked 365 days and never expired. The restore test checks inventory coverage, and freshness fails on an incomplete media step and, for Production, on uncovered R2 media.
+  - **CI.** A new `backup-kit` CI job runs actionlint 1.7.7, shellcheck and the plan tests. actionlint could not be downloaded in the session container, so CI is the evidence.
+
+### 2026-10-31 — Backup consolidation (PR #118 stays the source; branch `claude/project-thread-yjnwej`)
+
+- Owner asks: use the new private repo `hmohamed080/aladdin-backups` (empty, inactive code only), no shared backup bucket, resolve the 90-day versus 366-day retention mismatch, reuse the Acceptance R2 media buckets, separate GitHub environments per project.
+- `lib.sh`: the hardcoded shared bucket is gone. `expected_bucket` pins Production to `aladdin-production-db-backups` and Acceptance to `aladdin-acceptance-backups`; each is refused under the other label. R2 rules are now per bucket (`r2/production/{lifecycle,lock}.json`, `r2/acceptance/lifecycle.json`); workflows use per-project environments (`backup-<label>`, `backup-check-<label>`, `restore-test-<label>`).
+- Retention: database 366 days, R2 media copies 90 days after they are written. A copy can be up to 31 days older than a snapshot that uses it, so the **guaranteed full-restore window is 59 days**; older snapshots are database-only and `media-verify.sh` reports `DATABASE-ONLY` instead of failing on expired copies. `retention-test.sh` (offline, in CI) fails if rules, constants and README drift.
+- `build-repo.sh` builds INACTIVE by default (no `schedule:` trigger); `--scheduled` is for the activation GO.
+- **Not done / owner steps:** nothing hosted was created or changed. `aladdin-acceptance-backups`, its tokens, the GitHub environments and the `--scheduled` build await the Acceptance GO. ADR-0027 is also used by the WhatsApp OTP worker branch (#127): renumber that one.
+
+- 2026-11-01: owner chose Western Europe for Acceptance backups. The Acceptance backup bucket is **`aladdin-acceptance-backups-weur`** (private, Standard, r2.dev off, no lock; created by the owner). An earlier empty `aladdin-acceptance-backups` was created in ENAM by mistake of region and is left untouched, unused, pending the owner's decision. All config, tests and docs use the `-weur` name.
+
+- 2026-11-01 first Acceptance backup (run 41291273477): database backup passed (155 tables, 2,189 rows, 197 migrations); the R2 media step was correctly marked incomplete (9 originals, 7 copied, 2 unreadable). Both unreadable rows are `avatar_uploads` in state `deleted` (superseded avatars of one test user; the current avatar copied fine), still `cleaned_at is null`, so the snapshot lists originals the app already retired. `r2-media-backup.sh` now classifies a failed read (not_found, access_denied, transient, other), retries only transient errors, logs counts without any object or bucket name, and still marks the snapshot incomplete (`r2-read-diagnostics-test.sh`). Decision pending: how to treat retired originals.
+
+- 2026-11-01 retired-media handling (owner approved Option A, code and local tests only): the failed Acceptance backup's two "unreadable" originals were deleted avatars (state `deleted`, `cleaned_at` null). `ops/backups/r2-eligibility.sql` is the one rule for which R2 originals a backup requires; `snapshot-objects.py`, `r2-media-backup.sh` and `media-verify.sh` share it; the record reports `excluded_retired`. Tests: `r2-eligibility-test.sh` (real PostgreSQL parity), `r2-retired-media-test.sh` (deleted vs active avatar, shared references, missing active original, replacement race, restore verification). **Why `cleaned_at` stays null:** `removeMedia` (`frontend/src/server/storage/media.ts`) deletes the bytes inline after an avatar/cover/organization-image replacement and never calls `media_cleanup_complete`; the only caller of that function is the operator script `scripts/media-storage.mjs cleanup --execute`, which is manual and has no schedule. Not changed here (no hosted writes). **Unfinished:** decide whether the app should call `media_cleanup_complete` after an inline delete (or a scheduled cleanup run); the extra portfolio original in R2 is unreferenced by the database (6 ready portfolio rows, none pending or deleted) and was left alone.
+
+- 2026-11-01 restore-test stack pin: the first Acceptance restore stopped at the STACK MISMATCH guard because CLI 2.110.0 starts gotrue v2.193.0 / storage-api v1.66.4, older than Acceptance's managed Auth/Storage (auth migrations through 20260831180000: SCIM, MFA recovery codes, one-time-token expiry; storage migrations through 0073: versioning, bucket lifecycle). Verified read-only on Acceptance (postgres 17.11, 82 auth and 74 storage migrations) and against the upstream tags: CLI 2.119.0 pins gotrue v2.197.0 + storage-api v1.79.28 + postgres 17.11.0.002, the exact pairing (storage 1.84.19 would add migration 0074, which Acceptance lacks). `restore-test.sh` now pins `RESTORE_SUPABASE_CLI_VERSION=2.119.0`; the guard is unchanged; `db-backup.sh` keeps its dump-tool pin. The local container registry is blocked in the session, so the stack itself was not started; the first hosted restore run is the proof.
+
+- 2026-11-01 **Acceptance manual backup/restore milestone PASS** (owner-verified): backup 41297677151, restore 41299245228 (CLI 2.119.0, schema and row counts exact, 7/7 R2 originals), freshness 41299846162, snapshot `aladdin-acceptance-20261101T102928Z`. No hosted change by Claude. **Remaining before automatic Acceptance backups:** wrong-project test; `--scheduled` rebuild; `ACCEPTANCE_BACKUP_SCHEDULE=daily` 7-night trial; freshness-alarm test; owner approval for each. **Before Production:** see the readiness list in the thread report (buckets, tokens, environments, retention review, media still on Supabase Storage, stack pin check, owner GO).
+
+- 2026-11-01 restore schedule safety gate (owner GO, code and local tests only): `plan.sh restore` decides whether the Monthly restore test starts. Manual runs are unchanged; a scheduled run needs `PRODUCTION_BACKUP_ENABLED=true` AND the new `PRODUCTION_RESTORE_SCHEDULE_ENABLED=true` (default off). `restore-test.yml` gets a `plan` job; the restore job, environment isolation and guards are untouched. `plan-test.sh` 86 checks. Production blockers recorded: bucket has only the default 7-day multipart-abort rule, no Object Lock (owner-verified); a database-only backup is not complete Production protection (freshness checks only media kinds whose switch is on). Nothing hosted changed; `aladdin-backups` main stays `66c8ad6` until the diff is approved.
+
+- 2026-11-01 Production media coverage fails closed (owner GO, code and local tests only): coverage is judged from each snapshot's manifest (`storage_objects`, new `r2_required_originals`), not from `LEGACY_MEDIA_BACKUP` / `R2_MEDIA_BACKUP`. Freshness, `snapshot_done`, the restore snapshot pick and the media steps of the backup job all use it (`media_coverage`); a Production snapshot with uncovered files fails the job and is never skipped as done; counts must match the record exactly; empty inventories pass; unreadable manifests fail. `media-coverage-test.sh` 44 checks (mutation-checked). No switch or hosted setting changed.
+## 2026-11-01 — Unified Media & Assets, Stage 1 (UI fallbacks, static asset registry)
+- Added `components/media` (`SafeImage`, `MediaAvatar/Cover/Logo/Thumb`, `EmptyMedia`): a missing or failing media URL shows initials, a neutral cover or a glyph, never a broken image. Applied to the avatar field, installer hero/summary, public profile cover, portfolio `MediaImage`, quote thumbnails.
+- Added `lib/assets/registry.ts`; removed 6 byte-identical landing/brand duplicates (6.8 MB), old URLs kept by permanent redirects. Static assets stay in `public/`, never R2.
+- Not done: browser E2E for missing media (needs a seeded Supabase); hosted data untouched.
+
+## 2026-11-01 — Unified Media & Assets, Stage 2 (R2 core, isolation, no fallback)
+- Runtime environment guard in `createR2Client` (bucket vs APP_ENV, Supabase project, backup buckets, shared buckets); `MEDIA_LEGACY_STORAGE_WRITES` + `R2_STORAGE_ENABLED` close new Supabase writes with no fallback; `R2_SITE_BUCKET` and `site/` key builders; allow-list test for direct Supabase Storage access. See `docs/operations/r2/r2-only-media-stage2.md`.
+- Open: purchase-request photos still on Supabase Storage (owner decision).
+## 2026-11-01 — WhatsApp sign-up review (PR #116 branch, code only)
+
+- **Root cause of the permissions blocker.** `public.profiles` has no `service_role` UPDATE (20260804090001 revoked it) and `phone_verified_at` is writable by no API role (20261024090004), so a table update from the app can never work. Replaced by the service-role-only definer function `phone_sign_up_mark_verified(uuid, text)`, which requires a sign-up challenge for exactly that number consumed in the last 30 minutes and marks only the user's current primary number. Verification of ownership only; it authorizes nothing (login, recovery, MFA are separate decisions).
+- **Atomic send budget.** `phone_challenge_issue(...)` takes one advisory lock, checks the number's hourly cap and the rolling-24h global budget, and inserts the challenge in the same transaction. `provider_accepted_at` is stamped by `phone_challenge_mark_sent` when Meta accepts (billable); a rejected send deletes its row (budget slot released).
+- **Fail closed everywhere.** `WHATSAPP_ALLOWED_RECIPIENTS` and `WHATSAPP_DAILY_SEND_LIMIT` are required in every environment, production included. Local token-less development keeps its console-printed code.
+- **Template.** `aladdin_otp`, Arabic only (`WHATSAPP_OTP_LANGUAGE=ar`). Application code lifetime is now 5 minutes to match the expiry the owner reported on the template; the template itself was NOT inspected or changed (owner step).
+- **Migration `20261102090001` is NOT applied** to Acceptance or Production; it awaits the owner's approval. Permission contract `20261102090001.json` extends 20261029090002 with the three functions; replay, pgTAP `119_*` and `phone_code_budget_concurrency_test.sh` run in the supabase-rls workflow.
+
+## 2026-11-02 — Phone authority reconciliation, RTL E2E root cause, media reset tooling (PR #134, validation only)
+
+- **Single phone authority.** The R1 authority (`phone_verification_*`, `phone_signup_*`) plus the signed WhatsApp Delivery Worker is the only approved path. #116's separate in-app sender and its three legacy-table functions were removed (they had no callers in the R1 flow). Its missing guarantees were folded into R1 by migration `20261102090001_phone_authority_send_budget.sql`: global rolling-24h send budget (advisory lock, checked before the ip bucket), and `phone_verification_mark_sent` (service_role only, idempotent provider-acceptance record, called by the service after the Worker accepted). pgTAP 121 and `phone_send_budget_concurrency_test.sh` prove it. The text above describing `phone_challenge_issue` / 3 functions for #116 is superseded.
+- **RTL E2E root cause.** The workspace menu toggles (`setOpen(v => !v)`); the test's click-until-visible loop clicked before hydration, React replayed the queued click after hydration, so a later retry closed the menu again. Fixed in the test helper (wait for hydration, drive by `aria-expanded`); `workspace-switcher.test.tsx` pins the toggle contract. No UI change. Deduced from code, confirmed only by CI.
+- **Media tooling.** `scripts/media-cleanup-plan.mjs` + `.github/workflows/media-cleanup.yml` (disabled by default); `scripts/media-reset-execute.mjs` (Storage objects only, gated, journaled, submitted verification evidence never selectable). Plan: `docs/operations/r2/stage3-acceptance-readiness.md`.
+- Nothing hosted was touched. Open: final green CI on the last commit, then owner GO per Acceptance step.
+
+## 2026-11-02 - R2 reset safety, protected evidence path, Acceptance preflight (PR #134, validation-only draft)
+
+- Replaced the count-based reset approval with an immutable object-level manifest (`scripts/media-reset-manifest.mjs`): every object's bucket, key, storage id/eTag/size/updated_at, row state, reference and retention decision, hashed whole; written once at 0400; recomputed on load; stale if any entry changed.
+- Rewrote `scripts/media-reset-execute.mjs` (disabled by default): live-manifest staleness gate, hash-chained journal bound to project and manifest, per-batch revalidation by the database under row locks, success only if `media_reset_verify` is ok. 16 tests.
+- Held SQL `supabase/activation/legacy-media-reset.sql` (+rollback, +CI proof, mutation-checked on a local Postgres 16 stub) reconciles pointers (avatar, cover, logo, portfolio project cover), tombstones rows, drops stale locations; submitted verification evidence, row-less verification objects and R2 keys are refused in the database.
+- Prepared, NOT executed: `bv-evidence-r2-adoption.sql` + `scripts/bv-evidence-migrate.mjs` (adds a sha256-verified private R2 copy of submitted evidence; keeps the Supabase copy and the immutable row).
+- Read-only Acceptance preflight done (history guard, function-privilege hash vs contract 20261030090002, R2 bucket list). No hosted write of any kind.
+- Unfinished: no hosted-write browser E2E spec exists for the seven upload flows; Acceptance GO pending.

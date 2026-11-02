@@ -140,8 +140,11 @@ select pg_temp.receipt(:'u3', 'secondary_phone.reserve', '+201069100003') as r3 
 update app.reauth_receipts set expires_at = clock_timestamp() - interval '1 second' where id = :'r3';
 select is(pg_temp.st(:'u3', format('public.secondary_phone_reserve(%L, %L::uuid)', '+201069100003', :'r3')), '42501',
           'A16 a receipt older than 60 seconds is refused');
-select ok((select bool_and(expires_at - created_at = interval '60 seconds') from app.reauth_receipts
-            where id <> :'r3'), 'A17 receipts live exactly 60 seconds');
+-- Scoped to THIS file's fixtures (user ids 69000000-0000-4000-8000-*): the table is global, and any other committed receipt
+-- (for example the ones the installer phone-change concurrency script leaves behind) must not decide this assertion. The
+-- assertion itself is unchanged - every fixture receipt lives exactly 60 s - and it cannot pass vacuously: the set must be non-empty.
+select ok((select count(*) > 0 and bool_and(expires_at - created_at = interval '60 seconds') from app.reauth_receipts
+            where id <> :'r3' and user_id::text like '69000000-0000-4000-8000-%'), 'A17 receipts live exactly 60 seconds');
 
 -- ===========================================================================
 -- B. Reserve

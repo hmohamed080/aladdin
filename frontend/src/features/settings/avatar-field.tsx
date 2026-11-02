@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Cropper, { type Area } from "react-easy-crop";
 import { useI18n } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/controls";
+import { MediaAvatar } from "@/components/media/media-fallbacks";
 import { InlineError, InlineSuccess } from "@/components/ui/primitives";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { encodeCanvasWithin, ImagePrepareError } from "@/lib/media/resize-image";
@@ -117,31 +118,13 @@ export function AvatarField({ avatarUrl, displayName }: { avatarUrl: string | nu
     }
   };
 
-  const initial = displayName.trim().charAt(0).toUpperCase() || "?";
-
   return (
     <div className="flex flex-col gap-sm" data-testid="avatar-field">
       <span className="text-label font-medium text-fg-secondary">{t("profileIdentity.avatar.label")}</span>
       <div className="flex flex-wrap items-center gap-md">
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not a static asset
-          <img
-            src={avatarUrl}
-            alt={t("profileIdentity.avatar.label")}
-            width={80}
-            height={80}
-            decoding="async"
-            className="h-20 w-20 rounded-full border object-cover"
-            data-testid="avatar-current"
-          />
-        ) : (
-          <span
-            aria-hidden="true"
-            className="flex h-20 w-20 items-center justify-center rounded-full bg-surface-2 text-title text-fg-muted"
-          >
-            {initial}
-          </span>
-        )}
+        <span className="h-20 w-20 shrink-0 overflow-hidden rounded-full border text-title">
+          <MediaAvatar src={avatarUrl} name={displayName} alt={t("profileIdentity.avatar.label")} testId="avatar-current" />
+        </span>
         <input
           ref={inputRef}
           type="file"

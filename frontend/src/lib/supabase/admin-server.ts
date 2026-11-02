@@ -3,6 +3,7 @@ import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readPublicEnv, parseServerEnv } from "@/lib/env";
 import type { Database } from "@/types/database.types";
+import { signupCreateUserPayload, type SignupGrant } from "@/server/phone-verification/signup-service";
 
 /** The one authoritative security flag canonical password auth stamps into `app_metadata` — never `user_metadata`. The value keeps its historical `preview` wording: it is stored on existing accounts and must not change. */
 export const PASSWORD_SET_FLAG = "aladdin_pw_preview_password_set";
@@ -92,9 +93,9 @@ export async function savePendingRegistration(params: {
   username: string;
   audienceKind: "organization_type" | "persona_type";
   audienceValue: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const admin = getAdminClient();
-  const { error } = await admin.rpc("pending_registration_save", {
+  const { data, error } = await admin.rpc("pending_registration_save", {
     p_user_id: params.userId,
     p_username: params.username,
     p_audience_kind: params.audienceKind,
@@ -102,7 +103,11 @@ export async function savePendingRegistration(params: {
   });
   if (error) {
     console.error(`Failed to stage pending registration for ${params.userId}: ${error.message}`);
+    return false;
   }
+  // true = the 30-minute username lease is held (20261028090003). false never
+  // changes the caller's response: the name is re-asked after verification.
+  return data === true;
 }
 
 /**
@@ -142,13 +147,6 @@ export async function markPasswordAttachedAuthoritatively(userId: string): Promi
 // None of them ever logs the phone, the alias, or the password.
 // ---------------------------------------------------------------------------
 
-/**
- * Stored in `app_metadata.registration_source` of every phone account. The value
- * predates the flow's promotion to a permanent entry point and is kept verbatim —
- * it is DATA already written to existing accounts, not a label to modernise.
- */
-export const TEMPORARY_CRAFTSMAN_REGISTRATION_SOURCE = "temporary_craftsman_password_flow";
-
 /** True when ANY profile already holds this canonical E.164 phone. Throws on a lookup failure (never guesses "free"). */
 export async function isCanonicalPhoneTaken(e164: string): Promise<boolean> {
   const admin = getAdminClient();
@@ -162,43 +160,37 @@ export type CraftsmanUserCreation =
   | { ok: false; reason: "exists" | "rate_limited" | "rejected" | "failed" };
 
 /**
- * Creates the Supabase Auth user for the installer phone flow. The password goes to
- * GoTrue exactly once, here, and is hashed by GoTrue (bcrypt) — it is never
- * stored or logged by this application. `email_confirm: true` marks the
- * INTERNAL alias as confirmed (it is a login key the server derived itself,
- * never a mailbox), which is what lets the account pass the existing
- * verified-caller gates without any schema change. `full_name` feeds the
- * existing `app.handle_new_user` trigger, which creates `public.users` +
- * `public.profiles` exactly as for every other account.
+ * Creates the Supabase Auth user for the mobile-number sign-up (any account type) — and is the ONLY creator of a phone-alias account.
+ *
+ * It needs a GRANT: the single-use proof the phone verification authority returned after the WhatsApp code was checked. The payload comes
+ * from `signupCreateUserPayload` (one place, shared with the integration tests), which puts `phone_signup_grant` and
+ * `phone_signup_registration` in `app_metadata` — never `user_metadata`, which the account owner can edit. The database alias guard
+ * (migration 20261030090002) refuses an alias account created without a valid grant, so a caller that bypasses this function gets nothing.
+ *
+ * The password goes to GoTrue exactly once, here, and is hashed by GoTrue (bcrypt) — it is never stored or logged by this application.
+ * `email_confirm: true` marks the INTERNAL alias as confirmed (it is a login key the server derived, never a mailbox).
+ * `registration_source` and the password-set flag are kept in `app_metadata` exactly as for existing phone accounts.
+ *
+ * The earlier creators that took no grant (`createCraftsmanPasswordUser`, `createShowroomPasswordUser`) were removed in R2. Existing
+ * accounts keep their `registration_source` values as data; legacy phone/password SIGN-IN is untouched.
  */
-export async function createCraftsmanPasswordUser(params: {
-  loginAlias: string;
-  password: string;
-  fullName: string;
-}): Promise<CraftsmanUserCreation> {
-  return createPhonePasswordUser(params, TEMPORARY_CRAFTSMAN_REGISTRATION_SOURCE);
-}
-
-export async function createShowroomPasswordUser(params: { loginAlias: string; password: string; fullName: string }): Promise<CraftsmanUserCreation> {
-  return createPhonePasswordUser(params, "temporary_showroom_password_flow");
-}
-
-async function createPhonePasswordUser(params: { loginAlias: string; password: string; fullName: string }, source: string): Promise<CraftsmanUserCreation> {
+export async function createPhoneSignUpUser(params: { grant: SignupGrant; password: string; fullName: string; locale: "en" | "ar" }): Promise<CraftsmanUserCreation> {
   const admin = getAdminClient();
-  const { data, error } = await admin.auth.admin.createUser({
-    email: params.loginAlias,
-    password: params.password,
-    email_confirm: true,
-    user_metadata: { full_name: params.fullName, locale: "ar" },
-    app_metadata: { registration_source: source, [PASSWORD_SET_FLAG]: true },
-  });
+  const { data, error } = await admin.auth.admin.createUser(
+    signupCreateUserPayload(params.grant, {
+      password: params.password,
+      fullName: params.fullName,
+      locale: params.locale,
+      appMetadata: { registration_source: "phone_whatsapp_sign_up", [PASSWORD_SET_FLAG]: true },
+    }),
+  );
   if (error || !data.user) {
     const code = (error as { code?: string } | null)?.code;
     const status = (error as { status?: number } | null)?.status;
     if (code === "email_exists" || code === "user_already_exists") return { ok: false, reason: "exists" };
     if (status === 429 || code?.startsWith("over_")) return { ok: false, reason: "rate_limited" };
     if (code === "weak_password") return { ok: false, reason: "rejected" };
-    console.error(`installer phone sign-up: auth user creation failed (code ${code ?? "unknown"})`);
+    console.error(`phone sign-up: auth user creation failed (code ${code ?? "unknown"})`);
     return { ok: false, reason: "failed" };
   }
   return { ok: true, userId: data.user.id };
@@ -220,10 +212,42 @@ export async function deleteCraftsmanPasswordUser(userId: string): Promise<boole
 }
 
 /** Durable shared phone-auth limiter. Only service_role can consume buckets. */
-export async function consumePhoneAuthLimit(action: "sign-in" | "sign-up", ipKey: string, phoneKey: string): Promise<boolean> {
+export async function consumePhoneAuthLimit(action: "sign-in" | "sign-up" | "email-resend", ipKey: string, phoneKey: string): Promise<boolean> {
   const { data, error } = await getAdminClient().rpc("phone_auth_consume_limit", {
     p_action: action, p_ip_key: ipKey, p_phone_key: phoneKey,
   });
   if (error) throw new Error("phone auth limiter unavailable");
   return data === true;
+}
+
+/**
+ * The auth email behind a username or mobile number typed on the sign-in page,
+ * so the password grant can run against it. For a phone-registered account
+ * this is its internal login alias. Null when nothing matches; the caller
+ * answers exactly as for a wrong password, so this never reveals which
+ * usernames or numbers exist. Throws on a lookup failure (never guesses).
+ */
+export async function resolveSignInEmail(lookup: { username: string } | { phoneE164: string }): Promise<string | null> {
+  const admin = getAdminClient();
+  const query = admin.from("profiles").select("user_id").is("deleted_at", null).limit(1);
+  const { data, error } = await ("username" in lookup
+    ? query.eq("username_normalized", lookup.username.trim().toLowerCase())
+    : query.eq("phone_e164", lookup.phoneE164));
+  if (error) throw new Error(`sign-in identifier lookup failed (code ${error.code ?? "unknown"})`);
+  const userId = data?.[0]?.user_id;
+  if (!userId) return null;
+  const { data: user, error: userError } = await admin.auth.admin.getUserById(userId);
+  if (userError) throw new Error(`sign-in identifier lookup failed (code ${(userError as { code?: string }).code ?? "unknown"})`);
+  return user.user?.email ?? null;
+}
+
+/**
+ * Stores the birthday collected at sign-up on `public.users.birth_date` — the
+ * self-only row (RLS `users_select_self`), never the public profile. Called
+ * only right after the account proved its email or mobile number, with a value
+ * the caller has already validated (parseBirthDate). Throws on failure.
+ */
+export async function saveVerifiedBirthDate(userId: string, birthDate: string): Promise<void> {
+  const { error } = await getAdminClient().from("users").update({ birth_date: birthDate }).eq("id", userId);
+  if (error) throw new Error(`birth date save failed (code ${error.code ?? "unknown"})`);
 }

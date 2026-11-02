@@ -1,6 +1,6 @@
 {
   // Cloudflare Workers host for the Next.js frontend (ADR-0021). Built with
-  // `pnpm cf:build` (OpenNext); Vercel stays the live host until cutover.
+  // `pnpm cf:build` (OpenNext). The live host since the 2026-10-27 cutover.
   // Secrets are never written here: set them with `wrangler secret put` per
   // environment (see docs/guides/cloudflare-frontend.md).
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -39,6 +39,7 @@
         // deploy workflow; the bucket-scoped keys and SUPABASE_SERVICE_ROLE_KEY are Worker secrets.
         "R2_STORAGE_ENABLED": "true",
         "R2_PRODUCTION_WRITES_APPROVED": "false",
+        "MEDIA_LEGACY_STORAGE_WRITES": "false",
         "R2_PRIVATE_BUCKET": "aladdin-r2-acceptance-20261011-private",
         // Siteverify must report this hostname, or the CAPTCHA check fails closed.
         "TURNSTILE_ALLOWED_HOSTNAMES": "aladdin-frontend-preview.bstalent9.workers.dev",
@@ -46,6 +47,7 @@
         // RESEND_API_KEY is a Worker secret.
         "EMAIL_FROM": "Aladdin <no-reply@aladdindecore.com>",
         "APP_PUBLIC_ORIGIN": "https://aladdin-frontend-preview.bstalent9.workers.dev"
+        // Phone verification (PHONE_*) is intentionally absent: it ships OFF and delivery is never configured here.
       }
     },
     // Production: deployed only after the owner approves the cutover. Routes
@@ -70,6 +72,8 @@
         // aladdindecore.com domain. RESEND_API_KEY is a Worker secret.
         "EMAIL_FROM": "Aladdin <no-reply@aladdindecore.com>",
         "APP_PUBLIC_ORIGIN": "https://aladdindecore.com",
+        // Mobile-number sign-up codes: PHONE_* switches are absent on purpose (feature OFF). The Meta token never
+        // lives in this app; it belongs to the separate delivery Worker (PR #114), which stays disabled.
         // First cutover: media stays on Supabase Storage and Redis stays off. Each one
         // is turned on later by its own approval.
         "R2_STORAGE_ENABLED": "false",
