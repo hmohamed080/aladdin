@@ -25771,10 +25771,6 @@
      "grantable": false
     },
     {
-     "role": "postgres",
-     "grantable": false
-    },
-    {
      "role": "service_role",
      "grantable": false
     }
@@ -25812,10 +25808,6 @@
      "grantable": false
     },
     {
-     "role": "postgres",
-     "grantable": false
-    },
-    {
      "role": "service_role",
      "grantable": false
     }
@@ -25848,10 +25840,6 @@
     "search_path=\"\""
    ],
    "grants": [
-    {
-     "role": "postgres",
-     "grantable": false
-    },
     {
      "role": "postgres",
      "grantable": false
@@ -25896,10 +25884,6 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "postgres",
-     "grantable": false
     }
    ],
    "definer": true,
@@ -25930,10 +25914,6 @@
     "search_path=\"\""
    ],
    "grants": [
-    {
-     "role": "postgres",
-     "grantable": false
-    },
     {
      "role": "postgres",
      "grantable": false
