@@ -67,6 +67,11 @@ export function createPhoneVerificationService(deps: Deps) {
       await db.rpc("phone_verification_invalidate", { p_user_id: userId, p_challenge_id: challengeId, p_reason: "delivery_failed" });
       return UNAVAILABLE;
     }
+    // The Worker reported Meta accepted the message (the billable event). Recording it is bookkeeping only: it can never fail the
+    // user's request, and a lost stamp leaves a challenge that is simply "reserved, not known sent".
+    try {
+      await db.rpc("phone_verification_mark_sent", { p_challenge_id: challengeId });
+    } catch { /* bookkeeping only */ }
     return { status: "sent", challengeId, expiresAt: String(row.expires_at), resendAvailableAt: String(row.resend_available_at) };
   }
 

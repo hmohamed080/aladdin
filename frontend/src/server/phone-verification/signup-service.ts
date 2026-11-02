@@ -88,7 +88,12 @@ export function createPhoneSignupService(deps: Deps) {
         try {
           await db.rpc("phone_signup_invalidate", { p_registration_id: registrationId, p_challenge_id: challengeId, p_reason: "delivery_failed" });
         } catch { /* nothing more can be done; the challenge expires on its own */ }
+        return;
       }
+      // Meta accepted the message (the billable event). Bookkeeping only: it never changes the reply, which was already sent.
+      try {
+        await db.rpc("phone_verification_mark_sent", { p_challenge_id: challengeId });
+      } catch { /* bookkeeping only */ }
     })());
     return reply;
   }

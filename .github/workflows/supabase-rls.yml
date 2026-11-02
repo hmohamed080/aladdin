@@ -114,8 +114,8 @@ jobs:
       - name: Prove pending-registration username leases and claims serialize per name
         run: bash supabase/tests/registration_username_lease_concurrency_test.sh
 
-      - name: Prove the WhatsApp send budget holds under parallel requests
-        run: bash supabase/tests/phone_code_budget_concurrency_test.sh
+      - name: Prove the global phone-verification send budget holds under parallel requests
+        run: bash supabase/tests/phone_send_budget_concurrency_test.sh
 
       - name: Prove repeatability (second clean reset + tests)
         run: |

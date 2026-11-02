@@ -1,6 +1,6 @@
 {
  "version": "20261102090001",
- "source": "Integration replay contract: 20261030090002 plus the 3 service_role-only functions of #116's 20261102090001 (phone_challenge_issue, phone_challenge_mark_sent, phone_sign_up_mark_verified), identical to the entries in #116's own contract.",
+ "source": "Integration replay contract: 20261030090002 plus the one new service_role-only function of 20261102090001: public.phone_verification_mark_sent(uuid). The two start functions are replaced in place (signature and grants unchanged).",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.media_storage_resolve(text,text,text)",
@@ -20872,80 +20872,6 @@
    ],
    "grants": [
     {
-     "role": "postgres",
-     "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": true,
-    "authenticated": false,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
-   "signature": "public.phone_challenge_issue(uuid,text,text,timestamp with time zone,integer,integer)",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": true,
-    "authenticated": true,
-    "authenticator": true,
-    "dashboard_user": true,
-    "supabase_auth_admin": true,
-    "supabase_storage_admin": true
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
-     "role": "postgres",
-     "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": true,
-    "authenticated": false,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
-   "signature": "public.phone_challenge_mark_sent(uuid)",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": true,
-    "authenticated": true,
-    "authenticator": true,
-    "dashboard_user": true,
-    "supabase_auth_admin": true,
-    "supabase_storage_admin": true
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
      "role": "authenticated",
      "grantable": false
     },
@@ -20965,43 +20891,6 @@
     "supabase_storage_admin": false
    },
    "signature": "public.phone_password_account_allowed(text,text)",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": true,
-    "authenticated": true,
-    "authenticator": true,
-    "dashboard_user": true,
-    "supabase_auth_admin": true,
-    "supabase_storage_admin": true
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
-     "role": "postgres",
-     "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": true,
-    "authenticated": false,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
-   "signature": "public.phone_sign_up_mark_verified(uuid,text)",
    "schemaUsage": {
     "anon": true,
     "service_role": true,
@@ -21187,6 +21076,43 @@
     "supabase_storage_admin": false
    },
    "signature": "public.phone_verification_invalidate(uuid,uuid,text)",
+   "schemaUsage": {
+    "anon": true,
+    "service_role": true,
+    "authenticated": true,
+    "authenticator": true,
+    "dashboard_user": true,
+    "supabase_auth_admin": true,
+    "supabase_storage_admin": true
+   }
+  },
+  {
+   "kind": "f",
+   "owner": "postgres",
+   "config": [
+    "search_path=\"\""
+   ],
+   "grants": [
+    {
+     "role": "postgres",
+     "grantable": false
+    },
+    {
+     "role": "service_role",
+     "grantable": false
+    }
+   ],
+   "definer": true,
+   "effective": {
+    "anon": false,
+    "service_role": true,
+    "authenticated": false,
+    "authenticator": false,
+    "dashboard_user": false,
+    "supabase_auth_admin": false,
+    "supabase_storage_admin": false
+   },
+   "signature": "public.phone_verification_mark_sent(uuid)",
    "schemaUsage": {
     "anon": true,
     "service_role": true,

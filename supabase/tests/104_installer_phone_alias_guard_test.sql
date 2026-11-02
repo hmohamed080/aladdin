@@ -170,13 +170,13 @@ reset role;
 select is((select phone_e164 from public.profiles where user_id = '90000000-0000-4000-8000-0000000000a1'), '+201055500001',
   'after every direct-write attempt the alias account still holds its alias number');
 select is(
-  (select array_agg(n.nspname || '.' || p.proname order by p.proname collate "C")
+  (select array_agg(n.nspname || '.' || p.proname order by p.proname)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('public', 'app')
       and regexp_replace(lower(p.prosrc), '[[:space:]]+', ' ', 'g') ~ '(update (only )?(public[.])?profiles |insert into (public[.])?profiles[ (])'
       and p.prosrc ~* 'phone_(e164|national|country_iso2)'),
-  array['public.installer_phone_change_begin', 'public.installer_phone_change_settle', 'public.phone_sign_up_mark_verified', 'public.phone_signup_attach', 'public.phone_verification_verify', 'public.profile_set_phone', 'public.secondary_phone_make_primary'],
-  'the only functions in public/app that write profiles.phone_* are profile_set_phone, the two service-only phone-change journal functions (M3), PR #88''s secondary_phone_make_primary (which the identity guard keeps from moving an alias account''s login phone) and, since Phase B1, phone_verification_verify and, since R1, phone_signup_attach and phone_sign_up_mark_verified (#116; all service-only; they write ONLY phone_verified_at, never the number - see 119_, 120_ and 109_phone_*_test.sql)');
+  array['public.installer_phone_change_begin', 'public.installer_phone_change_settle', 'public.phone_signup_attach', 'public.phone_verification_verify', 'public.profile_set_phone', 'public.secondary_phone_make_primary'],
+  'the only functions in public/app that write profiles.phone_* are profile_set_phone, the two service-only phone-change journal functions (M3), PR #88''s secondary_phone_make_primary (which the identity guard keeps from moving an alias account''s login phone) and, since Phase B1, phone_verification_verify and, since R1, phone_signup_attach (both service-only; they write ONLY phone_verified_at, never the number - see 119_ and 120_phone_*_authority_test.sql)');
 
 -- ===========================================================================
 -- 7. Function contract unchanged

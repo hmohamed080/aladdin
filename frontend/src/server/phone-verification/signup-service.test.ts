@@ -33,6 +33,32 @@ const created = (deliver: boolean) => (args: Record<string, unknown>) => ({
   error: null,
 });
 
+describe("signup provider acceptance record", () => {
+  it("a delivered signup code is stamped as accepted, once, after the reply and without leaking the number or code", async () => {
+    const { service, calls, fake, flush } = harness({ phone_signup_start: created(true), phone_verification_mark_sent: true });
+    const out = await service.start(REG, PHONE, null);
+    expect(out.status).toBe("sent");
+    await flush();
+    expect(calls.map((c) => c.fn)).toEqual(["phone_signup_start", "phone_verification_mark_sent"]);
+    expect(Object.keys(calls[1]!.args)).toEqual(["p_challenge_id"]);
+    expect(JSON.stringify(calls[1]!)).not.toContain(fake.sent[0]!.code);
+    expect(JSON.stringify(calls[1]!)).not.toContain(PHONE);
+  });
+  it("a number that already has an account: same reply, nothing sent, nothing stamped (no budget spent, no enumeration signal)", async () => {
+    const { service, calls, fake, flush } = harness({ phone_signup_start: created(false) });
+    expect((await service.start(REG, PHONE, null)).status).toBe("sent");
+    await flush();
+    expect(fake.sent).toHaveLength(0);
+    expect(calls.map((c) => c.fn)).toEqual(["phone_signup_start"]);
+  });
+  it("a failed delivery closes the challenge and is never stamped as accepted", async () => {
+    const { service, calls, flush } = harness({ phone_signup_start: created(true) }, { failTransport: true });
+    await service.start(REG, PHONE, null);
+    await flush();
+    expect(calls.map((c) => c.fn)).toEqual(["phone_signup_start", "phone_signup_invalidate"]);
+  });
+});
+
 describe("signup service", () => {
   it("OFF: nothing is generated, no database call, nothing delivered", async () => {
     const { service, calls, fake } = harness({}, { enabled: false });

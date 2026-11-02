@@ -94,6 +94,27 @@ describe("start", () => {
   });
 });
 
+describe("provider acceptance record", () => {
+  it("is stamped once, only after the Worker accepted, and carries nothing but the challenge id", async () => {
+    const { service, calls, fake } = harness({ phone_verification_start: created, phone_verification_mark_sent: true });
+    const out = await service.start(USER, null);
+    expect(out.status).toBe("sent");
+    expect(calls.map((c) => c.fn)).toEqual(["phone_verification_start", "phone_verification_mark_sent"]);
+    expect(Object.keys(calls[1]!.args)).toEqual(["p_challenge_id"]);
+    expect(JSON.stringify(calls[1]!)).not.toContain(fake.sent[0]!.code);
+    expect(JSON.stringify(calls[1]!)).not.toContain(PHONE);
+  });
+  it("a failed delivery is never stamped as accepted", async () => {
+    const { service, calls } = harness({ phone_verification_start: created }, { failTransport: true });
+    await service.start(USER, null);
+    expect(calls.map((c) => c.fn)).not.toContain("phone_verification_mark_sent");
+  });
+  it("bookkeeping can never fail the request: a stamp error still returns sent", async () => {
+    const { service } = harness({ phone_verification_start: created, phone_verification_mark_sent: () => { throw new Error("db down"); } });
+    expect((await service.start(USER, null)).status).toBe("sent");
+  });
+});
+
 describe("verify", () => {
   it("offers a MAC for every accepted key, consistent with the MAC issued at start", async () => {
     let issued = "";
@@ -107,10 +128,11 @@ describe("verify", () => {
     const started = await service.start(USER, null);
     if (started.status !== "sent") throw new Error("setup failed");
     expect(await service.verify(USER, started.challengeId, fake.sent[0]!.code, null)).toEqual({ status: "verified" });
-    const candidates = calls[1]!.args.p_candidates as Record<string, string>;
+    const verifyCall = calls.find((c) => c.fn === "phone_verification_verify")!;
+    const candidates = verifyCall.args.p_candidates as Record<string, string>;
     expect(Object.keys(candidates).sort()).toEqual(["k1", "k2"]);
     expect(candidates.k2).toBe(issued);
-    expect(JSON.stringify(calls[1]!)).not.toContain(fake.sent[0]!.code);
+    expect(JSON.stringify(calls)).not.toContain(fake.sent[0]!.code);
   });
 
   it("collapses every failure into one generic 'invalid'", async () => {
