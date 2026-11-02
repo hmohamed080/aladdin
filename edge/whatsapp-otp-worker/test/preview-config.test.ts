@@ -62,3 +62,10 @@ test("preview config refuses phone numbers in the repository and a Graph URL ove
   assertBlocked("numbers in repo", o => { o.vars.OTP_ALLOWED_RECIPIENTS = "+201012345678"; });
   assertBlocked("graph override", o => { o.vars.WHATSAPP_GRAPH_BASE_URL = "http://127.0.0.1:1"; });
 });
+
+test("the global rolling-24h send budget must be configured as a positive integer (no budget, no sends)", () => {
+  assertBlocked("missing budget", (c) => { delete c.vars.OTP_DAILY_SEND_LIMIT; });
+  assertBlocked("zero budget", (c) => { c.vars.OTP_DAILY_SEND_LIMIT = "0"; });
+  assertBlocked("non-numeric budget", (c) => { c.vars.OTP_DAILY_SEND_LIMIT = "lots"; });
+  assertBlocked("fractional budget", (c) => { c.vars.OTP_DAILY_SEND_LIMIT = "2.5"; });
+});

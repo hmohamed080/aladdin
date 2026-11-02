@@ -150,6 +150,49 @@ describe("idempotency bound to the challenge (delivery_id)", () => {
   });
 });
 
+describe("global rolling-24h send budget (ported from #116's WhatsApp sign-up hardening)", () => {
+  const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  test("the (limit+1)th delivery inside 24 h is refused BEFORE Meta and before the token is read; earlier ones are sent", async () => {
+    const meta = mockMeta(); const reads = { n: 0 };
+    const env = baseEnv({ OTP_DAILY_SEND_LIMIT: "2", tokenReads: reads });
+    assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(1) })), env, meta.fetcher)).status, 200);
+    assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(2) })), env, meta.fetcher)).status, 200);
+    const refused = await handleRequest(await signedSend(goodBody({ delivery_id: id(3) })), env, meta.fetcher);
+    assert.equal(refused.status, 503);
+    assert.deepEqual(await refused.json(), { error: "budget_exhausted" });
+    assert.equal(meta.calls.length, 2);
+    assert.equal(reads.n, 2, "the refused delivery never read the Meta token");
+  });
+  test("a replay of an already-accepted delivery stays a harmless duplicate even when the budget is exhausted; claims older than 24 h do not count", async () => {
+    const meta = mockMeta(); const db = memoryReplayDb(); const env = baseEnv({ OTP_DAILY_SEND_LIMIT: "1", IDEMPOTENCY_DB: db });
+    assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(1) })), env, meta.fetcher)).status, 200);
+    assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(1) })), env, meta.fetcher)).status, 200, "duplicate, not budget_exhausted");
+    assert.equal(meta.calls.length, 1);
+    const old = memoryReplayDb(); old.seed("a".repeat(64), Math.floor(Date.now() / 1000) - 86_401);
+    const env2 = baseEnv({ OTP_DAILY_SEND_LIMIT: "1", IDEMPOTENCY_DB: old });
+    assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(2) })), env2, meta.fetcher)).status, 200, "a 24h+1s-old claim is outside the window");
+    const recent = memoryReplayDb(); recent.seed("b".repeat(64), Math.floor(Date.now() / 1000) - 3_600);
+    assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(3) })), baseEnv({ OTP_DAILY_SEND_LIMIT: "1", IDEMPOTENCY_DB: recent }), meta.fetcher)).status, 503);
+  });
+  test("a missing or invalid limit fails closed in every environment: nothing is sent, the token is never read", async () => {
+    for (const bad of [undefined, "", "0", "-1", "abc", "1e3", "2.5", " 5", "1000000", "05"]) {
+      const meta = mockMeta(); const reads = { n: 0 };
+      for (const environment of ["acceptance", "production"]) {
+        const res = await handleRequest(await signedSend(), baseEnv({ OTP_DAILY_SEND_LIMIT: bad, OTP_ENVIRONMENT: environment, tokenReads: reads }), meta.fetcher);
+        assert.equal(res.status, 503, `limit ${JSON.stringify(bad)} in ${environment}`);
+        assert.deepEqual(await res.json(), { error: "budget_unconfigured" });
+      }
+      assert.equal(meta.calls.length, 0); assert.equal(reads.n, 0);
+    }
+  });
+  test("it does not change the answer order for a disabled Worker or a number outside the allowlist", async () => {
+    const meta = mockMeta();
+    assert.equal((await handleRequest(await signedSend(), baseEnv({ WHATSAPP_DELIVERY_ENABLED: "false", OTP_DAILY_SEND_LIMIT: undefined }), meta.fetcher)).status, 503);
+    assert.equal((await handleRequest(await signedSend(goodBody({ to: "+201099999999" })), baseEnv({ OTP_DAILY_SEND_LIMIT: undefined }), meta.fetcher)).status, 403);
+    assert.equal(meta.calls.length, 0);
+  });
+});
+
 describe("the Meta request", () => {
   test("exact Authentication-template payload: name aladdin_otp, Arabic, code in the body AND the copy-code button, number without '+', token only in the header", async () => {
     const meta = mockMeta();
@@ -206,7 +249,7 @@ describe("preflight (signed, side-effect free) and leak checks", () => {
     const ok = await handleRequest(await signedSend('{"check":"preflight"}', { id: "preflight_1", path: "/v1/preflight" }), env, meta.fetcher);
     assert.equal(ok.status, 200);
     const text = await ok.text(); const out = JSON.parse(text);
-    assert.deepEqual({ ...out, sender_id_suffix: undefined }, { signing_secret_bound: true, meta_token_bound: true, d1_reachable: true, delivery_enabled: false, environment: "acceptance", recipient_mode: "allowlist", allowlist_entries: 1, template: "aladdin_otp", languages: "ar", graph_version: "v25.0", sender_id_suffix: undefined });
+    assert.deepEqual({ ...out, sender_id_suffix: undefined }, { signing_secret_bound: true, meta_token_bound: true, d1_reachable: true, delivery_enabled: false, environment: "acceptance", recipient_mode: "allowlist", allowlist_entries: 1, daily_send_limit: 100, template: "aladdin_otp", languages: "ar", graph_version: "v25.0", sender_id_suffix: undefined });
     assert.equal(out.sender_id_suffix, "5492");
     for (const secret of [FAKE_TOKEN, SECRET, PHONE, "1012345678", "1415528588305492"]) assert.ok(!text.includes(secret), "preflight must not contain " + secret.slice(0, 6));
     assert.equal(meta.calls.length, 0);

@@ -47,6 +47,12 @@ export interface Env {
   OTP_ENVIRONMENT?: string;
   /** "allowlist" (default; no list = no send) | "open" (production only, explicit). */
   OTP_RECIPIENT_MODE?: string;
+  /**
+   * Maximum deliveries claimed in any rolling 24 hours across ALL recipients: the Meta message budget and the cost cap against a
+   * distributed start flood (per-number, per-registration and per-IP limits live in the authority). A positive integer; a missing or
+   * invalid value means nothing is sent (fail closed), in every environment.
+   */
+  OTP_DAILY_SEND_LIMIT?: string;
   /** Exact E.164 numbers, comma separated. Set in the Worker dashboard, never in the repository. */
   OTP_ALLOWED_RECIPIENTS?: string;
   /** LOCAL rigs only (OTP_ENVIRONMENT=local): a loopback http URL standing in for graph.facebook.com. */
@@ -97,17 +103,35 @@ async function replayHash(eventId: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** The unique insert is the concurrency boundary; any storage problem fails closed. */
-export async function claimEvent(db: ReplayDb, eventId: string): Promise<{ outcome: "new" | "accepted" | "blocked" | "error"; idHash: string }> {
+const DAY_SECONDS = 86_400;
+
+/** The configured rolling-24h budget, or null when it is missing or invalid (which fails closed). */
+export function dailySendLimit(env: Pick<Env, "OTP_DAILY_SEND_LIMIT">): number | null {
+  const v = env.OTP_DAILY_SEND_LIMIT;
+  return typeof v === "string" && /^[1-9][0-9]{0,5}$/.test(v) ? Number(v) : null;
+}
+
+export type ClaimOutcome = "new" | "accepted" | "blocked" | "budget" | "error";
+
+/**
+ * The unique insert is the concurrency boundary; any storage problem fails closed. With a `dailyLimit` the SAME statement also enforces
+ * the global rolling-24h budget: it inserts only while fewer than `dailyLimit` rows were claimed in the last 24 hours, so concurrent
+ * requests cannot overshoot (D1 serializes writes). A repeat of an existing id is still reported as accepted/blocked, never as "budget".
+ */
+export async function claimEvent(db: ReplayDb, eventId: string, dailyLimit?: number): Promise<{ outcome: ClaimOutcome; idHash: string }> {
   const idHash = await replayHash(eventId);
   try {
-    const result = await db
-      .prepare("INSERT OR IGNORE INTO whatsapp_hook_events (event_hash, created_at, state) VALUES (?1, ?2, 'reserved')")
-      .bind(idHash, Math.floor(Date.now() / 1000))
-      .run();
+    const now = Math.floor(Date.now() / 1000);
+    const result = dailyLimit === undefined
+      ? await db.prepare("INSERT OR IGNORE INTO whatsapp_hook_events (event_hash, created_at, state) VALUES (?1, ?2, 'reserved')").bind(idHash, now).run()
+      : await db
+          .prepare("INSERT OR IGNORE INTO whatsapp_hook_events (event_hash, created_at, state) SELECT ?1, ?2, 'reserved' WHERE (SELECT COUNT(*) FROM whatsapp_hook_events WHERE created_at >= ?3) < ?4")
+          .bind(idHash, now, now - DAY_SECONDS, dailyLimit)
+          .run();
     if (result.success !== true || typeof result.meta?.changes !== "number") return { outcome: "error", idHash };
     if (result.meta.changes === 1) return { outcome: "new", idHash };
     const saved = await db.prepare("SELECT state FROM whatsapp_hook_events WHERE event_hash = ?1").bind(idHash).first<{ state: string }>();
+    if (!saved && dailyLimit !== undefined) return { outcome: "budget", idHash };
     return { outcome: saved?.state === "accepted" ? "accepted" : "blocked", idHash };
   } catch {
     return { outcome: "error", idHash };
@@ -340,6 +364,7 @@ async function preflight(env: Env): Promise<Response> {
     environment: env.OTP_ENVIRONMENT ?? "unset",
     recipient_mode: env.OTP_RECIPIENT_MODE === "open" && env.OTP_ENVIRONMENT === "production" ? "open" : "allowlist",
     allowlist_entries: allowedRecipients(env).length,
+    daily_send_limit: dailySendLimit(env) ?? 0, // 0 = missing/invalid, which makes the Worker send nothing
     template: env.WHATSAPP_OTP_TEMPLATE,
     languages: (env.WHATSAPP_OTP_LANGUAGES ?? "ar"),
     graph_version: env.WHATSAPP_GRAPH_API_VERSION,
@@ -370,12 +395,18 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
   if (eventId !== `otp_${req.deliveryId}`) return answer(400);
   if (env.WHATSAPP_DELIVERY_ENABLED !== "true") return answer(503, { error: "delivery_disabled" });
   if (!recipientAllowed(req.to, env)) return answer(403);
+  const dailyLimit = dailySendLimit(env);
+  if (dailyLimit === null) return answer(503, { error: "budget_unconfigured" }); // fail closed: no budget, no message
   const db = env.IDEMPOTENCY_DB;
   if (!db) return answer(503, { error: "idempotency_unavailable" });
-  const claim = await claimEvent(db, eventId);
+  const claim = await claimEvent(db, eventId, dailyLimit);
   if (claim.outcome === "error") return answer(503, { error: "idempotency_unavailable" });
   if (claim.outcome === "accepted") return answer(200, { status: "duplicate" }); // the same delivery, never re-sent
   if (claim.outcome === "blocked") return answer(409, { error: "already_attempted" });
+  if (claim.outcome === "budget") {
+    console.warn(JSON.stringify({ event: "whatsapp_otp_budget_exhausted", limit: dailyLimit })); // numbers only: nothing sensitive
+    return answer(503, { error: "budget_exhausted" });
+  }
   // The reservation is written BEFORE Meta is called. Even an ambiguous network failure is never retried by this Worker.
   const accepted = await submitOtp(req, env, fetcher);
   const saved = await recordOutcome(db, claim.idHash, accepted);

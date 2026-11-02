@@ -15,6 +15,25 @@ async function freshD1(mf: Miniflare) {
   return d1;
 }
 
+test("D1 real SQL engine: the global rolling-24h budget holds under concurrency (one atomic statement), never blocks a replay, ignores old claims", async () => {
+  const mf = new Miniflare({ modules: true, script: 'export default { async fetch() { return new Response("local"); } };', d1Databases: { IDEMPOTENCY_DB: "otp-budget-d1-only" } });
+  try {
+    const d1 = await freshD1(mf); const db = d1 as unknown as ReplayDb;
+    const outcomes = await Promise.all(Array.from({ length: 12 }, (_, i) => claimEvent(db, `otp_budget-${i}`, 3)));
+    assert.equal(outcomes.filter((o) => o.outcome === "new").length, 3, "exactly the limit is claimed");
+    assert.equal(outcomes.filter((o) => o.outcome === "budget").length, 9);
+    const count = await d1.prepare("SELECT COUNT(*) AS n FROM whatsapp_hook_events").first<{ n: number }>();
+    assert.equal(count?.n, 3);
+    const first = outcomes.find((o) => o.outcome === "new")!;
+    await d1.prepare("UPDATE whatsapp_hook_events SET state = 'accepted' WHERE event_hash = ?1").bind(first.idHash).run();
+    assert.equal((await claimEvent(db, `otp_budget-${outcomes.indexOf(first)}`, 3)).outcome, "accepted", "a replay is a duplicate, not a budget refusal");
+    await d1.prepare("UPDATE whatsapp_hook_events SET created_at = ?1").bind(Math.floor(Date.now() / 1000) - 90_000).run();
+    assert.equal((await claimEvent(db, "otp_budget-after-window", 3)).outcome, "new", "claims older than 24h are outside the window");
+  } finally {
+    await mf.dispose();
+  }
+});
+
 test("D1 real SQL engine: one challenge delivers once under concurrency, failures are never retried, replays never re-send", async () => {
   const mf = new Miniflare({ modules: true, script: 'export default { async fetch() { return new Response("local"); } };', d1Databases: { IDEMPOTENCY_DB: "otp-local-d1-only" } });
   try {

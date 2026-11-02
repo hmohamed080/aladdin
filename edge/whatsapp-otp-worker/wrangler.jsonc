@@ -15,6 +15,7 @@
     "OTP_ENVIRONMENT": "acceptance",
     "OTP_RECIPIENT_MODE": "allowlist",
     "WHATSAPP_GRAPH_API_VERSION": "v25.0",
+    "OTP_DAILY_SEND_LIMIT": "50",
     "WHATSAPP_DELIVERY_ENABLED": "false"
   },
   "secrets_store_secrets": [

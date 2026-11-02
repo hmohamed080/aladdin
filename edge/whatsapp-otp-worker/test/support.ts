@@ -31,10 +31,13 @@ export async function signedSend(
   });
 }
 
-export function memoryReplayDb(): ReplayDb & { rows: Map<string, string> } {
+export function memoryReplayDb(): ReplayDb & { rows: Map<string, string>; seed(hash: string, createdAt: number): void } {
   const rows = new Map<string, string>();
+  const created = new Map<string, number>();
   return {
     rows,
+    /** Test helper: a pre-existing claim created at the given epoch second (state "accepted"). */
+    seed(hash: string, createdAt: number) { rows.set(hash, "accepted"); created.set(hash, createdAt); },
     prepare(sql: string) {
       return {
         bind(...values: (string | number)[]) {
@@ -43,7 +46,14 @@ export function memoryReplayDb(): ReplayDb & { rows: Map<string, string> } {
               if (sql.startsWith("INSERT OR IGNORE")) {
                 const id = String(values[0]);
                 if (rows.has(id)) return { success: true, meta: { changes: 0 } };
+                if (sql.includes("WHERE (SELECT COUNT(*)")) {
+                  // The budgeted form: binds are (id, now, since, limit); insert only while fewer than limit rows are inside the window.
+                  const [, , since, limit] = values as number[];
+                  const inside = [...created.values()].filter((t) => t >= Number(since)).length;
+                  if (inside >= Number(limit)) return { success: true, meta: { changes: 0 } };
+                }
                 rows.set(id, "reserved");
+                created.set(id, Number(values[1]));
                 return { success: true, meta: { changes: 1 } };
               }
               if (sql.startsWith("UPDATE")) {
@@ -90,6 +100,7 @@ export function baseEnv(over: Partial<Env> & { tokenReads?: { n: number } } = {}
     OTP_ENVIRONMENT: "acceptance",
     OTP_RECIPIENT_MODE: "allowlist",
     OTP_ALLOWED_RECIPIENTS: PHONE,
+    OTP_DAILY_SEND_LIMIT: "100",
     IDEMPOTENCY_DB: memoryReplayDb(),
     ...rest,
   };
