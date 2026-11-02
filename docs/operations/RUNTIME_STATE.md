@@ -62,7 +62,7 @@
 - 2026-10-31: backup buckets are per project (`aladdin-production-db-backups`, `aladdin-acceptance-backups-weur`, the latter not created yet); the aladdin-backups repo holds only the inactive build. Guaranteed full-restore window for R2 media is 59 days (see `ops/backups/README.md`). Nothing hosted changed.
 - 2026-11-01 **Acceptance manual backup and restore: PASS** (daily backup run 41297677151, restore test run 41299245228 on snapshot `aladdin-acceptance-20261101T102928Z` with CLI 2.119.0, freshness run 41299846162; 7/7 R2 originals). Schedules off, Production disabled, PR #118 draft. See `ops/backups/README.md`.
 - 2026-11-01: the R2 media backup excludes provably retired originals (`ops/backups/r2-eligibility.sql`, ADR-0027 amendment); nothing hosted changed.
-- Migration `20261101090001_media_id_storage_keys.sql` (ids-only `u/`/`o/` keys for new R2 uploads, [ADR-0027](../decisions/ADR-0027-r2-id-keys-and-backups.md)) is applied nowhere hosted. Production media stays on Supabase Storage (`R2_STORAGE_ENABLED=false`), so it changes nothing there until R2 is switched on.
+- Migration `20261103090001_media_id_storage_keys.sql` (ids-only `u/`/`o/` keys for new R2 uploads, [ADR-0027](../decisions/ADR-0027-r2-id-keys-and-backups.md)) is applied nowhere hosted. Production media stays on Supabase Storage (`R2_STORAGE_ENABLED=false`), so it changes nothing there until R2 is switched on.
 
 ## Live site on Cloudflare Workers — 2026-10-27
 - `aladdindecore.com`, `www` and `next` are served by Worker `aladdin-frontend-production` (Custom Domains, attached by the owner 17:23–17:40Z). It binds `aladdin-backend-production` and uses the live Supabase project `kkpkgjrweysgvhvkhzun` (193 migrations). R2 and Redis are off in production.

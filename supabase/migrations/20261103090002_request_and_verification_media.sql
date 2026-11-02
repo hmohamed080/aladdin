@@ -24,7 +24,7 @@ alter table public.media_storage_locations drop constraint media_storage_locatio
 alter table public.media_storage_locations add constraint media_storage_locations_namespace_check
   check (namespace in ('avatar','portfolio','certificate','product','organization','request','verification'));
 
--- The 20261101090001 check spans two columns, so PostgreSQL named it automatically; find it by definition.
+-- The 20261103090001 check spans two columns, so PostgreSQL named it automatically; find it by definition.
 do $$
 declare c record;
 begin
