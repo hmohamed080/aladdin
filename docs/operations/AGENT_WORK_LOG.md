@@ -1,3 +1,15 @@
+## 2026-11-02 — B1 reconciliation (isolated branch, unpushed): #116's newer commits merged into the R2 integration, global send budget ported to the Worker
+
+**Goal:** release blocker B1 from the Production readiness audit. `origin/claude/registration-resume` (#116) had four commits (`e18112c8`, `db4a3b65`, `8142d3ce`, `cd91b834`) that the #127 head did not contain and that conflicted in ten files. Report: [B1 reconciliation report](../security/B1_REGISTRATION_RECONCILIATION_REPORT.md).
+
+**Done (branch `recon/b1-116-into-r2-20261102`, worktree `D:/projects/aladdin-b1-recon`, base `6a0ecd1b`, **not pushed**):** `4ef14522` merge keeping the R2 side of every conflict (the four commits harden the pre-R2 sign-up path that R2 replaced; legacy migration `20261102090001`, its contract, pgTAP, concurrency script and generated types removed; no migration history edited); `c83cd597` ports the one protection with no R2 equivalent, the **global rolling-24h send budget**, to the delivery Worker (`OTP_DAILY_SEND_LIMIT`, one atomic D1 claim statement, fail closed with `503 budget_unconfigured`, `503 budget_exhausted` before Meta, preflight `daily_send_limit`); `800770c2` gives the local rig and the app-to-Worker contract test the now-required setting.
+
+**Validation:** Worker `tsc` clean and `npm test` 73/73 (incl. a real-SQL 12-parallel-claims test); config guard PASS; frontend focused tests 9 files / 108 tests pass; ESLint clean on the changed test; `inspect-auth-security.test.mjs` 32/32. Frontend `tsc` shows one pre-existing unrelated error (`edge/media-worker` cannot find `postgres`; its `node_modules` is not installed in any local worktree). **Not run locally:** pgTAP / RLS replay / RC2 upgrade path, phone E2E and R1 matrix, Worker E2E rig, two local-integration suites, Auth CAPTCHA and Showroom E2E (CI, blocker B2).
+
+**Migration inventory (nothing applied):** 199 repo migrations, identical to the #127 head's set; Production has 193 applied (identical to `main`); outstanding for Production in order: `20261028090001`, `20261028090003`, `20261029090001`, `20261029090002`, `20261030090001`, `20261030090002`.
+
+**Open:** owner decisions on the Production budget value and whether failed Meta calls count; the unused legacy challenge table stays until Phase 4; the Acceptance Worker (`4d41419c`) does not have the budget yet; B2 to B7 unchanged. Production, Acceptance, Meta, secrets and every existing PR untouched.
+
 ## 2026-11-02 — WhatsApp OTP Phase C pilot CLOSED on Acceptance: real OTP delivered, end-to-end sign-up verified (Meta code 10 root cause found)
 
 **Goal:** finish the Acceptance pilot (Phase C, PR #127): one real WhatsApp OTP from the Worker, then an end-to-end sign-up; restore everything OFF after each window.
