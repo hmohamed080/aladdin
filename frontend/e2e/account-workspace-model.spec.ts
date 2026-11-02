@@ -338,6 +338,11 @@ test.describe("bilingual + responsive — changed surfaces", () => {
   }) => {
     await prefs(page, "ar", "light");
     await signIn(page, request, "hana@example.test", /\/b2b(\/|$)/);
+    // Hana owns a showroom: `/b2b` is only a hop. After a client-side sign-in the URL reads `/b2b` first and the
+    // server redirect to the showroom workspace replaces the whole page a moment later. A menu opened in that gap
+    // is destroyed by the redirect (the failure seen in CI: heading found, next assertion finds no menu). Wait for
+    // the destination before touching the header.
+    await page.waitForURL(/\/showroom(\/|$)/);
 
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await openSwitcher(page);
