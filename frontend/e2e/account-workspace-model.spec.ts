@@ -112,14 +112,18 @@ const workplaceMenu = (page: Page) => page.locator('[data-testid="workplace-menu
  * application's own state — be the source of truth. No timeout is widened and no assertion is weakened.
  */
 async function openToggleMenu(trigger: Locator, menu: Locator) {
-  await expect(trigger).toBeVisible();
-  await expect
-    .poll(() => trigger.evaluate((el) => Object.keys(el).some((key) => key.startsWith("__reactProps$"))), {
-      message: "the menu trigger has hydrated (its handler is attached)",
-    })
-    .toBe(true);
-  if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
-  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  // One attempt = verify the CURRENT trigger node is hydrated, press only if the menu is not already open, then wait
+  // for the application's own state. A press can still be lost when the page swaps the trigger node under us (a
+  // client navigation finishing right after sign-in or registration); the next attempt then sees the NEW, fresh
+  // node with aria-expanded=false and presses once on it. A press is never repeated on a node that already opened,
+  // so the open-then-closed double toggle cannot recur.
+  await expect(async () => {
+    await expect(trigger).toBeVisible({ timeout: 2_000 });
+    const hydrated = await trigger.evaluate((el) => Object.keys(el).some((key) => key.startsWith("__reactProps$")));
+    expect(hydrated, "the menu trigger has hydrated (its handler is attached)").toBe(true);
+    if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click({ timeout: 2_000 });
+    await expect(trigger).toHaveAttribute("aria-expanded", "true", { timeout: 2_000 });
+  }).toPass({ intervals: [250, 500, 1_000], timeout: 20_000 });
   await expect(menu).toBeVisible();
 }
 
