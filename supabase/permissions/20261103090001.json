@@ -1,6 +1,6 @@
 {
- "version": "20261101090002",
- "source": "Carried forward from 20261101090001: 20261101090002 only replaces existing function bodies (create or replace) and adds two triggers; no function signature or grant changes, so the contract is unchanged.",
+ "version": "20261103090001",
+ "source": "local supabase/postgres:17 replay of every migration through this version (claude/project-thread-yjnwej). Reviewed additions: app.media_storage_key_assign() and app.media_storage_key_for(...) executable by no client role; public.media_storage_object(text,text) service_role only.",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.media_storage_resolve(text,text,text)",

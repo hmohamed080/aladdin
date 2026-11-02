@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Backup coverage for the request and verification namespaces (20261101090002).
+"""Backup coverage for the request and verification namespaces (20261103090002).
 
 Purchase-request photos and business-verification documents are R2 originals like any other. The eligibility rule
 treats everything it cannot PROVE retired as required, and these two namespaces have no canonical table in that

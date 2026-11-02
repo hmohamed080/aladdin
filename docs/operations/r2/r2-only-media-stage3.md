@@ -11,7 +11,7 @@ Supabase Storage; R2 is the only store for new bytes.
 | Business-verification document | `verification` | `o/<org>/verification/<id>/original.<ext>` | upload/delete: `org.manage` and an unsubmitted draft; read: `org.manage`, or a reviewer of a **ready** document (`app.can_read_bv_object`) |
 
 Both reuse reservation, verification receipt (type, size, SHA-256), resolver, ids-only key trigger and cleanup of the other
-five namespaces (migration `20261101090002`, `create or replace` only: no signature or grant changes). Compliance rules are
+five namespaces (migration `20261103090002`, `create or replace` only: no signature or grant changes). Compliance rules are
 unchanged: a document attached to a submission is evidence, cannot be removed, is never a cleanup candidate and is never
 excluded from a media backup.
 
