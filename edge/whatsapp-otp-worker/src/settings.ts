@@ -76,9 +76,11 @@ export type SettingsRequest = {
   criticalPercent: number;
   reason: string;
   ceilingConfirmation: string | null;
+  /** Set by the app server ONLY after the database confirmed whatsapp_otp.ceiling_manage for the actor. A ceiling change without it is refused here. */
+  ceilingAuthorized: boolean;
 };
 
-const REQUEST_KEYS = new Set(["request_id", "actor_id", "expected_version", "daily_limit", "hard_ceiling", "warn_percent", "critical_percent", "reason", "ceiling_confirmation"]);
+const REQUEST_KEYS = new Set(["request_id", "actor_id", "expected_version", "daily_limit", "hard_ceiling", "warn_percent", "critical_percent", "reason", "ceiling_confirmation", "ceiling_authorized"]);
 
 /** Strict schema: exact key set, exact types, no coercion. A signed but malformed request is still refused. */
 export function parseSettingsRequest(raw: string): SettingsRequest | null {
@@ -87,21 +89,23 @@ export function parseSettingsRequest(raw: string): SettingsRequest | null {
   if (!b || typeof b !== "object" || Array.isArray(b)) return null;
   const o = b as Record<string, unknown>;
   for (const k of Object.keys(o)) if (!REQUEST_KEYS.has(k)) return null;
-  const { request_id, actor_id, expected_version, daily_limit, hard_ceiling, warn_percent, critical_percent, reason, ceiling_confirmation } = o;
+  const { request_id, actor_id, expected_version, daily_limit, hard_ceiling, warn_percent, critical_percent, reason, ceiling_confirmation, ceiling_authorized } = o;
   if (typeof request_id !== "string" || !UUID.test(request_id) || typeof actor_id !== "string" || !UUID.test(actor_id)) return null;
   if (!isInt(expected_version) || expected_version < 0) return null;
   if (!isInt(daily_limit) || !isInt(hard_ceiling) || !isInt(warn_percent) || !isInt(critical_percent)) return null;
   if (typeof reason !== "string" || reason.length > 500 || CONTROL.test(reason)) return null;
   if (ceiling_confirmation !== undefined && (typeof ceiling_confirmation !== "string" || ceiling_confirmation.length > 12)) return null;
+  if (ceiling_authorized !== undefined && typeof ceiling_authorized !== "boolean") return null;
   return {
     requestId: request_id.toLowerCase(), actorId: actor_id.toLowerCase(), expectedVersion: expected_version,
     dailyLimit: daily_limit, hardCeiling: hard_ceiling, warnPercent: warn_percent, criticalPercent: critical_percent,
     reason: reason.trim(), ceilingConfirmation: ceiling_confirmation === undefined ? null : ceiling_confirmation,
+    ceilingAuthorized: ceiling_authorized === true,
   };
 }
 
 export type ApplyFailure =
-  | "stale_version" | "replay" | "no_change" | "reason_too_short" | "ceiling_confirmation_required"
+  | "stale_version" | "replay" | "no_change" | "reason_too_short" | "ceiling_confirmation_required" | "ceiling_not_authorized"
   | "invalid_values" | "thresholds_out_of_order" | "daily_exceeds_ceiling" | "ceiling_below_current_limit" | "unreadable";
 export type ApplyResult = { ok: true; old: OtpSettings | null; new: OtpSettings } | { ok: false; error: ApplyFailure; currentVersion?: number };
 
@@ -135,6 +139,9 @@ export async function applySettings(db: Db, req: SettingsRequest, nowSeconds: nu
   }
 
   const ceilingChanged = current === null || current.hardCeiling !== req.hardCeiling;
+  // Defence in depth: whatever the caller believes the current ceiling is, THIS Worker compares against its own row and refuses a ceiling
+  // change that the app server did not mark as authorized after the database confirmed the elevated permission.
+  if (ceilingChanged && !req.ceilingAuthorized) return { ok: false, error: "ceiling_not_authorized" };
   if (req.reason.length < (ceilingChanged ? MIN_REASON_CEILING : MIN_REASON)) return { ok: false, error: "reason_too_short" };
   if (ceilingChanged && req.ceilingConfirmation !== String(req.hardCeiling)) return { ok: false, error: "ceiling_confirmation_required" };
   if (current && current.dailyLimit === req.dailyLimit && current.hardCeiling === req.hardCeiling && current.warnPercent === req.warnPercent && current.criticalPercent === req.criticalPercent) {

@@ -184,6 +184,30 @@ describe("Hard Ceiling and Daily Send Limit rules", () => {
     });
   });
 
+  test("DEFENCE IN DEPTH: a ceiling change the app server did not mark as authorized is refused by the Worker, whatever the caller believes the old ceiling was", async () => {
+    await withD1(async (d1, db) => {
+      const env = envFor(d1);
+      // initialization is a ceiling change too
+      for (const flag of [false, undefined]) {
+        const res = await adminCall(env, SETTINGS_PATH, settingsBody({ ceiling_authorized: flag }));
+        assert.equal(res.status, 403);
+        assert.deepEqual(await json(res), { error: "ceiling_not_authorized" });
+      }
+      assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM otp_settings").bind().first<{ n: number }>())?.n, 0);
+      await setup(d1, env);
+      const raise = (over = {}) => settingsBody({ expected_version: 1, hard_ceiling: 8000, ceiling_confirmation: "8000", reason: "Meta tier verified at 10,000 per day", ...over });
+      assert.deepEqual(await json(await adminCall(env, SETTINGS_PATH, raise({ ceiling_authorized: false }))), { error: "ceiling_not_authorized" });
+      assert.deepEqual(await json(await adminCall(env, SETTINGS_PATH, raise({ ceiling_authorized: undefined }))), { error: "ceiling_not_authorized" });
+      assert.equal((await db.prepare("SELECT hard_ceiling FROM otp_settings WHERE id = 1").bind().first<{ hard_ceiling: number }>())?.hard_ceiling, 5000, "nothing changed");
+      // the flag is a boolean, never a truthy string
+      assert.equal((await adminCall(env, SETTINGS_PATH, raise({ ceiling_authorized: "true" }))).status, 400);
+      // a limit-only change does not need it, and the flag does not let a stale or invalid change through
+      assert.equal((await adminCall(env, SETTINGS_PATH, settingsBody({ expected_version: 1, daily_limit: 160, ceiling_confirmation: undefined, ceiling_authorized: false, reason: "Raise the limit for the launch week" }))).status, 200);
+      assert.deepEqual(await json(await adminCall(env, SETTINGS_PATH, raise({ expected_version: 1, ceiling_authorized: true }))), { error: "stale_version", current_version: 2 });
+      assert.equal((await adminCall(env, SETTINGS_PATH, raise({ expected_version: 2, ceiling_authorized: true }))).status, 200);
+    });
+  });
+
   test("invalid values are refused at every layer: non-integers, out-of-range, threshold order, wrong types", async () => {
     await withD1(async (d1) => {
       const env = envFor(d1);

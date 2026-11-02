@@ -28,7 +28,7 @@ const view = (s: OtpSettings | null) =>
 const STATUS: Record<ApplyFailure, number> = {
   stale_version: 409, replay: 409, unreadable: 503,
   no_change: 422, reason_too_short: 422, ceiling_confirmation_required: 422, invalid_values: 422,
-  thresholds_out_of_order: 422, daily_exceeds_ceiling: 422, ceiling_below_current_limit: 422,
+  thresholds_out_of_order: 422, daily_exceeds_ceiling: 422, ceiling_below_current_limit: 422, ceiling_not_authorized: 403,
 };
 
 function usageRequestId(raw: string): string | null {

@@ -1,8 +1,8 @@
 -- pgTAP: admin-controlled WhatsApp OTP limits (20261103090001_whatsapp_otp_admin_settings.sql).
 --
 --   A. Permissions: the catalog, the locked Super Admin grants, Administrator = view only, everyone else nothing; view_check
---   B. begin: Super Admin only, identity from the session, validation, the Hard Ceiling's elevated permission and rules
---   C. finish: own request only, idempotent, audit with actor / old / new / reason / version, cannot alter the recorded values
+--   B. begin: service role only; the ACTOR's permissions are judged in the database, validation, the Hard Ceiling's elevated permission and rules
+--   C. finish: service role only, the actor's own request only, idempotent, audit with actor / old / new / reason / version
 --   D. reconcile: service role only, completes from the authoritative record, ignores forgeries, closes stale requests
 --   E. notification_record: service role only, fan-out only to staff holding whatsapp_otp.view through the EXISTING notifications,
 --      idempotent, statistics-only payloads, malformed input refused
@@ -12,7 +12,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(96);
+select plan(103);
 
 \set sa1   'a1000000-0000-4000-8000-000000000001'
 \set sa2   'a1000000-0000-4000-8000-000000000002'
@@ -77,15 +77,18 @@ end;
 $$;
 create function pg_temp.st(p_user uuid, p_sql text) returns text language sql as $$
   select coalesce(pg_temp.call_as(p_user, p_sql) ->> 'sqlstate', 'ok') $$;
+create function pg_temp.sv(p_sql text) returns text language sql as $$
+  select coalesce(pg_temp.call_svc(p_sql) ->> 'sqlstate', 'ok') $$;
 grant execute on function pg_temp.act_as(uuid), pg_temp.as_dba() to authenticated, anon, service_role;
 
 -- Canonical settings payloads
 create function pg_temp.s(p_daily int, p_ceiling int, p_warn int default 70, p_crit int default 90) returns jsonb language sql as $$
   select jsonb_build_object('daily_limit', p_daily, 'hard_ceiling', p_ceiling, 'warn_percent', p_warn, 'critical_percent', p_crit) $$;
+-- begin / finish are SERVICE ROLE ONLY: the app server passes the actor it verified from the session. "as p_user" below means "for that actor".
 create function pg_temp.begin_as(p_user uuid, p_ver int, p_old jsonb, p_new jsonb, p_reason text) returns jsonb language sql as $$
-  select pg_temp.call_as(p_user, format('public.admin_whatsapp_otp_settings_begin(%s, %L::jsonb, %L::jsonb, %L)', p_ver, p_old::text, p_new::text, p_reason)) $$;
+  select pg_temp.call_svc(format('public.admin_whatsapp_otp_settings_begin(%L::uuid, %s, %L::jsonb, %L::jsonb, %L)', p_user, p_ver, p_old::text, p_new::text, p_reason)) $$;
 create function pg_temp.fin_as(p_user uuid, p_req uuid, p_status text, p_ver int default null, p_code text default null) returns jsonb language sql as $$
-  select pg_temp.call_as(p_user, format('public.admin_whatsapp_otp_settings_finish(%L::uuid, %L, %L::int, %L)', p_req, p_status, p_ver, p_code)) $$;
+  select pg_temp.call_svc(format('public.admin_whatsapp_otp_settings_finish(%L::uuid, %L::uuid, %L, %L::int, %L)', p_user, p_req, p_status, p_ver, p_code)) $$;
 
 -- ---------------------------------------------------------------------------
 -- Fixtures
@@ -134,7 +137,15 @@ select is(pg_temp.call_anon('public.admin_whatsapp_otp_view_check()') ->> 'sqlst
 select is(pg_temp.begin_as(:'adm', 0, null, pg_temp.s(150, 5000), 'Initial limits approved by the owner')::jsonb ->> 'sqlstate', '42501',
   'B1 an Administrator cannot begin a change');
 select is(pg_temp.begin_as(:'plain', 0, null, pg_temp.s(150, 5000), 'Initial limits approved by the owner') ->> 'sqlstate', '42501', 'B2 an ordinary user cannot');
-select is(pg_temp.call_anon($q$public.admin_whatsapp_otp_settings_begin(0, null, '{}'::jsonb, 'x')$q$) ->> 'sqlstate', '42501', 'B3 anon cannot');
+select is(pg_temp.call_anon($q$public.admin_whatsapp_otp_settings_begin('a1000000-0000-4000-8000-000000000001'::uuid, 0, null, '{}'::jsonb, 'x')$q$) ->> 'sqlstate', '42501', 'B3 anon cannot');
+select is(pg_temp.call_as(:'sa1', format('public.admin_whatsapp_otp_settings_begin(%L::uuid, 0, null, %L::jsonb, %L)', :'sa1', pg_temp.s(150, 5000)::text, 'Initial limits approved by the owner for launch')) ->> 'sqlstate', '42501',
+  'B3b even a Super Admin''s OWN browser session cannot call begin: the privilege decision never rests on browser input');
+select is(pg_temp.call_as(:'mgr', format('public.admin_whatsapp_otp_settings_begin(%L::uuid, 1, %L::jsonb, %L::jsonb, %L)', :'mgr', pg_temp.s(150, 5000)::text, pg_temp.s(150, 5000)::text, 'forging an old ceiling to dodge the ceiling permission')) ->> 'sqlstate', '42501',
+  'B3c a manage-only user cannot call it directly with a forged "old" to dodge ceiling_manage');
+select is(pg_temp.call_svc(format('public.admin_whatsapp_otp_settings_begin(null::uuid, 0, null, %L::jsonb, %L)', pg_temp.s(150, 5000)::text, 'Initial limits approved by the owner for launch')) ->> 'sqlstate', '42501',
+  'B3d a missing actor is refused');
+select is(pg_temp.begin_as(:'susp', 0, null, pg_temp.s(150, 5000), 'Initial limits approved by the owner for launch') ->> 'sqlstate', '42501',
+  'B3e a suspended administrator is refused even though the server asked');
 select is(pg_temp.begin_as(:'mgr', 0, null, pg_temp.s(150, 5000), 'Initial limits approved by the owner') ->> 'sqlstate', '42501',
   'B4 manage WITHOUT ceiling_manage cannot set the ceiling (initialization is a ceiling change)');
 select is((select count(*)::int from app.whatsapp_otp_settings_requests), 0, 'B5 nothing was recorded by any refused call');
@@ -150,19 +161,19 @@ select is((select count(*)::int from public.audit_log where action = 'whatsapp_o
   'B9 the audit event "requested" records the actor, the old and the new values');
 
 -- Validation: every invalid payload is refused with 22023 and records nothing
-select is(pg_temp.st(:'sa1', format('public.admin_whatsapp_otp_settings_begin(0, null, %L::jsonb, %L)', pg_temp.s(6000, 5000)::text, 'Initial limits approved by the owner')), '22023', 'B10 limit above ceiling');
-select is(pg_temp.st(:'sa1', format('public.admin_whatsapp_otp_settings_begin(0, null, %L::jsonb, %L)', pg_temp.s(150, 5000, 90, 70)::text, 'Initial limits approved by the owner')), '22023', 'B11 warning above critical');
-select is(pg_temp.st(:'sa1', format('public.admin_whatsapp_otp_settings_begin(0, null, %L::jsonb, %L)', pg_temp.s(0, 5000)::text, 'Initial limits approved by the owner')), '22023', 'B12 zero limit');
-select is(pg_temp.st(:'sa1', format('public.admin_whatsapp_otp_settings_begin(0, null, %L::jsonb, %L)', pg_temp.s(150, 1000001)::text, 'Initial limits approved by the owner')), '22023', 'B13 ceiling beyond the integer sanity bound');
-select is(pg_temp.st(:'sa1', $q$public.admin_whatsapp_otp_settings_begin(0, null, '{"daily_limit":150.5,"hard_ceiling":5000,"warn_percent":70,"critical_percent":90}'::jsonb, 'Initial limits approved by the owner')$q$), '22023', 'B14 a non-integer');
-select is(pg_temp.st(:'sa1', $q$public.admin_whatsapp_otp_settings_begin(0, null, '{"daily_limit":"150","hard_ceiling":5000,"warn_percent":70,"critical_percent":90}'::jsonb, 'Initial limits approved by the owner')$q$), '22023', 'B15 a string instead of a number');
-select is(pg_temp.st(:'sa1', $q$public.admin_whatsapp_otp_settings_begin(0, null, '{"daily_limit":150,"hard_ceiling":5000,"warn_percent":70}'::jsonb, 'Initial limits approved by the owner')$q$), '22023', 'B16 a missing key');
-select is(pg_temp.st(:'sa1', $q$public.admin_whatsapp_otp_settings_begin(0, null, '{"daily_limit":150,"hard_ceiling":5000,"warn_percent":70,"critical_percent":90,"extra":1}'::jsonb, 'Initial limits approved by the owner')$q$), '22023', 'B17 an extra key');
-select is(pg_temp.st(:'sa1', format('public.admin_whatsapp_otp_settings_begin(0, null, %L::jsonb, %L)', pg_temp.s(150, 5000)::text, 'short')), '22023', 'B18 reason too short');
-select is(pg_temp.st(:'sa1', format('public.admin_whatsapp_otp_settings_begin(0, null, %L::jsonb, %L)', pg_temp.s(150, 5000)::text, 'ten chars!!')), '22023', 'B19 a ceiling change needs at least 20 characters');
-select is(pg_temp.st(:'sa1', format('public.admin_whatsapp_otp_settings_begin(1, null, %L::jsonb, %L)', pg_temp.s(150, 5000)::text, 'Initial limits approved by the owner')), '22023', 'B20 version 1 with no old settings');
-select is(pg_temp.st(:'sa1', format('public.admin_whatsapp_otp_settings_begin(0, %L::jsonb, %L::jsonb, %L)', pg_temp.s(100, 5000)::text, pg_temp.s(150, 5000)::text, 'Initial limits approved by the owner')), '22023', 'B21 old settings with version 0');
-select is(pg_temp.st(:'sa1', format('public.admin_whatsapp_otp_settings_begin(1, %L::jsonb, %L::jsonb, %L)', pg_temp.s(150, 5000)::text, pg_temp.s(150, 5000)::text, 'No actual change here')), '22023', 'B22 a no-op');
+select is(pg_temp.sv(format('public.admin_whatsapp_otp_settings_begin(%L::uuid, 0, null, %L::jsonb, %L)', :'sa1', pg_temp.s(6000, 5000)::text, 'Initial limits approved by the owner')), '22023', 'B10 limit above ceiling');
+select is(pg_temp.sv(format('public.admin_whatsapp_otp_settings_begin(%L::uuid, 0, null, %L::jsonb, %L)', :'sa1', pg_temp.s(150, 5000, 90, 70)::text, 'Initial limits approved by the owner')), '22023', 'B11 warning above critical');
+select is(pg_temp.sv(format('public.admin_whatsapp_otp_settings_begin(%L::uuid, 0, null, %L::jsonb, %L)', :'sa1', pg_temp.s(0, 5000)::text, 'Initial limits approved by the owner')), '22023', 'B12 zero limit');
+select is(pg_temp.sv(format('public.admin_whatsapp_otp_settings_begin(%L::uuid, 0, null, %L::jsonb, %L)', :'sa1', pg_temp.s(150, 1000001)::text, 'Initial limits approved by the owner')), '22023', 'B13 ceiling beyond the integer sanity bound');
+select is(pg_temp.sv($q$public.admin_whatsapp_otp_settings_begin('a1000000-0000-4000-8000-000000000001'::uuid, 0, null, '{"daily_limit":150.5,"hard_ceiling":5000,"warn_percent":70,"critical_percent":90}'::jsonb, 'Initial limits approved by the owner')$q$), '22023', 'B14 a non-integer');
+select is(pg_temp.sv($q$public.admin_whatsapp_otp_settings_begin('a1000000-0000-4000-8000-000000000001'::uuid, 0, null, '{"daily_limit":"150","hard_ceiling":5000,"warn_percent":70,"critical_percent":90}'::jsonb, 'Initial limits approved by the owner')$q$), '22023', 'B15 a string instead of a number');
+select is(pg_temp.sv($q$public.admin_whatsapp_otp_settings_begin('a1000000-0000-4000-8000-000000000001'::uuid, 0, null, '{"daily_limit":150,"hard_ceiling":5000,"warn_percent":70}'::jsonb, 'Initial limits approved by the owner')$q$), '22023', 'B16 a missing key');
+select is(pg_temp.sv($q$public.admin_whatsapp_otp_settings_begin('a1000000-0000-4000-8000-000000000001'::uuid, 0, null, '{"daily_limit":150,"hard_ceiling":5000,"warn_percent":70,"critical_percent":90,"extra":1}'::jsonb, 'Initial limits approved by the owner')$q$), '22023', 'B17 an extra key');
+select is(pg_temp.sv(format('public.admin_whatsapp_otp_settings_begin(%L::uuid, 0, null, %L::jsonb, %L)', :'sa1', pg_temp.s(150, 5000)::text, 'short')), '22023', 'B18 reason too short');
+select is(pg_temp.sv(format('public.admin_whatsapp_otp_settings_begin(%L::uuid, 0, null, %L::jsonb, %L)', :'sa1', pg_temp.s(150, 5000)::text, 'ten chars!!')), '22023', 'B19 a ceiling change needs at least 20 characters');
+select is(pg_temp.sv(format('public.admin_whatsapp_otp_settings_begin(%L::uuid, 1, null, %L::jsonb, %L)', :'sa1', pg_temp.s(150, 5000)::text, 'Initial limits approved by the owner')), '22023', 'B20 version 1 with no old settings');
+select is(pg_temp.sv(format('public.admin_whatsapp_otp_settings_begin(%L::uuid, 0, %L::jsonb, %L::jsonb, %L)', :'sa1', pg_temp.s(100, 5000)::text, pg_temp.s(150, 5000)::text, 'Initial limits approved by the owner')), '22023', 'B21 old settings with version 0');
+select is(pg_temp.sv(format('public.admin_whatsapp_otp_settings_begin(%L::uuid, 1, %L::jsonb, %L::jsonb, %L)', :'sa1', pg_temp.s(150, 5000)::text, pg_temp.s(150, 5000)::text, 'No actual change here')), '22023', 'B22 a no-op');
 
 -- The Hard Ceiling rules
 select is(pg_temp.begin_as(:'sa1', 1, pg_temp.s(150, 5000), pg_temp.s(150, 100), 'Lowering the ceiling only, to the audit minimum') ->> 'msg', 'whatsapp_otp: ceiling_below_current_limit',
@@ -179,11 +190,15 @@ select is(pg_temp.begin_as(:'sa2', 1, pg_temp.s(150, 5000), pg_temp.s(150, 8000)
 -- ===========================================================================
 -- C. finish
 -- ===========================================================================
+select is(pg_temp.call_as(:'sa1', format('public.admin_whatsapp_otp_settings_finish(%L::uuid, %L::uuid, ''applied'', 1, null)', :'sa1', (select (r ->> 'request_id') from first_req))) ->> 'sqlstate', '42501',
+  'C0 a browser session cannot complete a change: only the server, holding the Worker''s signed answer, can');
+select is(pg_temp.call_anon(format('public.admin_whatsapp_otp_settings_finish(%L::uuid, %L::uuid, ''applied'', 1, null)', :'sa1', (select (r ->> 'request_id') from first_req))) ->> 'sqlstate', '42501', 'C0b anon cannot either');
 select is(pg_temp.fin_as(:'sa2', (select (r ->> 'request_id')::uuid from first_req), 'applied', 1) ->> 'sqlstate', '42501', 'C1 another Super Admin cannot complete SOMEONE ELSE''S request');
-select is(pg_temp.fin_as(:'adm', (select (r ->> 'request_id')::uuid from first_req), 'applied', 1) ->> 'sqlstate', '42501', 'C2 an Administrator cannot complete a request');
+select is(pg_temp.fin_as(:'adm', (select (r ->> 'request_id')::uuid from first_req), 'applied', 1) ->> 'sqlstate', '42501', 'C2 an Administrator (not the actor) cannot complete a request');
 select is(pg_temp.fin_as(:'sa1', (select (r ->> 'request_id')::uuid from first_req), 'applied', 7) ->> 'sqlstate', '22023', 'C3 the applied version must be expected_version + 1');
 select is(pg_temp.fin_as(:'sa1', (select (r ->> 'request_id')::uuid from first_req), 'bogus', 1) ->> 'sqlstate', '22023', 'C4 an unknown status is refused');
 select is(pg_temp.fin_as(:'sa1', gen_random_uuid(), 'applied', 1) ->> 'sqlstate', '42501', 'C5 an unknown request is refused');
+select is(pg_temp.call_svc(format('public.admin_whatsapp_otp_settings_finish(null::uuid, %L::uuid, ''applied'', 1, null)', (select (r ->> 'request_id') from first_req))) ->> 'sqlstate', '42501', 'C5b a missing actor is refused');
 select is(pg_temp.fin_as(:'sa1', (select (r ->> 'request_id')::uuid from first_req), 'applied', 1) #>> '{}', 'applied', 'C6 the owner completes it');
 select is((select count(*)::int from public.audit_log where action = 'whatsapp_otp.settings_changed' and actor_user_id = :'sa1'::uuid
             and (metadata ->> 'request_id')::uuid = (select (r ->> 'request_id')::uuid from first_req)
@@ -288,9 +303,9 @@ select ok((select pg_get_constraintdef(oid) like '%whatsapp_otp.settings_changed
 select ok((select pg_get_constraintdef(oid) like '%whatsapp_otp.failure_rate%' and pg_get_constraintdef(oid) like '%message.sent%' and pg_get_constraintdef(oid) like '%job.review.received%'
             from pg_constraint where conname = 'ck_notifications_event_type_known'), 'F4 the notification allow-list gained the four events and kept every existing one');
 select ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                       where p.proname in ('admin_whatsapp_otp_settings_reconcile', 'whatsapp_otp_notification_record')
+                       where p.proname in ('admin_whatsapp_otp_settings_begin', 'admin_whatsapp_otp_settings_finish', 'admin_whatsapp_otp_settings_reconcile', 'whatsapp_otp_notification_record')
                          and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('public', p.oid, 'execute'))),
-  'F5 the two service-role functions are executable by no client role');
+  'F5 begin, finish, reconcile and notification_record are executable by no client role');
 select ok(not exists (select 1 from pg_proc p where p.proname like 'admin_whatsapp_otp%' and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('public', p.oid, 'execute'))),
   'F6 no admin function is executable by anon or PUBLIC');
 

@@ -13,11 +13,14 @@
 --   3. Ledgers         app.whatsapp_otp_settings_requests (a pending/applied/failed record per change, so a change whose Supabase completion
 --                      failed can be reconciled from the Worker's authoritative D1 audit) and app.whatsapp_otp_notification_events (the
 --                      dedupe ledger in front of app.notify). Both are closed tables: RLS on, no grants.
---   4. RPCs            begin / finish (the caller's own session: auth.uid() IS the actor), view_check, reconcile and notification_record
---                      (service role only, called by the app server).
+--   4. RPCs            view_check (the caller's own session). begin, finish, reconcile and notification_record are SERVICE ROLE ONLY:
+--                      the app server calls them with the actor it derived from the verified session, the current settings it read from
+--                      the Worker's signed usage endpoint and, for finish, the Worker's signed answer. A signed-in browser session can
+--                      reach none of them, so neither the privilege decision nor the audit completion rests on client-supplied input.
 --
--- SECURITY. Every function is SECURITY DEFINER with search_path = '' and schema-qualified references. Permission checks go through
--- app.admin_require (auth.uid() based), never a caller-supplied actor. The service-role functions are not executable by any client role.
+-- SECURITY. Every function is SECURITY DEFINER with search_path = '' and schema-qualified references. The database checks the ACTOR's
+-- permissions (app.admin_permissions_of: active platform role, not suspended) for the actor the trusted server passes; it never decides a
+-- privilege from a value a browser could forge. The service-role functions are not executable by any client role.
 -- ===========================================================================
 
 -- ---------------------------------------------------------------------------
@@ -171,17 +174,26 @@ begin
 end;
 $$;
 
--- BEGIN: authorize and record a requested change. The caller is the verified session; nothing about identity is a parameter.
-create function public.admin_whatsapp_otp_settings_begin(p_expected_version integer, p_old jsonb, p_new jsonb, p_reason text)
+-- BEGIN (service role): authorize and record a requested change for the ACTOR the server verified. p_old is the current Worker settings the
+-- server just read from the Worker's signed usage endpoint (never browser input), so the ceiling-change decision rests on trusted data.
+-- The Worker independently refuses a ceiling change that is not marked authorized, and compares the version, so a wrong p_old cannot change anything.
+create function public.admin_whatsapp_otp_settings_begin(p_actor uuid, p_expected_version integer, p_old jsonb, p_new jsonb, p_reason text)
 returns jsonb language plpgsql volatile security definer set search_path = '' as $$
 declare
-  v_actor   uuid := (select auth.uid());
+  v_perms   text[];
   v_reason  text := nullif(btrim(coalesce(p_reason, '')), '');
   v_ceiling boolean;
   v_min     integer;
   v_id      uuid := gen_random_uuid();
 begin
-  perform app.admin_require('whatsapp_otp.manage');
+  if p_actor is null then
+    raise exception 'whatsapp_otp: actor_required' using errcode = '42501';
+  end if;
+  -- The actor's EFFECTIVE permissions: active platform role assignments, active role, active permission, non-suspended account.
+  v_perms := app.admin_permissions_of(p_actor);
+  if not ('whatsapp_otp.manage' = any (v_perms)) then
+    raise exception 'admin permission whatsapp_otp.manage required' using errcode = '42501';
+  end if;
   if p_expected_version is null or p_expected_version < 0 then
     raise exception 'whatsapp_otp: invalid_version' using errcode = '22023';
   end if;
@@ -201,43 +213,44 @@ begin
   if (p_old is null) <> (p_expected_version = 0) then
     raise exception 'whatsapp_otp: invalid_version' using errcode = '22023';
   end if;
-  -- Derived here, never trusted from the client: the Hard Ceiling changes when it is first set or differs from the current one.
+  -- Derived here from the trusted old value: the Hard Ceiling changes when it is first set or differs from the current one.
   v_ceiling := p_old is null or (p_old ->> 'hard_ceiling')::int <> (p_new ->> 'hard_ceiling')::int;
-  if v_ceiling then
-    perform app.admin_require('whatsapp_otp.ceiling_manage');
+  if v_ceiling and not ('whatsapp_otp.ceiling_manage' = any (v_perms)) then
+    raise exception 'admin permission whatsapp_otp.ceiling_manage required' using errcode = '42501';
   end if;
   -- (a CASE ... THEN inside an IF condition would end the condition at its first THEN, so the minimum length is computed first)
   v_min := case when v_ceiling then 20 else 10 end;
   if v_reason is null or char_length(v_reason) > 500 or char_length(v_reason) < v_min then
     raise exception 'whatsapp_otp: reason_required' using errcode = '22023';
   end if;
-  if p_old is not null then
-    if p_old = p_new then
-      raise exception 'whatsapp_otp: no_change' using errcode = '22023';
-    end if;
+  if p_old is not null and p_old = p_new then
+    raise exception 'whatsapp_otp: no_change' using errcode = '22023';
   end if;
   insert into app.whatsapp_otp_settings_requests (id, actor_id, expected_version, old_settings, new_settings, reason, ceiling_changed)
-  values (v_id, v_actor, p_expected_version, p_old, p_new, v_reason, v_ceiling);
+  values (v_id, p_actor, p_expected_version, p_old, p_new, v_reason, v_ceiling);
+  -- Attribute the audit row to the ACTOR (transaction-local; this function is service-role only and the actor was verified by the server).
+  perform set_config('request.jwt.claims', json_build_object('sub', p_actor, 'role', 'authenticated')::text, true);
   perform app.record_audit_event('whatsapp_otp.settings_requested', 'whatsapp_otp_settings', v_id, null,
     jsonb_build_object('request_id', v_id, 'old', p_old, 'new', p_new, 'reason', v_reason, 'ceiling_changed', v_ceiling, 'expected_version', p_expected_version));
-  return jsonb_build_object('request_id', v_id, 'actor_id', v_actor, 'ceiling_changed', v_ceiling);
+  return jsonb_build_object('request_id', v_id, 'actor_id', p_actor, 'ceiling_changed', v_ceiling);
 end;
 $$;
 
--- FINISH: the caller's own session completes its own pending request. It cannot supply or alter old/new values: those were fixed at begin.
-create function public.admin_whatsapp_otp_settings_finish(p_request uuid, p_status text, p_version integer default null, p_code text default null)
+-- FINISH (service role): the server completes the actor's own pending request AFTER it received the Worker's signed answer. It cannot alter
+-- the old/new values, which were fixed at begin, and a request can only be finished for the actor who began it.
+create function public.admin_whatsapp_otp_settings_finish(p_actor uuid, p_request uuid, p_status text, p_version integer default null, p_code text default null)
 returns text language plpgsql volatile security definer set search_path = '' as $$
 declare
   v_row app.whatsapp_otp_settings_requests;
 begin
-  perform app.admin_require('whatsapp_otp.manage');
   select * into v_row from app.whatsapp_otp_settings_requests where id = p_request for update;
-  if not found or v_row.actor_id is distinct from (select auth.uid()) then
+  if not found or p_actor is null or v_row.actor_id is distinct from p_actor then
     raise exception 'whatsapp_otp: request_not_found' using errcode = '42501';
   end if;
   if v_row.status <> 'pending' then
     return v_row.status;                                   -- idempotent
   end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', p_actor, 'role', 'authenticated')::text, true);
   if p_status = 'applied' then
     if p_version is distinct from v_row.expected_version + 1 then
       raise exception 'whatsapp_otp: invalid_version' using errcode = '22023';
@@ -390,18 +403,18 @@ $$;
 -- admin permission against auth.uid(); the two service-role functions are not executable by any client role.
 -- ---------------------------------------------------------------------------
 revoke all on function public.admin_whatsapp_otp_view_check() from public, anon, authenticated, service_role;
-revoke all on function public.admin_whatsapp_otp_settings_begin(integer, jsonb, jsonb, text) from public, anon, authenticated, service_role;
-revoke all on function public.admin_whatsapp_otp_settings_finish(uuid, text, integer, text) from public, anon, authenticated, service_role;
+revoke all on function public.admin_whatsapp_otp_settings_begin(uuid, integer, jsonb, jsonb, text) from public, anon, authenticated, service_role;
+revoke all on function public.admin_whatsapp_otp_settings_finish(uuid, uuid, text, integer, text) from public, anon, authenticated, service_role;
 revoke all on function public.admin_whatsapp_otp_settings_reconcile(jsonb) from public, anon, authenticated, service_role;
 revoke all on function public.whatsapp_otp_notification_record(text, text, text, bigint, jsonb) from public, anon, authenticated, service_role;
 grant execute on function public.admin_whatsapp_otp_view_check() to authenticated;
-grant execute on function public.admin_whatsapp_otp_settings_begin(integer, jsonb, jsonb, text) to authenticated;
-grant execute on function public.admin_whatsapp_otp_settings_finish(uuid, text, integer, text) to authenticated;
+grant execute on function public.admin_whatsapp_otp_settings_begin(uuid, integer, jsonb, jsonb, text) to service_role;
+grant execute on function public.admin_whatsapp_otp_settings_finish(uuid, uuid, text, integer, text) to service_role;
 grant execute on function public.admin_whatsapp_otp_settings_reconcile(jsonb) to service_role;
 grant execute on function public.whatsapp_otp_notification_record(text, text, text, bigint, jsonb) to service_role;
 
 comment on function public.admin_whatsapp_otp_view_check() is 'Requires whatsapp_otp.view. The page loader calls it before reading the Worker''s usage, so the database decides who may see it.';
-comment on function public.admin_whatsapp_otp_settings_begin(integer, jsonb, jsonb, text) is 'Requires whatsapp_otp.manage (and whatsapp_otp.ceiling_manage when the Hard Ceiling changes). Validates, records the request and its audit event; the actor is auth.uid().';
-comment on function public.admin_whatsapp_otp_settings_finish(uuid, text, integer, text) is 'Completes the caller''s own pending request (applied or failed) and writes the audit event with actor, old value, new value and time. Idempotent; cannot alter the recorded values.';
+comment on function public.admin_whatsapp_otp_settings_begin(uuid, integer, jsonb, jsonb, text) is 'Service role only. Checks the ACTOR''s effective permissions (manage, and ceiling_manage when the ceiling changes, judged from the server-read current settings), validates, records the request and its audit event attributed to the actor.';
+comment on function public.admin_whatsapp_otp_settings_finish(uuid, uuid, text, integer, text) is 'Service role only, after the Worker''s signed answer. Completes the actor''s own pending request (applied or failed) and writes the audit event with actor, old value, new value and time. Idempotent; cannot alter the recorded values.';
 comment on function public.admin_whatsapp_otp_settings_reconcile(jsonb) is 'Service role only. Completes requests that the Worker''s authoritative D1 audit shows as applied and closes stale ones as not applied.';
 comment on function public.whatsapp_otp_notification_record(text, text, text, bigint, jsonb) is 'Service role only. Records a Worker alert once (dedupe ledger) and fans it out through app.notify to staff holding whatsapp_otp.view. Statistics only.';

@@ -43,7 +43,7 @@ export function envFor(d1: unknown, over: Partial<Env> = {}): Env {
 export type SettingsBody = Record<string, unknown>;
 export const settingsBody = (over: SettingsBody = {}): SettingsBody => ({
   request_id: crypto.randomUUID(), actor_id: ACTOR, expected_version: 0, daily_limit: 150, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90,
-  reason: "Initial limits approved by the owner for launch", ceiling_confirmation: "5000", ...over,
+  reason: "Initial limits approved by the owner for launch", ceiling_confirmation: "5000", ceiling_authorized: true, ...over,
 });
 
 /** A request signed the way the app server signs it (separate admin secret, id = adm_<request_id>). */
