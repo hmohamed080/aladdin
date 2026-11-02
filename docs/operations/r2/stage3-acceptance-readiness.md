@@ -9,25 +9,41 @@ Decision (2026-11-01): legacy application files are removed, never migrated; R2 
 
 | Class | Buckets | Treatment |
 | --- | --- | --- |
-| Application media | avatars, professional-portfolio, professional-certificates, product-images, organization images, request photos | Removed by `scripts/media-reset-execute.mjs` after an approved inventory. |
+| Application media | avatars, professional-portfolio, professional-certificates, product-images, organization images, request photos | Removed by `scripts/media-reset-execute.mjs` after an approved object-level manifest. |
 | Unsubmitted verification uploads (draft) | business-verification-documents, rows with no `submission_id` | Removed with the above. |
 | **Submitted verification evidence** | business-verification-documents, rows with `submission_id` | **Retained, always.** The tool cannot select them (plan excludes them, and every batch is re-checked). Included in backups. Retirement of these is a separate compliance decision. |
 
-Order, each step separately approved:
+Order, each step separately approved (full runbook: `acceptance-activation-runbook.md`):
 
-1. Read-only `media-reset.mjs inventory` and `snapshot` on the target; owner approves the inventory (including files
-   uploaded after 2026-10-25) and its SHA-256.
+1. Read-only `media-reset-execute.mjs manifest --project <ref> --out manifest.json` writes the **object-level approval
+   manifest** once (exclusive create, mode 0400): for every Storage object the bucket, key, storage id, size, eTag,
+   updated_at, owning row and state, whether anything points at it, and the retention decision (delete or retain, with
+   the reason: `legacy-row`, `orphan-object`, `r2-located`, `submitted-verification-evidence`,
+   `unreferenced-verification-object`); plus rows without an object and stale legacy locations. `summary` prints counts
+   and the SHA-256 of the complete canonical entries (no keys). The owner approves that hash, not a count summary.
+   The reader pages in byte order and fails closed if any total differs from the database's own counts or the counts
+   changed while reading.
 2. Fresh dated backup of the target proven restorable (section 3).
-3. `media-reset-execute.mjs plan` (counts and plan hash only).
-4. `MEDIA_RESET_EXECUTE_ENABLED=true media-reset-execute.mjs execute --project <ref> --approved-sha256 <hash>
-   --confirm "delete legacy media in <ref>" --before before.json --journal reset-journal.jsonl [--limit N]`.
-   Refused unless the flag, a hash equal to a fresh inventory, the exact phrase, a before-snapshot and a journal all hold.
-   A file uploaded after approval changes the hash and stops the run. Batches of 100, journaled by hash (resumable),
-   confirmed gone by read-back, fail-stop with a non-zero exit. Output and journal hold counts and hashes only.
-5. `media-reset.mjs snapshot` and `compare`; references that pointed at removed objects are reconciled by the existing
-   reviewed purge pipeline (a further approval). Then the Storage write-closure SQL (`supabase/activation/`), last.
+3. Install the held SQL `supabase/activation/legacy-media-reset.sql` (service-role functions; deletes nothing itself).
+4. `MEDIA_RESET_EXECUTE_ENABLED=true media-reset-execute.mjs execute --project <ref> --manifest manifest.json
+   --approved-sha256 <hash> --confirm "delete legacy media in <ref>" --before before.json --journal reset-journal.jsonl`.
+   Refused unless: the flag; the manifest file's recomputed hash equals the approved hash; a LIVE manifest still equals it
+   (a new upload, a replaced object with the same name, or a verification status change makes the approval stale);
+   the exact phrase; a before-snapshot of the same project whose bucket counts equal the manifest; a hash-chained journal
+   bound to this project and manifest. Each batch (at most 100) is then revalidated **by the database under row locks**
+   (storage id and eTag equal the manifest, submitted evidence, row-less verification objects and R2-located keys are
+   refused, all-or-nothing), which also clears every avatar/cover/logo/portfolio-project-cover pointer and tombstones the
+   row; only then are Storage objects removed and each confirmed gone; finally tombstones and legacy locations are
+   deleted. Success is reported only if `media_reset_verify` finds no broken pointer, legacy row, legacy object or
+   legacy location. Resumable and idempotent; fail-stop; counts and hashes only.
+5. `media-reset.mjs snapshot` and `compare`; then the Storage write-closure SQL, last.
+
+Submitted verification evidence is never selected: the manifest validator refuses any file that marks it for deletion,
+the database refuses it again under lock, and `bv-evidence-migrate.mjs` is the only (separately approved) path that
+moves it, by adding a sha256-verified private R2 copy and keeping the Supabase copy.
 
 Rollback: Storage deletion is not reversible; the backup of step 2 is the only recovery, which is why it gates the run.
+`legacy-media-reset-rollback.sql` removes the functions and keeps the journal.
 
 ## 2. Acceptance E2E for the seven media flows
 
