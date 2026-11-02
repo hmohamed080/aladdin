@@ -36,7 +36,7 @@ counts per provider and namespace only.
   for the seven application buckets after saving their exact definitions. CI proves it closes every bucket and that the
   rollback restores the exact policies. Preconditions in `supabase/activation/README.md`. Activate only after every upload
   path above is live and verified on that environment.
-- `scripts/media-reset.mjs` is read-only: `inventory` (counts, retained items, scope, SHA-256), `snapshot` and `compare`
+- `scripts/media-reset-execute.mjs` removes Storage objects only, disabled by default, gated (see stage3-acceptance-readiness.md). `scripts/media-reset.mjs` is read-only: `inventory` (counts, retained items, scope, SHA-256), `snapshot` and `compare`
   (before/after per-bucket object counts; fails if any bucket grew). It has no delete mode. Any deletion of hosted media
   needs a separate approval of a refreshed inventory (including files uploaded after 2026-10-25) and a reviewed execution
   path; the existing reviewed purge (avatars and portfolio only) is not extended here.
@@ -46,3 +46,6 @@ counts per provider and namespace only.
 Request photos and verification documents already stored in Supabase Storage keep working through the legacy provider
 (reads and deletes). They are neither moved nor deleted by this work. Retirement or migration of compliance documents is a
 separate, approved plan.
+
+
+Next steps (reset executor, legacy retirement, seven-flow matrix, backups): [stage3-acceptance-readiness.md](stage3-acceptance-readiness.md).

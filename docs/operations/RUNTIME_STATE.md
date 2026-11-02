@@ -793,3 +793,7 @@ Effective live alias and production target both dpl_6F4cLptBtEtR5LwF7mQAneigsc83
 
 ## R2 registration integration (Draft PR, not merged, nothing applied) — 2026-10-31
 - Branch `integration/unified-registration-r2-20261031`. Hosted state unchanged: the R1 alias guard is not installed, `20261030090001/2` and `20261031090001` are not applied anywhere, no `PHONE_*` flag is set, the interim hook is not enabled. Phone sign-up stays unavailable in any deployment that has all switches off.
+
+## Media R2 Stage 3 integration (PR #134, validation only) — 2026-11-02
+
+Code only; no hosted change. Acceptance still lacks 20261102090001 and 20261103090001/2. Phone authority is R1 + Delivery Worker only; hosted WhatsApp delivery OFF. Media cleanup schedule and the Storage reset executor are disabled by default. Next steps: `docs/operations/r2/stage3-acceptance-readiness.md`.
