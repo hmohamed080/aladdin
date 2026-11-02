@@ -96,6 +96,20 @@ jobs:
             echo "rollback;"
           } | run_sql
 
+      - name: Held legacy-media reset is safe (protected evidence, R2 keys, replaced objects), complete, idempotent and fully rolled back
+        run: |
+          run_sql() { docker exec -i supabase_db_aladdin psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q; }
+          { echo "begin;"; cat supabase/activation/legacy-media-reset.sql supabase/activation/verify-legacy-media-reset.sql; echo "rollback;"; } | run_sql
+          {
+            echo "begin;"
+            cat supabase/activation/legacy-media-reset.sql supabase/activation/legacy-media-reset-rollback.sql
+            echo "do \$\$ begin"
+            echo "  if exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname like 'media\\_reset\\_%' or p.proname = 'media_is_r2') then raise exception 'rollback left reset functions behind'; end if;"
+            echo "  if to_regclass('public.media_reset_journal') is null then raise exception 'rollback removed the journal'; end if;"
+            echo "end \$\$;"
+            echo "rollback;"
+          } | run_sql
+
       - name: Verify authoritative business-phone metadata matches the application
         run: node scripts/test-business-phone-parity.mjs --container supabase_db_aladdin --database postgres
 

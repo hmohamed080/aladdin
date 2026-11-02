@@ -19,3 +19,19 @@ Preconditions (all must be true before running it on an environment):
 4. A fresh database backup exists.
 
 Run in the Supabase SQL editor (it is one transaction). The rollback recreates the exact policies it saved.
+
+## `legacy-media-reset.sql` / `…-rollback.sql` / `verify-legacy-media-reset.sql`
+
+The database side of the owner-approved clean-media reset (legacy Supabase application media is removed, never
+migrated). It installs service-role-only functions: object-level manifest readers (keyset-paginated, with expected
+counts so a truncated read fails closed), `media_reset_retire` (locks the row, clears every avatar/cover/logo/portfolio
+project pointer, tombstones the row, journals it; refuses submitted verification evidence, row-less verification
+objects, R2-located keys and any object whose storage id/eTag differs from the approved manifest, all-or-nothing),
+`media_reset_storage_removed`, `media_reset_finalize`, `media_reset_drop_locations` and `media_reset_verify`
+(`ok` only when no broken pointer, legacy row, legacy object or legacy location remains). It deletes nothing by
+itself: `scripts/media-reset-execute.mjs` drives it behind its own gates, and the Storage object removal happens
+there. The rollback drops the functions and keeps the journal (audit evidence).
+
+Preconditions: the Acceptance seven-flow R2 E2E has passed, a fresh verified backup/restore exists, and the owner
+approved the refreshed object-level manifest (its sha256) for that exact project. Never combine it with the first
+R2 activation. CI proves it in a transaction that is rolled back (`supabase-rls.yml`).
