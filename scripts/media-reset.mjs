@@ -10,8 +10,9 @@
 //   node scripts/media-reset.mjs snapshot  --project <ref|local> > before.json   (per-bucket object counts)
 //   node scripts/media-reset.mjs compare --before before.json --after after.json  (fails if any bucket grew)
 //
-// Output: counts only (never keys, names, owners or ids), a `retained` section naming what must not be removed, and a
-// SHA-256 over the canonical counts so an approval refers to exactly this inventory.
+// Output: counts only (never keys, names, owners or ids) and a `retained` section naming what must not be removed. The
+// count hash here is a quick drift indicator ONLY: it is not an approval. The owner approves the object-level manifest
+// (scripts/media-reset-execute.mjs manifest), whose hash covers every bucket, key, storage identity and retention decision.
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { createRequire } from "node:module";

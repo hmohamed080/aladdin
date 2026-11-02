@@ -128,7 +128,7 @@ revoke all on function app.media_reset_lock_row(text, text) from public, anon, a
 -- Every Storage object of one application bucket with its identity and the reset decision.
 create or replace function public.media_reset_manifest_objects(p_bucket text, p_after text default null, p_limit integer default 200)
 returns table(bucket text, name text, object_id uuid, size_bytes bigint, etag text, updated_at timestamptz,
-              namespace text, row_id uuid, row_state text, referenced boolean, decision text, reason text)
+              namespace text, row_id uuid, row_state text, referenced boolean, submitted boolean, r2 boolean, decision text, reason text)
 language plpgsql stable security definer set search_path = '' as $$
 declare
   v_ns text := app.media_reset_namespace(p_bucket);
@@ -143,7 +143,7 @@ begin
      limit least(greatest(coalesce(p_limit, 200), 1), 500)
   )
   select p_bucket, o.name, o.id, o.size, o.etag, o.updated_at, v_ns, r.row_id, r.state,
-         app.media_reset_referenced(v_ns, r.row_id),
+         app.media_reset_referenced(v_ns, r.row_id), coalesce(r.retained, false), app.media_is_r2(v_ns, o.name),
          case when v_ns = 'verification' and (r.row_id is null or r.retained) then 'retain'
               when app.media_is_r2(v_ns, o.name) then 'retain'
               else 'delete' end,
@@ -162,13 +162,13 @@ grant execute on function public.media_reset_manifest_objects(text, text, intege
 
 -- Metadata rows that have no Storage object and are not served from R2 (broken pointers waiting to be cleaned).
 create or replace function public.media_reset_manifest_rows(p_after_namespace text default null, p_after_key text default null, p_limit integer default 200)
-returns table(namespace text, bucket text, object_key text, row_id uuid, row_state text, referenced boolean, decision text, reason text)
+returns table(namespace text, bucket text, object_key text, row_id uuid, row_state text, referenced boolean, submitted boolean, decision text, reason text)
 language sql stable security definer set search_path = '' as $$
-  select r.namespace, r.bucket, r.object_key, r.row_id, r.state, app.media_reset_referenced(r.namespace, r.row_id),
+  select r.namespace, r.bucket, r.object_key, r.row_id, r.state, app.media_reset_referenced(r.namespace, r.row_id), r.retained,
          case when r.retained then 'retain' else 'delete' end,
          case when r.retained then 'submitted-verification-evidence' else 'row-without-object' end
     from app.media_reset_rows() r
-   where not app.media_is_r2(r.namespace, r.object_key)
+   where (r.retained or not app.media_is_r2(r.namespace, r.object_key))
      and not exists (select 1 from storage.objects s where s.bucket_id = r.bucket and s.name = r.object_key)
      and (p_after_namespace is null
           or (r.namespace collate "C", r.object_key collate "C") > (p_after_namespace collate "C", p_after_key collate "C"))
@@ -205,7 +205,7 @@ language sql stable security definer set search_path = '' as $$
                   from (values ('avatars'),('professional-portfolio'),('professional-certificates'),('product-images'),
                                ('organization-images'),('purchase-request-images'),('business-verification-documents')) b(bucket)),
     'rows', (select count(*) from app.media_reset_rows() r
-              where not app.media_is_r2(r.namespace, r.object_key)
+              where (r.retained or not app.media_is_r2(r.namespace, r.object_key))
                 and not exists (select 1 from storage.objects s where s.bucket_id = r.bucket and s.name = r.object_key)),
     'locations', (select count(*) from public.media_storage_locations l
                    where l.provider = 'supabase'

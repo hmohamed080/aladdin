@@ -20,6 +20,7 @@ declare
   rq1 constant uuid := 'f2000000-0000-4000-8000-000000000051';
   bv1 constant uuid := 'f2000000-0000-4000-8000-000000000061';  -- draft verification document
   bv2 constant uuid := 'f2000000-0000-4000-8000-000000000062';  -- SUBMITTED evidence
+  bv4 constant uuid := 'f2000000-0000-4000-8000-000000000064';  -- SUBMITTED evidence already served from R2, no Supabase object
   proj constant uuid := 'f2000000-0000-4000-8000-0000000000a1';
   sub constant uuid := 'f2000000-0000-4000-8000-0000000000b1';
   g constant text := '-0000-4000-8000-';
@@ -31,6 +32,7 @@ declare
   k_rq1 text := 'f2000000-0000-4000-8000-0000000000d1/f2000000-0000-4000-8000-0000000000d2/' || rq1 || '.png';
   k_bv1 text := org || '/' || bv1 || '.pdf';
   k_bv2 text := org || '/' || bv2 || '.pdf';
+  k_bv4 text := org || '/' || bv4 || '.pdf';
   k_bv3 text := org || '/f2000000-0000-4000-8000-000000000063.pdf'; -- object with no row
 begin
   -- ----------------------------------------------------------- clean slate (rolled back by the caller)
@@ -66,12 +68,14 @@ begin
     values (rq1, 'f2000000-0000-4000-8000-0000000000d1', 'f2000000-0000-4000-8000-0000000000d2', org, k_rq1, 'image/png', 1, 'ready', ua);
   insert into public.business_verification_documents(id, organization_id, submission_id, doc_type, object_key, content_type, size_bytes, file_name, state, created_by)
     values (bv1, org, null, 'tax_card', k_bv1, 'application/pdf', 10, 'draft.pdf', 'ready', ua),
-           (bv2, org, sub, 'commercial_register', k_bv2, 'application/pdf', 10, 'submitted.pdf', 'ready', ua);
+           (bv2, org, sub, 'commercial_register', k_bv2, 'application/pdf', 10, 'submitted.pdf', 'ready', ua),
+           (bv4, org, sub, 'tax_card', k_bv4, 'application/pdf', 10, 'submitted-r2.pdf', 'ready', ua);
   set local session_replication_role = origin;
 
   insert into public.media_storage_locations(namespace, object_key, owner_user_id, provider, content_type, size_bytes, sha256, verified_at) values
     ('avatar', k_av3, ub, 'r2', 'image/webp', 100, repeat('a', 64), now()),
     ('portfolio', k_pi2, ua, 'r2', 'image/jpeg', 100, repeat('b', 64), now()),
+    ('verification', k_bv4, ua, 'r2', 'application/pdf', 100, repeat('c', 64), now()),
     ('avatar', k_av1, ua, 'supabase', 'image/jpeg', null, null, null),
     ('avatar', 'f2000000-0000-4000-8000-0000000000ff.jpg', ua, 'supabase', 'image/jpeg', null, null, null); -- stale location
 
@@ -114,7 +118,7 @@ begin
   -- ----------------------------------------------------------- manifest: counts and decisions
   c := public.media_reset_manifest_counts();
   if (c->'objects'->>'avatars')::int <> 4 or (c->'objects'->>'business-verification-documents')::int <> 3
-     or (c->>'rows')::int <> 1 or (c->>'locations')::int <> 1 or (c->>'submitted_verification_rows')::int <> 1 then
+     or (c->>'rows')::int <> 2 or (c->>'locations')::int <> 1 or (c->>'submitted_verification_rows')::int <> 2 then
     raise exception 'unexpected manifest counts: %', c; end if;
 
   -- Page the avatar bucket two at a time: every object exactly once, in byte order.
@@ -143,6 +147,8 @@ begin
     raise exception 'draft verification document is not a delete candidate'; end if;
   if (select count(*) from public.media_reset_manifest_rows(null, null, 50) m where m.object_key = k_av4 and m.decision = 'delete') <> 1 then
     raise exception 'row without object missing from manifest'; end if;
+  if (select count(*) from public.media_reset_manifest_rows(null, null, 50) m where m.object_key = k_bv4 and m.decision = 'retain' and m.reason = 'submitted-verification-evidence') <> 1 then
+    raise exception 'submitted evidence served from R2 missing from the manifest'; end if;
   if (select count(*) from public.media_reset_manifest_locations(null, null, 50)) <> 1 then raise exception 'stale location missing'; end if;
   begin perform public.media_reset_manifest_objects('not-a-bucket', null, 5); raise exception 'accepted a foreign bucket';
   exception when sqlstate '22023' then null; end;
@@ -265,10 +271,10 @@ begin
      or exists (select 1 from public.business_verification_documents where id = bv1) then
     raise exception 'a tombstone survived finalize'; end if;
   if not exists (select 1 from public.avatar_uploads where id = av3) or not exists (select 1 from public.portfolio_items where id = pi2)
-     or not exists (select 1 from public.business_verification_documents where id = bv2) then
+     or not exists (select 1 from public.business_verification_documents where id in (bv2)) or not exists (select 1 from public.business_verification_documents where id = bv4) then
     raise exception 'finalize removed a protected row'; end if;
   if exists (select 1 from public.media_storage_locations where namespace = 'avatar' and object_key = k_av1) then raise exception 'legacy location survived'; end if;
-  if (select count(*) from public.media_storage_locations where provider = 'r2') <> 2 then raise exception 'an R2 location was touched'; end if;
+  if (select count(*) from public.media_storage_locations where provider = 'r2') <> 3 then raise exception 'an R2 location was touched'; end if;
 
   set local role service_role;
   -- ----------------------------------------------------------- stale locations
@@ -285,7 +291,7 @@ begin
   -- ----------------------------------------------------------- the post-condition
   j := public.media_reset_verify();
   if j->>'ok' <> 'true' then raise exception 'verify not ok after a complete reset: %', j; end if;
-  if (j->'retained'->>'submitted_verification_rows')::int <> 1 or (j->'retained'->>'verification_objects')::int <> 2 then
+  if (j->'retained'->>'submitted_verification_rows')::int <> 2 or (j->'retained'->>'verification_objects')::int <> 2 then
     raise exception 'retained evidence miscounted: %', j; end if;
 
   -- A pointer to a legacy (non-R2) file is reported as broken, never silently accepted.
