@@ -110,6 +110,17 @@ jobs:
             echo "rollback;"
           } | run_sql
 
+      - name: Held verification-evidence R2 adoption only adopts verified submitted evidence, keeps every Supabase copy, and rolls back
+        run: |
+          run_sql() { docker exec -i supabase_db_aladdin psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q; }
+          { echo "begin;"; cat supabase/activation/bv-evidence-r2-adoption.sql supabase/activation/verify-bv-evidence-r2-adoption.sql; echo "rollback;"; } | run_sql
+          {
+            echo "begin;"
+            cat supabase/activation/bv-evidence-r2-adoption.sql supabase/activation/bv-evidence-r2-adoption-rollback.sql
+            echo "do \$\$ begin if exists (select 1 from pg_proc where proname like 'bv\\_evidence\\_%') then raise exception 'rollback left adoption functions behind'; end if; end \$\$;"
+            echo "rollback;"
+          } | run_sql
+
       - name: Verify authoritative business-phone metadata matches the application
         run: node scripts/test-business-phone-parity.mjs --container supabase_db_aladdin --database postgres
 

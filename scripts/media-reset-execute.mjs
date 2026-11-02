@@ -83,7 +83,7 @@ export function readJournal(path, { project, manifestSha256 } = {}) {
   return entries;
 }
 
-function journalWriter(path, existing) {
+export function journalWriter(path, existing) {
   let prev = existing.length ? existing[existing.length - 1].hash : GENESIS;
   let seq = existing.length;
   return (entry) => {
