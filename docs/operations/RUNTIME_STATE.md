@@ -1,5 +1,12 @@
 # Runtime State
 
+## WhatsApp OTP Phase C CLOSED on Acceptance — 2026-11-02 (everything OFF)
+
+- **Pilot PASS:** the Worker delivered a real OTP from Meta sender `1458603463983505` (template `aladdin_otp`, `ar`) and an end-to-end sign-up was verified (grant consumed, `auth.users` 14, profile `phone_verified_at` set). Root cause of the earlier Meta code 10: the System User token lacked the granular `whatsapp_business_messaging` permission for the sender's WhatsApp Account; fixed by assigning the account and regenerating the token. Details: [work log 2026-11-02](AGENT_WORK_LOG.md).
+- **Current hosted state (Acceptance only):** Worker `aladdin-whatsapp-otp-preview` active version `4d41419c-3854-4b29-ad53-e9ec81d732fc` (100%, code `31b1d7ff`, sender `1458603463983505`, `WHATSAPP_DELIVERY_ENABLED=false`); delivery-ON build `56a4ffe6-f51b-42f2-aa98-40e791ffa8e1` is uploaded and inactive. `WHATSAPP_ACCESS_TOKEN` (Secrets Store) holds the new correctly-scoped token (modified 2026-11-02 13:29Z). DB `false|false|off`, limits `5 / 6 / 60 s`; frontend `c97050e6` with `PHONE_OTP_DELIVERY=off` and both `PHONE_*_ENABLED=false`. D1 journal: 4 `failed`, 2 `accepted`.
+- **Repo:** branch `integration/whatsapp-otp-worker-r2-20261031`; sender change committed as `bb4cf537` on top of `31b1d7ff`; PR #127 stays Draft and unmerged. Production, Auth providers and `main` untouched.
+- **Open:** one throwaway Acceptance test account (`pilotwa1106`) remains (owner decision to delete); approved display name "Aladdin" still pending activation; no webhook/delivery receipts (app unpublished); the old sender is untested with the new token; Production activation and PR merge need explicit owner approval.
+
 ## WhatsApp OTP Phase C: C3/C4 attempt interrupted, back to OFF — 2026-11-01
 
 - C3 ran at 14:41-14:43Z; the owner's accidental *Create Account* click at **14:47:04Z** created one challenge, closed `delivery_failed` in 0.2 s (Worker delivery stayed `false`; no message; D1 0 rows; `auth.users` 13; 0 grants). The hourly pilot start is spent until **15:47:04Z**.
