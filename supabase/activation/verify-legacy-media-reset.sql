@@ -62,8 +62,8 @@ begin
   update public.organizations set logo_media_id = og1 where id = org;
   -- Product and request images hang off a product / request item the seed does not provide: skip their foreign keys.
   set local session_replication_role = replica;
-  insert into public.product_images(id, product_id, organization_id, object_key, content_type, slot, state, created_by)
-    values (pr1, 'f2000000-0000-4000-8000-0000000000c1', org, k_pr1, 'image/png', 1, 'ready', ua);
+  insert into public.product_images(id, product_id, organization_id, publisher_id, object_key, content_type, slot, state, created_by)
+    values (pr1, 'f2000000-0000-4000-8000-0000000000c1', org, 'f2000000-0000-4000-8000-0000000000c2', k_pr1, 'image/png', 1, 'ready', ua);
   insert into public.purchase_request_images(id, request_id, item_id, owner_scope, object_key, content_type, slot, state, created_by)
     values (rq1, 'f2000000-0000-4000-8000-0000000000d1', 'f2000000-0000-4000-8000-0000000000d2', org, k_rq1, 'image/png', 1, 'ready', ua);
   insert into public.business_verification_documents(id, organization_id, submission_id, doc_type, object_key, content_type, size_bytes, file_name, state, created_by)
