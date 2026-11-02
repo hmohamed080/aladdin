@@ -69,6 +69,11 @@ export const KNOWN_NOTIFICATION_EVENTS = [
   "job.assignment.completed",
   "job.assignment.cancelled",
   "job.review.received",
+  // Admin-only operational alerts (WhatsApp OTP budget and delivery health); statistics only.
+  "whatsapp_otp.budget_warning",
+  "whatsapp_otp.budget_critical",
+  "whatsapp_otp.budget_exhausted",
+  "whatsapp_otp.failure_rate",
 ] as const;
 
 export type KnownNotificationEvent = (typeof KNOWN_NOTIFICATION_EVENTS)[number];

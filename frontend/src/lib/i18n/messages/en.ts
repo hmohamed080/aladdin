@@ -1117,6 +1117,9 @@ export const en = {
       secondary_phone_changed: "changed their second phone",
       secondary_phone_converted: "made their second phone their main phone",
       phone_cooldown_overridden: "lifted a phone number cooldown",
+      whatsapp_otp_settings_requested: "requested a change to the WhatsApp code limits",
+      whatsapp_otp_settings_changed: "changed the WhatsApp code limits",
+      whatsapp_otp_settings_change_failed: "a change to the WhatsApp code limits did not apply",
     },
     preview: {
       navLabel: "Preview",
@@ -1879,6 +1882,7 @@ export const en = {
           duplicates: "duplicates",
           verification: "Business verification",
           phones: "Phone numbers",
+          whatsapp_otp: "WhatsApp codes",
         },
         permissionDesc: {
           users: {
@@ -1937,6 +1941,11 @@ export const en = {
           },
           phones: {
             cooldown_override: "Lift the 30-day cooldown on a released second phone number, with a mandatory reason.",
+          },
+          whatsapp_otp: {
+            view: "See WhatsApp code usage, limits and their change history.",
+            manage: "Change the daily limit and the alert thresholds for WhatsApp codes, with a reason.",
+            ceiling_manage: "Change the hard ceiling for WhatsApp codes (Super Admin), with confirmation and a reason.",
           },
         },
         scopes: {
@@ -2471,6 +2480,24 @@ export const en = {
        subject word would have to arrive as a param — which would mean the
        database persisting an English noun into a row an Arabic reader may open.
        The deep link already carries the specificity. */
+    whatsapp_otp: {
+      budget_warning: {
+        title: "WhatsApp codes are running low",
+        body: "{percent}% of the daily limit is used ({consumed} of {limit}). {remaining} left.",
+      },
+      budget_critical: {
+        title: "WhatsApp codes are almost used up",
+        body: "{percent}% of the daily limit is used ({consumed} of {limit}). Only {remaining} left.",
+      },
+      budget_exhausted: {
+        title: "WhatsApp code limit reached",
+        body: "The daily limit of {limit} codes is used up. New sign-ups by phone are paused until usage drops.",
+      },
+      failure_rate: {
+        title: "WhatsApp code delivery is failing",
+        body: "{failed} of {attempts} codes failed in the last {window_minutes} minutes ({failure_percent}%).",
+      },
+    },
     message: {
       sent: {
         title: "New message",
@@ -2640,6 +2667,69 @@ export const en = {
     countryLabel: "Country",
     nationalPlaceholder: "1012345678",
     invalid: "Enter a valid phone number for the selected country.",
+  },
+  whatsappOtp: {
+    title: "WhatsApp verification codes",
+    subtitle: "How many verification codes the platform may send in 24 hours, who is told when it runs low, and every change made to it.",
+    notConfigured: "The limits are not set yet. Until a Super Admin sets them, no code can be sent.",
+    unavailable: "The usage could not be loaded. Nothing was changed. Try again shortly.",
+    viewOnly: "You can view these numbers. Only a Super Admin can change them.",
+    usage: {
+      title: "Last 24 hours",
+      consumed: "Used",
+      remaining: "Remaining",
+      accepted: "Accepted",
+      failed: "Failed",
+      reserved: "In flight",
+      limit: "Daily limit",
+      ceiling: "Hard ceiling",
+      percent: "{percent}% of the daily limit",
+      level: { ok: "Within the limit", warning: "Running low", critical: "Almost used up", exhausted: "Used up" },
+    },
+    failure: {
+      title: "Delivery failures",
+      lastHour: "Last hour",
+      last24h: "Last 24 hours",
+      last7d: "Last 7 days",
+      rate: "{failed} of {attempts} failed ({percent}%)",
+      none: "No attempts",
+    },
+    form: {
+      title: "Change the limits",
+      dailyLimit: "Daily limit",
+      dailyLimitHint: "The most codes that may be sent in any rolling 24 hours. It can never be higher than the hard ceiling.",
+      hardCeiling: "Hard ceiling",
+      hardCeilingHint: "The highest value the daily limit may ever be set to. Changing it needs extra confirmation.",
+      warn: "Warning at (%)",
+      critical: "Critical at (%)",
+      reason: "Reason",
+      reasonHint: "Recorded permanently with your name, the old and the new values.",
+      ceilingConfirm: "Type the new hard ceiling ({value}) again to confirm",
+      save: "Save changes",
+      saving: "Saving…",
+      done: "The limits were updated.",
+      pending: "The change was sent but its result is not confirmed yet. Reload in a moment; it will be settled automatically.",
+      note: "These limits never exceed what WhatsApp itself allows this business to send.",
+    },
+    history: {
+      title: "Change history",
+      empty: "No changes yet.",
+      by: "By {actor}",
+      initial: "Initial values",
+      change: "{from} → {to}",
+    },
+    errors: {
+      forbidden: "You do not have permission to change this.",
+      ceilingForbidden: "Only a Super Admin with the ceiling permission can change the hard ceiling.",
+      invalid: "Check the numbers: whole numbers only, the limit may not exceed the ceiling and the warning must be below the critical level.",
+      ceilingBelowLimit: "The hard ceiling cannot be set below the current daily limit. Lower the daily limit in the same change.",
+      reasonRequired: "Write a reason (at least 10 characters, 20 when the hard ceiling changes).",
+      ceilingConfirmation: "Type the new hard ceiling exactly to confirm the change.",
+      stale: "Someone else changed these settings first. The page was refreshed; review and try again.",
+      noChange: "Nothing was changed.",
+      unavailable: "The change could not be applied right now. Nothing was changed.",
+      generic: "Something went wrong. Please try again.",
+    },
   },
   phoneCooldown: {
     title: "Phone cooldowns",

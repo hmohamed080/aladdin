@@ -59,7 +59,7 @@ export async function evaluateAlerts(db: Db, nowSeconds: number): Promise<{ rais
       const kind = KIND_BY_LEVEL[held]!;
       await enqueue(db, `${kind}:${state.episode + 1}`, kind, {
         limit, ceiling: settings.hardCeiling, consumed: w.c24, remaining: Math.max(0, limit - w.c24), percent,
-        warn_percent: settings.warnPercent, critical_percent: settings.criticalPercent, accepted: w.a24, failed: w.f24, reserved: w.r24, level: LEVEL_NAMES[held],
+        warn_percent: settings.warnPercent, critical_percent: settings.criticalPercent, accepted: w.a24, failed: w.f24, reserved: w.r24, level: LEVEL_NAMES[held] ?? "ok",
       }, nowSeconds);
       raised.push(kind);
     }
