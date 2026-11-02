@@ -22,7 +22,11 @@ function memoryDb(): ReplayDb {
               if (sql.startsWith("UPDATE")) { if (rows.get(String(v[1])) !== "reserved") return { success: true, meta: { changes: 0 } }; rows.set(String(v[1]), String(v[0])); return { success: true, meta: { changes: 1 } }; }
               throw new Error("unexpected sql");
             },
-            async first<T>() { return (rows.has(String(v[0])) ? { state: rows.get(String(v[0])) } : null) as T | null; },
+            async first<T>() {
+              // The Worker reads its settings row from D1 before every delivery: a fixture row, never production configuration.
+              if (sql.includes("FROM otp_settings WHERE id = 1")) return { daily_limit: 100, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90, version: 1, updated_at: 0, updated_by: "00000000-0000-4000-8000-000000000001" } as T;
+              return (rows.has(String(v[0])) ? { state: rows.get(String(v[0])) } : null) as T | null;
+            },
           };
         },
       };
@@ -48,7 +52,6 @@ function rig(over: Partial<Env> = {}) {
     OTP_ENVIRONMENT: "acceptance",
     OTP_RECIPIENT_MODE: "allowlist",
     OTP_ALLOWED_RECIPIENTS: PHONE,
-    OTP_DAILY_SEND_LIMIT: "100", // the global rolling-24h budget is required (no budget, no sends)
     IDEMPOTENCY_DB: memoryDb(),
     ...over,
   };

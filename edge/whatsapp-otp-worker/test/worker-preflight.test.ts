@@ -3,7 +3,12 @@ import { strict as assert } from "node:assert";
 // @ts-expect-error plain .mjs script
 import { run } from "../scripts/worker-preflight.mjs";
 import { handleRequest } from "../src/index.ts";
-import { FAKE_TOKEN, PHONE, SECRET, baseEnv, mockMeta } from "./support.ts";
+import { FAKE_TOKEN, PHONE, SECRET, baseEnv as plainEnv, memoryReplayDb, mockMeta } from "./support.ts";
+import { ADMIN_SECRET, NOTIFY_SECRET, NOTIFY_URL } from "./d1.ts";
+
+// A fully provisioned Worker: the send, admin and notify bindings, the notify URL and an initialized settings row.
+const baseEnv = (over: Partial<ReturnType<typeof plainEnv>> = {}) =>
+  plainEnv({ OTP_ADMIN_SIGNING_SECRET: { get: async () => ADMIN_SECRET }, OTP_NOTIFY_SIGNING_SECRET: { get: async () => NOTIFY_SECRET }, OTP_NOTIFY_URL: NOTIFY_URL, ...over });
 
 const through = (env: ReturnType<typeof baseEnv>, meta = mockMeta()) =>
   (async (url: string, init: RequestInit) => handleRequest(new Request(url, init), env, meta.fetcher)) as unknown as typeof fetch;
@@ -19,7 +24,9 @@ test("the script's real signer is accepted by the Worker and reports a healthy, 
 test("it fails (exit 1) with a clear hint for a wrong secret, a missing token binding, no D1, or an empty allowlist", async () => {
   const wrong = []; assert.equal(await run("https://w.example.invalid", { PHONE_OTP_WORKER_SECRET: "whsec_" + btoa("x".repeat(32)) }, through(baseEnv()), (l: string) => wrong.push(l)), 1);
   assert.match(wrong.join(""), /signing secret differs/);
-  for (const over of [{ WHATSAPP_ACCESS_TOKEN: { get: async () => "" } }, { IDEMPOTENCY_DB: undefined }, { OTP_ALLOWED_RECIPIENTS: "" }] as Array<Partial<ReturnType<typeof baseEnv>>>)
+  for (const over of [{ WHATSAPP_ACCESS_TOKEN: { get: async () => "" } }, { IDEMPOTENCY_DB: undefined }, { OTP_ALLOWED_RECIPIENTS: "" },
+    // the release gates added with the admin settings: uninitialized limits, no admin secret, no notify secret or URL
+    { IDEMPOTENCY_DB: memoryReplayDb({ settings: null }) }, { OTP_ADMIN_SIGNING_SECRET: undefined }, { OTP_NOTIFY_SIGNING_SECRET: undefined }, { OTP_NOTIFY_URL: undefined }] as Array<Partial<ReturnType<typeof baseEnv>>>)
     assert.equal(await run("https://w.example.invalid", { PHONE_OTP_WORKER_SECRET: SECRET }, through(baseEnv(over)), () => {}), 1, JSON.stringify(Object.keys(over)));
 });
 test("missing input or an insecure URL calls nothing", async () => {

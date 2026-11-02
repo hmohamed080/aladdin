@@ -10,7 +10,7 @@
 //   POST /__allow {to}  GET /__messages?to=   GET /__claims   POST /__fail_next   (rig-only; read what a handset would receive)
 // It refuses to start unless it binds to loopback, and the rig's "Meta token" is a fixed fake string.
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { Miniflare } from "miniflare";
 import { handleRequest } from "../src/index.ts";
 
@@ -22,8 +22,12 @@ const SENDER_ID = "1415528588305492";
 
 const mf = new Miniflare({ modules: true, script: 'export default { async fetch() { return new Response("rig"); } };', d1Databases: { IDEMPOTENCY_DB: "otp-rig-d1" } });
 const d1 = await mf.getD1Database("IDEMPOTENCY_DB");
-const ddl = readFileSync(new URL("../migrations/0001_hook_events.sql", import.meta.url), "utf8").split(/\r?\n/).filter((l) => !l.trim().startsWith("--")).join("\n");
-for (const stmt of ddl.split(";").map((x) => x.trim()).filter(Boolean)) await d1.prepare(stmt).run();
+for (const file of readdirSync(new URL("../migrations/", import.meta.url)).filter((f) => f.endsWith(".sql")).sort()) {
+  const ddl = readFileSync(new URL("../migrations/" + file, import.meta.url), "utf8").split(/\r?\n/).filter((l) => !l.trim().startsWith("--")).join("\n");
+  for (const stmt of ddl.split(";").map((x) => x.trim()).filter(Boolean)) await d1.prepare(stmt).run();
+}
+// A LOCAL RIG fixture only: the real Workers get their settings row from an explicit, audited Super Admin action.
+await d1.prepare("INSERT INTO otp_settings (id, daily_limit, hard_ceiling, warn_percent, critical_percent, version, updated_at, updated_by) VALUES (1, 100, 5000, 70, 90, 1, 0, '00000000-0000-4000-8000-000000000001')").run();
 
 const allowed = new Set();
 const messages = []; // what Meta "received": {at, to, code, template, language, buttonCode}
@@ -40,7 +44,6 @@ const env = () => ({
   OTP_ENVIRONMENT: "local",
   OTP_RECIPIENT_MODE: "allowlist",
   OTP_ALLOWED_RECIPIENTS: [...allowed].join(","),
-  OTP_DAILY_SEND_LIMIT: "100", // the global rolling-24h budget is required (no budget, no sends)
   WHATSAPP_GRAPH_BASE_URL: `http://127.0.0.1:${PORT}`,
   IDEMPOTENCY_DB: d1,
 });

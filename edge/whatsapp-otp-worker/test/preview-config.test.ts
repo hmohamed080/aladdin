@@ -63,9 +63,15 @@ test("preview config refuses phone numbers in the repository and a Graph URL ove
   assertBlocked("graph override", o => { o.vars.WHATSAPP_GRAPH_BASE_URL = "http://127.0.0.1:1"; });
 });
 
-test("the global rolling-24h send budget must be configured as a positive integer (no budget, no sends)", () => {
-  assertBlocked("missing budget", (c) => { delete c.vars.OTP_DAILY_SEND_LIMIT; });
-  assertBlocked("zero budget", (c) => { c.vars.OTP_DAILY_SEND_LIMIT = "0"; });
-  assertBlocked("non-numeric budget", (c) => { c.vars.OTP_DAILY_SEND_LIMIT = "lots"; });
-  assertBlocked("fractional budget", (c) => { c.vars.OTP_DAILY_SEND_LIMIT = "2.5"; });
+test("the budget is a D1 setting, never an env var; the admin and notify secrets are separate bindings; the cron and notify URL are pinned", () => {
+  assertBlocked("env-var budget", (c) => { c.vars.OTP_DAILY_SEND_LIMIT = "50"; });
+  assertBlocked("missing admin secret", (c) => { c.secrets_store_secrets = c.secrets_store_secrets.filter((s: any) => s.binding !== "OTP_ADMIN_SIGNING_SECRET"); });
+  assertBlocked("missing notify secret", (c) => { c.secrets_store_secrets = c.secrets_store_secrets.filter((s: any) => s.binding !== "OTP_NOTIFY_SIGNING_SECRET"); });
+  assertBlocked("admin secret reuses the send secret", (c) => { c.secrets_store_secrets.find((s: any) => s.binding === "OTP_ADMIN_SIGNING_SECRET").secret_name = "PHONE_OTP_WORKER_SECRET"; });
+  assertBlocked("notify secret reuses the admin secret", (c) => { c.secrets_store_secrets.find((s: any) => s.binding === "OTP_NOTIFY_SIGNING_SECRET").secret_name = "OTP_ADMIN_SIGNING_SECRET"; });
+  assertBlocked("no cron trigger", (c) => { delete c.triggers; });
+  assertBlocked("empty cron list", (c) => { c.triggers.crons = []; });
+  assertBlocked("http notify URL", (c) => { c.vars.OTP_NOTIFY_URL = "http://example.com/api/internal/whatsapp-otp/notify"; });
+  assertBlocked("wrong notify path", (c) => { c.vars.OTP_NOTIFY_URL = "https://example.com/api/other"; });
+  assertBlocked("no notify URL", (c) => { delete c.vars.OTP_NOTIFY_URL; });
 });
