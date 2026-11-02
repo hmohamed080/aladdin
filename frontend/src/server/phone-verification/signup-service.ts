@@ -83,7 +83,7 @@ export function createPhoneSignupService(deps: Deps) {
     defer((async () => {
       if (!deliver) return;
       try {
-        await transport.send({ to: e164, code, ttlSeconds: 300, purpose: "signup_proof", locale });
+        await transport.send({ to: e164, code, ttlSeconds: 300, purpose: "signup_proof", locale, deliveryId: challengeId });
       } catch {
         try {
           await db.rpc("phone_signup_invalidate", { p_registration_id: registrationId, p_challenge_id: challengeId, p_reason: "delivery_failed" });

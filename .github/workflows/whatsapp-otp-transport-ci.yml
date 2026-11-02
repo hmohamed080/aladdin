@@ -1,0 +1,36 @@
+name: WhatsApp OTP Transport CI
+
+on:
+  pull_request:
+    paths:
+      - "edge/whatsapp-otp-worker/**"
+      - ".github/workflows/whatsapp-otp-transport-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  transport:
+    name: otp-transport
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: edge/whatsapp-otp-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned TypeScript (no lockfile mutation)
+        run: npm install --no-save --package-lock=false typescript@5.8.3 wrangler@4 miniflare@4.20260730.0
+      - name: Refuse non-acceptance settings or enabled OTP delivery
+        run: node scripts/check-preview-config.mjs
+      - name: Bundle Worker (dry run only; no deployment)
+        run: npx wrangler deploy --dry-run --outdir /tmp/otp-worker-bundle
+      - name: Typecheck isolated Worker
+        run: npm run typecheck
+      - name: Test signed handlers against local Cloudflare D1 SQL engine (no live network)
+        run: npm run test:integration
+      - name: Test fail-closed, signature and replay behavior
+        run: npm run test:unit

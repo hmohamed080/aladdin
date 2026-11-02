@@ -24,8 +24,14 @@ export NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA TURNSTILE_SECRET_
 export TURNSTILE_ALLOWED_HOSTNAMES=127.0.0.1,localhost E2E_STUB_TURNSTILE=1 E2E_TURNSTILE_STUB=1
 export E2E_DB_CONTAINER="supabase_db_${_r2_project}" MAILPIT_URL="http://127.0.0.1:${_r2_prefix}24"
 AUTH_PASSWORD_PREVIEW_GRANT_SECRET="$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))")"; export AUTH_PASSWORD_PREVIEW_GRANT_SECRET
-if [[ "${1:-}" == "phone" ]]; then
+if [[ "${1:-}" == "phone" || "${1:-}" == "worker" ]]; then
   export PHONE_VERIFICATION_ENABLED=true PHONE_SIGNUP_VERIFICATION_ENABLED=true PHONE_OTP_DELIVERY=outbox
+  if [[ "${1:-}" == "worker" ]]; then
+    # app -> signed request -> Worker rig (real handler + real SQL D1) -> fake Meta. The secret is generated for this shell and shared with the rig.
+    export PHONE_OTP_DELIVERY=worker E2E_WORKER_RIG_URL="http://127.0.0.1:${RIG_PORT:-8788}" PHONE_OTP_WORKER_URL="http://127.0.0.1:${RIG_PORT:-8788}/v1/otp/send"
+    PHONE_OTP_WORKER_SECRET="$(node -e "process.stdout.write('whsec_' + require('crypto').randomBytes(32).toString('base64'))")"; export PHONE_OTP_WORKER_SECRET
+    export RIG_SIGNING_SECRET="${PHONE_OTP_WORKER_SECRET}"
+  fi
   PHONE_OTP_HMAC_KEYS="$(node -e "process.stdout.write(JSON.stringify({current:'r2e2e',keys:{r2e2e:require('crypto').randomBytes(32).toString('base64')}}))")"; export PHONE_OTP_HMAC_KEYS
   PHONE_SIGNUP_COOKIE_SECRET="$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))")"; export PHONE_SIGNUP_COOKIE_SECRET
   export PHONE_OTP_OUTBOX_DIR="${_r2_repo}/frontend/.local/phone-otp-outbox"

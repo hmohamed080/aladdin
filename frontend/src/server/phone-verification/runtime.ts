@@ -26,7 +26,7 @@ function build() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const db: PhoneVerificationDb = { rpc: (fn, args) => client.rpc(fn, args) as unknown as ReturnType<PhoneVerificationDb["rpc"]> };
-  const transport = selectTransport({ mode: parseDeliveryMode(env.delivery, process.env.NODE_ENV), outboxDir: env.outboxDir, nodeEnv: process.env.NODE_ENV });
+  const transport = selectTransport({ mode: parseDeliveryMode(env.delivery, process.env.NODE_ENV), outboxDir: env.outboxDir, nodeEnv: process.env.NODE_ENV, workerUrl: env.workerUrl, workerSecret: env.workerSecret });
   return { env, keyring, db, transport };
 }
 

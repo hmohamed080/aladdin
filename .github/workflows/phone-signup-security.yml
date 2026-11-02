@@ -12,7 +12,7 @@ name: Phone sign-up security (R2)
 on:
   workflow_dispatch:
   push:
-    branches: [integration/unified-registration-r2-20261031]
+    branches: [integration/unified-registration-r2-20261031, integration/whatsapp-otp-worker-r2-20261031]
   pull_request:
     branches: [claude/registration-resume]
 
@@ -107,6 +107,90 @@ jobs:
           path: |
             .artifacts/phone-e2e/
             frontend/test-results/**/error-context.md
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Stop the stack
+        if: always()
+        run: timeout 90s pnpm exec supabase stop --no-backup || true
+
+  worker-e2e:
+    name: worker-e2e (app -> signed request -> real Worker handler + real SQL D1 -> fake Meta)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      PLAYWRIGHT_HTML_OPEN: never
+      NEXT_PUBLIC_APP_ENV: local
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
+      TURNSTILE_ALLOWED_HOSTNAMES: 127.0.0.1,localhost
+      E2E_STUB_TURNSTILE: "1"
+      E2E_TURNSTILE_STUB: "1"
+      E2E_DB_CONTAINER: supabase_db_aladdin
+      MAILPIT_URL: http://127.0.0.1:54324
+      PHONE_VERIFICATION_ENABLED: "true"
+      PHONE_SIGNUP_VERIFICATION_ENABLED: "true"
+      PHONE_OTP_DELIVERY: worker
+      PHONE_OTP_WORKER_URL: http://127.0.0.1:8788/v1/otp/send
+      E2E_WORKER_RIG_URL: http://127.0.0.1:8788
+      E2E_NEXT_MODE: dev
+      E2E_ALIAS_GUARD: enforce
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+          pnpm install --frozen-lockfile
+          pnpm --filter frontend exec playwright install --with-deps chromium
+          cd edge/whatsapp-otp-worker && npm install --no-save --package-lock=false typescript@5.8.3 wrangler@4 miniflare@4.20260730.0
+      - name: Start local Supabase and replay migrations + seeds
+        run: |
+          set -o pipefail
+          pnpm exec supabase start --exclude studio,postgres-meta,edge-runtime,logflare,vector,supavisor > "$RUNNER_TEMP/stack.log" 2>&1
+          pnpm exec supabase db reset >> "$RUNNER_TEMP/stack.log" 2>&1
+          pnpm exec supabase status -o json > "$RUNNER_TEMP/status.json"
+      - name: Point the app at the stack, generate throwaway secrets, start the Worker rig
+        run: |
+          status=$(jq 'if type == "array" then .[0] else . end' "$RUNNER_TEMP/status.json")
+          api_url=$(jq -r '.API_URL // empty' <<<"$status")
+          anon=$(jq -r '.ANON_KEY // empty' <<<"$status")
+          service=$(jq -r '.SERVICE_ROLE_KEY // empty' <<<"$status")
+          test "$api_url" = "http://127.0.0.1:54321" || { echo "Unexpected local API URL"; exit 1; }
+          grant=$(openssl rand -hex 32); cookie=$(openssl rand -hex 32)
+          keyring=$(node -e "process.stdout.write(JSON.stringify({current:'ci',keys:{ci:require('crypto').randomBytes(32).toString('base64')}}))")
+          worker_secret=$(node -e "process.stdout.write('whsec_' + require('crypto').randomBytes(32).toString('base64'))")
+          for value in "$anon" "$service" "$grant" "$cookie" "$keyring" "$worker_secret"; do echo "::add-mask::$value"; done
+          {
+            echo "SUPABASE_URL=$api_url"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$api_url"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$service"
+            echo "AUTH_PASSWORD_PREVIEW_GRANT_SECRET=$grant"
+            echo "PHONE_SIGNUP_COOKIE_SECRET=$cookie"
+            echo "PHONE_OTP_HMAC_KEYS=$keyring"
+            echo "PHONE_OTP_WORKER_SECRET=$worker_secret"
+          } >> "$GITHUB_ENV"
+          (cd edge/whatsapp-otp-worker && RIG_SIGNING_SECRET="$worker_secret" nohup node scripts/local-rig.mjs > "$RUNNER_TEMP/rig.log" 2>&1 &)
+          for i in $(seq 1 30); do grep -q "rig ready" "$RUNNER_TEMP/rig.log" && break; sleep 1; done
+          grep "rig ready" "$RUNNER_TEMP/rig.log"
+      - name: Phone sign-up specs through the Worker (desktop and mobile)
+        working-directory: frontend
+        run: |
+          set -o pipefail
+          mkdir -p ../.artifacts/worker-e2e
+          pnpm exec playwright test --retries=0 --reporter=list --project=chromium-desktop --project=chromium-mobile e2e/one-field-auth.spec.ts 2>&1 | tee ../.artifacts/worker-e2e/playwright.log
+      - name: Keep the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-e2e-${{ github.sha }}
+          path: .artifacts/worker-e2e/
           retention-days: 14
           if-no-files-found: warn
       - name: Stop the stack

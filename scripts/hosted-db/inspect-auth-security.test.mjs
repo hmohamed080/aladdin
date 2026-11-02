@@ -233,3 +233,21 @@ describe("R2: --only migrations", () => {
     assert.equal(code, 2); assert.equal(called, 0);
   });
 });
+
+describe("R2: out-of-order detection in the migration diff", () => {
+  const repo = ["20261028090001", "20261029090001", "20261030090001", "20261030090002"];
+  it("flags a repo migration that is missing but older than the newest applied one, and says a plain push is not possible", () => {
+    const d = migrationDiff([{ version: "20261029090001" }, { version: "20261030090001" }], repo);
+    assert.deepEqual(d.out_of_order_missing, ["20261028090001"]);
+    assert.equal(d.plain_push_possible, false);
+    assert.deepEqual(d.repo_not_applied, ["20261028090001", "20261030090002"]);
+  });
+  it("a project that is simply behind (only newer migrations missing) can take a plain forward push", () => {
+    const d = migrationDiff([{ version: "20261028090001" }, { version: "20261029090001" }], repo);
+    assert.deepEqual(d.out_of_order_missing, []);
+    assert.equal(d.plain_push_possible, true);
+  });
+  it("a hosted migration the repo does not have also blocks a plain push", () => {
+    assert.equal(migrationDiff([{ version: "20261028090001" }, { version: "20261015000000" }], repo).plain_push_possible, false);
+  });
+});

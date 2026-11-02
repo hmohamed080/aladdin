@@ -21,6 +21,21 @@ import { E2E_PASSWORD, fillBirthDate, reachLanding, SIGN_UP_BUTTON, SIGN_UP_CONT
  */
 
 const DB = process.env.E2E_DB_CONTAINER ?? "supabase_db_aladdin";
+/** When set, delivery goes app -> signed request -> the REAL Worker handler (real SQL D1) -> FAKE Meta, all on this rig (edge/whatsapp-otp-worker/scripts/local-rig.mjs). */
+export const RIG = process.env.E2E_WORKER_RIG_URL;
+export const deliveryViaRig = process.env.PHONE_OTP_DELIVERY === "worker" && Boolean(RIG);
+export async function rigAllow(e164: string): Promise<void> {
+  const r = await fetch(`${RIG}/__allow`, { method: "POST", body: JSON.stringify({ to: e164 }) });
+  if (!r.ok) throw new Error("rig allowlist failed");
+}
+export type RigMessage = { at: number; to: string; template: string; language: string; type: string; code: string; buttonCode: string; buttonSubType: string; buttonIndex: string };
+export async function rigMessages(e164: string): Promise<RigMessage[]> {
+  return (await (await fetch(`${RIG}/__messages?to=${encodeURIComponent(e164)}`)).json()) as RigMessage[];
+}
+export async function rigClaims(): Promise<Record<string, number>> {
+  return (await (await fetch(`${RIG}/__claims`)).json()) as Record<string, number>;
+}
+export async function rigFailNext(): Promise<void> { await fetch(`${RIG}/__fail_next`, { method: "POST" }); }
 export const OUTBOX_DIR = resolve(process.env.PHONE_OTP_OUTBOX_DIR ?? ".local/phone-otp-outbox");
 
 export function sqlValue(query: string): string {
@@ -59,8 +74,14 @@ export function e164Of(nationalPhone: string): string {
 export async function readSignUpCode(e164: string, since: number, waitMs = 15_000): Promise<string | null> {
   const deadline = Date.now() + waitMs;
   for (;;) {
-    const entry = latestOutboxEntry(OUTBOX_DIR, e164, "signup_proof");
-    if (entry && Date.parse(entry.at) >= since) return entry.code;
+    if (deliveryViaRig) {
+      // what the fake Meta received, i.e. what a handset would show
+      const last = (await rigMessages(e164)).filter((m) => m.at >= since).at(-1);
+      if (last) return last.code;
+    } else {
+      const entry = latestOutboxEntry(OUTBOX_DIR, e164, "signup_proof");
+      if (entry && Date.parse(entry.at) >= since) return entry.code;
+    }
     if (Date.now() >= deadline) return null;
     await new Promise((r) => setTimeout(r, 250));
   }
@@ -80,6 +101,7 @@ export async function requestPhoneSignUp(
   await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
   await waitForCaptchaToken(page);
   const since = Date.now() - 1_000;
+  if (deliveryViaRig) await rigAllow(e164Of(phone));
   await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
   await expect(page.getByRole("heading", { name: /enter the whatsapp code|أدخل رمز واتساب/i })).toBeVisible({ timeout: 20_000 });
   return since;

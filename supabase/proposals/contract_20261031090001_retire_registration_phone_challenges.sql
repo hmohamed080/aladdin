@@ -18,6 +18,14 @@
 --      project already has (scripts/hosted-db/inspect-auth-security.mjs --only migrations).
 -- Promote it with a NEW timestamp later than every migration then in the repo; keep the body.
 --
+-- TRACKED AND MANDATORY (RF-001, issue #135): this is not an optional idea. docs/operations/RELEASE_FOLLOWUPS.md records it, and
+-- scripts/release-followups-guard.mjs (CI, migration-policy) fails the build if it is untracked, appears in supabase/migrations while OPEN,
+-- is past production_activated_on + 14 days, or is past the hard backstop date. Check condition 1-2 per environment with the read-only
+-- supabase/proposals/readiness_check_legacy_phone_challenges.sql (safe_to_promote); conditions 2 and 3 also need the owner attestation and approval.
+-- Production note: no Production build ever used this table (it does not exist there until 20261028090001 is applied, and the live rollback
+-- build predates PR #113), so condition 2 holds there by construction; the default plan still waits for R2 to be live (condition 1).
+-- Do NOT edit, rename or delete 20261028090001 or any applied migration: this file is a forward-only contract.
+--
 -- The guard below makes a premature run fail loudly instead of breaking sign-ups: it refuses while codes were issued in the last hour (an older
 -- build is still handing them out) and cascades nothing.
 do $$

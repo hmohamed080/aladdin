@@ -30,6 +30,12 @@ case "${cmd}" in
     ( [[ -d "${work}/supabase" ]] && cd "${work}" && "${cli[@]}" stop --no-backup >/dev/null 2>&1 ) || true
     rm -rf "${work}/supabase"; mkdir -p "${work}/supabase"
     cp -r "${repo}/supabase/migrations" "${repo}/supabase/templates" "${work}/supabase/"
+    # Rehearsal only: R2_HOLD_BACK="v1 v2 ..." keeps those migration versions OUT of the db reset (moved to ${work}/held) so a test can apply them later,
+    # reproducing a project whose history lacks them (e.g. Acceptance without the two target phone migrations).
+    if [[ -n "${R2_HOLD_BACK:-}" ]]; then
+      mkdir -p "${work}/held"; rm -f "${work}/held"/*.sql
+      for v in ${R2_HOLD_BACK}; do mv "${work}/supabase/migrations/${v}"_*.sql "${work}/held/"; done
+    fi
     cp "${repo}"/supabase/seed*.sql "${repo}/supabase/demo-seed.sql" "${work}/supabase/"
     git -C "${repo}" show HEAD:supabase/config.toml \
       | sed -e "s/^project_id = .*/project_id = \"${project}\"/" -e "s/\b543\([0-9][0-9]\)\b/${prefix}\1/g" -e "s/\b8083\b/${prefix}83/" > "${work}/supabase/config.toml"

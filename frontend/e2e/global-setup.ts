@@ -96,7 +96,7 @@ update auth.users
 
   // Mobile-number sign-up is OFF by default in the database. A run that delivers to the local outbox (PHONE_OTP_DELIVERY=outbox) is the
   // run that exercises it, so only then are the isolated stack's switches turned on. E2E_ALIAS_GUARD picks the guard mode (default enforce).
-  if (process.env.PHONE_OTP_DELIVERY === "outbox") {
+  if (process.env.PHONE_OTP_DELIVERY === "outbox" || (process.env.PHONE_OTP_DELIVERY === "worker" && process.env.E2E_WORKER_RIG_URL)) {
     const guard = process.env.E2E_ALIAS_GUARD ?? "enforce";
     if (!["observe", "enforce"].includes(guard)) throw new Error("E2E_ALIAS_GUARD must be observe or enforce");
     enablePhoneSignupSwitches(guard as "observe" | "enforce");

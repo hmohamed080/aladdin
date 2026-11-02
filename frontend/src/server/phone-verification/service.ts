@@ -60,7 +60,7 @@ export function createPhoneVerificationService(deps: Deps) {
     if (row.status !== "challenge_created" || typeof row.phone_e164 !== "string") return UNAVAILABLE;
 
     try {
-      await transport.send({ to: row.phone_e164, code, ttlSeconds: 300 });
+      await transport.send({ to: row.phone_e164, code, ttlSeconds: 300, purpose: "primary_proof", deliveryId: challengeId });
     } catch {
       // The code could not be delivered: close the challenge so it cannot be guessed blind. The attempt still counts toward
       // the account's resend budget (cost control). No detail about the transport reaches the caller.

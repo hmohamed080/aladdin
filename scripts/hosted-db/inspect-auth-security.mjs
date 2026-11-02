@@ -197,6 +197,10 @@ export function migrationDiff(appliedRows, repoVersions) {
     latest_applied: applied.at(-1) ?? null,
     applied_not_in_repo: applied.filter((v) => !r.has(v)),
     repo_not_applied: repoVersions.filter((v) => !a.has(v)),
+    // A repo migration that is MISSING on the project but OLDER than its newest applied one is out of order: `supabase db push` refuses it
+    // (it would need --include-all). Report it; never repair around it. Empty = a plain forward push is possible.
+    out_of_order_missing: repoVersions.filter((v) => !a.has(v) && applied.length > 0 && v < applied[applied.length - 1]),
+    plain_push_possible: !repoVersions.some((v) => !a.has(v) && applied.length > 0 && v < applied[applied.length - 1]) && !applied.some((v) => !r.has(v)),
     r2_markers: Object.fromEntries(R2_MARKER_MIGRATIONS.map((v) => [v, a.has(v)])),
   };
 }

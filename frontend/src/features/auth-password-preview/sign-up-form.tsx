@@ -21,6 +21,9 @@ import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/acco
 const initial: PhoneSignUpState = { ok: false };
 const initialEmail: PasswordAuthState = { ok: false };
 const RESEND_COOLDOWN_SECONDS = 30;
+// The phone verification authority enforces its own resend cooldown (app.phone_verification_config.resend_cooldown, 60 s by default) and
+// answers "too many attempts" before that. The button must not re-enable earlier than the authority will accept, so the phone path counts 60 s.
+const PHONE_RESEND_COOLDOWN_SECONDS = 60;
 const NO_PROVIDERS: OAuthAvailability = { google: false, facebook: false };
 const CONSENT_TYPES = ["terms", "privacy", "pilot"] as const;
 
@@ -104,7 +107,7 @@ export function PasswordSignUpForm({
   useEffect(() => {
     if (sendState.ok) {
       setEditing(false);
-      setCooldown(RESEND_COOLDOWN_SECONDS);
+      setCooldown(sendState.channel === "phone" ? PHONE_RESEND_COOLDOWN_SECONDS : RESEND_COOLDOWN_SECONDS);
       // The password only needs to exist for the ONE submit above.
       setPassword("");
       setRestartCode(undefined);
@@ -121,7 +124,8 @@ export function PasswordSignUpForm({
   }, [phoneVerifyState]);
 
   useEffect(() => {
-    if (emailResendState.ok || phoneResendState.ok) setCooldown(RESEND_COOLDOWN_SECONDS);
+    if (phoneResendState.ok) setCooldown(PHONE_RESEND_COOLDOWN_SECONDS);
+    else if (emailResendState.ok) setCooldown(RESEND_COOLDOWN_SECONDS);
   }, [emailResendState, phoneResendState]);
 
   useEffect(() => {
