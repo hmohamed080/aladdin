@@ -3,6 +3,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/env/storage", () => ({ readStorageEnv: () => ({
   R2_ACCOUNT_ID: "a".repeat(32), R2_ACCESS_KEY_ID: "test-key", R2_SECRET_ACCESS_KEY: "test-secret", R2_PRIVATE_BUCKET: "isolated-private", R2_PUBLIC_BUCKET: "isolated-public", R2_PUBLIC_BASE_URL: "https://media.example.test",
 }) }));
+vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_SUPABASE_URL: "https://localhost.invalid" }) }));
 const send = vi.hoisted(() => vi.fn());
 vi.mock("@aws-sdk/client-s3", async (original) => {
   const sdk = await original<typeof import("@aws-sdk/client-s3")>();

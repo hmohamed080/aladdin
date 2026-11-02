@@ -441,7 +441,7 @@ function supabaseIo(supabase) {
 
 function r2Io(env) {
   if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_PRIVATE_BUCKET) throw new OperatorError("R2 settings are required for this command");
-  const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+  const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
   const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
   const s3 = new S3Client({ region: "auto", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED", responseChecksumValidation: "WHEN_REQUIRED", endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY },
@@ -449,6 +449,10 @@ function r2Io(env) {
   const key = (row) => `${row.namespace}/${row.object_key}`;
   return {
     s3, DeleteObjectCommand, bucket: env.R2_PRIVATE_BUCKET, key,
+    exists: async (objectKey) => {
+      try { await s3.send(new HeadObjectCommand({ Bucket: env.R2_PRIVATE_BUCKET, Key: objectKey })); return true; }
+      catch (error) { if (error?.$metadata?.httpStatusCode === 404 || error?.name === "NotFound") return false; throw error; }
+    },
     putDestination: async (row, bytes) => {
       try {
         await s3.send(new PutObjectCommand({ Bucket: env.R2_PRIVATE_BUCKET, Key: key(row), Body: bytes,
@@ -581,27 +585,52 @@ async function cleanup(supabase, env, project, options) {
   const { data: rows, error } = await supabase.rpc("media_cleanup_candidates", { p_limit: options.limit });
   if (error) throw new OperatorError("Cleanup query failed; confirm the provider migration is installed in the selected environment");
   if (!options.execute) {
-    console.log(JSON.stringify({ dryRun: true, project, candidates: rows.length,
-      providers: rows.reduce((counts, row) => ({ ...counts, [row.provider]: (counts[row.provider] ?? 0) + 1 }), {}) }));
+    console.log(JSON.stringify({ dryRun: true, project, ...reconciliation(rows) }));
     return;
   }
-  const r2 = r2Io(env);
-  let retired = 0;
+  const result = await runCleanup(supabase, r2Io(env), rows);
+  console.log(JSON.stringify({ project, ...result }));
+  if (result.failed) process.exitCode = 1;
+}
+
+/** What is waiting for cleanup, by provider and namespace. Counts only: never keys, owners or object names. */
+export function reconciliation(rows) {
+  const count = (pick) => rows.reduce((acc, row) => ({ ...acc, [pick(row)]: (acc[pick(row)] ?? 0) + 1 }), {});
+  return { candidates: rows.length, providers: count((row) => row.provider), namespaces: count((row) => row.namespace) };
+}
+
+const VARIANT_NAMES = ["thumb", "card", "full"];
+/** Every physical object a record can own: the original, its pending upload copy and its variants. */
+export function objectsToDelete(object) {
+  const variants = VARIANT_NAMES.map((variant) => /^[uo]\//.test(object)
+    ? object.replace(/\/original\.[a-z0-9]+$/, `/v/${variant}.webp`) : `v/${object}/${variant}.webp`);
+  return [object, `pending/${object}`, ...variants];
+}
+
+/**
+ * Retire, delete the bytes, CONFIRM they are gone, then record completion. One row's failure never stops the
+ * others and is retried by the next run: retire is idempotent, deleting an absent object is a no-op, and a row is
+ * completed only after a read-back finds the original absent. A legacy Supabase object is never touched.
+ */
+export async function runCleanup(supabase, r2, rows) {
+  let retired = 0, failed = 0;
+  const preservedLegacy = rows.filter((row) => row.provider === "supabase").length;
   for (const row of rows) {
-    if (row.provider !== "r2") continue; // Legacy source objects are never removed by this tool.
-    // The database names the physical key: ids-only (u/…, o/…) for uploads since 2026-10-29, else the legacy key.
-    const { data: object, error: objectError } = await supabase.rpc("media_storage_object", { p_namespace: row.namespace, p_key: row.object_key });
-    if (objectError || typeof object !== "string" || !object) continue;
-    const { error: retireError } = await supabase.rpc("media_cleanup_retire", { p_namespace: row.namespace, p_key: row.object_key, p_owner: row.owner_user_id });
-    if (retireError) continue;
-    const variants = ["thumb", "card", "full"].map((variant) => /^[uo]\//.test(object)
-      ? object.replace(/\/original\.[a-z0-9]+$/, `/v/${variant}.webp`) : `v/${object}/${variant}.webp`);
-    for (const objectKey of [object, `pending/${object}`, ...variants]) await r2.s3.send(new r2.DeleteObjectCommand({ Bucket: r2.bucket, Key: objectKey }));
-    const { error: completeError } = await supabase.rpc("media_cleanup_complete", { p_namespace: row.namespace, p_key: row.object_key, p_owner: row.owner_user_id });
-    if (completeError) throw new OperatorError("Cleanup completion failed; retry safely");
-    retired++;
+    if (row.provider !== "r2") continue;
+    try {
+      // The database names the physical key: ids-only (u/…, o/…) for uploads since 2026-10-29, else the legacy key.
+      const { data: object, error: objectError } = await supabase.rpc("media_storage_object", { p_namespace: row.namespace, p_key: row.object_key });
+      if (objectError || typeof object !== "string" || !object) { failed++; continue; }
+      const { error: retireError } = await supabase.rpc("media_cleanup_retire", { p_namespace: row.namespace, p_key: row.object_key, p_owner: row.owner_user_id });
+      if (retireError) { failed++; continue; }
+      for (const objectKey of objectsToDelete(object)) await r2.s3.send(new r2.DeleteObjectCommand({ Bucket: r2.bucket, Key: objectKey }));
+      if (r2.exists && await r2.exists(object)) { failed++; continue; } // not gone: leave the row for the next run
+      const { error: completeError } = await supabase.rpc("media_cleanup_complete", { p_namespace: row.namespace, p_key: row.object_key, p_owner: row.owner_user_id });
+      if (completeError) { failed++; continue; }
+      retired++;
+    } catch { failed++; }
   }
-  console.log(JSON.stringify({ project, retired, preservedLegacy: rows.filter((row) => row.provider === "supabase").length }));
+  return { retired, failed, preservedLegacy };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

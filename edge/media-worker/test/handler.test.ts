@@ -14,7 +14,7 @@ const BYTES = new TextEncoder().encode("%PDF-1.7 private certificate bytes");
 const SHA = "b".repeat(64);
 
 /** In-memory stand-in for the database's current state; tests mutate it to revoke. */
-type Db = { deleted: boolean; suspended: boolean; sessionRevoked: boolean; published: boolean; grant: Record<string, unknown> | null };
+type Db = { deleted: boolean; suspended: boolean; sessionRevoked: boolean; published: boolean; key?: string; grant: Record<string, unknown> | null };
 let db: Db;
 let calls: { private: number; public: number; closed: number };
 
@@ -24,7 +24,7 @@ function fakeAuthority(): MediaAuthority {
       calls.private++;
       // Mirrors media_edge_authorize: owner + session + active + not deleted + unexpired.
       if (db.deleted || db.suspended || db.sessionRevoked || r.viewer !== VIEWER || r.session !== SESSION
-        || r.key !== KEY || r.expiresAt < NOW - 5) return null;
+        || r.key !== (db.key ?? KEY) || r.expiresAt < NOW - 5) return null;
       return db.grant;
     },
     async authorizePublic(r) {
@@ -154,6 +154,49 @@ describe("Mode P: private delivery", () => {
       { object: `u/${VIEWER}/certificates/${id}/original.pdf/../x`, contentType: "application/pdf", size: BYTES.length, sha256: SHA }]) {
       db.grant = grant;
       expect((await get(await privateUrl())).status).toBe(404);
+    }
+  });
+
+  it("serves request photos and verification documents by their ids-only keys, and only those shapes", async () => {
+    const id = "e9200000-0000-4000-8000-000000000003";
+    const reqId = "e9200000-0000-4000-8000-000000000004";
+    const RKEY = `${VIEWER}/${reqId}/${id}.png`;
+    const VKEY = `${VIEWER}/${id}.pdf`;
+    const requestObject = `u/${VIEWER}/requests/${reqId}/${id}/original.png`;
+    const orgRequestObject = `o/${VIEWER}/requests/${reqId}/${id}/original.png`;
+    const verificationObject = `o/${VIEWER}/verification/${id}/original.pdf`;
+    env.MEDIA_BUCKET = bucket({ [requestObject]: BYTES, [orgRequestObject]: BYTES, [verificationObject]: BYTES });
+    const g = (object: string, contentType: string) => ({ object, contentType, size: BYTES.length, sha256: SHA });
+    for (const [ns, k, grant] of [["request", RKEY, g(requestObject, "image/png")], ["request", RKEY, g(orgRequestObject, "image/png")],
+      ["verification", VKEY, g(verificationObject, "application/pdf")]] as const) {
+      db.grant = grant; db.key = k;
+      const res = await get(await privateUrl({ ns, k }, `/m/${ns}/original`));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe(grant.contentType);
+      expect(res.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+    }
+    // A request photo cannot be served as a PDF; a verification document may not live under u/ or the requests folder.
+    for (const [ns, k, grant] of [["request", RKEY, g(requestObject, "application/pdf")],
+      ["verification", VKEY, g(`u/${VIEWER}/verification/${id}/original.pdf`, "application/pdf")],
+      ["verification", VKEY, g(`o/${VIEWER}/requests/${reqId}/${id}/original.pdf`, "application/pdf")],
+      ["verification", VKEY, g(`o/${VIEWER}/verification/${id}/v/card.pdf`, "application/pdf")],
+      ["request", RKEY, g(verificationObject, "image/png")]] as const) {
+      db.grant = grant; db.key = k;
+      expect((await get(await privateUrl({ ns, k }, `/m/${ns}/original`))).status).toBe(404);
+    }
+  });
+
+  it("carries a workspace only for request photos and organization media, never for verification or personal media", async () => {
+    const WS = "e9300000-0000-4000-8000-000000000005";
+    const id = "e9200000-0000-4000-8000-000000000003";
+    const key = `${VIEWER}/${WS}/${id}.png`;
+    const object = `o/${VIEWER}/requests/${WS}/${id}/original.png`;
+    env.MEDIA_BUCKET = bucket({ [object]: BYTES });
+    db.grant = { object, contentType: "image/png", size: BYTES.length, sha256: SHA }; db.key = key;
+    expect((await get(await privateUrl({ ns: "request", k: key, ws: WS }, "/m/request/original"))).status).toBe(200);
+    for (const ns of ["verification", "certificate"] as const) {
+      db.key = `${VIEWER}/${id}.pdf`;
+      expect((await get(await privateUrl({ ns, k: `${VIEWER}/${id}.pdf`, ws: WS }, `/m/${ns}/original`))).status).toBe(404);
     }
   });
 

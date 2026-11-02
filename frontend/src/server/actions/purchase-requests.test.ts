@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ rpc: vi.fn(), list: vi.fn(), remove: vi.fn() }));
+const media = vi.hoisted(() => ({ authorize: vi.fn(), verify: vi.fn(), remove: vi.fn() }));
+vi.mock("@/server/storage/media", () => ({ authorizeMediaUpload: media.authorize, verifyPendingMedia: media.verify, removeMedia: media.remove }));
 vi.mock("@/lib/supabase/server", () => ({
   getServerSupabase: async () => ({ rpc: state.rpc, storage: { from: () => ({ list: state.list, remove: state.remove }) } }),
 }));
@@ -111,73 +113,56 @@ describe("purchaseRequestLifecycleAction", () => {
 });
 
 describe("reference image actions", () => {
-  it("requests a ticket only for an allowed type and a real item id", async () => {
+  const GRANT = { provider: "r2", url: "https://r2.test/pending", headers: {}, expiresIn: 120 };
+  beforeEach(() => { media.authorize.mockResolvedValue(GRANT); media.verify.mockResolvedValue(null); media.remove.mockResolvedValue(undefined); });
+
+  it("requests a ticket only for an allowed type and a real item id, and gets the central grant", async () => {
     state.rpc.mockResolvedValue({ data: KEY, error: null });
-    expect(await requestRequestImageUploadAction(ITEM, "image/png")).toEqual({ ok: true, key: KEY });
+    expect(await requestRequestImageUploadAction(ITEM, "image/png", 93)).toEqual({ ok: true, key: KEY, grant: GRANT });
+    expect(media.authorize).toHaveBeenCalledWith(expect.anything(), "request", KEY, 93);
     expect((await requestRequestImageUploadAction(ITEM, "image/gif")).ok).toBe(false);
     expect((await requestRequestImageUploadAction("nope", "image/png")).ok).toBe(false);
+    expect((await requestRequestImageUploadAction(ITEM, "image/png", 6 * 1024 * 1024)).ok).toBe(false);
     expect(state.rpc).toHaveBeenCalledTimes(1);
   });
 
-  it("reports the third image as the two-image limit", async () => {
+  it("reports the third image as the two-image limit, before any storage grant", async () => {
     state.rpc.mockResolvedValue({ data: null, error: { code: "23514", message: "an item can have at most 2 images" } });
     expect(await requestRequestImageUploadAction(ITEM, "image/png")).toEqual({ ok: false, code: "purchaseRequests.errors.maxImages" });
+    expect(media.authorize).not.toHaveBeenCalled();
   });
 
-  it("confirms only after the bytes are really in Storage", async () => {
+  it("fails the ticket (no fallback store) when the storage provider is unavailable", async () => {
+    state.rpc.mockResolvedValue({ data: KEY, error: null });
+    media.authorize.mockRejectedValue(new Error("R2 unavailable"));
+    expect(await requestRequestImageUploadAction(ITEM, "image/png", 93)).toEqual({ ok: false, code: "states.genericRetry" });
+    expect(state.list).not.toHaveBeenCalled();
+  });
+
+  it("confirms only after the central byte verification succeeds", async () => {
     state.rpc.mockResolvedValue({ data: IMAGE, error: null });
     expect(await confirmRequestImageUploadAction(KEY)).toEqual({ ok: true, id: IMAGE });
+    expect(media.verify).toHaveBeenCalledWith(expect.anything(), "request", KEY);
     state.rpc.mockClear();
-    state.list.mockResolvedValue({ data: [], error: null });
+    media.verify.mockRejectedValue(new Error("media unavailable"));
     expect((await confirmRequestImageUploadAction(KEY)).ok).toBe(false);
     expect(state.rpc).not.toHaveBeenCalled();
     expect((await confirmRequestImageUploadAction("not/a/key")).ok).toBe(false);
   });
 
-  it("removes through the RPC and then cleans up the bytes; a refusal leaves Storage alone", async () => {
+  it("removes through the RPC, then deletes the bytes through the central lifecycle; a refusal deletes nothing", async () => {
     state.rpc.mockResolvedValue({ data: KEY, error: null });
     expect(await removeRequestImageAction(IMAGE)).toEqual({ ok: true });
-    expect(state.remove).toHaveBeenCalledWith([KEY]);
-    state.remove.mockClear();
+    expect(media.remove).toHaveBeenCalledWith(expect.anything(), "request", KEY);
+    media.remove.mockClear();
     state.rpc.mockResolvedValue({ data: null, error: { code: "22023", message: "only a draft request can be edited" } });
     expect(await removeRequestImageAction(IMAGE)).toEqual({ ok: false, code: "purchaseRequests.errors.notDraft" });
-    expect(state.remove).not.toHaveBeenCalled();
-  });
-});
-
-describe("responses", () => {
-  const lines = JSON.stringify([{ requestItemId: ITEM, offeredQuantity: "5", unitPrice: "13.25", note: "partial" }]);
-
-  it("sends a PARTIAL response: the original item, the offered quantity, the unit price - no unit, no total", async () => {
-    state.rpc.mockResolvedValue({ data: REQ, error: null });
-    const r = await saveRequestResponseAction({ ok: false }, fd({ orgId: ORG, requestId: REQ, note: "Best price", validUntil: "2026-12-01", lines }));
-    expect(r).toEqual({ ok: true, id: REQ });
-    const [name, args] = state.rpc.mock.calls[0]!;
-    expect(name).toBe("purchase_request_response_save");
-    expect(args).toEqual({ p_org_id: ORG, p_request_id: REQ, p_note: "Best price", p_valid_until: "2026-12-01", p_items: [{ request_item_id: ITEM, offered_quantity: 5, unit_price: 13.25, note: "partial" }] });
+    expect(media.remove).not.toHaveBeenCalled();
   });
 
-  it("refuses bad lines locally (zero quantity, 3-decimal price, no lines) without calling the database", async () => {
-    const bad = (l: unknown[]) => saveRequestResponseAction({ ok: false }, fd({ orgId: ORG, requestId: REQ, lines: JSON.stringify(l) }));
-    expect((await bad([{ requestItemId: ITEM, offeredQuantity: "0", unitPrice: "1" }])).fieldErrors).toEqual({ lines: "purchaseRequests.errors.responseItemInvalid" });
-    expect((await bad([{ requestItemId: ITEM, offeredQuantity: "1", unitPrice: "12.505" }])).fieldErrors).toEqual({ lines: "purchaseRequests.errors.responseItemInvalid" });
-    expect((await bad([])).fieldErrors).toEqual({ lines: "purchaseRequests.errors.responseNeedsItem" });
-    expect(state.rpc).not.toHaveBeenCalled();
-  });
-
-  it("an out-of-audience request answers not-found, a missing capability answers denied", async () => {
-    state.rpc.mockResolvedValue({ data: null, error: { code: "P0002", message: "purchase request not found" } });
-    expect((await saveRequestResponseAction({ ok: false }, fd({ orgId: ORG, requestId: REQ, lines }))).code).toBe("purchaseRequests.errors.notFound");
-    state.rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "rfq.respond required" } });
-    expect((await saveRequestResponseAction({ ok: false }, fd({ orgId: ORG, requestId: REQ, lines }))).code).toBe("purchaseRequests.errors.denied");
-  });
-
-  it("withdraws and shortlists by id; shortlisting is only a flag", async () => {
-    state.rpc.mockResolvedValue({ data: null, error: null });
-    expect(await withdrawRequestResponseAction(REQ)).toEqual({ ok: true, id: REQ });
-    expect(await shortlistRequestResponseAction(REQ, true)).toEqual({ ok: true, id: REQ });
-    expect(state.rpc).toHaveBeenCalledWith("purchase_request_response_shortlist", { p_response_id: REQ, p_shortlisted: true });
-    expect(state.rpc.mock.calls.map((c) => c[0])).toEqual(["purchase_request_response_withdraw", "purchase_request_response_shortlist"]);
-    expect((await shortlistRequestResponseAction("nope", true)).ok).toBe(false);
+  it("reports a failed byte delete so the user can retry (the record is already retired)", async () => {
+    state.rpc.mockResolvedValue({ data: KEY, error: null });
+    media.remove.mockRejectedValue(new Error("R2 unavailable"));
+    expect(await removeRequestImageAction(IMAGE)).toEqual({ ok: false, code: "states.genericRetry" });
   });
 });

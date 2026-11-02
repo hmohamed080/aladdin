@@ -14,10 +14,12 @@ import {
 } from "@/features/purchase-requests/model";
 import { countChars } from "@/lib/text/count-chars";
 import {
-  REQUEST_IMAGE_BUCKET,
+  REQUEST_IMAGE_MAX_BYTES,
   isRequestImageContentType,
   isRequestImageKey,
 } from "@/lib/storage/request-images";
+import type { UploadGrant } from "@/lib/storage/provider-types";
+import { authorizeMediaUpload, removeMedia, verifyPendingMedia } from "@/server/storage/media";
 
 /**
  * Server Actions for shared Purchase Requests. Every one forwards the CALLER's JWT to a security-definer
@@ -124,27 +126,33 @@ export async function purchaseRequestLifecycleAction(_prev: RequestFormState, fd
 // ---------------------------------------------------------------------------
 // Reference images (draft only, at most 2 per item)
 // ---------------------------------------------------------------------------
-export type RequestImageTicket = { ok: true; key: string } | { ok: false; code: string };
+export type RequestImageTicket = { ok: true; key: string; grant: UploadGrant } | { ok: false; code: string };
 export type RequestImageResult = { ok: true } | { ok: false; code: string };
 export type RequestImageConfirm = { ok: true; id: string } | { ok: false; code: string };
 
-export async function requestRequestImageUploadAction(itemId: string, contentType: string): Promise<RequestImageTicket> {
+/**
+ * Photo bytes go to private storage through the central media system (R2 once routing is on): the RPC
+ * reserves the pending row and key, `authorizeMediaUpload` re-authorizes the caller and issues the grant.
+ * A failing storage provider fails this action; it never falls back to another store.
+ */
+export async function requestRequestImageUploadAction(itemId: string, contentType: string, expectedBytes?: number): Promise<RequestImageTicket> {
   if (!isUuid(itemId) || !isRequestImageContentType(contentType)) return { ok: false, code: E("imageType") };
+  if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > REQUEST_IMAGE_MAX_BYTES)) {
+    return { ok: false, code: E("imageSize") };
+  }
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("purchase_request_image_request_upload", { p_item_id: itemId, p_content_type: contentType });
   if (error || !isRequestImageKey(data)) return { ok: false, code: mapRequestError(error ?? new Error("invalid upload ticket")) };
-  return { ok: true, key: data };
+  try { return { ok: true, key: data, grant: await authorizeMediaUpload(supabase, "request", data, expectedBytes) }; }
+  catch { return { ok: false, code: "states.genericRetry" }; }
 }
 
-/** Confirm only AFTER the browser uploaded: the database never reads the byte store, so existence is checked here. */
+/** Confirm only after the trusted, bounded byte verification: SQL refuses pending-to-ready without its receipt. */
 export async function confirmRequestImageUploadAction(key: string): Promise<RequestImageConfirm> {
   if (!isRequestImageKey(key)) return { ok: false, code: "states.genericRetry" };
   const supabase = await getServerSupabase();
-  const slash = key.lastIndexOf("/");
-  const { data: listed, error: listError } = await supabase.storage
-    .from(REQUEST_IMAGE_BUCKET)
-    .list(key.slice(0, slash), { search: key.slice(slash + 1), limit: 5 });
-  if (listError || !(listed ?? []).some((o) => o.name === key.slice(slash + 1))) return { ok: false, code: "states.genericRetry" };
+  try { await verifyPendingMedia(supabase, "request", key); }
+  catch { return { ok: false, code: "states.genericRetry" }; }
   const { data, error } = await supabase.rpc("purchase_request_image_confirm_upload", { p_object_key: key });
   if (error || typeof data !== "string" || !isUuid(data)) return { ok: false, code: mapRequestError(error ?? new Error("invalid confirm result")) };
   return { ok: true, id: data };
@@ -155,8 +163,12 @@ export async function removeRequestImageAction(imageId: string): Promise<Request
   const supabase = await getServerSupabase();
   const { data: key, error } = await supabase.rpc("purchase_request_image_remove", { p_image_id: imageId });
   if (error) return { ok: false, code: mapRequestError(error) };
-  // Best-effort byte cleanup after the metadata change committed; an orphan is private and unreachable.
-  if (isRequestImageKey(key)) await supabase.storage.from(REQUEST_IMAGE_BUCKET).remove([key]);
+  // The record is already retired (unreadable). A failed byte delete is reported so the user can retry;
+  // the cleanup worker also finds it.
+  if (isRequestImageKey(key)) {
+    try { await removeMedia(supabase, "request", key); }
+    catch { return { ok: false, code: "states.genericRetry" }; }
+  }
   return { ok: true };
 }
 

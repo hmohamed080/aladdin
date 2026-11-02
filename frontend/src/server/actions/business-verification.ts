@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 import {
-  BV_BUCKET,
   BV_NOTE_MAX,
   BV_REASON_MAX,
   UUID_SHAPE,
@@ -14,6 +13,8 @@ import {
   BV_MAX_BYTES,
 } from "@/lib/business-verification/contract";
 import type { FormState } from "@/server/actions/sales-forms";
+import type { UploadGrant } from "@/lib/storage/provider-types";
+import { authorizeMediaUpload, removeMedia, verifyPendingMedia } from "@/server/storage/media";
 
 /**
  * Business verification actions. Nothing is decided here: every rule (who may upload, submit, review or
@@ -25,7 +26,7 @@ import type { FormState } from "@/server/actions/sales-forms";
 const SHOWROOM_PATH = "/showroom/verification";
 const ADMIN_PATH = "/admin/business-verification";
 
-export type BvTicket = { ok: true; key: string } | { ok: false; code: string };
+export type BvTicket = { ok: true; key: string; grant: UploadGrant } | { ok: false; code: string };
 export type BvResult = { ok: true } | { ok: false; code: string };
 
 export async function requestBvUploadAction(input: {
@@ -47,37 +48,39 @@ export async function requestBvUploadAction(input: {
     p_file_name: input.fileName.slice(0, 120),
   });
   if (error || typeof data !== "string" || !isBvKey(data)) return { ok: false, code: error ? mapBvError(error.message) : "businessVerification.errors.upload" };
-  return { ok: true, key: data };
+  // Central authorization and the provider choice (R2 once routing is on); a provider failure fails this action.
+  try { return { ok: true, key: data, grant: await authorizeMediaUpload(supabase, "verification", data, Math.trunc(input.sizeBytes)) }; }
+  catch { return { ok: false, code: "businessVerification.errors.upload" }; }
 }
 
 /**
- * Confirm only AFTER the browser has uploaded: the database never reads the byte store, so the existence
- * check lives here, through the caller's own Storage access (the same pattern as product images).
+ * Confirm only AFTER the browser has uploaded: the stored bytes are read back and verified (type, size,
+ * SHA-256) by the central media system, and the database refuses `ready` without that receipt.
  */
 export async function confirmBvUploadAction(key: string): Promise<BvResult> {
   if (!isBvKey(key)) return { ok: false, code: "businessVerification.errors.upload" };
   const supabase = await getServerSupabase();
-  const slash = key.lastIndexOf("/");
-  const { data: listed, error: listError } = await supabase.storage
-    .from(BV_BUCKET)
-    .list(key.slice(0, slash), { search: key.slice(slash + 1), limit: 5 });
-  if (listError || !(listed ?? []).some((o) => o.name === key.slice(slash + 1))) {
-    return { ok: false, code: "businessVerification.errors.upload" };
-  }
+  try { await verifyPendingMedia(supabase, "verification", key); }
+  catch { return { ok: false, code: "businessVerification.errors.upload" }; }
   const { error } = await supabase.rpc("business_verification_document_confirm", { p_object_key: key });
   if (error) return { ok: false, code: mapBvError(error.message) };
   revalidatePath(SHOWROOM_PATH);
   return { ok: true };
 }
 
+/**
+ * Only an UNSUBMITTED draft can be removed (the RPC refuses submitted evidence, which is retained).
+ * The record is retired first; the bytes are then deleted and cleanup completion recorded.
+ */
 export async function removeBvDocumentAction(documentId: string): Promise<BvResult> {
   if (!UUID_SHAPE.test(documentId)) return { ok: false, code: "states.genericRetry" };
   const supabase = await getServerSupabase();
   const { data: key, error } = await supabase.rpc("business_verification_document_remove", { p_document_id: documentId });
   if (error) return { ok: false, code: mapBvError(error.message) };
-  // Best-effort byte cleanup after the metadata change committed; the storage policy allows it only
-  // for an unsubmitted document of an organization the caller manages.
-  if (typeof key === "string" && isBvKey(key)) await supabase.storage.from(BV_BUCKET).remove([key]);
+  if (typeof key === "string" && isBvKey(key)) {
+    try { await removeMedia(supabase, "verification", key); }
+    catch { revalidatePath(SHOWROOM_PATH); return { ok: false, code: "businessVerification.errors.upload" }; }
+  }
   revalidatePath(SHOWROOM_PATH);
   return { ok: true };
 }
