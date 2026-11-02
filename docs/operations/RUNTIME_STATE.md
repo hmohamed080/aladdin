@@ -797,3 +797,5 @@ Effective live alias and production target both dpl_6F4cLptBtEtR5LwF7mQAneigsc83
 ## Media R2 Stage 3 integration (PR #134, validation only) — 2026-11-02
 
 Code only; no hosted change. Acceptance still lacks 20261102090001 and 20261103090001/2. Phone authority is R1 + Delivery Worker only; hosted WhatsApp delivery OFF. Media cleanup schedule and the Storage reset executor are disabled by default. Next steps: `docs/operations/r2/stage3-acceptance-readiness.md`.
+
+- **2026-11-02 Acceptance (read-only preflight):** 199 migrations applied, latest `20261030090002`; pending in order `20261102090001`, `20261103090001`, `20261103090002`. Function execute privileges (711 in app/public) equal contract `20261030090002` (md5 1977ba16...). Application Storage buckets hold no objects; no verification documents; 9 R2 locations (3 avatar, 6 portfolio). The locations namespace check still lacks `request`/`verification` until `20261103090002`. R2 buckets: acceptance private/public, acceptance backups, production DB backups; no Production media bucket. Production `R2_STORAGE_ENABLED=false`.

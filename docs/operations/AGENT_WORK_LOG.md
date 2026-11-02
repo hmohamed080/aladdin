@@ -7268,3 +7268,12 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - **RTL E2E root cause.** The workspace menu toggles (`setOpen(v => !v)`); the test's click-until-visible loop clicked before hydration, React replayed the queued click after hydration, so a later retry closed the menu again. Fixed in the test helper (wait for hydration, drive by `aria-expanded`); `workspace-switcher.test.tsx` pins the toggle contract. No UI change. Deduced from code, confirmed only by CI.
 - **Media tooling.** `scripts/media-cleanup-plan.mjs` + `.github/workflows/media-cleanup.yml` (disabled by default); `scripts/media-reset-execute.mjs` (Storage objects only, gated, journaled, submitted verification evidence never selectable). Plan: `docs/operations/r2/stage3-acceptance-readiness.md`.
 - Nothing hosted was touched. Open: final green CI on the last commit, then owner GO per Acceptance step.
+
+## 2026-11-02 - R2 reset safety, protected evidence path, Acceptance preflight (PR #134, validation-only draft)
+
+- Replaced the count-based reset approval with an immutable object-level manifest (`scripts/media-reset-manifest.mjs`): every object's bucket, key, storage id/eTag/size/updated_at, row state, reference and retention decision, hashed whole; written once at 0400; recomputed on load; stale if any entry changed.
+- Rewrote `scripts/media-reset-execute.mjs` (disabled by default): live-manifest staleness gate, hash-chained journal bound to project and manifest, per-batch revalidation by the database under row locks, success only if `media_reset_verify` is ok. 16 tests.
+- Held SQL `supabase/activation/legacy-media-reset.sql` (+rollback, +CI proof, mutation-checked on a local Postgres 16 stub) reconciles pointers (avatar, cover, logo, portfolio project cover), tombstones rows, drops stale locations; submitted verification evidence, row-less verification objects and R2 keys are refused in the database.
+- Prepared, NOT executed: `bv-evidence-r2-adoption.sql` + `scripts/bv-evidence-migrate.mjs` (adds a sha256-verified private R2 copy of submitted evidence; keeps the Supabase copy and the immutable row).
+- Read-only Acceptance preflight done (history guard, function-privilege hash vs contract 20261030090002, R2 bucket list). No hosted write of any kind.
+- Unfinished: no hosted-write browser E2E spec exists for the seven upload flows; Acceptance GO pending.
