@@ -32,7 +32,7 @@ must(config.vars?.OTP_ENVIRONMENT === "acceptance" && config.vars?.OTP_RECIPIENT
 must(!("OTP_ALLOWED_RECIPIENTS" in (config.vars ?? {})) && !JSON.stringify(config.vars ?? {}).includes("+20"), "the recipient allowlist (phone numbers) must be set in the Worker dashboard, never in the repository");
 must(!("WHATSAPP_GRAPH_BASE_URL" in (config.vars ?? {})), "the Graph URL override is for local rigs only");
 must(!config.secrets?.required?.length, "do not require an unprovisioned per-Worker signing secret");
-must(config.vars?.WHATSAPP_PHONE_NUMBER_ID === "1415528588305492", "unexpected WhatsApp sender");
+must(config.vars?.WHATSAPP_PHONE_NUMBER_ID === "1458603463983505", "unexpected WhatsApp sender");
 must(config.vars?.WHATSAPP_OTP_TEMPLATE === "aladdin_otp" && config.vars?.WHATSAPP_OTP_LANGUAGES === "ar", "unapproved template");
 must(!JSON.stringify(config.vars ?? {}).includes("whsec_") && !JSON.stringify(config.vars ?? {}).includes("Bearer "), "credentials must not be in plaintext vars");
 if (errors.length) {
