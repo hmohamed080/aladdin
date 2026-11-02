@@ -40,6 +40,7 @@ const env = () => ({
   OTP_ENVIRONMENT: "local",
   OTP_RECIPIENT_MODE: "allowlist",
   OTP_ALLOWED_RECIPIENTS: [...allowed].join(","),
+  OTP_DAILY_SEND_LIMIT: "100", // the global rolling-24h budget is required (no budget, no sends)
   WHATSAPP_GRAPH_BASE_URL: `http://127.0.0.1:${PORT}`,
   IDEMPOTENCY_DB: d1,
 });

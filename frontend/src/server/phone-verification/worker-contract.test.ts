@@ -48,6 +48,7 @@ function rig(over: Partial<Env> = {}) {
     OTP_ENVIRONMENT: "acceptance",
     OTP_RECIPIENT_MODE: "allowlist",
     OTP_ALLOWED_RECIPIENTS: PHONE,
+    OTP_DAILY_SEND_LIMIT: "100", // the global rolling-24h budget is required (no budget, no sends)
     IDEMPOTENCY_DB: memoryDb(),
     ...over,
   };
