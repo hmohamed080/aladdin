@@ -169,8 +169,8 @@ jobs:
         with:
           go-version: "1.23"
           cache: false
-      - name: actionlint (backup workflows)
-        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -color ops/backups/workflows/*.yml
+      - name: actionlint (backup and media-cleanup workflows)
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -color ops/backups/workflows/*.yml .github/workflows/media-cleanup.yml
       - name: shellcheck (backup scripts)
         run: shellcheck -S warning ops/backups/*.sh
       - name: Schedule, Production gate and target checks (offline)

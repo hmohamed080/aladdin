@@ -97,7 +97,7 @@ export function resetScope(inventory) {
   return scope;
 }
 
-function supabaseIo(supabase) {
+export function createReadOnlyInventoryIo(supabase) {
   const apply = (query, filters) => {
     if (filters.state) query = query.eq("state", filters.state);
     if (filters.otherStates) query = query.not("state", "in", `(${filters.otherStates.join(",")})`);
@@ -144,8 +144,8 @@ export async function main(argv = process.argv.slice(2)) {
   if (project !== configured) throw new ResetOperatorError("Requested project does not match the configured environment");
   const require = createRequire(new URL("../frontend/package.json", import.meta.url));
   const supabase = require("@supabase/supabase-js").createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  if (command === "snapshot") { console.log(JSON.stringify({ project: configured, readOnly: true, ...(await storageSnapshot(supabaseIo(supabase))) })); return; }
-  const inventory = await buildInventory(supabaseIo(supabase));
+  if (command === "snapshot") { console.log(JSON.stringify({ project: configured, readOnly: true, ...(await storageSnapshot(createReadOnlyInventoryIo(supabase))) })); return; }
+  const inventory = await buildInventory(createReadOnlyInventoryIo(supabase));
   console.log(JSON.stringify({ project: configured, readOnly: true, ...inventory, scope: resetScope(inventory) }, null, rest.includes("--json") ? 0 : 2));
 }
 
