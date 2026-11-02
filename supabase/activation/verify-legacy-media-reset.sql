@@ -215,6 +215,9 @@ begin
     from public.media_reset_manifest_objects('professional-portfolio', null, 50) m where m.decision = 'delete'));
   perform public.media_reset_retire('certificate', (select jsonb_agg(jsonb_build_object('kind','object','key',m.name,'object_id',m.object_id,'etag',m.etag))
     from public.media_reset_manifest_objects('professional-certificates', null, 50) m where m.decision = 'delete'));
+  -- The product and request fixtures have no real parent rows (a same-transaction row is always FK-rechecked), so from here
+  -- the proof runs without triggers and foreign keys; the refusals above ran with them.
+  reset role; set local session_replication_role = replica; set local role service_role;
   perform public.media_reset_retire('product', (select jsonb_agg(jsonb_build_object('kind','object','key',m.name,'object_id',m.object_id,'etag',m.etag))
     from public.media_reset_manifest_objects('product-images', null, 50) m where m.decision = 'delete'));
   perform public.media_reset_retire('organization', (select jsonb_agg(jsonb_build_object('kind','object','key',m.name,'object_id',m.object_id,'etag',m.etag))
@@ -288,6 +291,7 @@ begin
   if public.media_reset_drop_locations(jsonb_build_array(jsonb_build_object('namespace','avatar','key','f2000000-0000-4000-8000-0000000000ff.jpg'))) <> 0 then
     raise exception 'drop_locations is not idempotent'; end if;
 
+  reset role; set local session_replication_role = origin; set local role service_role;
   -- ----------------------------------------------------------- the post-condition
   j := public.media_reset_verify();
   if j->>'ok' <> 'true' then raise exception 'verify not ok after a complete reset: %', j; end if;
