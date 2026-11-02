@@ -43,8 +43,8 @@ begin
   delete from public.portfolio_items; delete from public.professional_certificates; delete from public.product_images;
   delete from public.purchase_request_images; delete from public.organization_images;
   delete from public.business_verification_documents; delete from public.avatar_uploads;
-  delete from storage.objects where bucket_id in ('avatars','professional-portfolio','professional-certificates','product-images',
-    'organization-images','purchase-request-images','business-verification-documents');
+  set local session_replication_role = replica; delete from storage.objects where bucket_id in ('avatars','professional-portfolio','professional-certificates','product-images',
+    'organization-images','purchase-request-images','business-verification-documents'); set local session_replication_role = origin;
 
   -- ----------------------------------------------------------- fixtures
   insert into public.avatar_uploads(id, owner_user_id, object_key, content_type, state) values
@@ -199,7 +199,7 @@ begin
   -- A replaced object (same name, new identity) is refused even though counts are unchanged.
   reset role;
   select id into oid from storage.objects where name = k_av2;
-  delete from storage.objects where name = k_av2;
+  set local session_replication_role = replica; delete from storage.objects where name = k_av2; set local session_replication_role = origin;
   insert into storage.objects(bucket_id, name, metadata) values ('avatars', k_av2, '{"size": 12, "eTag": "e-av2"}');
   set local role service_role;
   b := false;
@@ -253,8 +253,8 @@ begin
   if public.media_reset_verify()->>'ok' = 'true' then raise exception 'verify says ok before storage removal'; end if;
 
   reset role;
-  delete from storage.objects o using public.media_reset_journal j
-   where j.kind = 'object' and o.bucket_id = j.bucket and o.name = j.object_key;
+  set local session_replication_role = replica; delete from storage.objects o using public.media_reset_journal j
+   where j.kind = 'object' and o.bucket_id = j.bucket and o.name = j.object_key; set local session_replication_role = origin;
   set local role service_role;
   for k in select object_key from public.media_reset_journal where kind = 'object' loop
     if not public.media_reset_storage_removed((select namespace from public.media_reset_journal where object_key = k), k) then

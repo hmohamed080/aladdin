@@ -13,7 +13,7 @@ declare
 begin
   delete from public.media_storage_locations;
   delete from public.business_verification_documents;
-  delete from storage.objects where bucket_id = 'business-verification-documents';
+  set local session_replication_role = replica; delete from storage.objects where bucket_id = 'business-verification-documents'; set local session_replication_role = origin;
   set local session_replication_role = replica;
   insert into public.business_verification_documents(id, organization_id, submission_id, doc_type, object_key, content_type, size_bytes, file_name, state, created_by) values
     (d1, org, sub, 'tax_card', k1, 'application/pdf', 100, 'a.pdf', 'ready', ua), (d2, org, sub, 'commercial_register', k2, 'application/pdf', 200, 'b.pdf', 'ready', ua),
@@ -72,7 +72,7 @@ begin
   if not public.bv_evidence_unadopt(k1, sha1) then raise exception 'unadopt failed'; end if;
   if (public.bv_evidence_adoption_verify())->>'ok' = 'true' then raise exception 'verify ok after unadopt'; end if;
   reset role;
-  delete from storage.objects where bucket_id = 'business-verification-documents' and name = k2;
+  set local session_replication_role = replica; delete from storage.objects where bucket_id = 'business-verification-documents' and name = k2; set local session_replication_role = origin;
   set local role service_role;
   begin perform public.bv_evidence_unadopt(k2, sha2); raise exception 'unadopted evidence that has no Supabase copy';
   exception when sqlstate '42501' then null; end;
