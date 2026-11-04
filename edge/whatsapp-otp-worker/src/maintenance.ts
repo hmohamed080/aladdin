@@ -8,7 +8,7 @@
  */
 import type { Db } from "./db.ts";
 import { DAY_SECONDS, HOUR_SECONDS, LEVEL_NAMES, budgetLevel, readSettings, windowCounts } from "./settings.ts";
-import { signPayload } from "./signing.ts";
+import { type NotifyTransportEnv, accessHeaders, postSignedNotify } from "./notify-transport.ts";
 
 /** Percentage points a metric must fall below a threshold before its alert re-arms, so a rolling window hovering at a threshold cannot flap. */
 export const HYSTERESIS_POINTS = 5;
@@ -86,7 +86,7 @@ export async function evaluateAlerts(db: Db, nowSeconds: number): Promise<{ rais
   return { raised };
 }
 
-export type NotifyEnv = {
+export type NotifyEnv = NotifyTransportEnv & {
   OTP_NOTIFY_URL?: string;
   OTP_NOTIFY_SIGNING_SECRET?: { get(): Promise<string> };
   OTP_ENVIRONMENT?: string;
@@ -102,6 +102,8 @@ export async function deliverOutbox(env: NotifyEnv, db: Db, fetcher: typeof fetc
   let secret: string;
   try { secret = await env.OTP_NOTIFY_SIGNING_SECRET.get(); } catch { return { delivered: 0, failed: 0, skipped: "notify_secret_unreadable" }; }
   if (!secret) return { delivered: 0, failed: 0, skipped: "notify_unconfigured" };
+  // A half-configured or malformed Access token sends nothing and burns no retry attempt: the events wait in the outbox for the fix.
+  if (!(await accessHeaders(env)).ok) return { delivered: 0, failed: 0, skipped: "notify_access_credentials_invalid" };
 
   const due = await db
     .prepare("SELECT event_key, kind, payload, created_at, attempts FROM otp_notification_outbox WHERE delivered_at IS NULL AND next_attempt_at <= ?1 AND attempts < ?2 AND created_at >= ?3 ORDER BY created_at LIMIT 10")
@@ -114,15 +116,9 @@ export async function deliverOutbox(env: NotifyEnv, db: Db, fetcher: typeof fetc
     try {
       const body = JSON.stringify({ event_key: row.event_key, kind: row.kind, source_env: env.OTP_ENVIRONMENT ?? "unknown", occurred_at: row.created_at, stats: JSON.parse(row.payload) });
       const id = `ntf_${row.event_key.replace(/[^A-Za-z0-9_:-]/g, "")}`;
-      const stamp = nowSeconds;
-      const sig = await signPayload(secret, id, stamp, body);
-      if (!sig) throw new Error("unusable secret");
-      const res = await fetcher(url.toString(), {
-        method: "POST",
-        headers: { "content-type": "application/json", "webhook-id": id, "webhook-timestamp": String(stamp), "webhook-signature": sig },
-        body,
-        signal: AbortSignal.timeout(8000),
-      });
+      const sent = await postSignedNotify(env, url.toString(), secret, id, nowSeconds, body, fetcher);
+      if (!sent.sent) throw new Error("notify credentials unusable");
+      const res = sent.response;
       status = res.status;
       await res.body?.cancel().catch(() => undefined);
       if (res.ok) {

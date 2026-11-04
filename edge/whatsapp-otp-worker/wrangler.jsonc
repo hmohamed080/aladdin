@@ -24,6 +24,8 @@
     { "binding": "OTP_ADMIN_SIGNING_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_ADMIN_SIGNING_SECRET" },
     { "binding": "OTP_NOTIFY_SIGNING_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_NOTIFY_SIGNING_SECRET" },
     { "binding": "OTP_ADMIN_GRANT_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_ADMIN_GRANT_SECRET" },
+    { "binding": "OTP_NOTIFY_ACCESS_CLIENT_ID", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_NOTIFY_ACCESS_CLIENT_ID" },
+    { "binding": "OTP_NOTIFY_ACCESS_CLIENT_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_NOTIFY_ACCESS_CLIENT_SECRET" },
     {
       "binding": "WHATSAPP_ACCESS_TOKEN",
       "store_id": "acfaa67f391e499db6fde398022f50ce",

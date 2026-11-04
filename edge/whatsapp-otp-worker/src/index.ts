@@ -67,6 +67,12 @@ export interface Env {
   OTP_NOTIFY_SIGNING_SECRET?: { get(): Promise<string> };
   /** Third admin secret: verifies the database-issued grant that authorizes a settings change. The app server does not hold it. */
   OTP_ADMIN_GRANT_SECRET?: { get(): Promise<string> };
+  /**
+   * Cloudflare Access service token (Client ID + Client Secret) for the app's alert endpoint, two Secrets Store bindings of this Worker only.
+   * Additional to, never instead of, the HMAC signature the app verifies. Both or neither: a half-configured pair sends nothing.
+   */
+  OTP_NOTIFY_ACCESS_CLIENT_ID?: { get(): Promise<string> };
+  OTP_NOTIFY_ACCESS_CLIENT_SECRET?: { get(): Promise<string> };
   /** https URL of the app's notification endpoint (this Worker holds no database credential; it only posts signed statistics there). */
   OTP_NOTIFY_URL?: string;
   /** Exact E.164 numbers, comma separated. Set in the Worker dashboard, never in the repository. */

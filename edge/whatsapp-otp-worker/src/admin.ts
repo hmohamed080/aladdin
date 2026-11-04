@@ -11,7 +11,8 @@
 import type { Db } from "./db.ts";
 import type { Env } from "./index.ts";
 import { type ApplyFailure, type OtpSettings, applySettings, parseSettingsRequest, usageReport } from "./settings.ts";
-import { grantCanonical, sha256Hex, signPayload, verifyGrant, verifySignature } from "./signing.ts";
+import { isAccessRedirect, postSignedNotify } from "./notify-transport.ts";
+import { grantCanonical, sha256Hex, verifyGrant, verifySignature } from "./signing.ts";
 
 export const ADMIN_USAGE_PATH = "/v1/admin/usage";
 export const ADMIN_SETTINGS_PATH = "/v1/admin/settings";
@@ -58,18 +59,12 @@ export async function probeNotifyPath(env: Env, nowSeconds: number, fetcher: typ
   let secret = "";
   try { secret = await env.OTP_NOTIFY_SIGNING_SECRET.get(); } catch { return { result: "not_configured" }; }
   const body = JSON.stringify({ probe: true });
-  const id = "ntf_probe";
-  const signature = secret ? await signPayload(secret, id, nowSeconds, body) : null;
-  if (!signature) return { result: "not_configured" };
   try {
-    const res = await fetcher(url, {
-      method: "POST",
-      headers: { "content-type": "application/json", "webhook-id": id, "webhook-timestamp": String(nowSeconds), "webhook-signature": signature },
-      body,
-      redirect: "manual",
-      signal: AbortSignal.timeout(8000),
-    });
-    const challenged = res.headers.get("cf-mitigated") === "challenge";
+    // The same transport (Access service token, signature, no redirect following) as the real alert delivery.
+    const sent = await postSignedNotify(env, url, secret, "ntf_probe", nowSeconds, body, fetcher);
+    if (!sent.sent) return { result: "not_configured" };
+    const res = sent.response;
+    const challenged = res.headers.get("cf-mitigated") === "challenge" || isAccessRedirect(res);
     await res.body?.cancel().catch(() => undefined);
     const status = res.status;
     if (challenged) return { result: "blocked_by_cloudflare", status };

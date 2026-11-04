@@ -83,3 +83,13 @@ test("the Acceptance Worker is private (no workers.dev address, preview URLs or 
   assertBlocked("grant key reuses the admin secret", (c) => { c.secrets_store_secrets.find((s: any) => s.binding === "OTP_ADMIN_GRANT_SECRET").secret_name = "OTP_ADMIN_SIGNING_SECRET"; });
   assertBlocked("production grant key in Acceptance", (c) => { c.secrets_store_secrets.find((s: any) => s.binding === "OTP_ADMIN_GRANT_SECRET").secret_name = "OTP_ADMIN_GRANT_SECRET_PRODUCTION"; });
 });
+
+test("preview config requires the dedicated Access service-token pair and refuses sharing it with another secret", () => {
+  assertBlocked("missing Access id", o => { o.secrets_store_secrets = o.secrets_store_secrets.filter((s: any) => s.binding !== "OTP_NOTIFY_ACCESS_CLIENT_ID"); });
+  assertBlocked("missing Access secret", o => { o.secrets_store_secrets = o.secrets_store_secrets.filter((s: any) => s.binding !== "OTP_NOTIFY_ACCESS_CLIENT_SECRET"); });
+  assertBlocked("Access secret reuses the notify signing secret", o => { o.secrets_store_secrets.find((s: any) => s.binding === "OTP_NOTIFY_ACCESS_CLIENT_SECRET").secret_name = "OTP_NOTIFY_SIGNING_SECRET"; });
+});
+test("the Access service token never appears in plaintext vars", () => {
+  const text = JSON.stringify(baseline.vars);
+  assert.ok(!/cf-access|access_client|\.access"/i.test(text));
+});
