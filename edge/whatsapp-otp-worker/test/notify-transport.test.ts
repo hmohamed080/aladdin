@@ -171,3 +171,40 @@ describe("real alert delivery uses the SAME authenticated transport", () => {
     });
   });
 });
+
+describe("Acceptance-only probe diagnostics (who answered, never what was said)", () => {
+  const acc = (over: Record<string, unknown> = {}) => probeEnv({ ...ACCESS, OTP_ENVIRONMENT: "acceptance", ...over });
+  const run = async (res: () => Response, env = acc()) => {
+    const lines: string[] = [];
+    const out = await probeNotifyPath(env, now(), recorder(res).fetcher, (l) => lines.push(l));
+    return { out, lines };
+  };
+  test("Cloudflare error 1042 is identified from the error page and reported as cloudflare_routing", async () => {
+    const { out, lines } = await run(() => new Response("error code: 1042", { status: 404, headers: { "cf-ray": "9a1b2c3d4e5f6a7b-CDG" } }));
+    assert.deepEqual(out, { result: "unexpected", status: 404 });
+    assert.deepEqual(JSON.parse(lines[0]!), { event: "notify_probe_diag", status: 404, origin: "cloudflare_routing", cf_error_code: "1042", cf_ray: "9a1b2c3d4e5f6a7b-CDG" });
+  });
+  test("an Access HTML denial is edge_or_access_denial; the app's empty no-store answer is app", async () => {
+    const a = await run(() => new Response("<html>Forbidden</html>", { status: 403 }));
+    assert.equal(JSON.parse(a.lines[0]!).origin, "edge_or_access_denial");
+    const b = await run(() => new Response(null, { status: 400, headers: { "cache-control": "no-store" } }));
+    assert.deepEqual(JSON.parse(b.lines[0]!), { event: "notify_probe_diag", status: 400, origin: "app" });
+  });
+  test("an Access login redirect logs only the target HOST, never the URL or its token", async () => {
+    const { lines } = await run(() => new Response(null, { status: 302, headers: { location: ACCESS_LOGIN + "&meta=SECRETTOKEN" } }));
+    assert.deepEqual(JSON.parse(lines[0]!), { event: "notify_probe_diag", status: 302, origin: "access_login_redirect", location_host: "team-name.cloudflareaccess.com" });
+    assert.ok(!lines[0]!.includes("SECRETTOKEN"));
+  });
+  test("a thrown fetch logs only the error class; nothing is logged outside Acceptance", async () => {
+    const lines: string[] = [];
+    const boom = (async () => { throw new TypeError("boom " + CLIENT_SECRET); }) as unknown as typeof fetch;
+    assert.deepEqual(await probeNotifyPath(acc(), now(), boom, (l) => lines.push(l)), { result: "unreachable" });
+    assert.deepEqual(JSON.parse(lines[0]!), { event: "notify_probe_diag", origin: "fetch_threw", error_name: "TypeError" });
+    const other = await run(() => new Response(null, { status: 400 }), probeEnv({ ...ACCESS, OTP_ENVIRONMENT: "production" }));
+    assert.deepEqual(other.lines, []);
+  });
+  test("no log line ever contains the Access credentials, the signature or the request body", async () => {
+    const { lines } = await run(() => new Response("error code: 1042", { status: 404 }));
+    for (const l of lines) for (const bad of [CLIENT_ID, CLIENT_SECRET, NOTIFY_SECRET, "webhook-signature", "{\"probe\":true}"]) assert.ok(!l.includes(bad), bad);
+  });
+});

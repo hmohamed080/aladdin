@@ -11,6 +11,7 @@
 import type { Db } from "./db.ts";
 import type { Env } from "./index.ts";
 import { type ApplyFailure, type OtpSettings, applySettings, parseSettingsRequest, usageReport } from "./settings.ts";
+import { describeNotifyAnswer } from "./notify-diagnostics.ts";
 import { isAccessRedirect, postSignedNotify } from "./notify-transport.ts";
 import { grantCanonical, sha256Hex, verifyGrant, verifySignature } from "./signing.ts";
 
@@ -53,7 +54,7 @@ export type NotifyProbe = { result: "reachable" | "secret_mismatch" | "blocked_b
  * answer. A healthy path answers 400 (signature accepted, schema refused, nothing recorded and nobody notified). Nothing about the response body
  * is read. The URL is a pinned https variable of this Worker, never request input.
  */
-export async function probeNotifyPath(env: Env, nowSeconds: number, fetcher: typeof fetch = fetch): Promise<NotifyProbe> {
+export async function probeNotifyPath(env: Env, nowSeconds: number, fetcher: typeof fetch = fetch, log: (line: string) => void = console.log): Promise<NotifyProbe> {
   const url = env.OTP_NOTIFY_URL;
   if (!url || !env.OTP_NOTIFY_SIGNING_SECRET?.get) return { result: "not_configured" };
   let secret = "";
@@ -65,15 +66,22 @@ export async function probeNotifyPath(env: Env, nowSeconds: number, fetcher: typ
     if (!sent.sent) return { result: "not_configured" };
     const res = sent.response;
     const challenged = res.headers.get("cf-mitigated") === "challenge" || isAccessRedirect(res);
-    await res.body?.cancel().catch(() => undefined);
     const status = res.status;
+    // Acceptance only: one structured line (status + who answered). Never any secret, header value, signature or body.
+    if (env.OTP_ENVIRONMENT === "acceptance") {
+      try { log(JSON.stringify(await describeNotifyAnswer(res, isAccessRedirect(res)))); } catch { /* diagnostics never affect the probe */ }
+    }
+    await res.body?.cancel().catch(() => undefined);
     if (challenged) return { result: "blocked_by_cloudflare", status };
     if (status === 400) return { result: "reachable", status };
     if (status === 401) return { result: "secret_mismatch", status };
     if (status === 403) return { result: "refused", status };
     if (status === 503) return { result: "app_unconfigured", status };
     return { result: "unexpected", status };
-  } catch {
+  } catch (e) {
+    if (env.OTP_ENVIRONMENT === "acceptance") {
+      try { log(JSON.stringify({ event: "notify_probe_diag", origin: "fetch_threw", error_name: e instanceof Error ? e.name : "unknown" })); } catch { /* ignore */ }
+    }
     return { result: "unreachable" };
   }
 }
