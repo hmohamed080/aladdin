@@ -8,7 +8,7 @@
  */
 import type { Db } from "./db.ts";
 import { DAY_SECONDS, HOUR_SECONDS, LEVEL_NAMES, budgetLevel, readSettings, windowCounts } from "./settings.ts";
-import { type NotifyTransportEnv, accessHeaders, postSignedNotify } from "./notify-transport.ts";
+import { type NotifyTransportEnv, notifyTransportAvailable, postSignedNotify } from "./notify-transport.ts";
 
 /** Percentage points a metric must fall below a threshold before its alert re-arms, so a rolling window hovering at a threshold cannot flap. */
 export const HYSTERESIS_POINTS = 5;
@@ -102,8 +102,8 @@ export async function deliverOutbox(env: NotifyEnv, db: Db, fetcher: typeof fetc
   let secret: string;
   try { secret = await env.OTP_NOTIFY_SIGNING_SECRET.get(); } catch { return { delivered: 0, failed: 0, skipped: "notify_secret_unreadable" }; }
   if (!secret) return { delivered: 0, failed: 0, skipped: "notify_unconfigured" };
-  // A half-configured or malformed Access token sends nothing and burns no retry attempt: the events wait in the outbox for the fix.
-  if (!(await accessHeaders(env)).ok) return { delivered: 0, failed: 0, skipped: "notify_access_credentials_invalid" };
+  // No private transport (the APP_NOTIFY Service Binding) sends nothing and burns no retry attempt: the events wait in the outbox for the fix. Never a public fallback.
+  if (!notifyTransportAvailable(env)) return { delivered: 0, failed: 0, skipped: "notify_transport_unavailable" };
 
   const due = await db
     .prepare("SELECT event_key, kind, payload, created_at, attempts FROM otp_notification_outbox WHERE delivered_at IS NULL AND next_attempt_at <= ?1 AND attempts < ?2 AND created_at >= ?3 ORDER BY created_at LIMIT 10")
@@ -117,7 +117,7 @@ export async function deliverOutbox(env: NotifyEnv, db: Db, fetcher: typeof fetc
       const body = JSON.stringify({ event_key: row.event_key, kind: row.kind, source_env: env.OTP_ENVIRONMENT ?? "unknown", occurred_at: row.created_at, stats: JSON.parse(row.payload) });
       const id = `ntf_${row.event_key.replace(/[^A-Za-z0-9_:-]/g, "")}`;
       const sent = await postSignedNotify(env, url.toString(), secret, id, nowSeconds, body, fetcher);
-      if (!sent.sent) throw new Error("notify credentials unusable");
+      if (!sent.sent) throw new Error("notify transport unusable");
       const res = sent.response;
       status = res.status;
       await res.body?.cancel().catch(() => undefined);

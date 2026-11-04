@@ -414,7 +414,7 @@ describe("notify-check: the Worker proves the app's alert endpoint is reachable 
       const stamp = String(Math.floor(Date.now() / 1000));
       const { sign } = await import("./support.ts");
       const headers = { "content-type": "application/json", "webhook-id": id, "webhook-timestamp": stamp, "webhook-signature": await sign(id, stamp, raw, ADMIN_BYTES) };
-      const res = await handleRequest(new Request("https://worker.test" + NOTIFY_CHECK, { method: "POST", headers, body: raw }), envFor(d1, envOver), fetcher);
+      const res = await handleRequest(new Request("https://worker.test" + NOTIFY_CHECK, { method: "POST", headers, body: raw }), envFor(d1, { APP_NOTIFY: { fetch: fetcher }, ...envOver } as any), fetcher);
       status = res.status;
       result = await json(res);
     });

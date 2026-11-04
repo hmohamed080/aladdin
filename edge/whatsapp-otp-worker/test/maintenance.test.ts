@@ -138,7 +138,7 @@ describe("alert delivery to the app: signed, idempotent, retried, never touching
       await evaluateAlerts(db, now());
       const { calls, mk } = capture();
       const env = envFor(d1);
-      assert.deepEqual(await deliverOutbox(env, db, mk(200), now()), { delivered: 1, failed: 0 });
+      assert.deepEqual(await deliverOutbox({ ...env, APP_NOTIFY: { fetch: mk(200) } } as any, db, mk(200), now()), { delivered: 1, failed: 0 });
       assert.equal(calls.length, 1);
       const c = calls[0]!;
       assert.equal(c.url, NOTIFY_URL);
@@ -149,7 +149,7 @@ describe("alert delivery to the app: signed, idempotent, retried, never touching
       assert.equal(body.kind, "budget_warning"); assert.equal(body.source_env, "acceptance");
       assert.equal(c.headers.get("webhook-id"), "ntf_budget_warning:1");
       assert.equal((await outbox(db))[0]!.delivered_at !== null, true);
-      assert.deepEqual(await deliverOutbox(env, db, mk(200), now()), { delivered: 0, failed: 0 });
+      assert.deepEqual(await deliverOutbox({ ...env, APP_NOTIFY: { fetch: mk(200) } } as any, db, mk(200), now()), { delivered: 0, failed: 0 });
       assert.equal(calls.length, 1, "delivered events are never resent");
     });
   });
@@ -161,16 +161,16 @@ describe("alert delivery to the app: signed, idempotent, retried, never touching
       await evaluateAlerts(db, now());
       const { calls, mk } = capture();
       const env = envFor(d1); const t = now();
-      assert.deepEqual(await deliverOutbox(env, db, mk(500), t), { delivered: 0, failed: 1 });
+      assert.deepEqual(await deliverOutbox({ ...env, APP_NOTIFY: { fetch: mk(500) } } as any, db, mk(500), t), { delivered: 0, failed: 1 });
       let row = (await outbox(db))[0]!;
       assert.equal(row.delivered_at, null); assert.equal(row.attempts, 1); assert.equal(row.last_status, 500); assert.ok(row.next_attempt_at >= t + 60);
-      assert.deepEqual(await deliverOutbox(env, db, mk(200), t + 5), { delivered: 0, failed: 0 }, "not due yet: no hammering");
+      assert.deepEqual(await deliverOutbox({ ...env, APP_NOTIFY: { fetch: mk(200) } } as any, db, mk(200), t + 5), { delivered: 0, failed: 0 }, "not due yet: no hammering");
       assert.equal(calls.length, 1);
-      assert.deepEqual(await deliverOutbox(env, db, mk("throw"), t + 4000), { delivered: 0, failed: 1 }, "a network error is just another failed attempt");
+      assert.deepEqual(await deliverOutbox({ ...env, APP_NOTIFY: { fetch: mk("throw") } } as any, db, mk("throw"), t + 4000), { delivered: 0, failed: 1 }, "a network error is just another failed attempt");
       row = (await outbox(db))[0]!;
       assert.equal(row.attempts, 2); assert.equal(row.last_status, 0);
       assert.ok(row.next_attempt_at - (t + 4000) >= 120, "the backoff doubles");
-      assert.deepEqual(await deliverOutbox(env, db, mk(200), t + 9000), { delivered: 1, failed: 0 });
+      assert.deepEqual(await deliverOutbox({ ...env, APP_NOTIFY: { fetch: mk(200) } } as any, db, mk(200), t + 9000), { delivered: 1, failed: 0 });
       assert.equal((await outbox(db))[0]!.delivered_at !== null, true);
     });
   });
@@ -183,7 +183,7 @@ describe("alert delivery to the app: signed, idempotent, retried, never touching
       const { calls, mk } = capture();
       for (const over of [{ OTP_NOTIFY_URL: undefined }, { OTP_NOTIFY_SIGNING_SECRET: undefined }, { OTP_NOTIFY_URL: "http://app.example/api/internal/whatsapp-otp/notify" }, { OTP_NOTIFY_URL: "not a url" },
         { OTP_NOTIFY_SIGNING_SECRET: { get: async () => { throw new Error("down"); } } }, { OTP_NOTIFY_SIGNING_SECRET: { get: async () => "" } }, { OTP_NOTIFY_SIGNING_SECRET: { get: async () => "whsec_short" } }]) {
-        const r = await deliverOutbox(envFor(d1, over as any), db, mk(200), now());
+        const r = await deliverOutbox({ ...envFor(d1, over as any), APP_NOTIFY: { fetch: mk(200) } } as any, db, mk(200), now());
         assert.equal(r.delivered, 0, JSON.stringify(Object.keys(over)));
       }
       assert.equal(calls.length, 0);
@@ -199,7 +199,7 @@ describe("alert delivery to the app: signed, idempotent, retried, never touching
       await seedJournal(d1, 150, "accepted", now() - 10);
       await evaluateAlerts(db, now());
       const { mk } = capture();
-      const summary = await runMaintenance(env, purge, mk("throw"));
+      const summary = await runMaintenance({ ...env, APP_NOTIFY: { fetch: mk("throw") } } as any, purge, mk("throw"));
       assert.equal(summary.failed, 1); assert.deepEqual(summary.errors, []);
       for (let n = 1; n <= 3; n++) {
         const res = await handleRequest(await signedSend(goodBody({ delivery_id: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}` })), env, meta.fetcher);
@@ -208,7 +208,7 @@ describe("alert delivery to the app: signed, idempotent, retried, never touching
       assert.equal(meta.calls.length, 3);
       // even a database that cannot answer maintenance cannot throw out of it
       const broken = envFor({ prepare() { throw new Error("d1 down"); }, batch() { throw new Error("d1 down"); } });
-      const s2 = await runMaintenance(broken, purge, mk("throw"));
+      const s2 = await runMaintenance({ ...broken, APP_NOTIFY: { fetch: mk("throw") } } as any, purge, mk("throw"));
       assert.ok(s2.errors.length >= 1);
     });
   });

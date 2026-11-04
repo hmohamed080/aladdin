@@ -61,14 +61,14 @@ export async function probeNotifyPath(env: Env, nowSeconds: number, fetcher: typ
   try { secret = await env.OTP_NOTIFY_SIGNING_SECRET.get(); } catch { return { result: "not_configured" }; }
   const body = JSON.stringify({ probe: true });
   try {
-    // The same transport (Access service token, signature, no redirect following) as the real alert delivery.
+    // The same private transport (Service Binding, signature, no redirect following) as the real alert delivery. No binding: nothing is sent.
     const sent = await postSignedNotify(env, url, secret, "ntf_probe", nowSeconds, body, fetcher);
     if (!sent.sent) return { result: "not_configured" };
     const res = sent.response;
     const challenged = res.headers.get("cf-mitigated") === "challenge" || isAccessRedirect(res);
     const status = res.status;
-    // Acceptance only: one structured line (status + who answered). Never any secret, header value, signature or body.
-    if (env.OTP_ENVIRONMENT === "acceptance") {
+    // Acceptance only, and only for an answer that is NOT the healthy 400: one structured line (status + who answered). Never any secret, header value, signature or body.
+    if (env.OTP_ENVIRONMENT === "acceptance" && status !== 400) {
       try { log(JSON.stringify(await describeNotifyAnswer(res, isAccessRedirect(res)))); } catch { /* diagnostics never affect the probe */ }
     }
     await res.body?.cancel().catch(() => undefined);

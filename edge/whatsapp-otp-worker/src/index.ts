@@ -68,11 +68,11 @@ export interface Env {
   /** Third admin secret: verifies the database-issued grant that authorizes a settings change. The app server does not hold it. */
   OTP_ADMIN_GRANT_SECRET?: { get(): Promise<string> };
   /**
-   * Cloudflare Access service token (Client ID + Client Secret) for the app's alert endpoint, two Secrets Store bindings of this Worker only.
-   * Additional to, never instead of, the HMAC signature the app verifies. Both or neither: a half-configured pair sends nothing.
+   * Private Service Binding to the app's own Worker: the ONLY route for the alert callback (probe and real alerts). A same-account workers.dev
+   * Worker cannot be reached with global fetch (Cloudflare 1042) and the public hostname is behind Access, which a binding does not traverse.
+   * Missing binding = nothing is sent (fail closed); there is no public fallback.
    */
-  OTP_NOTIFY_ACCESS_CLIENT_ID?: { get(): Promise<string> };
-  OTP_NOTIFY_ACCESS_CLIENT_SECRET?: { get(): Promise<string> };
+  APP_NOTIFY?: { fetch(input: string, init?: RequestInit): Promise<Response> };
   /** https URL of the app's notification endpoint (this Worker holds no database credential; it only posts signed statistics there). */
   OTP_NOTIFY_URL?: string;
   /** Exact E.164 numbers, comma separated. Set in the Worker dashboard, never in the repository. */

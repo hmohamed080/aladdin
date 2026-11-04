@@ -1,6 +1,6 @@
 # WhatsApp OTP: Cloudflare Access service authentication for the alert callback (Acceptance)
 
-Status: PREPARED, not deployed. No Access application, policy, token or secret has been created. Acceptance only; Production is untouched.
+Status: SUPERSEDED by WHATSAPP_OTP_NOTIFY_SERVICE_BINDING.md (Cloudflare error 1042 made a Worker-to-workers.dev Access call impossible). Kept for history; do not follow.
 
 ## Why
 

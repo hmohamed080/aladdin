@@ -84,12 +84,19 @@ test("the Acceptance Worker is private (no workers.dev address, preview URLs or 
   assertBlocked("production grant key in Acceptance", (c) => { c.secrets_store_secrets.find((s: any) => s.binding === "OTP_ADMIN_GRANT_SECRET").secret_name = "OTP_ADMIN_GRANT_SECRET_PRODUCTION"; });
 });
 
-test("preview config requires the dedicated Access service-token pair and refuses sharing it with another secret", () => {
-  assertBlocked("missing Access id", o => { o.secrets_store_secrets = o.secrets_store_secrets.filter((s: any) => s.binding !== "OTP_NOTIFY_ACCESS_CLIENT_ID"); });
-  assertBlocked("missing Access secret", o => { o.secrets_store_secrets = o.secrets_store_secrets.filter((s: any) => s.binding !== "OTP_NOTIFY_ACCESS_CLIENT_SECRET"); });
-  assertBlocked("Access secret reuses the notify signing secret", o => { o.secrets_store_secrets.find((s: any) => s.binding === "OTP_NOTIFY_ACCESS_CLIENT_SECRET").secret_name = "OTP_NOTIFY_SIGNING_SECRET"; });
+test("the alert callback must use exactly one private Service Binding to the Acceptance frontend, with no Access credential and no public-fetch flag", () => {
+  assertBlocked("no service binding", o => { delete o.services; });
+  assertBlocked("empty service bindings", o => { o.services = []; });
+  assertBlocked("wrong binding name", o => { o.services[0].binding = "OTP_WORKER"; });
+  assertBlocked("binding to the production frontend", o => { o.services[0].service = "aladdin-frontend-production"; });
+  assertBlocked("binding to the unsuffixed frontend", o => { o.services[0].service = "aladdin-frontend"; });
+  assertBlocked("binding to another environment", o => { o.services[0].environment = "production"; });
+  assertBlocked("binding to a non-default entrypoint", o => { o.services[0].entrypoint = "Admin"; });
+  assertBlocked("a second service binding", o => { o.services.push({ binding: "OTHER", service: "aladdin-backend-preview" }); });
+  assertBlocked("an Access client id binding", o => { o.secrets_store_secrets.push({ binding: "OTP_NOTIFY_ACCESS_CLIENT_ID", store_id: "acfaa67f391e499db6fde398022f50ce", secret_name: "OTP_NOTIFY_ACCESS_CLIENT_ID" }); });
+  assertBlocked("global_fetch_strictly_public", o => { o.compatibility_flags = ["global_fetch_strictly_public"]; });
 });
-test("the Access service token never appears in plaintext vars", () => {
+test("no Access token appears in plaintext vars", () => {
   const text = JSON.stringify(baseline.vars);
-  assert.ok(!/cf-access|access_client|\.access"/i.test(text));
+  assert.ok(!/cf-access|access_client|.access"/i.test(text));
 });

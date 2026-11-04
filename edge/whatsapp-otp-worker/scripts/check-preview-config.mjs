@@ -20,7 +20,7 @@ must(
   config.d1_databases[0]?.database_id === "da65d5e4-8344-4078-9c2d-8a4bb4907f79",
   "D1 must be isolated Acceptance replay DB"
 );
-// Seven DISTINCT secrets: the Meta token, the send, admin and notify signing secrets, the admin GRANT key (which the app server never holds) and the Access service-token pair. The send secret
+// Five DISTINCT secrets: the Meta token, the send, admin and notify signing secrets and the admin GRANT key (which the app server never holds). The send secret
 // must never double as the admin or notify secret, so neither route family can be driven with another's credential.
 const EXPECTED_BINDINGS = [
   ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_ACCESS_TOKEN"],
@@ -28,9 +28,6 @@ const EXPECTED_BINDINGS = [
   ["OTP_ADMIN_SIGNING_SECRET", "OTP_ADMIN_SIGNING_SECRET"],
   ["OTP_NOTIFY_SIGNING_SECRET", "OTP_NOTIFY_SIGNING_SECRET"],
   ["OTP_ADMIN_GRANT_SECRET", "OTP_ADMIN_GRANT_SECRET"],
-  // Cloudflare Access service token (Client ID + Secret) for the alert callback: Worker-only, a dedicated pair, never the frontend's.
-  ["OTP_NOTIFY_ACCESS_CLIENT_ID", "OTP_NOTIFY_ACCESS_CLIENT_ID"],
-  ["OTP_NOTIFY_ACCESS_CLIENT_SECRET", "OTP_NOTIFY_ACCESS_CLIENT_SECRET"],
 ];
 must(
   config.secrets_store_secrets?.length === EXPECTED_BINDINGS.length &&
@@ -38,8 +35,18 @@ must(
     config.secrets_store_secrets.some((b) => b.binding === binding && b.secret_name === secretName && b.store_id === "acfaa67f391e499db6fde398022f50ce")
   ) &&
   new Set(config.secrets_store_secrets.map((b) => b.secret_name)).size === EXPECTED_BINDINGS.length,
-  "the Meta token, the send/admin/notify signing secrets, the admin grant key and the Access service-token pair must be seven distinct pre-verified account Secrets Store bindings"
+  "the Meta token, the send/admin/notify signing secrets, and the admin grant key must be five distinct pre-verified account Secrets Store bindings"
 );
+// The alert callback travels over ONE private Service Binding to the Acceptance frontend (never the public hostname, which is behind Access and
+// unreachable from a Worker: Cloudflare 1042). No Access credential, no public-fetch compatibility flag, no second or production binding.
+must(
+  Array.isArray(config.services) && config.services.length === 1 &&
+  config.services[0]?.binding === "APP_NOTIFY" && config.services[0]?.service === "aladdin-frontend-preview" &&
+  !config.services[0]?.environment && !config.services[0]?.entrypoint,
+  "the alert callback must use exactly one private Service Binding APP_NOTIFY -> aladdin-frontend-preview"
+);
+must(!JSON.stringify(config).includes("OTP_NOTIFY_ACCESS") && !JSON.stringify(config).includes("CF-Access"), "no Cloudflare Access credential may be bound: the internal binding does not traverse Access");
+must(!(config.compatibility_flags ?? []).includes("global_fetch_strictly_public"), "global_fetch_strictly_public must not be enabled: the callback uses the private Service Binding, not the public internet");
 must(Array.isArray(config.triggers?.crons) && config.triggers.crons.length >= 1, "the scheduled maintenance trigger (journal retention, alert evaluation) must be configured");
 must(!("OTP_DAILY_SEND_LIMIT" in (config.vars ?? {})), "the send budget is a Super Admin setting in D1, not an environment variable");
 must(/^https:\/\/[a-z0-9.-]+\/api\/internal\/whatsapp-otp\/notify$/.test(String(config.vars?.OTP_NOTIFY_URL ?? "")), "OTP_NOTIFY_URL must be the https URL of the app's notification endpoint");
