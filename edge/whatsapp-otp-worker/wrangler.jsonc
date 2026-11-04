@@ -3,7 +3,8 @@
   "name": "aladdin-whatsapp-otp-preview",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
-  "workers_dev": true,
+  "workers_dev": false,
+  "preview_urls": false,
   "routes": [],
   "observability": {
     "enabled": true
@@ -22,6 +23,7 @@
   "secrets_store_secrets": [
     { "binding": "OTP_ADMIN_SIGNING_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_ADMIN_SIGNING_SECRET" },
     { "binding": "OTP_NOTIFY_SIGNING_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_NOTIFY_SIGNING_SECRET" },
+    { "binding": "OTP_ADMIN_GRANT_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_ADMIN_GRANT_SECRET" },
     {
       "binding": "WHATSAPP_ACCESS_TOKEN",
       "store_id": "acfaa67f391e499db6fde398022f50ce",

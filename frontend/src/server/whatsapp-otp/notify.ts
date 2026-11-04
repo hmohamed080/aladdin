@@ -5,7 +5,11 @@ import { verifyBody } from "./signing";
  * secret or the admin secret); the body carries statistics and nothing else. The database re-validates every field again and writes through
  * the existing notification system (`app.notify`), once per event (a dedupe ledger), only to active staff who hold whatsapp_otp.view.
  *
- * Answers: 200 recorded or duplicate (the Worker marks the event delivered), 401 bad signature, 400 malformed, 503 not configured or the
+ * ENVIRONMENT BINDING: the event names the Worker environment that raised it (`source_env`). This app accepts ONLY the one that belongs to it
+ * (production app <- production Worker, staging app <- acceptance Worker, local <- local), even when the signature is valid and the schema is
+ * fine; anything else is refused with 403 and nothing is recorded. An app that cannot tell its own environment accepts nothing (503).
+ *
+ * Answers: 200 recorded or duplicate (the Worker marks the event delivered), 401 bad signature, 400 malformed, 403 wrong environment, 503 not configured or the
  * database failed (the Worker keeps the event in its outbox and retries with backoff). A notification problem can never touch OTP delivery:
  * this route is downstream of it and the Worker's send path never waits for it.
  */
@@ -13,8 +17,16 @@ const MAX_BODY = 2048;
 const KINDS = ["budget_warning", "budget_critical", "budget_exhausted", "failure_rate"] as const;
 const KEYS = new Set(["event_key", "kind", "source_env", "occurred_at", "stats"]);
 
+/** The Worker environment name this app trusts, from its own NEXT_PUBLIC_APP_ENV. Unknown = trust nothing. */
+export function expectedSourceEnvFor(appEnv: string | undefined): string | undefined {
+  const map = new Map([["production", "production"], ["staging", "acceptance"], ["local", "local"]]);
+  return map.get(appEnv ?? "");
+}
+
 export type NotifyDeps = {
   secret: string | undefined;
+  /** The only `source_env` this app accepts (see expectedSourceEnvFor). */
+  expectedSourceEnv: string | undefined;
   record: (a: { eventKey: string; kind: string; sourceEnv: string; occurredAt: number; stats: Record<string, number | string> }) => Promise<{ ok: boolean }>;
   now?: () => number;
 };
@@ -51,13 +63,15 @@ export async function handleNotify(request: Request, deps: NotifyDeps): Promise<
   if (request.method !== "POST") return reply(405);
   if (request.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") return reply(415);
   if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY) return reply(413);
-  if (!deps.secret) return reply(503);
+  if (!deps.secret || !deps.expectedSourceEnv) return reply(503);
   const raw = await request.text();
   if (new TextEncoder().encode(raw).length > MAX_BODY) return reply(413);
   // Authenticate BEFORE parsing or touching any state.
   if (!verifyBody(deps.secret, raw, request.headers, deps.now?.() ?? Date.now())) return reply(401);
   const parsed = parseNotifyBody(raw);
   if (!parsed) return reply(400);
+  // A valid signature and schema are not enough: the event must come from THIS app's own Worker environment.
+  if (parsed.sourceEnv !== deps.expectedSourceEnv) return reply(403);
   // The signed id must BE this event's identity (the Worker signs `ntf_<event_key>`), so one signature cannot be re-labelled as another event.
   if (request.headers.get("webhook-id") !== `ntf_${parsed.eventKey.replace(/[^A-Za-z0-9_:-]/g, "")}`) return reply(400);
   try {

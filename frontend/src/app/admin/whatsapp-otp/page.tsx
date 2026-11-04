@@ -9,9 +9,11 @@ import { can } from "@/lib/permissions/admin";
 import { requireAdminRoute } from "@/server/authorization/admin";
 import { appliedRows } from "@/server/whatsapp-otp/settings-change";
 import { fetchUsage, type FailureWindow } from "@/server/whatsapp-otp/worker-admin";
+import { resolveWorkerTransport } from "@/server/whatsapp-otp/worker-binding";
 import { AdminHeader, StatTile } from "@/features/admin/parts";
 import { Badge, Card, SectionTitle, StatePanel } from "@/components/ui/primitives";
 import { WhatsappOtpSettingsForm } from "@/features/admin-ops/whatsapp-otp-settings-form";
+import { WhatsappOtpNotifyCheck } from "@/features/admin-ops/whatsapp-otp-notify-check";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +34,8 @@ export default async function WhatsappOtpPage() {
   if (denied) return <StatePanel tone="danger" title={t("whatsappOtp.errors.forbidden")} />;
 
   const env = readPhoneVerificationEnv();
-  const result = await fetchUsage({ workerUrl: env.workerUrl, adminSecret: env.adminSecret });
+  const route = resolveWorkerTransport();
+  const result = route.ok ? await fetchUsage({ workerUrl: env.workerUrl, adminSecret: env.adminSecret, fetchImpl: route.fetchImpl }) : ({ ok: false } as const);
 
   const header = <AdminHeader locale={locale} title={t("whatsappOtp.title")} subtitle={t("whatsappOtp.subtitle")} />;
   if (!result.ok) {
@@ -58,6 +61,8 @@ export default async function WhatsappOtpPage() {
   const who = (id: string) => names.get(id) || id.slice(0, 8);
 
   const s = usage.settings;
+  const runtime = usage.runtime;
+  const bindingsReady = runtime ? ["signing_secret_bound", "admin_secret_bound", "admin_grant_secret_bound", "notify_configured", "meta_token_bound", "d1_reachable"].every((k) => runtime[k] === true) : false;
   const canManage = can(access, "whatsapp_otp.manage");
   const canCeiling = can(access, "whatsapp_otp.ceiling_manage");
   const n = (v: number) => formatNumber(v, locale);
@@ -92,6 +97,31 @@ export default async function WhatsappOtpPage() {
             <StatTile locale={locale} label={t("whatsappOtp.usage.reserved")} value={usage.reserved} />
             <StatTile locale={locale} label={t("whatsappOtp.usage.limit")} value={s.daily_limit} hint={`${t("whatsappOtp.usage.ceiling")}: ${n(s.hard_ceiling)}`} />
           </div>
+        </Card>
+      ) : null}
+
+      {runtime ? (
+        <Card>
+          <SectionTitle>{t("whatsappOtp.runtime.title")}</SectionTitle>
+          <div className="mt-md grid gap-md sm:grid-cols-4" data-testid="whatsapp-otp-runtime">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-label text-fg-muted">{t("whatsappOtp.runtime.environment")}</span>
+              <span className="text-body text-fg" dir="ltr">{String(runtime.environment ?? "")}</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-label text-fg-muted">{t("whatsappOtp.runtime.delivery")}</span>
+              <Badge tone={runtime.delivery_enabled === true ? "success" : "warning"}>{t(runtime.delivery_enabled === true ? "whatsappOtp.runtime.deliveryOn" : "whatsappOtp.runtime.deliveryOff")}</Badge>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-label text-fg-muted">{t("whatsappOtp.runtime.recipients")}</span>
+              <span className="text-body text-fg">{runtime.recipient_mode === "open" ? t("whatsappOtp.runtime.recipientsOpen") : t("whatsappOtp.runtime.recipientsList", { count: n(Number(runtime.allowlist_entries ?? 0)) })}</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-label text-fg-muted">{t("whatsappOtp.runtime.bindings")}</span>
+              <Badge tone={bindingsReady ? "success" : "danger"}>{t(bindingsReady ? "whatsappOtp.runtime.ready" : "whatsappOtp.runtime.missing")}</Badge>
+            </div>
+          </div>
+          {canManage ? <WhatsappOtpNotifyCheck /> : null}
         </Card>
       ) : null}
 

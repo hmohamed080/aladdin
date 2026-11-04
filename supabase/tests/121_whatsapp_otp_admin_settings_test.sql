@@ -12,7 +12,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(103);
+select plan(127);
 
 \set sa1   'a1000000-0000-4000-8000-000000000001'
 \set sa2   'a1000000-0000-4000-8000-000000000002'
@@ -106,6 +106,8 @@ insert into public.admin_roles (key, name, rank, scope_type) values ('probe_wo_m
 insert into public.admin_role_permissions (role_id, permission_key) select id, 'whatsapp_otp.manage' from public.admin_roles where key = 'probe_wo_manage';
 insert into public.admin_role_assignments (user_id, role_id) select :'mgr', id from public.admin_roles where key = 'probe_wo_manage';
 update public.users set status = 'suspended' where id = :'susp';
+-- The grant key: in production the owner inserts the value that is also the Worker's OTP_ADMIN_GRANT_SECRET. Here a fixed test key.
+insert into app.whatsapp_otp_grant_key (id, key) values (1, decode(repeat('21', 32), 'hex'));
 
 -- ===========================================================================
 -- A. Permissions
@@ -221,13 +223,13 @@ create temp table rec_req as select pg_temp.begin_as(:'sa1', 1, pg_temp.s(150, 5
 select is(pg_temp.call_as(:'sa1', 'public.admin_whatsapp_otp_settings_reconcile(''[]''::jsonb)') ->> 'sqlstate', '42501', 'D1 a Super Admin''s browser session cannot call reconcile');
 select is(pg_temp.call_anon('public.admin_whatsapp_otp_settings_reconcile(''[]''::jsonb)') ->> 'sqlstate', '42501', 'D2 anon cannot');
 select is(pg_temp.call_svc(format('public.admin_whatsapp_otp_settings_reconcile(%L::jsonb)',
-  jsonb_build_array(jsonb_build_object('request_id', (select r ->> 'request_id' from rec_req), 'actor', :'sa2', 'version', 2))::text)) ->> 'applied', '0',
+  jsonb_build_array(jsonb_build_object('request_id', (select r ->> 'request_id' from rec_req), 'actor', :'sa2', 'version', 2, 'at', 1793600100, 'new', pg_temp.s(170, 5000)))::text)) ->> 'applied', '0',
   'D3 a record naming a DIFFERENT actor is ignored (no forged completion)');
 select is(pg_temp.call_svc(format('public.admin_whatsapp_otp_settings_reconcile(%L::jsonb)',
-  jsonb_build_array(jsonb_build_object('request_id', (select r ->> 'request_id' from rec_req), 'actor', :'sa1', 'version', 9))::text)) ->> 'applied', '0',
+  jsonb_build_array(jsonb_build_object('request_id', (select r ->> 'request_id' from rec_req), 'actor', :'sa1', 'version', 9, 'at', 1793600101, 'new', pg_temp.s(170, 5000)))::text)) ->> 'applied', '0',
   'D4 a record with the wrong version is ignored');
 select is(pg_temp.call_svc(format('public.admin_whatsapp_otp_settings_reconcile(%L::jsonb)',
-  jsonb_build_array('junk', 5, jsonb_build_object('request_id', 'nope'), jsonb_build_object('request_id', (select r ->> 'request_id' from rec_req), 'actor', :'sa1', 'version', 2))::text)) ->> 'applied', '1',
+  jsonb_build_array('junk', 5, jsonb_build_object('request_id', 'nope'), jsonb_build_object('request_id', (select r ->> 'request_id' from rec_req), 'actor', :'sa1', 'version', 2, 'at', 1793600102, 'new', pg_temp.s(170, 5000)))::text)) ->> 'applied', '1',
   'D5 malformed elements are skipped and the genuine record completes the pending request');
 select is((select count(*)::int from public.audit_log where action = 'whatsapp_otp.settings_changed' and metadata ->> 'reconciled' = 'true'
             and metadata ->> 'actor_id' = :'sa1' and (metadata ->> 'request_id')::uuid = (select (r ->> 'request_id')::uuid from rec_req)), 1,
@@ -288,7 +290,7 @@ select is(pg_temp.call_svc($q$public.whatsapp_otp_notification_record('x', 'bogu
 select is(pg_temp.call_svc($q$public.whatsapp_otp_notification_record('budget_warning:2', 'budget_warning', 'Production!', 1793700003, '{"percent":70}'::jsonb)$q$) ->> 'sqlstate', '22023', 'E20 a malformed environment name is refused');
 select is(pg_temp.call_svc($q$public.whatsapp_otp_notification_record('budget_warning:2', 'budget_warning', 'acceptance', 5, '{"percent":70}'::jsonb)$q$) ->> 'sqlstate', '22023', 'E21 an impossible time is refused');
 select is(pg_temp.call_svc($q$public.whatsapp_otp_notification_record('budget_warning:2', 'budget_warning', 'acceptance', 1793700003, '{"failed":1,"accepted":2}'::jsonb)$q$) ->> 'status', 'recorded', 'E22 a numeric key valid for the kind passes');
-select is((select count(*)::int from app.whatsapp_otp_notification_events), 5, 'E23 the ledger holds exactly the five recorded events (each refusal left nothing behind)');
+select is((select count(*)::int from app.whatsapp_otp_notification_events where kind <> 'audit_unmatched'), 5, 'E23 the ledger holds exactly the five recorded events (each refusal left nothing behind)');
 -- the existing inbox rules still apply: only the recipient reads or marks their own row
 select is(pg_temp.call_as(:'adm', $q$(select count(*) from public.notifications where event_type = 'whatsapp_otp.budget_warning')$q$) #>> '{}', '3', 'E24 an Administrator sees exactly their own three alerts through RLS');
 select is(pg_temp.call_as(:'mdr', $q$(select count(*) from public.notifications where event_type like 'whatsapp_otp.%')$q$) #>> '{}', '0', 'E25 a Moderator sees none of them');
@@ -300,14 +302,76 @@ select is(pg_temp.call_as(:'sa1', 'jsonb_build_object(''n'', (select count(*) fr
 select is(pg_temp.call_as(:'sa1', 'jsonb_build_object(''n'', (select count(*) from app.whatsapp_otp_notification_events))') ->> 'sqlstate', '42501', 'F2 the notification ledger is closed too');
 select ok((select pg_get_constraintdef(oid) like '%whatsapp_otp.settings_changed%' and pg_get_constraintdef(oid) like '%whatsapp_otp.settings_requested%' and pg_get_constraintdef(oid) like '%whatsapp_otp.settings_change_failed%'
             from pg_constraint where conname = 'ck_audit_action_known'), 'F3 the audit allow-list gained the three actions');
-select ok((select pg_get_constraintdef(oid) like '%whatsapp_otp.failure_rate%' and pg_get_constraintdef(oid) like '%message.sent%' and pg_get_constraintdef(oid) like '%job.review.received%'
-            from pg_constraint where conname = 'ck_notifications_event_type_known'), 'F4 the notification allow-list gained the four events and kept every existing one');
+select ok((select pg_get_constraintdef(oid) like '%whatsapp_otp.failure_rate%' and pg_get_constraintdef(oid) like '%whatsapp_otp.audit_unmatched%' and pg_get_constraintdef(oid) like '%message.sent%' and pg_get_constraintdef(oid) like '%job.review.received%'
+            from pg_constraint where conname = 'ck_notifications_event_type_known'), 'F4 the notification allow-list gained the five events and kept every existing one');
 select ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                        where p.proname in ('admin_whatsapp_otp_settings_begin', 'admin_whatsapp_otp_settings_finish', 'admin_whatsapp_otp_settings_reconcile', 'whatsapp_otp_notification_record')
                          and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('public', p.oid, 'execute'))),
   'F5 begin, finish, reconcile and notification_record are executable by no client role');
 select ok(not exists (select 1 from pg_proc p where p.proname like 'admin_whatsapp_otp%' and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('public', p.oid, 'execute'))),
   'F6 no admin function is executable by anon or PUBLIC');
+
+-- ===========================================================================
+-- G. The database-issued grant (a leaked admin signing secret cannot authorize or impersonate) and detection of unmatched changes
+-- ===========================================================================
+create temp table grant_req as select pg_temp.begin_as(:'sa1', 1, pg_temp.s(170, 5000), pg_temp.s(180, 5000), 'Grant probe: a small raise of the daily limit') as r;
+select ok((select r ->> 'grant' ~ '^[A-Za-z0-9+/]{43}=$' from grant_req), 'G1 begin returns a grant (a base64 HMAC-SHA256)');
+select is((select r ->> 'grant' from grant_req),
+  encode(extensions.hmac(convert_to(format('v1|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s', (select r ->> 'request_id' from grant_req), :'sa1', 1, 180, 5000, 70, 90, 0,
+    (select r ->> 'grant_expires' from grant_req), encode(extensions.digest(convert_to('Grant probe: a small raise of the daily limit', 'UTF8'), 'sha256'), 'hex')), 'UTF8'),
+    decode(repeat('21', 32), 'hex'), 'sha256'), 'base64'),
+  'G2 it equals an independent HMAC over exactly this request, actor, version, values, ceiling flag, expiry and reason hash');
+select ok((select (r ->> 'grant_expires')::bigint between extract(epoch from now())::bigint + 290 and extract(epoch from now())::bigint + 310 from grant_req), 'G3 it is valid for five minutes');
+select is((select r ->> 'reason' from grant_req), 'Grant probe: a small raise of the daily limit', 'G4 the reason the grant covers is returned exactly as stored');
+create temp table grant_ceiling as select pg_temp.begin_as(:'sa1', 1, pg_temp.s(170, 5000), pg_temp.s(170, 6000), 'Raise the ceiling for the launch window, approved') as r;
+select is((select r ->> 'ceiling_changed' from grant_ceiling), 'true', 'G5 a ceiling change is marked as database-authorized inside the grant');
+select isnt((select r ->> 'grant' from grant_ceiling), (select r ->> 'grant' from grant_req), 'G6 every request gets its own grant');
+select is(pg_temp.call_svc('jsonb_build_object(''n'', (select count(*) from app.whatsapp_otp_grant_key))') ->> 'sqlstate', '42501', 'G7 the grant key is unreadable by the service role');
+select is(pg_temp.call_as(:'sa1', 'jsonb_build_object(''n'', (select count(*) from app.whatsapp_otp_grant_key))') ->> 'sqlstate', '42501', 'G8 ...and by a signed-in Super Admin');
+select throws_ok($q$insert into app.whatsapp_otp_grant_key (id, key) values (2, decode(repeat('21', 32), 'hex'))$q$, '23514', null, 'G9 only one key row can exist');
+select throws_ok($q$update app.whatsapp_otp_grant_key set key = decode('2121', 'hex') where id = 1$q$, '23514', null, 'G10 a short key is refused by the table');
+create temp table req_count as select count(*)::int n from app.whatsapp_otp_settings_requests;
+delete from app.whatsapp_otp_grant_key;
+select is(pg_temp.begin_as(:'sa1', 1, pg_temp.s(170, 5000), pg_temp.s(190, 5000), 'Must not be recorded without a grant key') ->> 'sqlstate', '55000', 'G11 without a grant key no change can begin (fail closed)');
+select is((select count(*)::int from app.whatsapp_otp_settings_requests), (select n from req_count), 'G12 ...and nothing was recorded');
+insert into app.whatsapp_otp_grant_key (id, key) values (1, decode(repeat('21', 32), 'hex'));
+
+-- Detection: a change in the Worker's audit that no approved request accounts for
+select is(pg_temp.call_svc(format('public.admin_whatsapp_otp_settings_reconcile(%L::jsonb)',
+  jsonb_build_array(jsonb_build_object('request_id', gen_random_uuid(), 'actor', :'sa1', 'version', 41, 'at', 1793600200, 'new', pg_temp.s(4000, 5000)))::text)) ->> 'unmatched', '1',
+  'G13 a Worker change with no request at all is reported as unmatched');
+select is((select count(*)::int from public.notifications where event_type = 'whatsapp_otp.audit_unmatched' and params ->> 'version' = '41' and recipient_user_id in (:'sa1'::uuid, :'sa2'::uuid, :'adm'::uuid)), 3,
+  'G14 it reaches both Super Admins and the Administrator through the existing notifications');
+select is((select count(*)::int from public.notifications where event_type = 'whatsapp_otp.audit_unmatched' and recipient_user_id in (:'susp'::uuid, :'mdr'::uuid, :'sup'::uuid, :'mgr'::uuid, :'plain'::uuid)), 0,
+  'G15 nobody else, and not a suspended account, receives it');
+select is((select params::text from public.notifications where event_type = 'whatsapp_otp.audit_unmatched' and params ->> 'version' = '41' limit 1), '{"version": 41}',
+  'G16 the notification carries the version number only (no actor, values or reason)');
+select is(pg_temp.call_svc(format('public.admin_whatsapp_otp_settings_reconcile(%L::jsonb)',
+  jsonb_build_array(jsonb_build_object('request_id', gen_random_uuid(), 'actor', :'sa1', 'version', 41, 'at', 1793600200, 'new', pg_temp.s(4000, 5000)))::text)) ->> 'unmatched', '0',
+  'G17 seeing the same change again alerts nobody twice');
+select is((select count(*)::int from public.notifications where event_type = 'whatsapp_otp.audit_unmatched' and params ->> 'version' = '41'), (select count(*)::int from view_holders), 'G18 ...and creates no new notifications');
+-- a genuine request, but the Worker applied DIFFERENT values than were approved
+create temp table mis_req as select pg_temp.begin_as(:'sa1', 1, pg_temp.s(170, 5000), pg_temp.s(185, 5000), 'Values will differ from what the Worker applied') as r;
+select is(pg_temp.call_svc(format('public.admin_whatsapp_otp_settings_reconcile(%L::jsonb)',
+  jsonb_build_array(jsonb_build_object('request_id', (select r ->> 'request_id' from mis_req), 'actor', :'sa1', 'version', 2, 'at', 1793600300, 'new', pg_temp.s(4900, 5000)))::text)) ->> 'unmatched', '1',
+  'G19 a real request whose applied values differ from the approved ones is reported');
+select is((select status from app.whatsapp_otp_settings_requests where id = (select (r ->> 'request_id')::uuid from mis_req)), 'pending', 'G20 ...and is NOT marked as applied');
+-- a request that Supabase already recorded as applied does not alert when it is seen again
+create temp table ok_req as select pg_temp.begin_as(:'sa1', 1, pg_temp.s(170, 5000), pg_temp.s(186, 5000), 'A normal change that completes cleanly') as r;
+select is(pg_temp.fin_as(:'sa1', (select (r ->> 'request_id')::uuid from ok_req), 'applied', 2) #>> '{}', 'applied', 'G21 a normal change completes');
+select is(pg_temp.call_svc(format('public.admin_whatsapp_otp_settings_reconcile(%L::jsonb)',
+  jsonb_build_array(jsonb_build_object('request_id', (select r ->> 'request_id' from ok_req), 'actor', :'sa1', 'version', 2, 'at', 1793600400, 'new', pg_temp.s(186, 5000)))::text)) ->> 'unmatched', '0',
+  'G22 a matching applied change is not reported');
+select is(pg_temp.call_svc(format('public.admin_whatsapp_otp_settings_reconcile(%L::jsonb)',
+  jsonb_build_array(jsonb_build_object('request_id', (select r ->> 'request_id' from ok_req), 'actor', :'sa1', 'version', 2, 'at', 12, 'new', pg_temp.s(186, 5000)),
+                    jsonb_build_object('request_id', gen_random_uuid(), 'actor', :'sa1', 'version', 77, 'new', pg_temp.s(1, 5000)),
+                    jsonb_build_object('request_id', gen_random_uuid(), 'actor', :'sa1', 'version', 78, 'at', 1793600500, 'new', jsonb_build_object('daily_limit', 9)))::text)) ->> 'unmatched', '0',
+  'G23 elements with an impossible time, no time or invalid values are skipped, never raised');
+select ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                       where n.nspname = 'app' and p.proname = 'whatsapp_otp_record_unmatched'
+                         and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute')
+                              or has_function_privilege('service_role', p.oid, 'execute') or has_function_privilege('public', p.oid, 'execute'))),
+  'G24 the internal alert function is executable by no client role');
 
 select * from finish();
 rollback;

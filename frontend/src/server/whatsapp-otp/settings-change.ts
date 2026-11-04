@@ -21,7 +21,7 @@ type Rpc<T> = { data: T | null; code: string | null; message: string | null };
 
 export type ChangeDeps = {
   fetchUsage: () => Promise<UsageResult>;
-  begin: (a: { actor: string; expectedVersion: number; old: Record<string, number> | null; next: Record<string, number>; reason: string }) => Promise<Rpc<{ request_id: string; ceiling_changed: boolean }>>;
+  begin: (a: { actor: string; expectedVersion: number; old: Record<string, number> | null; next: Record<string, number>; reason: string }) => Promise<Rpc<{ request_id: string; ceiling_changed: boolean; reason: string; grant: string; grant_expires: number }>>;
   apply: (payload: SettingsPayload) => Promise<ApplyOutcome>;
   finish: (a: { actor: string; request: string; status: "applied" | "failed"; version?: number; code?: string }) => Promise<Rpc<string>>;
 };
@@ -56,12 +56,15 @@ const WORKER_CODE: Record<string, string> = {
   ceiling_below_current_limit: "ceilingBelowLimit",
   unreadable: "unavailable",
   admin_unconfigured: "unavailable",
+  grant_unconfigured: "unavailable",
+  grant_invalid: "generic",
   storage_unavailable: "unavailable",
 };
 
 /** The database's refusal (code + message) to a translation key. Messages are fixed strings raised by the RPC, never user input. */
 export function mapBeginError(code: string | null, message: string | null): string {
   const m = message ?? "";
+  if (code === "55000") return "unavailable"; // the database has no grant key yet: nothing can be authorized (fail closed)
   if (code === "42501") return m.includes("ceiling_manage") ? "ceilingForbidden" : "forbidden";
   if (code === "22023") {
     if (m.includes("ceiling_below_current_limit")) return "ceilingBelowLimit";
@@ -104,10 +107,13 @@ export async function changeSettings(deps: ChangeDeps, input: ChangeInput): Prom
     actor_id: input.actorId,
     expected_version: version,
     ...next,
-    reason,
+    // The reason EXACTLY as the database stored it: the grant covers its hash.
+    reason: begun.data.reason,
     ...(ceilingChanged ? { ceiling_confirmation: String(input.hardCeiling) } : {}),
     // true ONLY because the database just confirmed ceiling_manage for this actor (begin refuses otherwise).
     ceiling_authorized: begun.data.ceiling_changed === true,
+    grant: begun.data.grant,
+    grant_expires: begun.data.grant_expires,
   });
 
   if (outcome.kind === "applied") {
@@ -123,8 +129,8 @@ export async function changeSettings(deps: ChangeDeps, input: ChangeInput): Prom
 }
 
 /** Rows of the Worker's authoritative audit that Supabase has to learn about (only changes, never the actor's input). */
-export function appliedRows(usage: WorkerUsage): { request_id: string; actor: string; version: number }[] {
+export function appliedRows(usage: WorkerUsage): { request_id: string; actor: string; version: number; at: number; new: Record<string, number> }[] {
   return usage.audit
     .filter((a) => a.kind === "update" || a.kind === "initialize")
-    .map((a) => ({ request_id: a.request_id, actor: a.actor, version: a.version }));
+    .map((a) => ({ request_id: a.request_id, actor: a.actor, version: a.version, at: a.at, new: { daily_limit: a.new.daily_limit, hard_ceiling: a.new.hard_ceiling, warn_percent: a.new.warn_percent, critical_percent: a.new.critical_percent } }));
 }

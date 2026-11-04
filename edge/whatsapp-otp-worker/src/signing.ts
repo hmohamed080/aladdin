@@ -48,3 +48,27 @@ export async function sha256Hex(text: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+/** The fields a DATABASE-issued admin grant covers. The Worker rebuilds this string from the request itself, so a grant cannot be reused for anything else. */
+export type GrantFields = {
+  requestId: string; actorId: string; expectedVersion: number;
+  dailyLimit: number; hardCeiling: number; warnPercent: number; criticalPercent: number;
+  ceilingAuthorized: boolean; grantExpires: number;
+};
+
+/** "v1|request|actor|version|daily|ceiling|warn|critical|ceilingAuthorized|expires|sha256(reason)". Mirrors admin_whatsapp_otp_settings_begin. */
+export async function grantCanonical(f: GrantFields, rawReason: string): Promise<string> {
+  return ["v1", f.requestId, f.actorId, f.expectedVersion, f.dailyLimit, f.hardCeiling, f.warnPercent, f.criticalPercent, f.ceilingAuthorized ? 1 : 0, f.grantExpires, await sha256Hex(rawReason)].join("|");
+}
+
+/**
+ * Constant-time check of a grant (base64 HMAC-SHA256) with the grant key. The key lives in the Aladdin database and in this Worker's Secrets
+ * Store, NEVER in the app server, so the admin signing secret alone can authenticate a request but can no longer authorize a change.
+ */
+export async function verifyGrant(secret: string, canonical: string, grant: string): Promise<boolean> {
+  const bytes = keyBytes(secret);
+  const sig = decode64(grant);
+  if (!bytes || !sig || sig.length !== 32) return false;
+  const key = await crypto.subtle.importKey("raw", bytes as BufferSource, { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  return crypto.subtle.verify("HMAC", key, sig as BufferSource, new TextEncoder().encode(canonical));
+}

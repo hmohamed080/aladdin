@@ -78,9 +78,14 @@ export type SettingsRequest = {
   ceilingConfirmation: string | null;
   /** Set by the app server ONLY after the database confirmed whatsapp_otp.ceiling_manage for the actor. A ceiling change without it is refused here. */
   ceilingAuthorized: boolean;
+  /** The reason exactly as signed (untrimmed): the database grant covers its hash. */
+  reasonRaw: string;
+  /** The database-issued, single-request authorization (base64 HMAC) and its expiry (epoch seconds). Verified in admin.ts. */
+  grant: string;
+  grantExpires: number;
 };
 
-const REQUEST_KEYS = new Set(["request_id", "actor_id", "expected_version", "daily_limit", "hard_ceiling", "warn_percent", "critical_percent", "reason", "ceiling_confirmation", "ceiling_authorized"]);
+const REQUEST_KEYS = new Set(["request_id", "actor_id", "expected_version", "daily_limit", "hard_ceiling", "warn_percent", "critical_percent", "reason", "ceiling_confirmation", "ceiling_authorized", "grant", "grant_expires"]);
 
 /** Strict schema: exact key set, exact types, no coercion. A signed but malformed request is still refused. */
 export function parseSettingsRequest(raw: string): SettingsRequest | null {
@@ -89,18 +94,20 @@ export function parseSettingsRequest(raw: string): SettingsRequest | null {
   if (!b || typeof b !== "object" || Array.isArray(b)) return null;
   const o = b as Record<string, unknown>;
   for (const k of Object.keys(o)) if (!REQUEST_KEYS.has(k)) return null;
-  const { request_id, actor_id, expected_version, daily_limit, hard_ceiling, warn_percent, critical_percent, reason, ceiling_confirmation, ceiling_authorized } = o;
+  const { request_id, actor_id, expected_version, daily_limit, hard_ceiling, warn_percent, critical_percent, reason, ceiling_confirmation, ceiling_authorized, grant, grant_expires } = o;
   if (typeof request_id !== "string" || !UUID.test(request_id) || typeof actor_id !== "string" || !UUID.test(actor_id)) return null;
   if (!isInt(expected_version) || expected_version < 0) return null;
   if (!isInt(daily_limit) || !isInt(hard_ceiling) || !isInt(warn_percent) || !isInt(critical_percent)) return null;
   if (typeof reason !== "string" || reason.length > 500 || CONTROL.test(reason)) return null;
   if (ceiling_confirmation !== undefined && (typeof ceiling_confirmation !== "string" || ceiling_confirmation.length > 12)) return null;
   if (ceiling_authorized !== undefined && typeof ceiling_authorized !== "boolean") return null;
+  if (typeof grant !== "string" || !/^[A-Za-z0-9+/]{43}=$/.test(grant) || !isInt(grant_expires) || grant_expires < 1) return null;
   return {
     requestId: request_id.toLowerCase(), actorId: actor_id.toLowerCase(), expectedVersion: expected_version,
     dailyLimit: daily_limit, hardCeiling: hard_ceiling, warnPercent: warn_percent, criticalPercent: critical_percent,
     reason: reason.trim(), ceilingConfirmation: ceiling_confirmation === undefined ? null : ceiling_confirmation,
     ceilingAuthorized: ceiling_authorized === true,
+    reasonRaw: reason, grant, grantExpires: grant_expires,
   };
 }
 

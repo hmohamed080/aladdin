@@ -3,6 +3,9 @@
   // and `scripts/check-production-config.mjs` must print PASS first. Isolated from Acceptance: its own Worker name, its own D1 database and
   // dedicated *_PRODUCTION secret names. It shares nothing with the Acceptance Worker except the account's Secrets Store (distinct secrets).
   //
+  // Reachability: PRIVATE. workers_dev is off and there are no routes, so the Worker has no public address; the Production frontend reaches it
+  // through the service binding OTP_WORKER (frontend/wrangler.jsonc). Deploy this Worker BEFORE that frontend.
+  //
   // Shipped state: WHATSAPP_DELIVERY_ENABLED=false. Turning it on is the approved cutover, made by a reviewed change to this file AND the guard.
   // Recipient mode is "open" (any valid mobile number, no allowlist): there is deliberately NO OTP_ALLOWED_RECIPIENTS variable or binding.
   // The daily limit and hard ceiling are NOT here: they are Super Admin settings stored in this Worker's D1 (table otp_settings).
@@ -10,7 +13,9 @@
   "name": "aladdin-whatsapp-otp-production",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
-  "workers_dev": true,
+  // PRIVATE: no workers.dev address, no preview URLs, no routes. Reached only through the frontend's service binding OTP_WORKER.
+  "workers_dev": false,
+  "preview_urls": false,
   "routes": [],
   "observability": { "enabled": true },
   "vars": {
@@ -28,7 +33,8 @@
     { "binding": "WHATSAPP_ACCESS_TOKEN", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "WHATSAPP_ACCESS_TOKEN_PRODUCTION" },
     { "binding": "OTP_SIGNING_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "PHONE_OTP_WORKER_SECRET_PRODUCTION" },
     { "binding": "OTP_ADMIN_SIGNING_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_ADMIN_SIGNING_SECRET_PRODUCTION" },
-    { "binding": "OTP_NOTIFY_SIGNING_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_NOTIFY_SIGNING_SECRET_PRODUCTION" }
+    { "binding": "OTP_NOTIFY_SIGNING_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_NOTIFY_SIGNING_SECRET_PRODUCTION" },
+    { "binding": "OTP_ADMIN_GRANT_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_ADMIN_GRANT_SECRET_PRODUCTION" }
   ],
   "d1_databases": [
     {

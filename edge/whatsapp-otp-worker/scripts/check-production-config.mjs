@@ -15,12 +15,13 @@ const must = (ok, reason) => { if (!ok) errors.push(reason); };
 
 const STORE = "acfaa67f391e499db6fde398022f50ce";
 const ACCEPTANCE_D1 = "da65d5e4-8344-4078-9c2d-8a4bb4907f79";
-const ACCEPTANCE_SECRETS = ["WHATSAPP_ACCESS_TOKEN", "PHONE_OTP_WORKER_SECRET", "OTP_ADMIN_SIGNING_SECRET", "OTP_NOTIFY_SIGNING_SECRET"];
+const ACCEPTANCE_SECRETS = ["WHATSAPP_ACCESS_TOKEN", "PHONE_OTP_WORKER_SECRET", "OTP_ADMIN_SIGNING_SECRET", "OTP_NOTIFY_SIGNING_SECRET", "OTP_ADMIN_GRANT_SECRET"];
 const EXPECTED_BINDINGS = [
   ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_ACCESS_TOKEN_PRODUCTION"],
   ["OTP_SIGNING_SECRET", "PHONE_OTP_WORKER_SECRET_PRODUCTION"],
   ["OTP_ADMIN_SIGNING_SECRET", "OTP_ADMIN_SIGNING_SECRET_PRODUCTION"],
   ["OTP_NOTIFY_SIGNING_SECRET", "OTP_NOTIFY_SIGNING_SECRET_PRODUCTION"],
+  ["OTP_ADMIN_GRANT_SECRET", "OTP_ADMIN_GRANT_SECRET_PRODUCTION"],
 ];
 const raw = JSON.stringify(config);
 
@@ -29,7 +30,7 @@ must(config.main === "src/index.ts", "unexpected entry point");
 must(vars.WHATSAPP_DELIVERY_ENABLED === "false", "WhatsApp delivery must stay disabled until the approved cutover");
 must(vars.OTP_ENVIRONMENT === "production", "OTP_ENVIRONMENT must be production");
 must(vars.OTP_RECIPIENT_MODE === "open", "Production recipient mode must be open");
-must(config.workers_dev === true && Array.isArray(config.routes) && config.routes.length === 0 && !config.route && !config.site, "isolated workers.dev only: no custom-domain routes");
+must(config.workers_dev === false && config.preview_urls === false && Array.isArray(config.routes) && config.routes.length === 0 && !config.route && !config.site, "the Worker must be PRIVATE: workers_dev off, preview_urls off, no routes (reached only through the frontend service binding)");
 must(!config.env, "no wrangler environments: this file IS the Production Worker");
 must(
   config.d1_databases?.length === 1 &&
@@ -45,7 +46,7 @@ must(
   bindings.length === EXPECTED_BINDINGS.length &&
   EXPECTED_BINDINGS.every(([b, n]) => bindings.some((x) => x.binding === b && x.secret_name === n && x.store_id === STORE)) &&
   new Set(bindings.map((x) => x.secret_name)).size === EXPECTED_BINDINGS.length,
-  "exactly four distinct *_PRODUCTION secrets (Meta token, send, admin, notify) from the account Secrets Store"
+  "exactly five distinct *_PRODUCTION secrets (Meta token, send, admin, notify, admin grant key) from the account Secrets Store"
 );
 must(bindings.every((x) => x.secret_name.endsWith("_PRODUCTION") && !ACCEPTANCE_SECRETS.includes(x.secret_name)), "Production must never bind an Acceptance secret");
 must(!raw.includes("OTP_ALLOWED_RECIPIENTS"), "no recipient allowlist variable or binding in Production (recipient mode is open)");
@@ -66,4 +67,4 @@ if (errors.length) {
   console.error("OTP Production configuration BLOCKED:\n" + errors.map((s) => "- " + s).join("\n"));
   process.exit(1);
 }
-console.log("OTP Production configuration PASS: isolated Production Worker + D1, four *_PRODUCTION secrets, recipient mode open without an allowlist, delivery disabled");
+console.log("OTP Production configuration PASS: private Production Worker + isolated D1, five *_PRODUCTION secrets, recipient mode open without an allowlist, delivery disabled");

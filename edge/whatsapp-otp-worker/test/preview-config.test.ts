@@ -75,3 +75,11 @@ test("the budget is a D1 setting, never an env var; the admin and notify secrets
   assertBlocked("wrong notify path", (c) => { c.vars.OTP_NOTIFY_URL = "https://example.com/api/other"; });
   assertBlocked("no notify URL", (c) => { delete c.vars.OTP_NOTIFY_URL; });
 });
+
+test("the Acceptance Worker is private (no workers.dev address, preview URLs or routes) and carries a distinct admin grant key", () => {
+  assertBlocked("public workers.dev", (c) => { c.workers_dev = true; });
+  assertBlocked("preview urls", (c) => { c.preview_urls = true; });
+  assertBlocked("missing grant key", (c) => { c.secrets_store_secrets = c.secrets_store_secrets.filter((s: any) => s.binding !== "OTP_ADMIN_GRANT_SECRET"); });
+  assertBlocked("grant key reuses the admin secret", (c) => { c.secrets_store_secrets.find((s: any) => s.binding === "OTP_ADMIN_GRANT_SECRET").secret_name = "OTP_ADMIN_SIGNING_SECRET"; });
+  assertBlocked("production grant key in Acceptance", (c) => { c.secrets_store_secrets.find((s: any) => s.binding === "OTP_ADMIN_GRANT_SECRET").secret_name = "OTP_ADMIN_GRANT_SECRET_PRODUCTION"; });
+});

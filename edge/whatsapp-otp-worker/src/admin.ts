@@ -11,16 +11,20 @@
 import type { Db } from "./db.ts";
 import type { Env } from "./index.ts";
 import { type ApplyFailure, type OtpSettings, applySettings, parseSettingsRequest, usageReport } from "./settings.ts";
-import { sha256Hex, verifySignature } from "./signing.ts";
+import { grantCanonical, sha256Hex, signPayload, verifyGrant, verifySignature } from "./signing.ts";
 
 export const ADMIN_USAGE_PATH = "/v1/admin/usage";
 export const ADMIN_SETTINGS_PATH = "/v1/admin/settings";
+/** Release gate: proves, FROM THE WORKER, that the app's alert endpoint is reachable and accepts this Worker's signature (no data is sent or stored). */
+export const ADMIN_NOTIFY_CHECK_PATH = "/v1/admin/notify-check";
 const MAX_ADMIN_BODY = 2048;
+/** A grant is issued for five minutes; a far-future expiry is never accepted. */
+const GRANT_MAX_AHEAD = 900;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 
 const reply = (status: number, obj: unknown): Response => new Response(JSON.stringify(obj), { status, headers: JSON_HEADERS });
-export const isAdminPath = (path: string): boolean => path === ADMIN_USAGE_PATH || path === ADMIN_SETTINGS_PATH;
+export const isAdminPath = (path: string): boolean => path === ADMIN_USAGE_PATH || path === ADMIN_SETTINGS_PATH || path === ADMIN_NOTIFY_CHECK_PATH;
 
 const view = (s: OtpSettings | null) =>
   s && { daily_limit: s.dailyLimit, hard_ceiling: s.hardCeiling, warn_percent: s.warnPercent, critical_percent: s.criticalPercent, version: s.version, updated_at: s.updatedAt, updated_by: s.updatedBy };
@@ -41,7 +45,45 @@ function usageRequestId(raw: string): string | null {
   } catch { return null; }
 }
 
-export async function handleAdminRequest(request: Request, env: Env, nowMs = Date.now()): Promise<Response> {
+export type NotifyProbe = { result: "reachable" | "secret_mismatch" | "blocked_by_cloudflare" | "refused" | "app_unconfigured" | "unexpected" | "unreachable" | "not_configured"; status?: number };
+
+/**
+ * Send ONE correctly signed but deliberately invalid body (`{"probe":true}`) to the configured alert URL and report only the HTTP class of the
+ * answer. A healthy path answers 400 (signature accepted, schema refused, nothing recorded and nobody notified). Nothing about the response body
+ * is read. The URL is a pinned https variable of this Worker, never request input.
+ */
+export async function probeNotifyPath(env: Env, nowSeconds: number, fetcher: typeof fetch = fetch): Promise<NotifyProbe> {
+  const url = env.OTP_NOTIFY_URL;
+  if (!url || !env.OTP_NOTIFY_SIGNING_SECRET?.get) return { result: "not_configured" };
+  let secret = "";
+  try { secret = await env.OTP_NOTIFY_SIGNING_SECRET.get(); } catch { return { result: "not_configured" }; }
+  const body = JSON.stringify({ probe: true });
+  const id = "ntf_probe";
+  const signature = secret ? await signPayload(secret, id, nowSeconds, body) : null;
+  if (!signature) return { result: "not_configured" };
+  try {
+    const res = await fetcher(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", "webhook-id": id, "webhook-timestamp": String(nowSeconds), "webhook-signature": signature },
+      body,
+      redirect: "manual",
+      signal: AbortSignal.timeout(8000),
+    });
+    const challenged = res.headers.get("cf-mitigated") === "challenge";
+    await res.body?.cancel().catch(() => undefined);
+    const status = res.status;
+    if (challenged) return { result: "blocked_by_cloudflare", status };
+    if (status === 400) return { result: "reachable", status };
+    if (status === 401) return { result: "secret_mismatch", status };
+    if (status === 403) return { result: "refused", status };
+    if (status === 503) return { result: "app_unconfigured", status };
+    return { result: "unexpected", status };
+  } catch {
+    return { result: "unreachable" };
+  }
+}
+
+export async function handleAdminRequest(request: Request, env: Env, nowMs = Date.now(), runtime?: () => Promise<Record<string, string | number | boolean>>, fetcher: typeof fetch = fetch): Promise<Response> {
   const path = new URL(request.url).pathname;
   if (request.method !== "POST" || !isAdminPath(path)) return reply(404, {});
   if (request.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") return reply(415, {});
@@ -67,6 +109,19 @@ export async function handleAdminRequest(request: Request, env: Env, nowMs = Dat
   // The signed id must BE this request's identity, so one valid signature cannot be replayed as a different request.
   if (webhookId !== `adm_${requestId}`) return reply(400, { error: "invalid_request" });
 
+  // A settings change must also carry a grant the Aladdin DATABASE issued for exactly this request (see begin). The grant key is a third,
+  // separate secret that the app server never holds, so a leaked admin signing secret can authenticate a request but cannot authorize a
+  // change or impersonate an administrator. Checked BEFORE the replay claim so a forged request does not burn a request id.
+  if (settingsReq) {
+    if (!env.OTP_ADMIN_GRANT_SECRET?.get) return reply(503, { error: "grant_unconfigured" });
+    let grantSecret = "";
+    try { grantSecret = await env.OTP_ADMIN_GRANT_SECRET.get(); } catch { return reply(503, { error: "grant_unconfigured" }); }
+    if (!grantSecret) return reply(503, { error: "grant_unconfigured" });
+    const fresh = settingsReq.grantExpires >= nowSeconds && settingsReq.grantExpires - nowSeconds <= GRANT_MAX_AHEAD;
+    const canonical = await grantCanonical(settingsReq, settingsReq.reasonRaw);
+    if (!fresh || !(await verifyGrant(grantSecret, canonical, settingsReq.grant))) return reply(403, { error: "grant_invalid" });
+  }
+
   // One-time claim: a captured signed request is refused the second time, even inside the clock window.
   try {
     const claim = await db.prepare("INSERT OR IGNORE INTO otp_admin_requests (request_hash, created_at) VALUES (?1, ?2)").bind(await sha256Hex(webhookId), nowSeconds).run();
@@ -75,7 +130,13 @@ export async function handleAdminRequest(request: Request, env: Env, nowMs = Dat
   } catch { return reply(503, { error: "storage_unavailable" }); }
 
   try {
-    if (path === ADMIN_USAGE_PATH) return reply(200, await usageReport(db, nowSeconds));
+    if (path === ADMIN_NOTIFY_CHECK_PATH) return reply(200, await probeNotifyPath(env, nowSeconds, fetcher));
+    if (path === ADMIN_USAGE_PATH) {
+      const report = await usageReport(db, nowSeconds);
+      let facts: Record<string, string | number | boolean> | undefined;
+      try { facts = await runtime?.(); } catch { facts = undefined; }
+      return reply(200, facts ? { ...report, runtime: facts } : report);
+    }
     const result = await applySettings(db, settingsReq!, nowSeconds);
     if (!result.ok) return reply(STATUS[result.error], result.currentVersion === undefined ? { error: result.error } : { error: result.error, current_version: result.currentVersion });
     return reply(200, { status: "applied", old: view(result.old), new: view(result.new), version: result.new.version });

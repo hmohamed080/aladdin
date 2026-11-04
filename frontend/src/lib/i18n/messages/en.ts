@@ -2497,6 +2497,10 @@ export const en = {
         title: "WhatsApp code delivery is failing",
         body: "{failed} of {attempts} codes failed in the last {window_minutes} minutes ({failure_percent}%).",
       },
+      audit_unmatched: {
+        title: "WhatsApp limits changed without approval",
+        body: "The delivery service recorded a change to the code limits (version {version}) that was not approved here. Review the change history.",
+      },
     },
     message: {
       sent: {
@@ -2674,6 +2678,31 @@ export const en = {
     notConfigured: "The limits are not set yet. Until a Super Admin sets them, no code can be sent.",
     unavailable: "The usage could not be loaded. Nothing was changed. Try again shortly.",
     viewOnly: "You can view these numbers. Only a Super Admin can change them.",
+    notifyCheck: {
+      button: "Test the alert connection",
+      running: "Testing…",
+      reachable: "The alert connection works.",
+      secret_mismatch: "The sending service and this app use different alert keys.",
+      blocked_by_cloudflare: "Cloudflare protection is blocking the sending service from reaching this app.",
+      refused: "This app refused the alert (wrong environment or a security rule).",
+      app_unconfigured: "This app is not set up to receive alerts yet.",
+      unexpected: "The alert connection answered in an unexpected way.",
+      unreachable: "The sending service could not reach this app.",
+      not_configured: "The sending service has no alert connection configured.",
+    },
+    runtime: {
+      title: "Sending service",
+      environment: "Environment",
+      delivery: "Sending",
+      deliveryOn: "On",
+      deliveryOff: "Off",
+      recipients: "Recipients",
+      recipientsOpen: "Any valid mobile number",
+      recipientsList: "Approved test numbers only ({count})",
+      bindings: "Secure connections",
+      ready: "All in place",
+      missing: "Something is missing",
+    },
     usage: {
       title: "Last 24 hours",
       consumed: "Used",

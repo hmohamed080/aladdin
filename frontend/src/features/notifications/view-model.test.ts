@@ -141,6 +141,8 @@ describe("every approved event type has real bilingual copy", () => {
       "whatsapp_otp.budget_critical": { percent: 91, consumed: 137, limit: 150, remaining: 13, environment: "production" },
       "whatsapp_otp.budget_exhausted": { limit: 150, environment: "production" },
       "whatsapp_otp.failure_rate": { attempts: 20, failed: 8, failure_percent: 40, window_minutes: 60, environment: "production" },
+      // The version number only; no actor, value or reason is ever placed in a notification.
+      "whatsapp_otp.audit_unmatched": { version: 7 },
     };
 
     const unfilled: string[] = [];

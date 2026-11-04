@@ -65,6 +65,8 @@ export interface Env {
   OTP_ADMIN_SIGNING_SECRET?: { get(): Promise<string> };
   /** Secrets Store binding that signs the outbound operational-alert calls to the app. Separate from the send and admin secrets. */
   OTP_NOTIFY_SIGNING_SECRET?: { get(): Promise<string> };
+  /** Third admin secret: verifies the database-issued grant that authorizes a settings change. The app server does not hold it. */
+  OTP_ADMIN_GRANT_SECRET?: { get(): Promise<string> };
   /** https URL of the app's notification endpoint (this Worker holds no database credential; it only posts signed statistics there). */
   OTP_NOTIFY_URL?: string;
   /** Exact E.164 numbers, comma separated. Set in the Worker dashboard, never in the repository. */
@@ -336,7 +338,7 @@ export async function submitOtp(req: SendRequest, env: Env, fetcher: typeof fetc
 }
 
 /** Signed, side-effect-free runtime check: reports whether each binding is PRESENT and the switches' state. Never a value. */
-async function preflight(env: Env): Promise<Response> {
+async function preflightReport(env: Env): Promise<Record<string, string | number | boolean>> {
   let tokenBound = false;
   try { tokenBound = Boolean(await env.WHATSAPP_ACCESS_TOKEN?.get()); } catch { tokenBound = false; }
   let d1 = false;
@@ -345,11 +347,14 @@ async function preflight(env: Env): Promise<Response> {
   try { settings = env.IDEMPOTENCY_DB ? await readSettings(env.IDEMPOTENCY_DB as unknown as Db) : null; } catch { settings = null; }
   let adminBound = false;
   try { adminBound = Boolean(await env.OTP_ADMIN_SIGNING_SECRET?.get()); } catch { adminBound = false; }
+  let grantBound = false;
+  try { grantBound = Boolean(await env.OTP_ADMIN_GRANT_SECRET?.get()); } catch { grantBound = false; }
   let notifyConfigured = false;
   try { notifyConfigured = Boolean(env.OTP_NOTIFY_URL) && Boolean(await env.OTP_NOTIFY_SIGNING_SECRET?.get()); } catch { notifyConfigured = false; }
-  return answer(200, {
+  return {
     signing_secret_bound: true,
     admin_secret_bound: adminBound,
+    admin_grant_secret_bound: grantBound,
     notify_configured: notifyConfigured,
     meta_token_bound: tokenBound,
     d1_reachable: d1,
@@ -366,12 +371,19 @@ async function preflight(env: Env): Promise<Response> {
     languages: (env.WHATSAPP_OTP_LANGUAGES ?? "ar"),
     graph_version: env.WHATSAPP_GRAPH_API_VERSION,
     sender_id_suffix: String(env.WHATSAPP_PHONE_NUMBER_ID ?? "").slice(-4),
-  });
+  };
+}
+
+/** Signed, side-effect-free runtime check: reports whether each binding is PRESENT and the switches' state. Never a value. */
+async function preflight(env: Env): Promise<Response> {
+  return answer(200, await preflightReport(env));
 }
 
 export async function handleRequest(request: Request, env: Env, fetcher: typeof fetch = fetch): Promise<Response> {
   const path = new URL(request.url).pathname;
-  if (isAdminPath(path)) return handleAdminRequest(request, env); // its own secret, its own checks
+  // its own secret, its own checks; the admin usage answer also carries the same non-secret runtime facts as the signed preflight, because a
+  // private Worker (no public address) cannot be preflighted from outside
+  if (isAdminPath(path)) return handleAdminRequest(request, env, Date.now(), () => preflightReport(env), fetcher);
   if (request.method !== "POST" || (path !== SEND_PATH && path !== PREFLIGHT_PATH)) return answer(404);
   if (request.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") return answer(415);
   if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY) return answer(413);

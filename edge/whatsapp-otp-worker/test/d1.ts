@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert";
 import { readFileSync, readdirSync } from "node:fs";
+import { createHash, createHmac } from "node:crypto";
 import { Miniflare } from "miniflare";
 import type { Db } from "../src/db.ts";
 import type { Env, ReplayDb } from "../src/index.ts";
@@ -10,6 +11,8 @@ export const ADMIN_BYTES = new Uint8Array(32).fill(77);
 export const ADMIN_SECRET = "whsec_" + btoa(String.fromCharCode(...ADMIN_BYTES));
 export const NOTIFY_BYTES = new Uint8Array(32).fill(55);
 export const NOTIFY_SECRET = "whsec_" + btoa(String.fromCharCode(...NOTIFY_BYTES));
+export const GRANT_BYTES = new Uint8Array(32).fill(33);
+export const GRANT_SECRET = "whsec_" + btoa(String.fromCharCode(...GRANT_BYTES));
 export const ACTOR = "11111111-2222-4333-8444-555555555555";
 export const OTHER_ACTOR = "99999999-2222-4333-8444-555555555555";
 export const NOTIFY_URL = "https://app.test/api/internal/whatsapp-otp/notify";
@@ -34,6 +37,7 @@ export function envFor(d1: unknown, over: Partial<Env> = {}): Env {
   return baseEnv({
     IDEMPOTENCY_DB: d1 as ReplayDb,
     OTP_ADMIN_SIGNING_SECRET: { get: async () => ADMIN_SECRET },
+    OTP_ADMIN_GRANT_SECRET: { get: async () => GRANT_SECRET },
     OTP_NOTIFY_SIGNING_SECRET: { get: async () => NOTIFY_SECRET },
     OTP_NOTIFY_URL: NOTIFY_URL,
     ...over,
@@ -41,10 +45,21 @@ export function envFor(d1: unknown, over: Partial<Env> = {}): Env {
 }
 
 export type SettingsBody = Record<string, unknown>;
-export const settingsBody = (over: SettingsBody = {}): SettingsBody => ({
-  request_id: crypto.randomUUID(), actor_id: ACTOR, expected_version: 0, daily_limit: 150, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90,
-  reason: "Initial limits approved by the owner for launch", ceiling_confirmation: "5000", ceiling_authorized: true, ...over,
-});
+/** What the Aladdin database signs in admin_whatsapp_otp_settings_begin (same canonical string), computed synchronously for tests. */
+export function grantFor(b: SettingsBody, opts: { bytes?: Uint8Array; expires?: number } = {}): { grant: string; grant_expires: number } {
+  const expires = opts.expires ?? Math.floor(Date.now() / 1000) + 300;
+  const canonical = ["v1", b.request_id, b.actor_id, b.expected_version, b.daily_limit, b.hard_ceiling, b.warn_percent, b.critical_percent, b.ceiling_authorized ? 1 : 0, expires, createHash("sha256").update(String(b.reason)).digest("hex")].join("|");
+  return { grant: createHmac("sha256", Buffer.from(opts.bytes ?? GRANT_BYTES)).update(canonical).digest("base64"), grant_expires: expires };
+}
+
+/** A valid body INCLUDING the database grant over exactly these fields. Pass `grant`/`grant_expires` in `over` to forge or break it. */
+export const settingsBody = (over: SettingsBody = {}): SettingsBody => {
+  const base: SettingsBody = {
+    request_id: crypto.randomUUID(), actor_id: ACTOR, expected_version: 0, daily_limit: 150, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90,
+    reason: "Initial limits approved by the owner for launch", ceiling_confirmation: "5000", ceiling_authorized: true, ...over,
+  };
+  return { ...grantFor(base), ...base };
+};
 
 /** A request signed the way the app server signs it (separate admin secret, id = adm_<request_id>). */
 export async function adminCall(

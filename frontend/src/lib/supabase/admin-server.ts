@@ -87,7 +87,7 @@ async function whatsappOtpRpc<T>(call: (c: SupabaseClient<Database>) => PromiseL
 }
 
 export function whatsappOtpSettingsBegin(a: { actor: string; expectedVersion: number; old: Json; next: Json; reason: string }) {
-  return whatsappOtpRpc<{ request_id: string; actor_id: string; ceiling_changed: boolean }>((c) =>
+  return whatsappOtpRpc<{ request_id: string; actor_id: string; ceiling_changed: boolean; reason: string; grant: string; grant_expires: number }>((c) =>
     c.rpc("admin_whatsapp_otp_settings_begin", { p_actor: a.actor, p_expected_version: a.expectedVersion, p_old: a.old, p_new: a.next, p_reason: a.reason }),
   );
 }
@@ -99,7 +99,7 @@ export function whatsappOtpSettingsFinish(a: { actor: string; request: string; s
 }
 
 export function whatsappOtpSettingsReconcile(applied: Json) {
-  return whatsappOtpRpc<{ applied: number; abandoned: number }>((c) => c.rpc("admin_whatsapp_otp_settings_reconcile", { p_applied: applied }));
+  return whatsappOtpRpc<{ applied: number; abandoned: number; unmatched: number }>((c) => c.rpc("admin_whatsapp_otp_settings_reconcile", { p_applied: applied }));
 }
 
 export function whatsappOtpNotificationRecord(a: { eventKey: string; kind: string; sourceEnv: string; occurredAt: number; stats: Json }) {

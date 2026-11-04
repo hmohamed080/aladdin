@@ -34,6 +34,14 @@ describe("Cloudflare production config (committed Wrangler files)", () => {
     expect(services).toContainEqual({ binding: "BACKEND", service: "aladdin-backend-production" });
   });
 
+  it("reaches the WhatsApp delivery Worker only through its own environment's private service binding", () => {
+    const config = frontendConfig() as unknown as { env: { production: { services: { binding: string; service: string }[] }; preview: { services: { binding: string; service: string }[] } } };
+    expect(config.env.production.services).toContainEqual({ binding: "OTP_WORKER", service: "aladdin-whatsapp-otp-production" });
+    expect(config.env.preview.services).toContainEqual({ binding: "OTP_WORKER", service: "aladdin-whatsapp-otp-preview" });
+    expect(config.env.production.services.filter((s) => s.binding === "OTP_WORKER")).toHaveLength(1);
+    expect(config.env.preview.services.filter((s) => s.binding === "OTP_WORKER")).toHaveLength(1);
+  });
+
   it("refuses a frontend with no BACKEND binding", () => {
     const config = frontendConfig();
     config.env.production.services = config.env.production.services.filter((s) => s.binding !== "BACKEND");

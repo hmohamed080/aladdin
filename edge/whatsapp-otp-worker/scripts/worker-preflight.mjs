@@ -31,6 +31,7 @@ export async function run(base, env, fetchImpl = fetch, log = console.log) {
     settings_initialized: out.settings_initialized === true,
     daily_send_limit_configured: Number.isInteger(out.daily_send_limit) && out.daily_send_limit > 0 && out.daily_send_limit <= out.hard_ceiling,
     admin_secret_bound: out.admin_secret_bound === true,
+    admin_grant_secret_bound: out.admin_grant_secret_bound === true,
     notify_configured: out.notify_configured === true,
     recipient_mode_is_allowlist: out.recipient_mode === "allowlist",
   };

@@ -274,3 +274,191 @@ describe("usage report", () => {
     });
   });
 });
+
+import { ADMIN_BYTES, ADMIN_SECRET, GRANT_SECRET, NOTIFY_SECRET, grantFor } from "./d1.ts";
+
+describe("database-issued grant: a leaked admin signing secret cannot authorize or impersonate (F-1)", () => {
+  const counts = async (db: any) => ({
+    settings: (await db.prepare("SELECT COUNT(*) AS n FROM otp_settings").bind().first())?.n,
+    audit: (await db.prepare("SELECT COUNT(*) AS n FROM otp_settings_audit").bind().first())?.n,
+    claims: (await db.prepare("SELECT COUNT(*) AS n FROM otp_admin_requests").bind().first())?.n,
+  });
+  const refused = async (over: Record<string, unknown>, mutate?: (b: Record<string, any>) => void, envOver: Record<string, unknown> = {}) => {
+    let out: { status: number; body: any; counts: any } | undefined;
+    await withD1(async (d1, db) => {
+      const body = settingsBody(over) as Record<string, any>;
+      mutate?.(body);
+      const res = await adminCall(envFor(d1, envOver), SETTINGS_PATH, body);
+      out = { status: res.status, body: await json(res), counts: await counts(db) };
+    });
+    return out!;
+  };
+  const nothing = { settings: 0, audit: 0, claims: 0 };
+
+  test("a request signed with the admin secret but WITHOUT a grant is refused as malformed and writes nothing", async () => {
+    const r = await refused({}, (b) => { delete b.grant; delete b.grant_expires; });
+    assert.equal(r.status, 400);
+    assert.deepEqual(r.counts, nothing);
+  });
+
+  test("a grant forged with the wrong key (the admin secret, or any key the Worker does not hold) is refused; the request id is not burned", async () => {
+    await withD1(async (d1, db) => {
+      const env = envFor(d1);
+      const forged = settingsBody();
+      Object.assign(forged, grantFor(forged, { bytes: ADMIN_BYTES }));
+      const res = await adminCall(env, SETTINGS_PATH, forged);
+      assert.equal(res.status, 403);
+      assert.deepEqual(await json(res), { error: "grant_invalid" });
+      assert.deepEqual(await counts(db), nothing);
+      Object.assign(forged, grantFor(forged)); // the same request id, now with the genuine grant, is still usable
+      assert.equal((await adminCall(env, SETTINGS_PATH, forged)).status, 200);
+    });
+  });
+
+  test("a genuine grant cannot be reused for different values, a different actor, a flipped ceiling flag, another reason or another request", async () => {
+    const tamper: [string, (b: Record<string, any>) => void][] = [
+      ["daily limit", (b) => { b.daily_limit = 151; }],
+      ["hard ceiling", (b) => { b.hard_ceiling = 9000; b.ceiling_confirmation = "9000"; }],
+      ["warn", (b) => { b.warn_percent = 60; }],
+      ["critical", (b) => { b.critical_percent = 95; }],
+      ["actor (impersonation)", (b) => { b.actor_id = OTHER_ACTOR; }],
+      ["expected version", (b) => { b.expected_version = 1; }],
+      ["reason", (b) => { b.reason = "A different reason that was never approved"; }],
+      ["request id", (b) => { b.request_id = crypto.randomUUID(); }],
+      ["expiry", (b) => { b.grant_expires += 60; }],
+    ];
+    for (const [name, mutate] of tamper) {
+      const r = await refused({}, mutate);
+      assert.equal(r.status, 403, name);
+      assert.deepEqual(r.counts, nothing, name);
+    }
+  });
+
+  test("a ceiling change the database did not authorize cannot be turned on by editing the flag", async () => {
+    // the database issued the grant for ceiling_authorized=false; the attacker flips the field to true
+    const r = await refused({ ceiling_authorized: false }, (b) => { b.ceiling_authorized = true; });
+    assert.equal(r.status, 403);
+    assert.deepEqual(r.counts, nothing);
+  });
+
+  test("an expired grant and a far-future grant are refused", async () => {
+    const past = await refused({}, (b) => Object.assign(b, grantFor(b, { expires: Math.floor(Date.now() / 1000) - 5 })));
+    assert.equal(past.status, 403);
+    const future = await refused({}, (b) => Object.assign(b, grantFor(b, { expires: Math.floor(Date.now() / 1000) + 86_400 })));
+    assert.equal(future.status, 403);
+    assert.deepEqual(future.counts, nothing);
+  });
+
+  test("an unbound, empty or unreadable grant secret fails closed (503) and writes nothing", async () => {
+    for (const over of [{ OTP_ADMIN_GRANT_SECRET: undefined }, { OTP_ADMIN_GRANT_SECRET: { get: async () => "" } }, { OTP_ADMIN_GRANT_SECRET: { get: async () => { throw new Error("store down"); } } }]) {
+      const r = await refused({}, undefined, over);
+      assert.equal(r.status, 503);
+      assert.deepEqual(r.body, { error: "grant_unconfigured" });
+      assert.deepEqual(r.counts, nothing);
+    }
+  });
+
+  test("a malformed grant (wrong length, wrong alphabet, wrong type) is refused as invalid", async () => {
+    for (const bad of ["", "x", "A".repeat(43), "A".repeat(44), "!".repeat(43) + "=", 5]) {
+      const r = await refused({}, (b) => { b.grant = bad; });
+      assert.equal(r.status, 400, String(bad));
+      assert.deepEqual(r.counts, nothing);
+    }
+  });
+
+  test("the read-only usage route needs no grant, and a valid grant never replaces the admin signature", async () => {
+    await withD1(async (d1) => {
+      const env = envFor(d1);
+      assert.equal((await adminCall(env, USAGE_PATH, usageBody())).status, 200);
+      assert.equal((await adminCall(env, SETTINGS_PATH, settingsBody(), { skipSignature: true })).status, 401);
+    });
+  });
+});
+
+describe("usage carries the non-secret runtime facts (a private Worker cannot be preflighted from outside)", () => {
+  test("environment, switches and which bindings exist - never a value", async () => {
+    await withD1(async (d1) => {
+      await configure(d1);
+      const env = envFor(d1, { OTP_ENVIRONMENT: "production", OTP_RECIPIENT_MODE: "open", OTP_ALLOWED_RECIPIENTS: "", WHATSAPP_DELIVERY_ENABLED: "false" });
+      const res = await adminCall(env, USAGE_PATH, usageBody());
+      const text = await res.text();
+      const out = JSON.parse(text);
+      assert.equal(res.status, 200);
+      assert.deepEqual(
+        { e: out.runtime.environment, m: out.runtime.recipient_mode, d: out.runtime.delivery_enabled, a: out.runtime.allowlist_entries, ad: out.runtime.admin_secret_bound, g: out.runtime.admin_grant_secret_bound, n: out.runtime.notify_configured, db: out.runtime.d1_reachable },
+        { e: "production", m: "open", d: false, a: 0, ad: true, g: true, n: true, db: true },
+      );
+      for (const secret of [ADMIN_SECRET, GRANT_SECRET, NOTIFY_SECRET, SECRET]) assert.ok(!text.includes(secret), "no secret value may appear in the answer");
+      const missing = await json(await adminCall(envFor(d1, { OTP_ADMIN_GRANT_SECRET: undefined }), USAGE_PATH, usageBody()));
+      assert.equal(missing.runtime.admin_grant_secret_bound, false);
+    });
+  });
+});
+
+import { verifySignature as verifyHeaders } from "../src/signing.ts";
+
+describe("notify-check: the Worker proves the app's alert endpoint is reachable (F-5 release gate)", () => {
+  const NOTIFY_CHECK = "/v1/admin/notify-check";
+  const check = async (answer: (req: Request) => Promise<Response> | Response, envOver: Record<string, unknown> = {}) => {
+    const seen: { url: string; headers: Headers; body: string; redirect?: string }[] = [];
+    const fetcher = (async (url: string, init: RequestInit) => {
+      seen.push({ url, headers: new Headers(init.headers), body: String(init.body), redirect: init.redirect });
+      return answer(new Request(url, init));
+    }) as unknown as typeof fetch;
+    let result: Record<string, any> = {};
+    let status = 0;
+    await withD1(async (d1) => {
+      const body = usageBody();
+      const raw = JSON.stringify(body);
+      const id = `adm_${body.request_id}`;
+      const stamp = String(Math.floor(Date.now() / 1000));
+      const { sign } = await import("./support.ts");
+      const headers = { "content-type": "application/json", "webhook-id": id, "webhook-timestamp": stamp, "webhook-signature": await sign(id, stamp, raw, ADMIN_BYTES) };
+      const res = await handleRequest(new Request("https://worker.test" + NOTIFY_CHECK, { method: "POST", headers, body: raw }), envFor(d1, envOver), fetcher);
+      status = res.status;
+      result = await json(res);
+    });
+    return { status, result, seen };
+  };
+
+  test("a 400 from the app (signature accepted, probe body refused) means reachable; the probe is signed, minimal and pinned to the configured URL", async () => {
+    const r = await check(() => new Response(null, { status: 400 }));
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.result, { result: "reachable", status: 400 });
+    assert.equal(r.seen.length, 1);
+    assert.equal(r.seen[0]!.url, "https://app.test/api/internal/whatsapp-otp/notify");
+    assert.equal(r.seen[0]!.body, '{"probe":true}');
+    assert.equal(r.seen[0]!.redirect, "manual");
+    assert.equal(await verifyHeaders(r.seen[0]!.body, r.seen[0]!.headers, NOTIFY_SECRET), true, "signed with the NOTIFY secret");
+    assert.equal(await verifyHeaders(r.seen[0]!.body, r.seen[0]!.headers, ADMIN_SECRET), false, "never the admin secret");
+  });
+
+  test("each failure mode is reported as a distinct, value-free category", async () => {
+    assert.deepEqual((await check(() => new Response(null, { status: 401 }))).result, { result: "secret_mismatch", status: 401 });
+    assert.deepEqual((await check(() => new Response(null, { status: 403 }))).result, { result: "refused", status: 403 });
+    assert.deepEqual((await check(() => new Response(null, { status: 403, headers: { "cf-mitigated": "challenge" } }))).result, { result: "blocked_by_cloudflare", status: 403 });
+    assert.deepEqual((await check(() => new Response(null, { status: 503 }))).result, { result: "app_unconfigured", status: 503 });
+    assert.deepEqual((await check(() => new Response(null, { status: 200 }))).result, { result: "unexpected", status: 200 });
+    assert.deepEqual((await check(() => new Response(null, { status: 302, headers: { location: "https://elsewhere.test/" } }))).result, { result: "unexpected", status: 302 });
+    assert.deepEqual((await check(() => { throw new Error("network down https://secret-host.example"); })).result, { result: "unreachable" });
+  });
+
+  test("an unconfigured Worker reports not_configured and calls nothing", async () => {
+    for (const over of [{ OTP_NOTIFY_URL: undefined }, { OTP_NOTIFY_SIGNING_SECRET: undefined }, { OTP_NOTIFY_SIGNING_SECRET: { get: async () => "" } }]) {
+      const r = await check(() => new Response(null, { status: 400 }), over);
+      assert.deepEqual(r.result, { result: "not_configured" });
+      assert.equal(r.seen.length, 0);
+    }
+  });
+
+  test("it needs the admin signature like every admin route, and is single-use", async () => {
+    await withD1(async (d1) => {
+      const env = envFor(d1);
+      assert.equal((await adminCall(env, NOTIFY_CHECK, usageBody(), { skipSignature: true })).status, 401);
+      assert.equal((await adminCall(env, NOTIFY_CHECK, usageBody(), { secretBytes: new Uint8Array(32).fill(90) })).status, 401);
+      const body = usageBody();
+      assert.equal((await adminCall(env, NOTIFY_CHECK, body)).status, 200);
+      assert.equal((await adminCall(env, NOTIFY_CHECK, body)).status, 409);
+    });
+  });
+});

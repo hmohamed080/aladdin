@@ -54,7 +54,9 @@ test("the Worker is isolated: name, routes, environments", () => {
   blocked("frontend name", (c) => { c.name = "aladdin-frontend-production"; });
   blocked("custom route", (c) => { c.routes = ["aladdindecore.com/*"]; });
   blocked("route key", (c) => { c.route = "aladdindecore.com/*"; });
-  blocked("workers_dev off", (c) => { c.workers_dev = false; });
+  blocked("public workers.dev address", (c) => { c.workers_dev = true; });
+  blocked("preview URLs on", (c) => { c.preview_urls = true; });
+  blocked("preview URLs missing", (c) => { delete c.preview_urls; });
   blocked("env block", (c) => { c.env = { staging: {} }; });
 });
 
@@ -66,11 +68,14 @@ test("the D1 database is exactly the Production one; the Acceptance one is refus
   blocked("acceptance id in a var", (c) => { c.vars.X = preview.d1_databases[0].database_id; });
 });
 
-test("exactly four distinct *_PRODUCTION secrets; no Acceptance secret, no reuse, no SMS-hook secret", () => {
+test("exactly five distinct *_PRODUCTION secrets (incl. the admin grant key); no Acceptance secret, no reuse, no SMS-hook secret", () => {
   const names = (c: any) => c.secrets_store_secrets as any[];
   blocked("acceptance token", (c) => { names(c)[0].secret_name = "WHATSAPP_ACCESS_TOKEN"; });
   blocked("acceptance send secret", (c) => { names(c)[1].secret_name = "PHONE_OTP_WORKER_SECRET"; });
   blocked("acceptance admin secret", (c) => { names(c)[2].secret_name = "OTP_ADMIN_SIGNING_SECRET"; });
+  blocked("acceptance grant key", (c) => { names(c)[4].secret_name = "OTP_ADMIN_GRANT_SECRET"; });
+  blocked("grant key reuses the admin secret", (c) => { names(c)[4].secret_name = "OTP_ADMIN_SIGNING_SECRET_PRODUCTION"; });
+  blocked("missing grant binding", (c) => { c.secrets_store_secrets = names(c).filter((s) => s.binding !== "OTP_ADMIN_GRANT_SECRET"); });
   blocked("admin reuses the send secret", (c) => { names(c)[2].secret_name = "PHONE_OTP_WORKER_SECRET_PRODUCTION"; });
   blocked("notify reuses the admin secret", (c) => { names(c)[3].secret_name = "OTP_ADMIN_SIGNING_SECRET_PRODUCTION"; });
   blocked("missing admin binding", (c) => { c.secrets_store_secrets = names(c).filter((s) => s.binding !== "OTP_ADMIN_SIGNING_SECRET"); });

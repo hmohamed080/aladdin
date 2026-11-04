@@ -4,11 +4,11 @@ import { strict as assert } from "node:assert";
 import { run } from "../scripts/worker-preflight.mjs";
 import { handleRequest } from "../src/index.ts";
 import { FAKE_TOKEN, PHONE, SECRET, baseEnv as plainEnv, memoryReplayDb, mockMeta } from "./support.ts";
-import { ADMIN_SECRET, NOTIFY_SECRET, NOTIFY_URL } from "./d1.ts";
+import { ADMIN_SECRET, GRANT_SECRET, NOTIFY_SECRET, NOTIFY_URL } from "./d1.ts";
 
 // A fully provisioned Worker: the send, admin and notify bindings, the notify URL and an initialized settings row.
 const baseEnv = (over: Partial<ReturnType<typeof plainEnv>> = {}) =>
-  plainEnv({ OTP_ADMIN_SIGNING_SECRET: { get: async () => ADMIN_SECRET }, OTP_NOTIFY_SIGNING_SECRET: { get: async () => NOTIFY_SECRET }, OTP_NOTIFY_URL: NOTIFY_URL, ...over });
+  plainEnv({ OTP_ADMIN_SIGNING_SECRET: { get: async () => ADMIN_SECRET }, OTP_ADMIN_GRANT_SECRET: { get: async () => GRANT_SECRET }, OTP_NOTIFY_SIGNING_SECRET: { get: async () => NOTIFY_SECRET }, OTP_NOTIFY_URL: NOTIFY_URL, ...over });
 
 const through = (env: ReturnType<typeof baseEnv>, meta = mockMeta()) =>
   (async (url: string, init: RequestInit) => handleRequest(new Request(url, init), env, meta.fetcher)) as unknown as typeof fetch;

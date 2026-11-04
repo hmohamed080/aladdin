@@ -77,7 +77,7 @@ do $$
 declare
   v_def text;
   v_missing text[];
-  v_add text[] := array['whatsapp_otp.budget_warning', 'whatsapp_otp.budget_critical', 'whatsapp_otp.budget_exhausted', 'whatsapp_otp.failure_rate'];
+  v_add text[] := array['whatsapp_otp.budget_warning', 'whatsapp_otp.budget_critical', 'whatsapp_otp.budget_exhausted', 'whatsapp_otp.failure_rate', 'whatsapp_otp.audit_unmatched'];
 begin
   select pg_get_constraintdef(c.oid) into v_def from pg_constraint c
    where c.conname = 'ck_notifications_event_type_known' and c.conrelid = 'public.notifications'::regclass;
@@ -123,9 +123,9 @@ comment on table app.whatsapp_otp_settings_requests is
 -- The key is (event_key, occurred_at): the Worker retries the same event with the same occurred_at, while a recreated D1 that restarts its
 -- episode counter produces a different occurred_at and is therefore never silently swallowed as a duplicate.
 create table app.whatsapp_otp_notification_events (
-  event_key    text not null check (event_key ~ '^(budget_warning|budget_critical|budget_exhausted|failure_rate):[0-9]{1,9}$'),
+  event_key    text not null check (event_key ~ '^(budget_warning|budget_critical|budget_exhausted|failure_rate|audit_unmatched):[0-9]{1,9}$'),
   occurred_at  timestamptz not null,
-  kind         text not null check (kind in ('budget_warning', 'budget_critical', 'budget_exhausted', 'failure_rate')),
+  kind         text not null check (kind in ('budget_warning', 'budget_critical', 'budget_exhausted', 'failure_rate', 'audit_unmatched')),
   source_env   text not null check (source_env ~ '^[a-z]{3,16}$'),
   stats        jsonb not null check (jsonb_typeof(stats) = 'object' and length(stats::text) <= 1024),
   recipients   integer not null check (recipients >= 0),
@@ -136,6 +136,21 @@ alter table app.whatsapp_otp_notification_events enable row level security;
 revoke all on app.whatsapp_otp_notification_events from public, anon, authenticated, service_role;
 comment on table app.whatsapp_otp_notification_events is
   'Dedupe ledger in front of app.notify for the WhatsApp OTP operational alerts. Closed table.';
+
+-- The GRANT KEY: a symmetric key that exists only in this database and in the delivery Worker's Secrets Store (never in the app server).
+-- begin signs a short-lived grant with it for exactly one request; the Worker refuses a settings change without a valid grant, so a leaked
+-- admin signing secret can authenticate a request but cannot authorize a change or impersonate an administrator. The key is NOT created
+-- here: the owner inserts the same value that is stored as OTP_ADMIN_GRANT_SECRET[_PRODUCTION] (as postgres, once, never in a migration):
+--   insert into app.whatsapp_otp_grant_key (id, key) values (1, decode('<base64 of the 32+ key bytes>', 'base64'));
+-- Until it exists begin raises grant_key_unconfigured and no change can be made (fail closed). No client role can read or write this table.
+create table app.whatsapp_otp_grant_key (
+  id         smallint primary key check (id = 1),
+  key        bytea not null check (octet_length(key) >= 32),
+  created_at timestamptz not null default clock_timestamp()
+);
+alter table app.whatsapp_otp_grant_key enable row level security;
+revoke all on app.whatsapp_otp_grant_key from public, anon, authenticated, service_role;
+comment on table app.whatsapp_otp_grant_key is 'Closed table. The single HMAC key that signs WhatsApp OTP settings grants; shared only with the delivery Worker Secrets Store.';
 
 -- ---------------------------------------------------------------------------
 -- 4. Validation: the same invariants the Worker and its D1 CHECKs enforce
@@ -185,6 +200,9 @@ declare
   v_ceiling boolean;
   v_min     integer;
   v_id      uuid := gen_random_uuid();
+  v_key     bytea;
+  v_exp     bigint;
+  v_grant   text;
 begin
   if p_actor is null then
     raise exception 'whatsapp_otp: actor_required' using errcode = '42501';
@@ -226,13 +244,25 @@ begin
   if p_old is not null and p_old = p_new then
     raise exception 'whatsapp_otp: no_change' using errcode = '22023';
   end if;
+  select k.key into v_key from app.whatsapp_otp_grant_key k where k.id = 1;
+  if v_key is null then
+    raise exception 'whatsapp_otp: grant_key_unconfigured' using errcode = '55000';
+  end if;
   insert into app.whatsapp_otp_settings_requests (id, actor_id, expected_version, old_settings, new_settings, reason, ceiling_changed)
   values (v_id, p_actor, p_expected_version, p_old, p_new, v_reason, v_ceiling);
+  -- The grant: an HMAC over exactly this request (id, actor, version, the four values, whether the ceiling change was authorized, expiry, a
+  -- hash of the reason). The Worker rebuilds the same string from the request it receives, so the grant cannot be reused for anything else.
+  v_exp := extract(epoch from clock_timestamp())::bigint + 300;
+  v_grant := encode(extensions.hmac(
+    convert_to(format('v1|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s', v_id, p_actor, p_expected_version,
+      p_new ->> 'daily_limit', p_new ->> 'hard_ceiling', p_new ->> 'warn_percent', p_new ->> 'critical_percent',
+      case when v_ceiling then 1 else 0 end, v_exp, encode(extensions.digest(convert_to(v_reason, 'UTF8'), 'sha256'), 'hex')), 'UTF8'),
+    v_key, 'sha256'), 'base64');
   -- Attribute the audit row to the ACTOR (transaction-local; this function is service-role only and the actor was verified by the server).
   perform set_config('request.jwt.claims', json_build_object('sub', p_actor, 'role', 'authenticated')::text, true);
   perform app.record_audit_event('whatsapp_otp.settings_requested', 'whatsapp_otp_settings', v_id, null,
     jsonb_build_object('request_id', v_id, 'old', p_old, 'new', p_new, 'reason', v_reason, 'ceiling_changed', v_ceiling, 'expected_version', p_expected_version));
-  return jsonb_build_object('request_id', v_id, 'actor_id', p_actor, 'ceiling_changed', v_ceiling);
+  return jsonb_build_object('request_id', v_id, 'actor_id', p_actor, 'ceiling_changed', v_ceiling, 'reason', v_reason, 'grant', v_grant, 'grant_expires', v_exp);
 end;
 $$;
 
@@ -276,6 +306,46 @@ $$;
 -- RECONCILE (service role, called by the app server with rows it got from the Worker's signed usage endpoint): a change that D1 applied
 -- but whose Supabase completion never arrived is completed from the AUTHORITATIVE D1 record; a request older than 15 minutes that D1
 -- never applied is closed as not applied. A browser can never reach this function.
+-- UNMATCHED CHANGE (internal): the Worker's authoritative audit shows a settings change that Supabase never approved (no request for that
+-- actor and version, or one that is not recorded as applied). Raised once per (version, time) through the EXISTING notification system, to
+-- active staff holding whatsapp_otp.view. Statistics only: the number of the version, never an actor, a value or a reason.
+create function app.whatsapp_otp_record_unmatched(p_version integer, p_at bigint)
+returns integer language plpgsql volatile security definer set search_path = '' as $$
+declare
+  v_when timestamptz := to_timestamp(p_at);
+  v_n    integer;
+  v_user uuid;
+  v_id   uuid;
+begin
+  insert into app.whatsapp_otp_notification_events (event_key, occurred_at, kind, source_env, stats, recipients)
+  values ('audit_unmatched:' || p_version, v_when, 'audit_unmatched', 'worker', jsonb_build_object('version', p_version), 0)
+  on conflict (event_key, occurred_at) do nothing;
+  get diagnostics v_n = row_count;
+  if v_n = 0 then
+    return 0;
+  end if;
+  v_n := 0;
+  for v_user in
+    select distinct a.user_id
+      from public.admin_role_assignments a
+      join public.admin_roles r on r.id = a.role_id and r.status = 'active'
+      join public.admin_role_permissions rp on rp.role_id = r.id and rp.permission_key = 'whatsapp_otp.view'
+      join public.admin_permissions p on p.key = rp.permission_key and p.is_active
+      join public.users u on u.id = a.user_id
+     where a.is_active and a.scope_type = 'platform' and u.status not in ('suspended', 'deactivated')
+  loop
+    v_id := app.notify(v_user, null, 'whatsapp_otp.audit_unmatched', 'whatsapp_otp', null, '/admin/whatsapp-otp',
+                       'notifications.whatsapp_otp.audit_unmatched.title', 'notifications.whatsapp_otp.audit_unmatched.body',
+                       jsonb_build_object('version', p_version));
+    if v_id is not null then
+      v_n := v_n + 1;
+    end if;
+  end loop;
+  update app.whatsapp_otp_notification_events set recipients = v_n where event_key = 'audit_unmatched:' || p_version and occurred_at = v_when;
+  return v_n;
+end;
+$$;
+
 create function public.admin_whatsapp_otp_settings_reconcile(p_applied jsonb)
 returns jsonb language plpgsql volatile security definer set search_path = '' as $$
 declare
@@ -283,6 +353,7 @@ declare
   v_row app.whatsapp_otp_settings_requests;
   v_applied integer := 0;
   v_abandoned integer := 0;
+  v_unmatched integer := 0;
 begin
   if p_applied is null or jsonb_typeof(p_applied) <> 'array' or jsonb_array_length(p_applied) > 100 then
     raise exception 'whatsapp_otp: invalid_reconcile_input' using errcode = '22023';
@@ -291,17 +362,29 @@ begin
     continue when jsonb_typeof(e) <> 'object'
       or coalesce(e ->> 'request_id', '') !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       or coalesce(e ->> 'actor', '') !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      or coalesce(e ->> 'version', '') !~ '^[0-9]{1,9}$';
+      or coalesce(e ->> 'version', '') !~ '^[0-9]{1,9}$'
+      or coalesce(e ->> 'at', '') !~ '^[0-9]{9,11}$'
+      or not app.whatsapp_otp_settings_valid(e -> 'new');
     update app.whatsapp_otp_settings_requests
        set status = 'applied', result_version = (e ->> 'version')::int, finished_at = clock_timestamp()
      where id = (e ->> 'request_id')::uuid and status = 'pending'
        and actor_id = (e ->> 'actor')::uuid and expected_version + 1 = (e ->> 'version')::int
+       and new_settings = e -> 'new'
     returning * into v_row;
     if found then
       perform app.record_audit_event('whatsapp_otp.settings_changed', 'whatsapp_otp_settings', v_row.id, null,
         jsonb_build_object('request_id', v_row.id, 'actor_id', v_row.actor_id, 'old', v_row.old_settings, 'new', v_row.new_settings,
                            'reason', v_row.reason, 'version', v_row.result_version, 'ceiling_changed', v_row.ceiling_changed, 'reconciled', true));
       v_applied := v_applied + 1;
+    elsif not exists (
+      select 1 from app.whatsapp_otp_settings_requests r
+       where r.id = (e ->> 'request_id')::uuid and r.status = 'applied'
+         and r.actor_id = (e ->> 'actor')::uuid and r.expected_version + 1 = (e ->> 'version')::int and r.new_settings = e -> 'new'
+    ) then
+      -- The Worker applied a change that no approved request of this actor, version and values accounts for: alert the administrators.
+      if app.whatsapp_otp_record_unmatched((e ->> 'version')::int, (e ->> 'at')::bigint) > 0 then
+        v_unmatched := v_unmatched + 1;
+      end if;
     end if;
   end loop;
   for v_row in
@@ -314,7 +397,7 @@ begin
       jsonb_build_object('request_id', v_row.id, 'actor_id', v_row.actor_id, 'code', 'not_applied', 'reconciled', true));
     v_abandoned := v_abandoned + 1;
   end loop;
-  return jsonb_build_object('applied', v_applied, 'abandoned', v_abandoned);
+  return jsonb_build_object('applied', v_applied, 'abandoned', v_abandoned, 'unmatched', v_unmatched);
 end;
 $$;
 
@@ -402,6 +485,7 @@ $$;
 -- 6. Grants: nothing is executable by anon or PUBLIC. The admin RPCs are callable by a signed-in user but every one re-checks the
 -- admin permission against auth.uid(); the two service-role functions are not executable by any client role.
 -- ---------------------------------------------------------------------------
+revoke all on function app.whatsapp_otp_record_unmatched(integer, bigint) from public, anon, authenticated, service_role;
 revoke all on function public.admin_whatsapp_otp_view_check() from public, anon, authenticated, service_role;
 revoke all on function public.admin_whatsapp_otp_settings_begin(uuid, integer, jsonb, jsonb, text) from public, anon, authenticated, service_role;
 revoke all on function public.admin_whatsapp_otp_settings_finish(uuid, uuid, text, integer, text) from public, anon, authenticated, service_role;

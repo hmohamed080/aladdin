@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { signPayload, verifySignature } from "../../../../edge/whatsapp-otp-worker/src/signing";
 import { signBody, verifyBody } from "./signing";
-import { adminBase, applySettings, fetchUsage, parseUsage, type ApplyOutcome, type UsageResult, type WorkerUsage } from "./worker-admin";
+import { adminBase, applySettings, fetchUsage, parseUsage, probeNotify, type ApplyOutcome, type UsageResult, type WorkerUsage } from "./worker-admin";
 import { CEILING_MANAGE, MANAGE, appliedRows, changeSettings, mapBeginError, type ChangeDeps, type ChangeInput } from "./settings-change";
-import { handleNotify, parseNotifyBody } from "./notify";
+import { expectedSourceEnvFor, handleNotify, parseNotifyBody } from "./notify";
+import { chooseWorkerTransport } from "./worker-binding";
 import { ADMIN_ROUTE_RULES, canAccessAdminPath, parseAdminAccess } from "@/lib/permissions/admin";
 import { parsePhoneVerificationEnv } from "@/lib/env/phone-verification";
 
@@ -12,6 +13,7 @@ const OTHER = "whsec_" + Buffer.alloc(32, 9).toString("base64");
 const ACTOR = "a1000000-0000-4000-8000-000000000001";
 const REQ = "b2000000-0000-4000-8000-000000000002";
 const NOW = 1_800_000_000_000;
+const GRANT = "A".repeat(43) + "=";
 
 const settings = { daily_limit: 150, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90, version: 3, updated_at: 1, updated_by: ACTOR };
 const usageOf = (s: typeof settings | null): WorkerUsage =>
@@ -78,7 +80,7 @@ describe("worker admin client", () => {
     expect(parseUsage(null)).toBeNull();
   });
   it("maps the Worker answer: applied, a definite 4xx refusal, and everything else as AMBIGUOUS (never 'failed')", async () => {
-    const payload = { request_id: REQ, actor_id: ACTOR, expected_version: 3, daily_limit: 200, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90, reason: "because of reasons", ceiling_authorized: false };
+    const payload = { request_id: REQ, actor_id: ACTOR, expected_version: 3, daily_limit: 200, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90, reason: "because of reasons", ceiling_authorized: false, grant: GRANT, grant_expires: 1_800_000_300 };
     const call = (res: () => Promise<Response>) => applySettings({ workerUrl: "https://w.example/v1/otp/send", adminSecret: SECRET, fetchImpl: res as unknown as typeof fetch }, payload);
     expect(await call(async () => new Response(JSON.stringify({ status: "applied", version: 4 }), { status: 200 }))).toEqual({ kind: "applied", version: 4 });
     expect(await call(async () => new Response(JSON.stringify({ error: "stale_version", current_version: 5 }), { status: 409 }))).toEqual({ kind: "refused", code: "stale_version", currentVersion: 5 });
@@ -93,7 +95,7 @@ function deps(over: Partial<ChangeDeps> = {}): ChangeDeps & { calls: string[] } 
   const calls: string[] = [];
   const base: ChangeDeps = {
     fetchUsage: async () => { calls.push("usage"); return { ok: true, usage: usageOf(settings) } as UsageResult; },
-    begin: async () => { calls.push("begin"); return { data: { request_id: REQ, ceiling_changed: false }, code: null, message: null }; },
+    begin: async () => { calls.push("begin"); return { data: { request_id: REQ, ceiling_changed: false, reason: "raising for a launch week", grant: GRANT, grant_expires: 1_800_000_300 }, code: null, message: null }; },
     apply: async () => { calls.push("apply"); return { kind: "applied", version: 4 } as ApplyOutcome; },
     finish: async () => { calls.push("finish"); return { data: "applied", code: null, message: null }; },
   };
@@ -139,7 +141,7 @@ describe("changeSettings: the security order", () => {
   it("sends ceiling_authorized only when the DATABASE confirmed the ceiling change, plus the typed confirmation", async () => {
     let sent: Record<string, unknown> | null = null;
     const d = deps({
-      begin: async () => ({ data: { request_id: REQ, ceiling_changed: true }, code: null, message: null }),
+      begin: async () => ({ data: { request_id: REQ, ceiling_changed: true, reason: "raising the ceiling for the launch", grant: GRANT, grant_expires: 1_800_000_300 }, code: null, message: null }),
       apply: async (p) => { sent = p as unknown as Record<string, unknown>; return { kind: "applied", version: 4 }; },
     });
     await changeSettings(d, input({ hardCeiling: 6000, ceilingConfirmation: "6000", reason: "raising the ceiling for the launch" }));
@@ -181,7 +183,7 @@ describe("changeSettings: the security order", () => {
     expect(await changeSettings(d, input())).toEqual({ ok: true, code: "whatsappOtp.form.done" });
   });
   it("builds reconcile input only from the Worker's audit rows", () => {
-    expect(appliedRows(usageOf(settings))).toEqual([{ request_id: REQ, actor: ACTOR, version: 3 }]);
+    expect(appliedRows(usageOf(settings))).toEqual([{ request_id: REQ, actor: ACTOR, version: 3, at: 1, new: { daily_limit: 150, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90 } }]);
   });
 });
 
@@ -196,7 +198,7 @@ describe("notify callback", () => {
       body: over.method === "GET" ? undefined : b,
     });
   };
-  const run = (r: Request, record = vi.fn(async () => ({ ok: true })), secret: string | null = SECRET) => handleNotify(r, { secret: secret ?? undefined, record, now: () => NOW }).then((res) => ({ status: res.status, record }));
+  const run = (r: Request, record = vi.fn(async () => ({ ok: true })), secret: string | null = SECRET) => handleNotify(r, { secret: secret ?? undefined, expectedSourceEnv: "production", record, now: () => NOW }).then((res) => ({ status: res.status, record }));
 
   it("records a validly signed alert once and answers 200", async () => {
     const { status, record } = await run(req(body));
@@ -262,5 +264,102 @@ describe("permissions and configuration", () => {
     expect(e.notifySecret).toBe(SECRET);
     expect(() => parsePhoneVerificationEnv({ PHONE_OTP_ADMIN_SECRET: "short" })).toThrow();
     expect(parsePhoneVerificationEnv({}).adminSecret).toBeUndefined();
+  });
+});
+
+describe("the database grant is carried to the Worker exactly as issued (F-1)", () => {
+  it("sends the grant, its expiry and the reason EXACTLY as the database stored it", async () => {
+    let sent: Record<string, unknown> | null = null;
+    const d = deps({
+      begin: async () => ({ data: { request_id: REQ, ceiling_changed: false, reason: "stored by the database", grant: GRANT, grant_expires: 1_800_000_123 }, code: null, message: null }),
+      apply: async (p) => { sent = p as unknown as Record<string, unknown>; return { kind: "applied", version: 4 }; },
+    });
+    await changeSettings(d, input({ reason: "  typed by the admin with spaces  " }));
+    expect(sent).toMatchObject({ grant: GRANT, grant_expires: 1_800_000_123, reason: "stored by the database", ceiling_authorized: false });
+  });
+  it("never reaches the Worker when the database refuses or has no grant key (fail closed)", async () => {
+    const d = deps({ begin: async () => ({ data: null, code: "55000", message: "whatsapp_otp: grant_key_unconfigured" }) });
+    expect(await changeSettings(d, input())).toEqual({ ok: false, code: "whatsappOtp.errors.unavailable" });
+    expect(d.calls).toEqual(["usage"]);
+    expect(mapBeginError("55000", "x")).toBe("unavailable");
+  });
+  it("a Worker answer of grant_invalid is a definite refusal, recorded as failed", async () => {
+    const d = deps({ apply: async () => ({ kind: "refused", code: "grant_invalid" }) as ApplyOutcome });
+    expect(await changeSettings(d, input())).toEqual({ ok: false, code: "whatsappOtp.errors.generic" });
+    expect(d.calls).toEqual(["usage", "begin", "finish"]);
+  });
+});
+
+describe("notification environment binding (F-4)", () => {
+  const stamp = NOW / 1000;
+  const mk = (sourceEnv: string) => {
+    const b = JSON.stringify({ event_key: "budget_warning:2", kind: "budget_warning", source_env: sourceEnv, occurred_at: 1_799_999_000, stats: { limit: 150, percent: 73 } });
+    const id = "ntf_budget_warning:2";
+    return new Request("https://app.test/api/internal/whatsapp-otp/notify", { method: "POST", headers: { "content-type": "application/json", "webhook-id": id, "webhook-timestamp": String(stamp), "webhook-signature": signBody(SECRET, id, stamp, b)! }, body: b });
+  };
+  const run = (r: Request, expectedSourceEnv: string | undefined) => {
+    const record = vi.fn(async () => ({ ok: true }));
+    return handleNotify(r, { secret: SECRET, expectedSourceEnv, record, now: () => NOW }).then((res) => ({ status: res.status, record }));
+  };
+  it("maps the app environment to the only Worker environment it trusts", () => {
+    expect(expectedSourceEnvFor("production")).toBe("production");
+    expect(expectedSourceEnvFor("staging")).toBe("acceptance");
+    expect(expectedSourceEnvFor("local")).toBe("local");
+    expect(expectedSourceEnvFor("preview")).toBeUndefined();
+    expect(expectedSourceEnvFor(undefined)).toBeUndefined();
+    expect(expectedSourceEnvFor("__proto__")).toBeUndefined();
+  });
+  it("a correctly signed, schema-valid alert from the OTHER environment is refused and never recorded", async () => {
+    const wrongForProduction = await run(mk("acceptance"), "production");
+    expect(wrongForProduction.status).toBe(403);
+    expect(wrongForProduction.record).not.toHaveBeenCalled();
+    const wrongForAcceptance = await run(mk("production"), "acceptance");
+    expect(wrongForAcceptance.status).toBe(403);
+    expect(wrongForAcceptance.record).not.toHaveBeenCalled();
+    for (const odd of ["local", "worker", "unknown", "prod"]) expect((await run(mk(odd), "production")).status).toBe(403);
+  });
+  it("the matching environment is accepted, and an app that cannot tell its own environment accepts nothing (503)", async () => {
+    const ok = await run(mk("production"), "production");
+    expect(ok.status).toBe(200);
+    expect(ok.record).toHaveBeenCalledTimes(1);
+    const unknown = await run(mk("production"), undefined);
+    expect(unknown.status).toBe(503);
+    expect(unknown.record).not.toHaveBeenCalled();
+  });
+});
+
+describe("private Worker transport: a service binding in production, never a public URL (F-2)", () => {
+  const binding = { fetch: vi.fn(async () => new Response("{}")) };
+  it("uses the binding whenever it exists, in every environment", async () => {
+    for (const appEnv of ["production", "staging", "local", undefined]) {
+      const t = chooseWorkerTransport({ appEnv, binding });
+      expect(t.ok && t.via).toBe("binding");
+    }
+    const t = chooseWorkerTransport({ appEnv: "production", binding });
+    if (t.ok && t.fetchImpl) await t.fetchImpl("https://internal.example/v1/admin/usage", { method: "POST" });
+    expect(binding.fetch).toHaveBeenCalledWith("https://internal.example/v1/admin/usage", { method: "POST" });
+  });
+  it("production, an unknown environment and a missing configuration NEVER fall back to a public URL", () => {
+    for (const appEnv of ["production", undefined, "", "prod", "preview", "Production"]) expect(chooseWorkerTransport({ appEnv, binding: undefined })).toEqual({ ok: false });
+  });
+  it("only an explicit local or staging environment may use the configured URL without a binding", () => {
+    expect(chooseWorkerTransport({ appEnv: "local", binding: undefined })).toEqual({ ok: true, via: "public", fetchImpl: undefined });
+    expect(chooseWorkerTransport({ appEnv: "staging", binding: undefined })).toEqual({ ok: true, via: "public", fetchImpl: undefined });
+  });
+});
+
+describe("probeNotify: the Worker-side alert-path check", () => {
+  const config = (res: () => Promise<Response>) => ({ workerUrl: "https://w.example/v1/otp/send", adminSecret: SECRET, fetchImpl: res as unknown as typeof fetch });
+  it("returns only a known category, signed with the ADMIN secret to the admin path", async () => {
+    let seen = "";
+    const ok = await probeNotify({ ...config(async () => new Response(JSON.stringify({ result: "reachable", status: 400 }))), fetchImpl: (async (u: string) => { seen = u; return new Response(JSON.stringify({ result: "reachable", status: 400 })); }) as unknown as typeof fetch });
+    expect(ok).toEqual({ ok: true, result: "reachable" });
+    expect(seen).toBe("https://w.example/v1/admin/notify-check");
+  });
+  it("treats an unknown value, an HTTP error, a network error and a missing secret as unavailable", async () => {
+    expect(await probeNotify(config(async () => new Response(JSON.stringify({ result: "<script>" }))))).toEqual({ ok: false });
+    expect(await probeNotify(config(async () => new Response("{}", { status: 503 })))).toEqual({ ok: false });
+    expect(await probeNotify(config(async () => { throw new Error("x"); }))).toEqual({ ok: false });
+    expect(await probeNotify({ workerUrl: "https://w.example/v1/otp/send", adminSecret: undefined })).toEqual({ ok: false });
   });
 });

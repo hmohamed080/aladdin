@@ -29,6 +29,8 @@ export type WorkerUsage = {
   failure: { last_hour: FailureWindow; last_24h: FailureWindow; last_7d: FailureWindow; last_failure_at: number | null };
   notifications: { pending: number; oldest_pending_at: number | null };
   audit: AuditEntry[];
+  /** Non-secret facts about the Worker itself (which switches and bindings exist). Absent on an older Worker. */
+  runtime?: Record<string, string | number | boolean>;
 };
 
 export type WorkerAdminConfig = { workerUrl: string | undefined; adminSecret: string | undefined; fetchImpl?: typeof fetch; timeoutMs?: number; now?: () => number };
@@ -46,6 +48,9 @@ export type SettingsPayload = {
   reason: string;
   ceiling_confirmation?: string;
   ceiling_authorized: boolean;
+  /** The database-issued authorization for exactly this request (base64 HMAC) and its expiry. The app server cannot mint one. */
+  grant: string;
+  grant_expires: number;
 };
 
 export type ApplyOutcome =
@@ -124,5 +129,23 @@ export async function applySettings(config: WorkerAdminConfig, payload: Settings
     return { kind: "ambiguous" };
   } catch {
     return { kind: "ambiguous" };
+  }
+}
+
+export const NOTIFY_CHECK_RESULTS = ["reachable", "secret_mismatch", "blocked_by_cloudflare", "refused", "app_unconfigured", "unexpected", "unreachable", "not_configured"] as const;
+export type NotifyCheckResult = (typeof NOTIFY_CHECK_RESULTS)[number];
+
+/** Ask the Worker to prove, from ITS network position, that the app's alert endpoint is reachable (sends one signed, deliberately invalid probe). */
+export async function probeNotify(config: WorkerAdminConfig): Promise<{ ok: true; result: NotifyCheckResult } | { ok: false }> {
+  if (!adminBase(config.workerUrl) || !config.adminSecret) return { ok: false };
+  const requestId = randomUUID();
+  try {
+    const res = await post(config, "/v1/admin/notify-check", requestId, JSON.stringify({ request_id: requestId }));
+    if (!res || !res.ok) return { ok: false };
+    const body = (await res.json().catch(() => null)) as { result?: unknown } | null;
+    const result = (NOTIFY_CHECK_RESULTS as readonly unknown[]).includes(body?.result) ? (body!.result as NotifyCheckResult) : null;
+    return result ? { ok: true, result } : { ok: false };
+  } catch {
+    return { ok: false };
   }
 }
