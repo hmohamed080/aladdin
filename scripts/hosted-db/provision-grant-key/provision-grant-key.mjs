@@ -132,8 +132,12 @@ export function readLine(prompt, { stdin = process.stdin, stdout = process.stdou
   return new Promise((resolve) => {
     const rl = readline.createInterface({ input: stdin, output: stdout, terminal: false });
     stdout.write(prompt);
-    rl.once("line", (line) => { rl.close(); resolve(line); });
-    rl.once("close", () => resolve(""));
+    // rl.close() emits "close" synchronously, so the line must be settled BEFORE closing; otherwise the close handler
+    // would win the race and resolve "" (which made a correct confirmation phrase look empty).
+    let settled = false;
+    const finish = (value) => { if (!settled) { settled = true; resolve(value); } };
+    rl.once("line", (line) => { finish(line); rl.close(); });
+    rl.once("close", () => finish(""));
   });
 }
 

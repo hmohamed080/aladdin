@@ -1,11 +1,12 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import fs from "node:fs";
+import { PassThrough } from "node:stream";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   ACCEPTANCE_REF, CONFIRMATION_PHRASE, PINNED_CA_SHA256, PRODUCTION_REF, REQUIRED_MIGRATION,
-  fingerprint, makeOut, parseTarget, run, validateGrantKey, verifyPinnedCa,
+  fingerprint, makeOut, parseTarget, readLine, run, validateGrantKey, verifyPinnedCa,
 } from "./provision-grant-key.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -288,4 +289,46 @@ test("source hygiene: no file writes, no env/arg key input, no DDL, no console l
   assert.ok(!/\bupdate\s+app\.|\bdelete\s+from\b/i.test(code), "must never update or delete");
   assert.ok(!/migrations?\//.test(code.replace(/supabase_migrations/g, "")), "must not touch migration files");
   assert.match(code, /values \(1, \$1\)/);
+});
+
+// ---- Regression: confirmation input must go through the REAL readline implementation (not a mocked callback) ----
+function realLine(input) {
+  const stdin = new PassThrough();
+  const stdout = new PassThrough();
+  const out = [];
+  stdout.on("data", (d) => out.push(String(d)));
+  const promise = readLine("Type it: ", { stdin, stdout });
+  if (input === null) stdin.end();
+  else stdin.write(input);
+  return { promise, out };
+}
+
+test("readLine (real readline): returns the typed line, not the empty string from the close handler", async () => {
+  const { promise, out } = realLine(CONFIRMATION_PHRASE + "\n");
+  assert.equal(await promise, CONFIRMATION_PHRASE);
+  assert.match(out.join(""), /Type it:/);
+});
+
+test("readLine (real readline): handles CRLF and keeps the line when input ends without a newline", async () => {
+  assert.equal(await realLine(CONFIRMATION_PHRASE + "\r\n").promise, CONFIRMATION_PHRASE);
+  const s = new PassThrough();
+  const p = readLine("x", { stdin: s, stdout: new PassThrough() });
+  s.end(CONFIRMATION_PHRASE);
+  assert.equal(await p, CONFIRMATION_PHRASE);
+});
+
+test("readLine (real readline): closed input with no line resolves to the empty string", async () => {
+  assert.equal(await realLine(null).promise, "");
+});
+
+test("end to end with the real readLine: correct phrase writes, wrong phrase cancels with no write", async () => {
+  for (const [typed, expectWrite] of [[CONFIRMATION_PHRASE + "\n", true], ["provision acceptance\n", false], ["\n", false]]) {
+    const h = harness({ argv: ["--write"] });
+    h.deps.line = (p) => { h.prompts.push(p); return realLine(typed).promise; };
+    const code = await run(h.deps);
+    assert.equal(inserts(h.db).length, expectWrite ? 1 : 0, JSON.stringify(typed));
+    assert.equal(code, expectWrite ? 0 : 1);
+    if (!expectWrite) assert.match(h.output(), /cancelled: the confirmation phrase did not match; nothing was written/);
+    noSecretIn(h.output());
+  }
 });
