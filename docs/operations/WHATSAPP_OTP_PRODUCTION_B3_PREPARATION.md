@@ -129,7 +129,7 @@ Targets `aladdin-frontend-preview` (Acceptance) and `aladdin-frontend-production
 | **Never on the frontend** | - | `OTP_ADMIN_GRANT_SECRET*` (the app server must not hold the grant key) |
 | Stay OFF / unset | - | `PHONE_VERIFICATION_ENABLED`, `PHONE_SIGNUP_VERIFICATION_ENABLED`, `PHONE_OTP_DELIVERY`, `PHONE_OTP_HMAC_KEYS` until cutover |
 
-The three `whsec_` values must be identical on both sides, so the owner must retain each value (a Secrets Store value cannot be read back). Format: `whsec_` + base64 of >= 32 random bytes. Supabase side: one SQL statement run once by the owner per environment inserts the grant key (`insert into app.whatsapp_otp_grant_key (id, key) values (1, decode('<base64 of the key bytes>', 'base64'))`, same bytes as the Worker secret after `whsec_`).
+The three `whsec_` values must be identical on both sides, so the owner must retain each value (a Secrets Store value cannot be read back). Format: `whsec_` + base64 of >= 32 random bytes. The grant key reaches the Supabase database **only** through the reviewed helper in section 11 (never through SQL text, the SQL Editor, an argument, a file or chat).
 
 ## 8. Remaining values and owner actions
 
@@ -163,7 +163,7 @@ Principles: Acceptance only; no Production resource is read or written; WhatsApp
 
 **A2. Apply Supabase migration `20261103090001` to Acceptance.** Verify: the six functions + helper exist, the permission contract passes, ledgers and `app.whatsapp_otp_grant_key` are empty, `begin` raises `grant_key_unconfigured`, the new permissions exist with Super Admin = view/manage/ceiling_manage and Administrator = view. *Rollback:* none destructive (additive); forward-fix migration if needed.
 
-**A3. Owner: insert the Acceptance grant key into the Acceptance database** (same bytes as A1; SQL in section 7). Verify with a single `begin` through the app after A6 (no value is ever read back).
+**A3. Owner: provision the Acceptance grant key** with `scripts/hosted-db/provision-grant-key/provision-grant-key.mjs` (section 11): a dry run first, then `--write` after a typed confirmation. Verified by a non-sensitive fingerprint and a row count; the key is never read back. Adds no migration and no schema change.
 
 **A4. Acceptance D1: backup and `migrations apply` (0002).** `wrangler d1 export`, then apply; baseline check says `current`, `otp_settings` empty. *Rollback:* none needed (additive).
 
@@ -182,3 +182,36 @@ Principles: Acceptance only; no Production resource is read or written; WhatsApp
 Stop after A10 and report. Production preparation (P-steps) is planned only after the Acceptance results are accepted:
 
 **P-0** repeat the preflight for Production; **P-1** owner creates the Production grant key (C-6) and inserts it in the Production database after **P-2** the Supabase migration; **P-3** Production D1 backup and baseline (section 3); **P-4** owner sets the Production frontend values (section 7, no public Worker); **P-5** guard + dry-run; **P-6** deploy the private Production Worker with delivery OFF; **P-7** deploy the Production frontend (only now, because of the binding gate); **P-8** Super Admin initialises 150 / 5,000 / 70 / 90 and verifies audit and history; **P-9** G-NOTIFY on Production and Security Events review; **P-10** G-META evidence; then the separately approved cutover (a reviewed change of `wrangler.production.jsonc` and its guard to enable delivery, a controlled single send first).
+
+## 11. A3 helper: secure one-time provisioning of the Acceptance grant key
+
+**Where:** `scripts/hosted-db/provision-grant-key/` (`provision-grant-key.mjs`, the pinned Supabase Root 2021 CA, unit and integration tests). Owner-executed on the owner's machine. It adds no migration, no DDL, no dependency and no lockfile: it loads the repo's own pinned `postgres@3.4.9` (root `pnpm-lock.yaml`, via `edge/media-worker`) and refuses any other version. Install the normal way: `pnpm install --frozen-lockfile` at the repo root.
+
+**Prerequisites:** A2 applied (done); the Acceptance Secrets Store entry `OTP_ADMIN_GRANT_SECRET` exists (done) and its `whsec_...` value is in your password manager; the Acceptance **database password** (Supabase Dashboard > Project Settings > Database; reset it there only if you do not have it) and a **Session pooler** connection string (Dashboard > Connect > Session pooler, `postgresql://postgres.nxossqhdfltcqdwvbewi:<password>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres`).
+
+**Run (an interactive terminal, ideally with shell history disabled):**
+1. `node scripts/hosted-db/provision-grant-key/provision-grant-key.mjs` - **dry run**. Paste the connection string at the first hidden prompt and the key at the second (nothing is echoed). It validates, connects, verifies the target and reports; **it writes nothing**.
+2. Compare the printed key fingerprint (12 hex characters of SHA-256) with your own record if you keep one.
+3. `node scripts/hosted-db/provision-grant-key/provision-grant-key.mjs --write` - enter both again, type `PROVISION ACCEPTANCE` when asked. It inserts one row in one transaction, verifies it **before COMMIT** and again after, and prints only: rows (expected 1), fingerprint match, schema signature unchanged, migration history unchanged.
+4. Close the terminal. Clear the clipboard.
+
+**Safeguards (all unit-tested; the real driver path is integration-tested against a local Postgres):**
+
+| Control | Behaviour |
+|---|---|
+| Input | key and connection string are accepted **only** at hidden prompts of an interactive terminal; any argument other than `--write`/`--help` is a usage error; never read from files, environment variables or pipes |
+| Format | `whsec_` + canonical base64, decoded length >= 32 bytes (same rule as the Worker and the table CHECK), at least 16 distinct byte values; checked **before** any connection |
+| SQL | constant statements; the key is only the bound `bytea` parameter `$1` of `insert ... values (1, $1)`; never interpolated, concatenated or logged |
+| Target | the URI must be the Acceptance pooler (`postgres.nxossqhdfltcqdwvbewi` on `*.pooler.supabase.com`) or the Acceptance direct host; **the Production reference anywhere in the URI (also upper case or percent-encoded) is refused before any network use**; wrong database, port or scheme refused |
+| TLS | verified against the pinned Supabase Root 2021 CA (SHA-256 `80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA`, check it in Dashboard > Database > Settings > SSL) and the host name; no unverified fallback |
+| Independent identity checks (read-only transaction) | PostgreSQL 17.11 (Acceptance; Production differs), migration `20261103090001` applied, `app.whatsapp_otp_grant_key` present with RLS on and **0 rows** |
+| No overwrite | any existing row stops the run; the write transaction takes an exclusive lock and re-checks the count; `on conflict do nothing` as a last guard |
+| Verification | fingerprint of the stored key computed **inside the database** (`sha256(key)`) and compared with the local value before COMMIT (mismatch = rollback) and again after; row count 1; schema signature (relations, functions, constraints, policies, triggers) and migration history identical before and after |
+| Output | one scrubbing channel; any registered secret (key, URI, password, hash) is replaced by `[hidden]`; errors are reported by code only |
+| Cleanup | the key bytes are zeroed, the connection is closed, no file is written; JavaScript strings cannot be wiped, so close the terminal afterwards |
+| Migration history | pure data write: no DDL, no migration file, no `schema_migrations` change (asserted) |
+
+**If the step fails or is interrupted:** nothing is half-written (single transaction). Re-run the dry run; "a grant key already exists" means it is done or needs a reviewed rotation. Rotation is not part of this helper. **Production** uses the same procedure only after a separate approval, with its own prerequisites and a hardened Production variant of the identity checks; this helper refuses Production by design.
+
+**Functional proof (not part of A3):** at A8 a real change through the Admin page must succeed; a key mismatch between the database and `OTP_ADMIN_GRANT_SECRET` makes the Worker answer `grant_invalid`, which fails safely.
+
