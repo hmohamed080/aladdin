@@ -8578,6 +8578,41 @@ export type Database = {
         }
         Returns: string
       }
+      admin_staff_invite: {
+        Args: { p_email: string; p_role_id: string; p_reason: string }
+        Returns: Json
+      }
+      admin_staff_invitation_revoke: {
+        Args: { p_id: string; p_reason: string }
+        Returns: undefined
+      }
+      admin_staff_invitations_list: {
+        Args: never
+        Returns: {
+          id: string
+          email_masked: string
+          role_key: string
+          role_name: string
+          status: string
+          expires_at: string
+          created_at: string
+          invited_by: string
+          invited_by_name: string
+          inviter_authorized: boolean
+        }[]
+      }
+      staff_invitation_lookup: {
+        Args: { p_token: string }
+        Returns: { status: string; role_name: string; email_masked: string; matches_caller: boolean }[]
+      }
+      staff_invitation_registration_check: {
+        Args: { p_token: string; p_email: string }
+        Returns: boolean
+      }
+      staff_invitation_accept: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       invitation_lookup: {
         Args: { p_token: string }
         Returns: {
