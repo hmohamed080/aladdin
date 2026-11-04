@@ -12,7 +12,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { readdirSync, readFileSync } from "node:fs";
 
 const MIGRATIONS = new URL("../migrations/", import.meta.url);
-const QUERY = "select type, name from sqlite_master where name not like 'sqlite_%' and name not like '_cf_%' order by type, name";
+const QUERY = "select type, name, sql from sqlite_master where name not like 'sqlite_%' and name not like '_cf_%' order by type, name";
 
 /** Pure classification: which objects exist and what the next step is. */
 export function classify(objects, expected) {
@@ -44,6 +44,47 @@ export function expectedFromMigrations(dir = MIGRATIONS) {
   return { tables: [...new Set(tables)] };
 }
 
+
+/** SQLite stores a CREATE statement without IF NOT EXISTS; compare modulo that, comments and whitespace. */
+export function normalizeSql(sql) {
+  return String(sql)
+    .replace(/--[^\n]*/g, " ")
+    .replace(/\bIF NOT EXISTS\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s*([(),])\s*/g, "$1")
+    .replace(/;\s*$/, "")
+    .trim()
+    .toLowerCase();
+}
+
+/** Every CREATE TABLE / CREATE INDEX statement of one migration file, keyed by object name. */
+export function createStatements(file, dir = MIGRATIONS) {
+  const text = readFileSync(new URL(file, dir), "utf8").replace(/--[^\n]*/g, " ");
+  const out = new Map();
+  for (const stmt of text.split(";")) {
+    const m = /^\s*CREATE\s+(?:UNIQUE\s+)?(?:TABLE|INDEX)\s+(?:IF NOT EXISTS\s+)?([a-z_0-9]+)/i.exec(stmt);
+    if (m) out.set(m[1], normalizeSql(stmt));
+  }
+  return out;
+}
+
+/** Exact-SQL comparison of live objects against the named migration files: matching, missing, different and unexpected objects. */
+export function verifySchema(objects, files, dir = MIGRATIONS) {
+  const live = new Map(objects.filter((o) => o.sql).map((o) => [o.name, normalizeSql(o.sql)]));
+  const expected = new Map();
+  for (const f of files) for (const [k, v] of createStatements(f, dir)) expected.set(k, v);
+  const matching = [];
+  const missing = [];
+  const different = [];
+  for (const [name, sql] of expected) {
+    if (!live.has(name)) missing.push(name);
+    else if (live.get(name) === sql) matching.push(name);
+    else different.push(name);
+  }
+  const unexpected = [...live.keys()].filter((n) => !expected.has(n) && n !== "d1_migrations");
+  return { matching, missing, different, unexpected };
+}
+
 export function runCheck(database, runner = spawnSync) {
   if (!/^[a-z0-9-]{3,63}$/.test(database ?? "")) throw new Error("usage: d1-baseline-check.mjs <database-name>");
   const wrangler = fileURLToPath(new URL("../node_modules/wrangler/bin/wrangler.js", import.meta.url));
@@ -51,7 +92,7 @@ export function runCheck(database, runner = spawnSync) {
   if (r.status !== 0) throw new Error("wrangler failed: " + String(r.stderr || r.stdout).slice(0, 300));
   const start = r.stdout.indexOf("[");
   const rows = JSON.parse(r.stdout.slice(start))[0]?.results ?? [];
-  return { database, ...classify(rows, expectedFromMigrations()) };
+  return { database, ...classify(rows, expectedFromMigrations()), schema: verifySchema(rows, readdirSync(MIGRATIONS).filter((x) => x.endsWith(".sql")).sort()) };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

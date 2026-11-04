@@ -52,3 +52,37 @@ test("runCheck is read-only (one SELECT through wrangler d1 execute), validates 
   assert.throws(() => runCheck("x", ok), /usage/);
   assert.throws(() => runCheck("aladdin-whatsapp-otp-production", () => ({ status: 1, stdout: "", stderr: "Authentication error" })), /wrangler failed/);
 });
+
+// @ts-expect-error plain .mjs script
+import { verifySchema, normalizeSql } from "../scripts/d1-baseline-check.mjs";
+
+// The Production D1 as read back from sqlite_master (read-only) on 2026-11-04, before any migration was applied by tooling.
+const LIVE_PRODUCTION = [
+  { type: "index", name: "whatsapp_hook_events_created_at", sql: "CREATE INDEX whatsapp_hook_events_created_at ON whatsapp_hook_events(created_at)" },
+  {
+    type: "table",
+    name: "whatsapp_hook_events",
+    sql: "CREATE TABLE whatsapp_hook_events (   event_hash TEXT PRIMARY KEY NOT NULL     CHECK(length(event_hash) = 64),   created_at INTEGER NOT NULL,   state TEXT NOT NULL DEFAULT 'reserved'     CHECK(state IN ('reserved', 'accepted', 'failed')) )",
+  },
+];
+
+test("the hand-created Production schema matches migration 0001 statement by statement (exact SQL, not just names)", () => {
+  const r = verifySchema(LIVE_PRODUCTION, ["0001_hook_events.sql"]);
+  assert.deepEqual(r.matching.sort(), ["whatsapp_hook_events", "whatsapp_hook_events_created_at"]);
+  assert.deepEqual([r.missing, r.different, r.unexpected], [[], [], []]);
+});
+
+test("a drifted column, CHECK, default, index or an extra object is detected", () => {
+  const tweak = (from: string, to: string) => LIVE_PRODUCTION.map((o) => ({ ...o, sql: o.sql.replace(from, to) }));
+  assert.deepEqual(verifySchema(tweak("length(event_hash) = 64", "length(event_hash) = 32"), ["0001_hook_events.sql"]).different, ["whatsapp_hook_events"]);
+  assert.deepEqual(verifySchema(tweak("DEFAULT 'reserved'", "DEFAULT 'accepted'"), ["0001_hook_events.sql"]).different, ["whatsapp_hook_events"]);
+  assert.deepEqual(verifySchema(tweak("'failed'", "'failed', 'x'"), ["0001_hook_events.sql"]).different, ["whatsapp_hook_events"]);
+  assert.deepEqual(verifySchema(tweak("(created_at)", "(state)"), ["0001_hook_events.sql"]).different, ["whatsapp_hook_events_created_at"]);
+  assert.deepEqual(verifySchema(LIVE_PRODUCTION.slice(1), ["0001_hook_events.sql"]).missing, ["whatsapp_hook_events_created_at"]);
+  assert.deepEqual(verifySchema([...LIVE_PRODUCTION, { type: "table", name: "stray", sql: "CREATE TABLE stray (a)" }], ["0001_hook_events.sql"]).unexpected, ["stray"]);
+});
+
+test("normalization ignores IF NOT EXISTS, comments, case and whitespace only", () => {
+  assert.equal(normalizeSql("CREATE TABLE IF NOT EXISTS t (\n  a INTEGER, -- c\n  b TEXT\n);"), normalizeSql("create table t(a integer,b text)"));
+  assert.notEqual(normalizeSql("CREATE TABLE t (a INTEGER)"), normalizeSql("CREATE TABLE t (a TEXT)"));
+});
