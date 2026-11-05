@@ -160,7 +160,13 @@ export function SocialLinksCard({
             />
             {!r.ok ? (
               <div id={errorId}>
-                <InlineError>{t(`onboarding.business.links.error.${r.reason}`)}</InlineError>
+                {/* While typing, the message is visible and tied to the input (aria-invalid, aria-describedby) but not announced
+                    on every keystroke; after a blocked Next it is an alert. */}
+                {showErrors ? (
+                  <InlineError>{t(`onboarding.business.links.error.${r.reason}`)}</InlineError>
+                ) : (
+                  <p aria-live="off" className="text-label text-danger">{t(`onboarding.business.links.error.${r.reason}`)}</p>
+                )}
               </div>
             ) : r.url ? (
               <p id={previewId} className="break-words text-label text-fg-muted">

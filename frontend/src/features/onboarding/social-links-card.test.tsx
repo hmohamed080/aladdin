@@ -92,16 +92,32 @@ describe("SocialLinksCard", () => {
     expect(inputs()[0]).toHaveValue("@shop");
   });
 
-  it("an invalid non-empty value cannot be collapsed and its alert stays visible", () => {
+  it("typing a partial invalid value shows the message tied to the input but does not announce it as an alert", () => {
     renderWithI18n(<Harness />, "en");
     fireEvent.click(toggle(L.platform.instagram));
     fireEvent.change(inputs()[0]!, { target: { value: "https://evil.example/shop" } });
-    const alert = screen.getByRole("alert");
-    expect(alert).toHaveTextContent(L.error.wrongHost);
+    const message = screen.getByText(L.error.wrongHost);
+    expect(message).toBeVisible();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(message.closest("[role='alert']")).toBeNull();
+    expect(inputs()[0]).toHaveAttribute("aria-invalid", "true");
+    expect(document.getElementById(inputs()[0]!.getAttribute("aria-describedby")!)).toContainElement(message);
+  });
+
+  it("after a blocked Next (showErrors) the same message is an alert", () => {
+    renderWithI18n(<Harness showErrors initial={{ ...blank, instagram: "https://evil.example/shop" }} />, "en");
+    expect(screen.getByRole("alert")).toHaveTextContent(L.error.wrongHost);
+  });
+
+  it("an invalid non-empty value cannot be collapsed and its message stays visible", () => {
+    renderWithI18n(<Harness />, "en");
+    fireEvent.click(toggle(L.platform.instagram));
+    fireEvent.change(inputs()[0]!, { target: { value: "https://evil.example/shop" } });
+    expect(screen.getByText(L.error.wrongHost)).toBeVisible();
     fireEvent.click(toggle(L.platform.instagram));
     expect(toggle(L.platform.instagram)).toHaveAttribute("aria-expanded", "true");
     expect(inputs()).toHaveLength(1);
-    expect(screen.getByRole("alert")).toHaveTextContent(L.error.wrongHost);
+    expect(screen.getByText(L.error.wrongHost)).toBeVisible();
     expect(inputs()[0]).toHaveAttribute("aria-invalid", "true");
     expect(within(toggle(L.platform.instagram)).queryByText(L.saved)).toBeNull();
     expect(screen.getByText(L.counterNone)).toBeInTheDocument();
