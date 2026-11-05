@@ -404,5 +404,36 @@ set local request.jwt.claims = :'u3';
 select throws_ok($q$select public.business_verification_detail('117a0001-0000-4000-8000-000000000117')$q$,'42501',null,'a non-reviewer is still refused');
 reset role;
 
+-- ---------------------------------------------------------------------------
+-- 7. Mirror of the address rule: ANY managed showroom without a link keeps the item
+-- ---------------------------------------------------------------------------
+insert into auth.users(id,instance_id,aud,role,email,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
+values('11700006-0000-4000-8000-000000000117','00000000-0000-0000-0000-000000000000','authenticated','authenticated','links117-6@example.test',now(),'{}','{}',now(),now());
+insert into public.onboarding_progress(user_id,selected_track,selected_org_type,account_type_completed_at,completed_at)
+values('11700006-0000-4000-8000-000000000117','business','showroom_dealer',now(),now());
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11700006-0000-4000-8000-000000000117","role":"authenticated"}';
+select lives_ok($q$select public.business_draft_save_v3(p_display_name=>'Showroom 117 C',p_legal_name=>'Showroom 117 C LLC',p_org_type=>'showroom_dealer',p_governorate=>'cairo',p_city=>'maadi',p_contact_phone=>'+201012345119',p_activity_type=>'decor_showroom',p_website_url=>'https://showroom-c.example.com')$q$,'owner 6 saves a linked showroom');
+insert into _ids select 'o6a', public.business_draft_submit_v3()::text;
+reset role;
+-- An additional business needs the first one to be active.
+set local session_replication_role = replica;
+update public.organizations set status = 'active' where id = (select v::uuid from _ids where k='o6a');
+set local session_replication_role = origin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11700006-0000-4000-8000-000000000117","role":"authenticated"}';
+select lives_ok($q$select public.business_draft_save_v2(p_display_name=>'Showroom 117 D legacy',p_legal_name=>'Showroom 117 D LLC',p_org_type=>'showroom_dealer',p_governorate=>'cairo',p_city=>'maadi',p_contact_phone=>'+201012345120',p_activity_type=>'decor_showroom')$q$,'owner 6 saves a second, legacy showroom through _v2');
+insert into _ids select 'o6b', public.business_draft_submit_v2()::text;
+reset role;
+select ok(pg_temp.manages_showroom('11700006-0000-4000-8000-000000000117'), 'setup: user 6 manages two showrooms');
+select is((select count(*)::int from public.organizations where id in (select v::uuid from _ids where k in ('o6a','o6b')) and num_nonnulls(facebook_url,instagram_url,tiktok_url,website_url)=0),1,'setup: exactly one of them has no link');
+select ok((app.profile_completion('11700006-0000-4000-8000-000000000117')->'missing') ? 'organization_links','one linked and one legacy showroom: the item stays');
+select is((app.profile_completion('11700006-0000-4000-8000-000000000117')->'missing') - 'organization_links', pg_temp.profile_completion_before('11700006-0000-4000-8000-000000000117')->'missing','nothing else changes for that owner');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11700006-0000-4000-8000-000000000117","role":"authenticated"}';
+select lives_ok(format('select public.organization_social_links_set(%L, null, %L, null, null)', (select v from _ids where k='o6b'), 'https://www.instagram.com/showroom117d'),'owner 6 adds a link to the legacy showroom');
+reset role;
+select ok(not (app.profile_completion('11700006-0000-4000-8000-000000000117')->'missing') ? 'organization_links','both showrooms have a link: the item disappears');
+
 select * from finish();
 rollback;

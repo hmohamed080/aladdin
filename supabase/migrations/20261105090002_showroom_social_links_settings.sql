@@ -6,7 +6,7 @@
 --     organization.social_links_changed with the link COUNT only (links never go into logs), and not blocked by
 --     the verified-identity lock: links are business information, not identity.
 --   * app.profile_completion: one more item, 'organization_links', for a caller who manages a showroom, missing
---     while none of the showrooms they manage has a link (a legacy showroom created by an old client).
+--     while at least one of the showrooms they manage has no link (a legacy showroom created by an old client).
 --   * public.business_verification_detail: the four links in the 'organization' object, for the Admin reviewer.
 --
 -- The two re-created functions are copied from their latest definitions (app.profile_completion:
@@ -207,11 +207,9 @@ begin
 
     -- A showroom needs at least one social or website link (a legacy showroom created by an old client has none).
     v_total := v_total + 1;
-    if exists(select 1 from public.memberships m join public.organizations o on o.id=m.organization_id join public.membership_capabilities c on c.membership_id=m.id and c.capability_key='org.manage' where m.user_id=v_uid and m.status='active' and o.org_type='showroom_dealer' and num_nonnulls(o.facebook_url, o.instagram_url, o.tiktok_url, o.website_url) > 0) then
-      v_done := v_done + 1;
-    else
+    if exists(select 1 from public.memberships m join public.organizations o on o.id=m.organization_id join public.membership_capabilities c on c.membership_id=m.id and c.capability_key='org.manage' where m.user_id=v_uid and m.status='active' and o.org_type='showroom_dealer' and num_nonnulls(o.facebook_url, o.instagram_url, o.tiktok_url, o.website_url) = 0) then
       v_missing := array_append(v_missing,'organization_links');
-    end if;
+    else v_done := v_done + 1; end if;
   end if;
   return jsonb_build_object(
     'percent', case when v_total = 0 then 100 else round(100.0 * v_done / v_total) end,
