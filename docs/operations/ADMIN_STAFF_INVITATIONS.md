@@ -91,5 +91,6 @@ Use the existing audited controls on **Admin Staff**: **Remove role** (`admin_st
 2. **Reveal the full invited address on Admin Staff, Invitations (separate small change).** The roster is masked by default and stays so. Click the masked address to toggle the full value, only for callers who already pass the invitation-management authority check.
    * The masking happens inside `admin_staff_invitations_list`, so the full address never reaches the browser today. A reveal therefore needs a new server-checked read (one invitation id in, one address out), not a client-side toggle. That is a new migration, so it needs its own approval and review.
    * Re-check the caller's authority and the invitation's visibility on every reveal; return nothing otherwise; never return it in the list payload; do not cache it.
-   * Decide whether each reveal writes an audit event (recommended: a new `admin_staff.invitation_email_revealed` action) and whether revealing is limited to `pending` rows.
+   * **Approved decisions (owner, 2026-11-05):** masked by default; reveal only with `admin_staff.manage`, through a server-authorized single-invitation lookup; allowed regardless of invitation status; every reveal is audited as `admin_staff.invitation_email_revealed` (a new `ck_audit_action_known` append); no full address in any list payload or cache.
+   * Ships as its own PR after A7 closes. Automatic invitation e-mail stays a separate future feature.
    * Do not start it before A7 QA is closed, so the deployed code under test stays fixed.
