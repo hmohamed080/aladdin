@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { readPublicEnv } from "@/lib/env";
 
 /**
  * Token-to-session handoff for Admin Staff invitations.
@@ -21,7 +22,8 @@ export function cookieOptions() {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    // Same rule as the session cookies (lib/supabase/server.ts): Secure everywhere except a local environment.
+    secure: readPublicEnv().NEXT_PUBLIC_APP_ENV !== "local",
     path: STAFF_INVITATION_COOKIE_PATH,
     maxAge: STAFF_INVITATION_COOKIE_MAX_AGE_SECONDS,
   };

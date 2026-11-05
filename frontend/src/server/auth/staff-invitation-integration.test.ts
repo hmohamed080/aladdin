@@ -5,6 +5,8 @@ const isStaff = vi.fn();
 vi.mock("@/server/queries/platform", () => ({ loadIsAdminStaff: () => isStaff() }));
 vi.mock("@/server/queries/business-setup", () => ({ computeMandatoryBusinessSetup: vi.fn(async () => ({ required: false })) }));
 vi.mock("@/server/queries/landing", () => ({ resolveActiveLanding: vi.fn(async () => "/home") }));
+const appEnv = vi.hoisted(() => ({ value: "acceptance" }));
+vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_APP_ENV: appEnv.value }) }));
 
 import { GET } from "@/app/auth/staff-invitation/[token]/route";
 import { sanitizeNext } from "./next";
@@ -29,6 +31,14 @@ describe("the invitation link handoff (token leaves the URL on the first hop)", 
     expect(cookie).toMatch(/SameSite=lax/i);
     expect(cookie).toMatch(/Path=\/auth\/staff-invitation/i);
     expect(cookie).toMatch(/Max-Age=1800/i);
+    expect(cookie).toMatch(/Secure/i);
+  });
+  it("is Secure in every environment except a local one (same rule as the session cookies)", async () => {
+    appEnv.value = "local";
+    expect((await call(TOKEN)).headers.get("set-cookie") ?? "").not.toMatch(/Secure/i);
+    appEnv.value = "production";
+    expect((await call(TOKEN)).headers.get("set-cookie") ?? "").toMatch(/Secure/i);
+    appEnv.value = "acceptance";
   });
   it("is uncacheable, sends no Referer and is not indexed", async () => {
     const res = await call(TOKEN);
