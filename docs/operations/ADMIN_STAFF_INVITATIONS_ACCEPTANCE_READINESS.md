@@ -8,6 +8,7 @@ Status: **readiness only. Nothing here has been executed.** No hosted migration,
 |---|---|---|
 | Acceptance frontend (`aladdin-frontend-preview`) | Latest deployment `45db2715-d9f9-4951-8210-0f63446de2cc`, 100%, created 2026-11-04T12:46Z | `wrangler deployments list` (read-only). **Re-read immediately before any deploy; do not reuse this value.** |
 | Migration chain in the repository | `…20261103090001_whatsapp_otp_admin_settings` then `20261105090001_admin_staff_invitations` are the only two migrations after the RC2 line | repository listing |
+| A3 grant key | Owner ran `select count(*) from app.whatsapp_otp_grant_key` on Acceptance on 2026-11-05: **1 row**. Provisioned; do not recreate or overwrite. Key-to-Worker match still needs the functional proof at A8. | owner, read-only |
 | Hosted Acceptance applied versions | `20261103090001` is recorded as applied by the earlier A2 step and its independent read-only identity check (`WHATSAPP_OTP_PRODUCTION_B3_PREPARATION.md`). **This session has no authorized read access to the hosted database, so it did not re-verify it.** | documentation only |
 | Hosted function definitions | not verifiable by this session | see the owner query in section 3 |
 | Branch allowed to deploy to `cloudflare-preview` | must include `feat/admin-staff-invitations-20261105` before the Preview workflow can run | GitHub Environment setting (owner) |
@@ -25,19 +26,57 @@ The frontend deploy must not come before the migration: the new pages call funct
 
 ## 3. Preflight (owner, read-only, hosted Acceptance)
 
+One query, run in the Acceptance SQL Editor. It reads catalogs and counts only and prints no key material.
+
 ```sql
--- applied versions: expect 20261103090001 as the newest and no 20261105090001
-select version from supabase_migrations.schema_migrations order by version desc limit 5;
--- helper bodies, to compare with the same query on a fresh local database
-select md5(pg_get_functiondef('app.admin_require_manageable_target(uuid)'::regprocedure));
-select md5(pg_get_functiondef('app.admin_prepare_platform_account(uuid,text)'::regprocedure));
--- the audit allow-list currently enforced
-select pg_get_constraintdef(oid) from pg_constraint where conname = 'ck_audit_action_known';
--- no object of the new migration exists yet
-select to_regclass('app.admin_staff_invitations'), to_regproc('public.staff_invitation_accept(text)');
+-- Read-only. Acceptance preflight before migration 20261105090001. Prints one JSON document; it reads catalogs and counts only (no key material).
+select jsonb_pretty(jsonb_build_object(
+  'db_version', current_setting('server_version'),
+  'newest_migrations', (select jsonb_agg(version order by version desc) from (select version from supabase_migrations.schema_migrations order by version desc limit 3) m),
+  'A2_20261103090001_applied', exists (select 1 from supabase_migrations.schema_migrations where version = '20261103090001'),
+  'A7_20261105090001_still_pending', not exists (select 1 from supabase_migrations.schema_migrations where version = '20261105090001'),
+  'invitation_objects_absent', to_regclass('app.admin_staff_invitations') is null
+      and to_regprocedure('public.staff_invitation_accept(text)') is null
+      and to_regprocedure('app.admin_prepare_platform_account_core(uuid,text,text,uuid)') is null,
+  'otp_admin_functions_present_expect_7', (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where (n.nspname, p.proname) in (('public','admin_whatsapp_otp_view_check'), ('public','admin_whatsapp_otp_settings_begin'), ('public','admin_whatsapp_otp_settings_finish'),
+                                       ('public','admin_whatsapp_otp_settings_reconcile'), ('public','whatsapp_otp_notification_record'),
+                                       ('app','whatsapp_otp_record_unmatched'), ('app','whatsapp_otp_settings_valid'))),
+  'grant_key_rows_expect_1', (select count(*) from app.whatsapp_otp_grant_key),
+  'grant_key_table_closed', (select relrowsecurity from pg_class where oid = 'app.whatsapp_otp_grant_key'::regclass)
+      and not exists (select 1 from unnest(array['anon','authenticated','service_role']) r where has_table_privilege(r, 'app.whatsapp_otp_grant_key', 'select')),
+  'audit_vocabulary_has_whatsapp_otp', (select pg_get_constraintdef(oid) like '%whatsapp_otp.%' from pg_constraint where conname = 'ck_audit_action_known' and conrelid = 'public.audit_log'::regclass),
+  'audit_vocabulary_lacks_staff_invitation_yet', (select pg_get_constraintdef(oid) not like '%admin_staff.invited%' from pg_constraint where conname = 'ck_audit_action_known' and conrelid = 'public.audit_log'::regclass),
+  'manageable_target_guard_original', pg_get_functiondef('app.admin_require_manageable_target(uuid)'::regprocedure) like '%target is not an existing Admin Staff member%',
+  'dba_prepare_helper_original', pg_get_functiondef('app.admin_prepare_platform_account(uuid,text)'::regprocedure) like '%dba_platform_prepare%'
+      and pg_get_functiondef('app.admin_prepare_platform_account(uuid,text)'::regprocedure) not like '%_core%',
+  'dba_prepare_helper_not_client_executable', not (has_function_privilege('anon', 'app.admin_prepare_platform_account(uuid,text)', 'execute')
+      or has_function_privilege('authenticated', 'app.admin_prepare_platform_account(uuid,text)', 'execute')
+      or has_function_privilege('service_role', 'app.admin_prepare_platform_account(uuid,text)', 'execute')),
+  'record_consent_present', to_regprocedure('public.record_consent(public.consent_type[],text)') is not null,
+  'active_super_admins', (select count(*) from public.admin_role_assignments a join public.admin_roles r on r.id = a.role_id where r.key = 'super_admin' and a.is_active)
+)) as acceptance_preflight;
 ```
 
-Expected: both `to_regclass` and `to_regproc` are NULL; the constraint list contains the WhatsApp OTP actions of `20261103090001`.
+**Expected on Acceptance before step 2** (all must hold):
+
+| Field | Expected |
+|---|---|
+| `A2_20261103090001_applied` | `true` |
+| `A7_20261105090001_still_pending` | `true` |
+| `invitation_objects_absent` | `true` |
+| `otp_admin_functions_present_expect_7` | `7` |
+| `grant_key_rows_expect_1` | `1` (A3 provisioned; key-to-Worker match is proved functionally at A8) |
+| `grant_key_table_closed` | `true` |
+| `audit_vocabulary_has_whatsapp_otp` | `true` |
+| `audit_vocabulary_lacks_staff_invitation_yet` | `true` |
+| `manageable_target_guard_original` | `true` |
+| `dba_prepare_helper_original` | `true` |
+| `dba_prepare_helper_not_client_executable` | `true` |
+| `record_consent_present` | `true` |
+| `active_super_admins` | `1` or more |
+
+Any other value stops the rollout until explained. `newest_migrations` should start with `20261103090001`.
 
 ## 4. Post-migration verification (read-only)
 
