@@ -7,6 +7,12 @@ Step 1 keeps trading name, legal name and optional description (maximum 250 char
 
 Step 2 requires governorate and a catalogue city or valid custom city. The detailed address is optional at onboarding, limited to 250 whitespace-separated words, with a bounded 16,384-character payload. Missing showroom address remains an informational account-completion item linking to the existing branch editor in /b2b/settings. It does not block initial business creation or grant approval.
 
+# Showroom links in step 1 — 2026-11-05
+
+Step 1 of the showroom wizard now has a links card (Facebook, Instagram, TikTok, website) between the optional email and the optional description. A showroom must add at least one valid link and no invalid one to leave step 1; a missing link is also flagged on the type step and on submit. The rule applies to new showrooms only: existing showrooms keep working and see one profile-completion item.
+
+Saving uses `business_draft_save_v3` and `business_draft_submit_v3`, which add the four link columns and enforce the rule for a showroom; the v2 RPCs stay for old clients. Each save sends all four links, because the v3 save replaces them. Settings edits go through `organization_social_links_set` (audited, count only). Full design, deviations and deploy order: [showroom-social-links-onboarding.md](showroom-social-links-onboarding.md).
+
 ## Rationale and scope
 Business contacts belong to organizations, not the personal profile or Supabase login alias. They are unverified contacts. Reuse public.activities / public.organization_activities; do not introduce an enum or parallel activity taxonomy. Store the address in the primary branch's existing address_ar field. Preserve incomplete drafts; new draft fields are nullable and no historical data is invented or backfilled. Omitted new fields preserve saved values; explicitly empty email/address clears them.
 

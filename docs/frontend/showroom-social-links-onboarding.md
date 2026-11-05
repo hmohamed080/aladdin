@@ -1,6 +1,6 @@
 # Showroom onboarding: social and website links — design
 
-**Status:** Draft for owner approval · 2026-11-05 · no code, migration or hosted change exists yet.
+**Status:** Implemented (pending review/merge) · 2026-11-05 · branch `feat/showroom-social-links-20261105`, local only. Nothing is applied to Acceptance or Production.
 
 ## Purpose
 Let a new Showroom add where customers can find it online (Facebook, Instagram, TikTok, website) during business onboarding, and require at least one of them.
@@ -100,6 +100,23 @@ Column names, the exact audit action name, the precise copy, the settings screen
 2. A missing link does **not** block approval, activation or selling, for new or existing showrooms.
 3. The description field moves below the links card (optional fields last).
 4. Links are not shown to customers yet.
+
+## Implementation record and deviations from this design
+Implemented as designed except for the points below, each decided during the build.
+
+- **Migrations:** `20261105090001_showroom_social_links.sql` (columns on drafts and organizations, the validator, `business_draft_save_v3` / `business_draft_submit_v3`) and `20261105090002_showroom_social_links_settings.sql` (`organization_social_links_set`, audit action, profile-completion item, admin detail). The v2 RPCs are untouched.
+- **Validator grant:** `app.social_link_valid` is executable by `authenticated` only. The design said no API-role execute, but CHECK constraints are evaluated as the writing role, so an owner updating an organization row needs it. `anon` and `service_role` have no grant.
+- **Save replaces all four links:** the v3 save and the settings RPC replace every link, and an omitted link is cleared. Every client save therefore sends all four values.
+- **Last link cannot be cleared from Settings:** a showroom cannot save with zero links, and the required message appears when the manager clears the last one.
+- **Type chosen after step 1:** if the showroom type is picked on the type step (no preselected type), the gate sends the person back to step 1 with the links card flagged, instead of failing at submit.
+- **Facebook `profile.php?id=`:** the id is lost, because the validator keeps no query string (the no-query rule). Such a link is saved as the profile.php path only; a page URL or handle is the supported form.
+- **Audit:** the action `organization.social_links_changed` records a count of links only, never the values.
+- **Admin label:** the website link label in the admin detail uses `businessVerification.admin.linksWebsite` (en Website, ar الموقع الإلكتروني); brand names stay untranslated.
+- **Deploy order:** apply the two migrations first, then deploy the frontend. The new client calls the v3 RPCs, which do not exist before the migrations.
+- **Rollback:** revert the frontend; the migrations are expand-only and may stay.
+- **Journey test:** `frontend/e2e/showroom-social-links.spec.ts` covers the blocked Next, the `@shop` preview and continue, no overflow at 375px and left-to-right inputs in Arabic. It needs the local seeded stack and Turnstile reachability; see the work log for whether it was run. The `showroom-auth` and `account-workspace-model` specs gained one link step because a showroom now needs a link to leave step 1.
+- **Browser defect fixed:** the first browser run showed the collapsed inputs visible, because the closed panels combined the `hidden` attribute with the `flex` class. Closed panels now use the `hidden` class; the journey spec and a class assertion cover it.
+- **Known follow-up, not part of this change:** `service_role` cannot UPDATE `business_creation_drafts` because the existing check `business_draft_contact_shape` calls `app.business_address_word_count` without an execute grant. This is older than this change; suggest a separate issue.
 
 ## Related
 [Showroom business onboarding](showroom-business-onboarding.md) · [ADR-0016](../decisions/ADR-0016-business-phone-database-validation.md) · `frontend/src/lib/onboarding/business-details.ts` · `frontend/src/features/onboarding/business-flow.tsx` · `supabase/migrations/20261014133000_showroom_optional_address_completion.sql`

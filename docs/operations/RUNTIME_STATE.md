@@ -1,5 +1,9 @@
 # Runtime State
 
+## Showroom social links (draft, local only) — 2026-11-05
+- Branch `feat/showroom-social-links-20261105` (from `main` `f823d88c`): migrations `20261105090001` and `20261105090002` plus the frontend. Not pushed, no PR, not applied to Acceptance or Production; both migrations are expand-only. Deploy order when approved: migrations first, then the frontend. Rollback: revert the frontend, the migrations may stay.
+- Local verification: pgTAP 145 files / 6499 tests PASS, migration policy PASS, permission contract 695 exact PASS, Playwright journey 6 passed on a private local stack. Details in the work log.
+
 ## Live site on Cloudflare Workers — 2026-10-27
 - `aladdindecore.com`, `www` and `next` are served by Worker `aladdin-frontend-production` (Custom Domains, attached by the owner 17:23–17:40Z). It binds `aladdin-backend-production` and uses the live Supabase project `kkpkgjrweysgvhvkhzun` (193 migrations). R2 and Redis are off in production.
 - DNS: Cloudflare zone `c90ddcdec7bacd2485e1e5bcbac8afce` (nameservers johnathan/mona.ns.cloudflare.com, registrar GoDaddy). Zoho MX/SPF/DKIM unchanged; wildcard `*` still CNAME to Vercel, DNS only. No DMARC.
