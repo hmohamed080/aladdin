@@ -10,6 +10,7 @@ import { loadMandatoryBusinessSetup } from "@/server/queries/business-setup";
 import { APPLICATION_ORG_TYPES } from "@/lib/onboarding/account-types";
 import { validateBusinessLocation } from "@/lib/location/business-location";
 import { slotErrorCode } from "@/lib/workspace/applications";
+import { normalizeSocialLinks, socialLinksError } from "@/lib/onboarding/social-links";
 import { isWithinDescriptionLimit } from "@/lib/text/description-limit";
 import type { Database } from "@/types/database.types";
 
@@ -17,8 +18,8 @@ import type { Database } from "@/types/database.types";
  * Business creation writers. Thin, shape-only validators over the trusted
  * security-definer RPCs — the verified-caller gate, the required-field check, the
  * transactional organization + owner-membership + primary-branch creation, and the
- * idempotency guarantee all live in the database (`business_draft_save_v2` /
- * `business_draft_submit_v2` → app.organization_create_owned).
+ * idempotency guarantee all live in the database (`business_draft_save_v3` /
+ * `business_draft_submit_v3` → app.organization_create_owned).
  *
  * The DRAFT ID is the thread that makes this safe. It is the resume handle and the
  * idempotency key: submitting the same draft twice returns the same organization,
@@ -45,6 +46,10 @@ const businessSchema = businessDetailsSchema.extend({
   /** The city typed through "Other"; mutually exclusive with `city`. */
   cityCustomName: z.string().trim().max(120).nullish(),
   primaryBranchName: z.string().trim().max(120).nullish(),
+  facebookUrl: z.string().max(400).nullish(),
+  instagramUrl: z.string().max(400).nullish(),
+  tiktokUrl: z.string().max(400).nullish(),
+  websiteUrl: z.string().max(400).nullish(),
 });
 export type BusinessInput = z.input<typeof businessSchema>;
 
@@ -72,6 +77,8 @@ function legalNameMissing(legalName: string | null | undefined): boolean {
  * `additional_pending`), so the person sees the real reason rather than a generic refusal.
  */
 function failureCode(error: { code?: string; hint?: string | null; message?: string }): string {
+  if (error.code === "22023" && /showroom link/i.test(error.message ?? "")) return "onboarding.error.linksRequired";
+  if (error.code === "22023" && /social link/i.test(error.message ?? "")) return "onboarding.error.linkInvalid";
   if (error.code === "22023" && /description/i.test(error.message ?? "")) return "onboarding.error.descriptionTooLong";
   if (!notEntitled(error)) return "onboarding.error.saveFailed";
   return error.hint ? slotErrorCode(error.hint) : "onboarding.error.businessNotAllowed";
@@ -100,6 +107,11 @@ export async function saveBusiness(input: BusinessInput): Promise<BusinessAction
   if (v.step === "identity" && (v.displayName?.trim().length ?? 0) < 2) return { ok: false, code: "onboarding.error.businessNameRequired" };
   if (v.step === "identity" && legalNameMissing(v.legalName)) return { ok: false, code: "onboarding.error.legalNameRequired" };
   if (orgType === "showroom_dealer" && v.step === "identity") { const error = showroomIdentityError(v); if (error) return { ok: false, code: error }; }
+  // Links are required to finish a showroom's identity step; whatever is entered is always validated, on any step.
+  const rawLinks = { facebook: v.facebookUrl, instagram: v.instagramUrl, tiktok: v.tiktokUrl, website: v.websiteUrl };
+  const links = normalizeSocialLinks(rawLinks);
+  if (!links.ok) return { ok: false, code: "onboarding.error.linkInvalid" };
+  if (orgType === "showroom_dealer" && v.step === "identity") { const error = socialLinksError(rawLinks); if (error) return { ok: false, code: error }; }
   if (v.step === "location" && (!v.governorate || !(v.city || v.cityCustomName))) return { ok: false, code: "onboarding.error.locationRequired" };
 
   // Governorate / city / custom city must be canonical (catalogue governorate, a city of THAT governorate, or a custom city).
@@ -108,7 +120,7 @@ export async function saveBusiness(input: BusinessInput): Promise<BusinessAction
   if (!location.ok) return { ok: false, code: "onboarding.error.locationInvalid" };
 
   const supabase = await getServerSupabase();
-  const { data, error } = await supabase.rpc("business_draft_save_v2", {
+  const { data, error } = await supabase.rpc("business_draft_save_v3", {
     p_contact_phone: v.contactPhone ?? undefined,
     p_contact_email: input.contactEmail == null ? undefined : v.contactEmail ?? "",
     p_activity_type: v.activityType ?? undefined,
@@ -122,6 +134,11 @@ export async function saveBusiness(input: BusinessInput): Promise<BusinessAction
     p_city: location.value.city ?? undefined,
     p_city_custom_name: location.value.cityCustomName ?? undefined,
     p_primary_branch_name: v.primaryBranchName ?? undefined,
+    // v3 REPLACES all four links: an absent link is sent omitted (database null = cleared).
+    p_facebook_url: links.links.facebook ?? undefined,
+    p_instagram_url: links.links.instagram ?? undefined,
+    p_tiktok_url: links.links.tiktok ?? undefined,
+    p_website_url: links.links.website ?? undefined,
   });
   // The database is the final authority on who may open a business (42501 = not
   // entitled, `20260928090001_business_creation_entitlement.sql`); say so plainly.
@@ -150,7 +167,10 @@ export async function submitBusiness(input: BusinessInput): Promise<BusinessActi
   if (legalNameMissing(parsed.data.legalName)) return { ok: false, code: "onboarding.error.legalNameRequired" };
   const mandatory = await loadMandatoryBusinessSetup();
   const orgType = mandatory.required ? mandatory.orgType : parsed.data.orgType;
-  if (orgType === "showroom_dealer") { const error = showroomIdentityError(parsed.data); if (error) return { ok: false, code: error }; }
+  if (orgType === "showroom_dealer") {
+    const error = showroomIdentityError(parsed.data) ?? socialLinksError({ facebook: parsed.data.facebookUrl, instagram: parsed.data.instagramUrl, tiktok: parsed.data.tiktokUrl, website: parsed.data.websiteUrl });
+    if (error) return { ok: false, code: error };
+  }
   if (!parsed.data.governorate || !(parsed.data.city || parsed.data.cityCustomName)) return { ok: false, code: "onboarding.error.locationRequired" };
   const complete = validateBusinessLocation(parsed.data, { complete: true });
   if (!complete.ok) {
@@ -165,7 +185,7 @@ export async function submitBusiness(input: BusinessInput): Promise<BusinessActi
   // business they just created. A later, additional application leaves them in their approved workspace and shows its status.
   const slot = await supabase.rpc("my_organization_application_slot");
   const landing = slot.data === "first_available" ? "/b2b" : "/business/applications";
-  const { data: orgId, error } = await supabase.rpc("business_draft_submit_v2", {
+  const { data: orgId, error } = await supabase.rpc("business_draft_submit_v3", {
     p_draft_id: input.draftId ?? saved.draftId ?? undefined,
   });
   if (error) {

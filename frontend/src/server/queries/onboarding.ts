@@ -134,6 +134,10 @@ export type BusinessAnswers = {
   /** The city typed through "Other" (null when a catalogue city — or nothing — is chosen). */
   cityCustomName: string | null;
   primaryBranchName: string | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
+  tiktokUrl: string | null;
+  websiteUrl: string | null;
   organizationId: string | null;
   completedAt: string | null;
 };
@@ -193,6 +197,10 @@ export async function getBusinessOnboardingData(): Promise<BusinessOnboardingDat
       city: stored.city,
       cityCustomName: stored.cityCustomName,
       primaryBranchName: draft?.primary_branch_name ?? null,
+      facebookUrl: draft?.facebook_url ?? null,
+      instagramUrl: draft?.instagram_url ?? null,
+      tiktokUrl: draft?.tiktok_url ?? null,
+      websiteUrl: draft?.website_url ?? null,
       organizationId: draft?.organization_id ?? null,
       completedAt: draft?.completed_at ?? null,
     },

@@ -39,6 +39,10 @@ const emptyAnswers: BusinessAnswers = {
   city: null,
   cityCustomName: null,
   primaryBranchName: null,
+  facebookUrl: null,
+  instagramUrl: null,
+  tiktokUrl: null,
+  websiteUrl: null,
   organizationId: null,
   completedAt: null,
 };
