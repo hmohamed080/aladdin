@@ -1,6 +1,6 @@
 # Admin Staff invitations: Acceptance deployment readiness and rollback
 
-Status: **step 2 (migration) and step 3 (verification) are DONE on Acceptance (2026-11-05, evidence in section 4a).** Not yet done: frontend deploy, QA invitations, live role checks, A8. No Production change. Each remaining step needs its own explicit owner approval. A8 is not part of this document.
+Status: **A7 is CLOSED on Acceptance (2026-11-05; evidence in sections 4a and 5a).** Migration applied and verified, frontend deployed, live role checks and final audit passed. Not part of this document and not started: A8 onward, Production. Each further step needs its own explicit owner approval.
 
 ## 1. Facts established read-only (2026-11-05)
 
@@ -114,6 +114,14 @@ Any other value stops the rollout until explained. `newest_migrations` should st
 | 9 | Reuse an accepted link and a withdrawn link | both refused |
 
 Do not initialize limits, send WhatsApp messages or change `WHATSAPP_DELIVERY_ENABLED` during QA. Suspend (do not delete) the QA accounts afterwards.
+
+### 5a. A7 closure evidence (2026-11-05)
+
+* **Deployment:** Acceptance frontend `aladdin-frontend-preview` from `47d4fe0b` (workflow run 42026625795; docs-only difference from the CI-verified `09fdc130`). New version `deae226d-0686-4e0f-a545-db0c073e7db1` at 100%; replaced (rollback target) `45db2715-d9f9-4951-8210-0f63446de2cc`. Smoke: `/api/health`, `/`, `/auth/sign-in`, `/legal/terms` 200; `/showroom` 307 (static redirect to `/showroom/home`). The WhatsApp delivery Worker stayed on `11b9f694-1f2e-4e2c-ad41-8a8d0a8ae13e`; delivery OFF; Production untouched.
+* **Live checks (owner, browser):** Super Admin sees Admin Staff, Invitations (form, empty roster). Moderator invitation accepted; `/admin/whatsapp-otp` gives the permission-based 404. Administrator invitation accepted; `/admin/whatsapp-otp` shows usage, delivery status, failure statistics and history, with no settings form and no connection probe. A used link, opened signed out, shows "This invitation has already been used" and cannot be accepted.
+* **Final read-only audit (owner, SQL Editor): all checks passed.** 2 accepted invitations (Administrator, Moderator); 1 revoked Administrator invitation (withdrawn by the owner on purpose and replaced by a new invitation to the same address, which was accepted: intended QA activity); 0 pending. Active roles: 1 Super Admin, 1 Administrator, 1 Moderator. Assignments match user and role; consent complete; all duplicate counts 0; each accepted invitation has exactly one `admin_staff.invitation_accepted`, one `admin_role.assigned` (source `staff_invitation`) and one `account.platform_prepared` (source `staff_invitation`); no unauthorized assignment; no WhatsApp audit activity; invitation table still closed; grant key rows 1; limits uninitialized.
+* **State kept for A8:** both QA accounts stay active (Administrator and Moderator roles). Remove them with the audited Remove role and Disable only after the A8 to A10 rehearsal, with separate approval.
+* **Follow-ups (separate PRs, not blockers):** invitation e-mail reveal (design approved) and automatic invitation e-mail; see `ADMIN_STAFF_INVITATIONS.md` section 10.
 
 ## 6. Rollback plan
 
