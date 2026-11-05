@@ -120,6 +120,23 @@ export const registrationSchema = z
     if (!birthDate.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: birthDate.code, path: ["birthDate"] });
   });
 
+/**
+ * Registration for INVITED PLATFORM STAFF: exactly the marketplace rules for name, e-mail, password and birth date, with no username and no
+ * account type (staff are never given a marketplace persona). Kept beside registrationSchema so the two cannot drift.
+ */
+export const staffRegistrationSchema = z
+  .object({
+    displayName: displayNameSchema,
+    email: emailSchema,
+    password: passwordSchema,
+    birthDate: z.string({ invalid_type_error: "authPasswordPreview.error.birthDateRequired", required_error: "authPasswordPreview.error.birthDateRequired" }).trim(),
+  })
+  .superRefine((value, ctx) => {
+    addWeakPasswordIssues(value.password, [value.email], ["password"], ctx);
+    const birthDate = parseBirthDate(value.birthDate);
+    if (!birthDate.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: birthDate.code, path: ["birthDate"] });
+  });
+
 export const resetPasswordSchema = z
   .object({
     email: emailSchema,

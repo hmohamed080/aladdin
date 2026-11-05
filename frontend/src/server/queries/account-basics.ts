@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { computeMandatoryBusinessSetup } from "@/server/queries/business-setup";
+import { loadIsAdminStaff } from "@/server/queries/platform";
 
 /**
  * Account basics (ADR-0026): the phone, location (governorate + town) and
@@ -77,6 +78,8 @@ export function hasMissingBasics(missing: MissingBasics): boolean {
  */
 export async function needsAccountBasics(supabase: Client): Promise<boolean> {
   try {
+    // Platform staff are dedicated accounts with no marketplace persona: their landing is /admin, never the account-basics screen.
+    if (await loadIsAdminStaff(supabase)) return false;
     // A business registration answers these inside its business setup (owner
     // decision 2026-10-29): until its first business exists, that wizard is
     // where it goes, never a separate page.
