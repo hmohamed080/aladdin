@@ -48,7 +48,7 @@ export function SocialLinksCard({
   if (focusPlatform !== prevFocus) {
     setPrevFocus(focusPlatform);
     if (focusPlatform) {
-      if (!open.has(focusPlatform)) setOpen(new Set([...open, focusPlatform]));
+      setOpen((o) => (o.has(focusPlatform) ? o : new Set([...o, focusPlatform])));
       setFocusRequest({ platform: focusPlatform });
     }
   }
@@ -67,6 +67,14 @@ export function SocialLinksCard({
     return r.ok && r.url !== null;
   }).length;
   const required = showErrors && socialLinksError(values) === "onboarding.error.linksRequired";
+
+  // The required message opens Instagram, and it stays open afterwards: the first valid character clears `required`,
+  // and an input the person is typing in must never collapse under the cursor.
+  const [prevRequired, setPrevRequired] = useState(false);
+  if (required !== prevRequired) {
+    setPrevRequired(required);
+    if (required) setOpen((o) => (o.has("instagram") ? o : new Set([...o, "instagram"])));
+  }
 
   const forcedOpen = (p: SocialPlatform) => !results[p].ok || (required && p === "instagram");
   const isOpen = (p: SocialPlatform) => open.has(p) || forcedOpen(p);

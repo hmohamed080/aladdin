@@ -175,11 +175,25 @@ export function BusinessFlow({
     websiteUrl: s.links.website,
   });
 
+  /** Show the card's messages and move focus to the first invalid link, or Instagram when none is valid. */
+  const flagLinks = () => {
+    setShowLinkErrors(true);
+    const invalid = SOCIAL_PLATFORMS.find((p) => !normalizeSocialLink(p, state.links[p]).ok);
+    setLinkFocus({ platform: invalid ?? "instagram" });
+  };
+
   const persistAdvance = () => {
     if (current === "identity" && showroom && socialLinksError(state.links)) {
-      setShowLinkErrors(true);
-      const invalid = SOCIAL_PLATFORMS.find((p) => !normalizeSocialLink(p, state.links[p]).ok);
-      setLinkFocus({ platform: invalid ?? "instagram" });
+      setError(null);
+      flagLinks();
+      return;
+    }
+    // Showroom chosen AFTER step 1 (no preselected type): step 1 never showed its showroom fields, so send the
+    // person back there now rather than letting submit fail at the end.
+    if (current === "type" && state.orgType === "showroom_dealer" && !identityDone(state)) {
+      setError(null);
+      goto("identity");
+      if (socialLinksError(state.links)) flagLinks();
       return;
     }
     start(async () => {

@@ -472,3 +472,64 @@ describe("BusinessFlow — showroom links (step 1)", () => {
     expect(saveBusiness).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("BusinessFlow — showroom chosen on the type step", () => {
+  const showroomChoice = () => screen.getByRole("button", { name: new RegExp(en.onboarding.business.orgTypes.showroom_dealer) });
+  async function toTypeStep() {
+    renderWithI18n(<BusinessFlow answers={emptyAnswers} presetOrgType={null} draftId={null} />, "en");
+    fillNames("Cairo Ceramics", "Cairo Ceramics Trading LLC");
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(screen.getByText(en.onboarding.business.type.title)).toBeInTheDocument();
+    expect(saveBusiness).toHaveBeenCalledTimes(1);
+  }
+
+  it("picking Showroom with no links returns to step 1 with the required message and Instagram focused, saving nothing", async () => {
+    await toTypeStep();
+    fireEvent.click(showroomChoice());
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(saveBusiness).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(en.onboarding.business.location.title)).toBeNull();
+    expect(screen.getByText(en.onboarding.business.links.title)).toBeInTheDocument();
+    expect(screen.getAllByRole("alert").map((a) => a.textContent)).toContain(en.onboarding.error.linksRequired);
+    expect(screen.getByLabelText("Instagram")).toHaveFocus();
+  });
+
+  it("picking a non-showroom type advances normally", async () => {
+    await toTypeStep();
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(en.onboarding.business.orgTypes.supplier) }));
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(saveBusiness).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(screen.getByText(en.onboarding.business.location.title)).toBeInTheDocument());
+  });
+
+  it("once step 1 holds the showroom details and a valid link, the type step advances", async () => {
+    await toTypeStep();
+    fireEvent.click(showroomChoice());
+    await act(async () => { fireEvent.click(continueBtn()); });
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "decor_showroom" } });
+    fireEvent.change(screen.getByLabelText(label.phoneLabel), { target: { value: "01012345678" } });
+    fireEvent.change(screen.getByLabelText("Instagram"), { target: { value: "@cairoceramics" } });
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(screen.getByText(en.onboarding.business.type.title)).toBeInTheDocument();
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(saveBusiness).toHaveBeenCalledTimes(3);
+    expect(saveBusiness.mock.calls[2]![0]).toMatchObject({ orgType: "showroom_dealer", instagramUrl: "@cairoceramics" });
+    await waitFor(() => expect(screen.getByText(en.onboarding.business.location.title)).toBeInTheDocument());
+  });
+
+  it("a links-blocked Next on step 1 clears a stale save error", async () => {
+    saveBusiness.mockResolvedValueOnce({ ok: false, code: "onboarding.error.saveFailed" } as never);
+    renderWithI18n(<BusinessFlow answers={emptyAnswers} presetOrgType="showroom_dealer" draftId="draft-1" />, "en");
+    fillNames("Cairo Ceramics", "Cairo Ceramics Trading LLC");
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "decor_showroom" } });
+    fireEvent.change(screen.getByLabelText(label.phoneLabel), { target: { value: "01012345678" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Instagram/ }));
+    fireEvent.change(screen.getByLabelText("Instagram"), { target: { value: "@cairoceramics" } });
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(screen.getByText(en.onboarding.error.saveFailed)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Instagram"), { target: { value: "" } });
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(screen.queryByText(en.onboarding.error.saveFailed)).toBeNull();
+    expect(screen.getAllByRole("alert").map((a) => a.textContent)).toContain(en.onboarding.error.linksRequired);
+  });
+});

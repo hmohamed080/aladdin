@@ -103,6 +103,19 @@ describe("SocialLinksCard", () => {
     expect(inputs()).toHaveLength(1);
   });
 
+  it("an Instagram input opened by the required message stays open while the person types (no focusPlatform)", () => {
+    renderWithI18n(<Harness showErrors />, "en");
+    const input = inputs()[0]!;
+    fireEvent.change(input, { target: { value: "@" } });
+    fireEvent.change(input, { target: { value: "@s" } });
+    expect(screen.queryByText(en.onboarding.error.linksRequired)).toBeNull();
+    expect(inputs()).toHaveLength(1);
+    expect(toggle(L.platform.instagram)).toHaveAttribute("aria-expanded", "true");
+    // Once it is valid it behaves like any opened input: pressing the toggle hides it.
+    fireEvent.click(toggle(L.platform.instagram));
+    expect(inputs()).toHaveLength(0);
+  });
+
   it("a filled-but-invalid link shows its own reason, not the required message", () => {
     renderWithI18n(<Harness showErrors initial={{ ...blank, website: "javascript:alert(1)" }} />, "en");
     const alerts = screen.getAllByRole("alert").map((a) => a.textContent);
