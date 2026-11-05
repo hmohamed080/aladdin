@@ -5013,6 +5013,21 @@ export const en = {
         failed: "The legal name could not be saved. Try again.",
       },
     },
+    links: {
+      label: "Showroom links",
+      hint: "Your Instagram, Facebook, TikTok or website. At least one link stays on your showroom.",
+      save: "Save links",
+      saving: "Saving…",
+      saved: "Links saved.",
+      unverifiedNote: "Shown to the review team. Not verified.",
+      empty: "No links added yet. Add at least one so customers and the review team can find your showroom.",
+      error: {
+        invalid: "One of the links is not valid. Check it and try again.",
+        required: "Keep at least one link. A showroom cannot remove its last link.",
+        forbidden: "You do not have permission to change the links.",
+        failed: "The links could not be saved. Try again.",
+      },
+    },
     location: {
       edit: "Edit location",
       title: "Location of {name}",

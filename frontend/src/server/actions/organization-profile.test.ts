@@ -4,7 +4,7 @@ const state = vi.hoisted(() => ({ rpc: vi.fn(), revalidate: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: state.revalidate }));
 vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({ rpc: state.rpc }) }));
 
-import { saveLegalNameAction, setBranchLocationAction } from "./organization-profile";
+import { saveLegalNameAction, saveSocialLinksAction, setBranchLocationAction } from "./organization-profile";
 import { saveOrganizationContactAction } from "./contacts";
 
 const ORG = "9c000000-cccc-4ccc-8ccc-000000000001";
@@ -97,5 +97,47 @@ describe("saveOrganizationContactAction (registered contact)", () => {
     expect((await saveOrganizationContactAction({ ok: false }, form({ orgId: ORG, email: "nope" }))).code).toBe("onboarding.error.contactInvalid");
     state.rpc.mockResolvedValue({ data: null, error: { code: "22023", message: "a showroom needs a business phone" } });
     expect((await saveOrganizationContactAction({ ok: false }, form({ orgId: ORG, email: "a@b.co" }))).code).toBe("onboarding.error.showroomPhoneRequired");
+  });
+});
+
+describe("saveSocialLinksAction", () => {
+  const canonical = { facebook: null, instagram: "https://www.instagram.com/alpha.showroom", tiktok: null, website: "https://alpha.com" };
+
+  it("refuses all-blank and a bad link before any round trip", async () => {
+    expect(await saveSocialLinksAction(ORG, { instagram: "  ", website: "" })).toEqual({ ok: false, code: "required" });
+    expect(await saveSocialLinksAction(ORG, { facebook: "https://evil.example/x", instagram: "alpha" })).toEqual({ ok: false, code: "invalid" });
+    expect(state.rpc).not.toHaveBeenCalled();
+  });
+
+  it("sends canonical URLs (null for blank), revalidates and returns the canonical links", async () => {
+    state.rpc.mockResolvedValue({ data: { facebook_url: null, instagram_url: canonical.instagram, tiktok_url: null, website_url: canonical.website }, error: null });
+    const res = await saveSocialLinksAction(ORG, { instagram: "@alpha.showroom", website: "ALPHA.com/" });
+    expect(res).toEqual({ ok: true, links: canonical });
+    expect(state.rpc).toHaveBeenCalledWith("organization_social_links_set", {
+      p_org_id: ORG,
+      p_facebook_url: null,
+      p_instagram_url: canonical.instagram,
+      p_tiktok_url: null,
+      p_website_url: canonical.website,
+    });
+    expect(state.revalidate).toHaveBeenCalledWith("/showroom/settings");
+    expect(state.revalidate).toHaveBeenCalledWith("/b2b/settings");
+  });
+
+  it("falls back to the normalised input when the payload is unusable", async () => {
+    state.rpc.mockResolvedValue({ data: null, error: null });
+    expect(await saveSocialLinksAction(ORG, { instagram: "alpha.showroom", website: "alpha.com" })).toEqual({ ok: true, links: canonical });
+  });
+
+  it("maps database refusals", async () => {
+    const raw = { instagram: "alpha.showroom" };
+    state.rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "x" } });
+    expect(await saveSocialLinksAction(ORG, raw)).toEqual({ ok: false, code: "forbidden" });
+    state.rpc.mockResolvedValue({ data: null, error: { code: "22023", hint: "links_required", message: "x" } });
+    expect(await saveSocialLinksAction(ORG, raw)).toEqual({ ok: false, code: "required" });
+    state.rpc.mockResolvedValue({ data: null, error: { code: "22023", message: "x" } });
+    expect(await saveSocialLinksAction(ORG, raw)).toEqual({ ok: false, code: "invalid" });
+    state.rpc.mockResolvedValue({ data: null, error: { code: "XX000", message: "x" } });
+    expect(await saveSocialLinksAction(ORG, raw)).toEqual({ ok: false, code: "failed" });
   });
 });
