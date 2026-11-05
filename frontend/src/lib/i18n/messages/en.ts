@@ -6591,6 +6591,12 @@ export const en = {
     accept: "Accept and continue",
     accepting: "Accepting…",
     mismatch: "You are signed in with a different address than the one invited ({email}). Sign out, then register or sign in with the invited address.",
+    consent: {
+      title: "Confirm the agreements",
+      body: "Before this account can become platform staff, we need to record that you accepted the current Terms, Privacy Policy and pilot notice.",
+      submit: "Agree and continue",
+      saving: "Saving…",
+    },
     register: {
       title: "Create your staff account",
       intro: "Your e-mail must be the invited address. A staff account has no marketplace profile and no username.",
@@ -6600,6 +6606,8 @@ export const en = {
       back: "Back to the invitation",
     },
     error: {
+      consentRequired: "The agreements must be on record before this invitation can be accepted.",
+      consentFailed: "We could not record your agreement. Try again in a moment.",
       generic: "Something went wrong. Try again in a moment.",
       invalid: "This invitation is not valid.",
       expired: "This invitation has expired.",

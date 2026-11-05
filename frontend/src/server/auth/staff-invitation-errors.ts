@@ -16,6 +16,7 @@ export function staffInvitationErrorCode(error: { code?: string; message?: strin
     [/recipient_mismatch/, "recipientMismatch"],
     [/inviter_not_authorized/, "inviterNotAuthorized"],
     [/account_not_eligible/, "accountNotEligible"],
+    [/consent_required/, "consentRequired"],
     [/expired/, "expired"],
     [/not_pending|not_found/, "notAvailable"],
     [/staff_invitation: invalid/, "invalid"],

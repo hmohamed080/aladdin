@@ -11,6 +11,7 @@ import { captchaTokenFrom, isCaptchaFailure } from "@/server/auth/captcha";
 import { type GoTrueError, isAccountExistsError, isRateLimitError, padToRegistrationFloor } from "@/server/auth/signup-guards";
 import { staffInvitationErrorCode } from "@/server/auth/staff-invitation-errors";
 import { clearStaffInvitationToken, readStaffInvitationToken } from "@/server/auth/staff-invitation-token";
+import { lookupStaffInvitation } from "@/server/queries/staff-invitations";
 import {
   displayNameSchema,
   emailSchema,
@@ -151,8 +152,10 @@ export async function verifyStaffSignUp(_prev: StaffInvitationState, formData: F
   }
   await markPasswordAttachedAuthoritatively(data.user.id);
   const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
-  // Best-effort, exactly as in the marketplace flow: a bookkeeping hiccup never undoes a verified, credentialed session.
-  await supabase.rpc("record_consent", { p_types: [...CONSENT_TYPES], p_locale: locale });
+  // Unlike the marketplace flow this result is checked, and the database enforces it: staff_invitation_accept refuses any account that
+  // lacks the current terms, privacy and pilot receipts. A failure here never undoes the verified session; it is retried once, and if it
+  // still fails the person continues to the invitation page, which shows the consent step (recoverable, never a dead end).
+  if (!(await recordConsentReceipts(supabase, locale))) console.error("staff registration: consent receipts not recorded; the invitation page will ask again");
   const name = displayNameSchema.safeParse(data.user.user_metadata?.display_name);
   if (name.success) await supabase.rpc("profile_set_display_name", { p_display_name: name.data });
   const birth = parseBirthDate(data.user.user_metadata?.birth_date);
@@ -165,6 +168,34 @@ export async function verifyStaffSignUp(_prev: StaffInvitationState, formData: F
   }
   // No account type, no username, no pending registration, no onboarding: straight to the invitation, where the person explicitly accepts.
   redirect(ENTRY_PATH);
+}
+
+/** record_consent with one retry; true only when the database confirmed the write. */
+async function recordConsentReceipts(supabase: Awaited<ReturnType<typeof getServerSupabase>>, locale: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const { error } = await supabase.rpc("record_consent", { p_types: [...CONSENT_TYPES], p_locale: locale });
+    if (!error) return true;
+  }
+  return false;
+}
+
+/**
+ * Recovery for an invitee whose consent receipts are missing (registration was interrupted, or recording failed). The signed-in person must
+ * be the one the invitation names, must tick the agreement, and the receipts are re-read from the database before success is reported.
+ */
+export async function recordStaffConsentAction(_prev: StaffInvitationState, formData: FormData): Promise<StaffInvitationState> {
+  if (formData.get("consent_agree") !== "on") return { ok: false, code: "authPasswordPreview.error.consentRequired" };
+  const token = await readStaffInvitationToken();
+  if (!token) return { ok: false, code: "staffInvitation.error.invalid" };
+  const supabase = await getServerSupabase();
+  const before = await lookupStaffInvitation(token);
+  if (before.status !== "pending" || !before.matchesCaller) return { ok: false, code: "staffInvitation.error.recipientMismatch" };
+  const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
+  if (!(await recordConsentReceipts(supabase, locale))) return { ok: false, code: "staffInvitation.error.consentFailed" };
+  const after = await lookupStaffInvitation(token);
+  if (!after.consentComplete) return { ok: false, code: "staffInvitation.error.consentFailed" };
+  revalidatePath(ENTRY_PATH);
+  return { ok: true };
 }
 
 export async function acceptStaffInvitationAction(): Promise<StaffInvitationState> {

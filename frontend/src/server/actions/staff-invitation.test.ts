@@ -30,6 +30,7 @@ vi.mock("@/lib/supabase/admin-server", () => ({ markPasswordAttachedAuthoritativ
 import {
   acceptStaffInvitationAction,
   createStaffInvitationAction,
+  recordStaffConsentAction,
   requestStaffSignUp,
   revokeStaffInvitationAction,
   verifyStaffSignUp,
@@ -191,6 +192,34 @@ describe("verifyStaffSignUp", () => {
     expect(saveVerifiedBirthDate).toHaveBeenCalledWith("u1", "1990-01-15");
   });
 
+  it("checks the consent write, retries once, and a persistent failure never undoes the session: the invitation page asks again", async () => {
+    cookieStore.set(STAFF_INVITATION_COOKIE, TOKEN);
+    verifyOtp.mockResolvedValueOnce(verified);
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    rpc.mockImplementation(async (fn: string) => (fn === "record_consent" ? { data: null, error: { code: "XX000", message: "boom" } } : { data: null, error: null }));
+    expect(await redirectOf(verifyStaffSignUp(init, code()))).toBe("REDIRECT:/auth/staff-invitation");
+    expect(rpc.mock.calls.filter((c) => c[0] === "record_consent")).toHaveLength(2);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("consent receipts not recorded"));
+    expect(JSON.stringify(log.mock.calls)).not.toContain("boom");
+  });
+
+  it("a transient consent failure is recovered by the single retry", async () => {
+    cookieStore.set(STAFF_INVITATION_COOKIE, TOKEN);
+    verifyOtp.mockResolvedValueOnce(verified);
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let first = true;
+    rpc.mockImplementation(async (fn: string) => {
+      if (fn === "record_consent" && first) {
+        first = false;
+        return { data: null, error: { code: "XX000", message: "blip" } };
+      }
+      return { data: null, error: null };
+    });
+    await redirectOf(verifyStaffSignUp(init, code()));
+    expect(rpc.mock.calls.filter((c) => c[0] === "record_consent")).toHaveLength(2);
+    expect(log).not.toHaveBeenCalledWith(expect.stringContaining("consent receipts"));
+  });
+
   it("refuses a malformed code and a missing handoff cookie without calling GoTrue", async () => {
     cookieStore.set(STAFF_INVITATION_COOKIE, TOKEN);
     expect((await verifyStaffSignUp(init, code({ token: "12" }))).code).toBe("authPasswordPreview.error.invalidCode");
@@ -206,6 +235,47 @@ describe("verifyStaffSignUp", () => {
   });
 });
 
+describe("recordStaffConsentAction (recovery after an interrupted registration)", () => {
+  const agree = () => form({ consent_agree: "on" });
+  const lookupRow = (over: Record<string, unknown> = {}) => ({ status: "pending", role_name: "Administrator", email_masked: "q•••@•••.test", matches_caller: true, consent_complete: false, ...over });
+  const respond = (lookups: Array<Record<string, unknown>>, consent: { error: unknown } = { error: null }) => {
+    const queue = [...lookups];
+    rpc.mockImplementation(async (fn: string) => {
+      if (fn === "staff_invitation_lookup") return { data: [queue.shift() ?? lookupRow()], error: null };
+      if (fn === "record_consent") return { data: null, error: consent.error };
+      return { data: null, error: null };
+    });
+  };
+
+  it("needs the explicit agreement and the handoff cookie, and touches nothing otherwise", async () => {
+    expect((await recordStaffConsentAction(init, form({}))).code).toBe("authPasswordPreview.error.consentRequired");
+    expect((await recordStaffConsentAction(init, agree())).code).toBe("staffInvitation.error.invalid");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("is only for the person the invitation names", async () => {
+    cookieStore.set(STAFF_INVITATION_COOKIE, TOKEN);
+    respond([lookupRow({ matches_caller: false })]);
+    expect((await recordStaffConsentAction(init, agree())).code).toBe("staffInvitation.error.recipientMismatch");
+    expect(rpc.mock.calls.map((c) => c[0])).not.toContain("record_consent");
+  });
+
+  it("records all three consent types, re-reads the receipts and only then reports success", async () => {
+    cookieStore.set(STAFF_INVITATION_COOKIE, TOKEN);
+    respond([lookupRow(), lookupRow({ consent_complete: true })]);
+    expect(await recordStaffConsentAction(init, agree())).toEqual({ ok: true });
+    expect(rpc).toHaveBeenCalledWith("record_consent", { p_types: ["terms", "privacy", "pilot"], p_locale: expect.any(String) });
+  });
+
+  it("does not report success when the write fails or the receipts are still missing afterwards", async () => {
+    cookieStore.set(STAFF_INVITATION_COOKIE, TOKEN);
+    respond([lookupRow()], { error: { code: "XX000", message: "boom" } });
+    expect((await recordStaffConsentAction(init, agree())).code).toBe("staffInvitation.error.consentFailed");
+    respond([lookupRow(), lookupRow({ consent_complete: false })]);
+    expect((await recordStaffConsentAction(init, agree())).code).toBe("staffInvitation.error.consentFailed");
+  });
+});
+
 describe("acceptStaffInvitationAction", () => {
   it("needs the handoff cookie", async () => {
     expect((await acceptStaffInvitationAction()).code).toBe("staffInvitation.error.invalid");
@@ -216,6 +286,7 @@ describe("acceptStaffInvitationAction", () => {
     ["staff_invitation: recipient_mismatch", "staffInvitation.error.recipientMismatch"],
     ["staff_invitation: inviter_not_authorized", "staffInvitation.error.inviterNotAuthorized"],
     ["staff_invitation: account_not_eligible", "staffInvitation.error.accountNotEligible"],
+    ["staff_invitation: consent_required", "staffInvitation.error.consentRequired"],
     ["staff_invitation: expired", "staffInvitation.error.expired"],
     ["staff_invitation: invalid", "staffInvitation.error.invalid"],
     ["staff_invitation: you cannot accept your own invitation", "staffInvitation.error.self"],

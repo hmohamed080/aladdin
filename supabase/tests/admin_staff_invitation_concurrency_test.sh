@@ -31,6 +31,10 @@ values ('${inviter}', '00000000-0000-0000-0000-000000000000', 'authenticated', '
 insert into public.admin_role_assignments (user_id, role_id)
 select '${inviter}', id from public.admin_roles where key = 'administrator';
 update public.users set status = 'active' where id = '${inviter}';
+-- Acceptance requires the current consent receipts (as after a real registration); the races below are about the invitation, not consent.
+insert into public.consent_receipts (user_id, consent_type, version, locale)
+select u, t, app.current_consent_version(t), 'en'
+  from unnest(array['${invitee_a}', '${invitee_c}']::uuid[]) u, unnest(enum_range(null::public.consent_type)) t;
 SQL
 
 as_user() { # as_user <uuid> <sql...>: run one statement as a signed-in user, print its single value

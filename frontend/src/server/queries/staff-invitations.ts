@@ -13,9 +13,11 @@ export type StaffInvitationView = {
   roleName: string | null;
   emailMasked: string | null;
   matchesCaller: boolean;
+  /** The signed-in caller holds receipts for the current terms, privacy and pilot documents (false when signed out). */
+  consentComplete: boolean;
 };
 
-const INVALID: StaffInvitationView = { status: "invalid", roleName: null, emailMasked: null, matchesCaller: false };
+const INVALID: StaffInvitationView = { status: "invalid", roleName: null, emailMasked: null, matchesCaller: false, consentComplete: false };
 const STATES = ["invalid", "pending", "accepted", "revoked", "expired"] as const;
 
 export async function lookupStaffInvitation(token: string | null): Promise<StaffInvitationView> {
@@ -30,6 +32,7 @@ export async function lookupStaffInvitation(token: string | null): Promise<Staff
     roleName: status === "pending" ? (row.role_name ?? null) : null,
     emailMasked: status === "pending" ? (row.email_masked ?? null) : null,
     matchesCaller: status === "pending" && Boolean(row.matches_caller),
+    consentComplete: status === "pending" && Boolean(row.consent_complete),
   };
 }
 

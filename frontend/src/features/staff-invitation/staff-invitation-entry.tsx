@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { useI18n } from "@/lib/i18n/context";
+import { StaffConsentStep } from "@/features/staff-invitation/consent-step";
 import { AuthCard } from "@/features/auth/auth-card";
 import { ButtonLink, SubmitButton } from "@/components/ui/controls";
 import { acceptStaffInvitationAction, type StaffInvitationState } from "@/server/actions/staff-invitation";
@@ -47,6 +48,14 @@ export function StaffInvitationEntry({ view, isSignedIn }: { view: StaffInvitati
         <p role="alert" className="text-body text-danger" data-staff-invitation="mismatch">
           {t("staffInvitation.mismatch", { email })}
         </p>
+      </AuthCard>
+    );
+  }
+
+  if (!view.consentComplete) {
+    return (
+      <AuthCard title={t("staffInvitation.consent.title")} subtitle={t("staffInvitation.intro", { role })}>
+        <StaffConsentStep />
       </AuthCard>
     );
   }

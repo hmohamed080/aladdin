@@ -9,6 +9,7 @@ vi.mock("@/server/actions/staff-invitation", () => ({
   acceptStaffInvitationAction: vi.fn(async () => ({ ok: false, code: "staffInvitation.error.recipientMismatch" })),
   createStaffInvitationAction: (...a: unknown[]) => createStaffInvitationAction(...a),
   revokeStaffInvitationAction: vi.fn(async () => ({ ok: true })),
+  recordStaffConsentAction: vi.fn(async () => ({ ok: true })),
   requestStaffSignUp: vi.fn(),
   verifyStaffSignUp: vi.fn(),
 }));
@@ -18,7 +19,7 @@ import { StaffInvitationEntry } from "./staff-invitation-entry";
 import { StaffRegisterForm } from "./staff-register-form";
 import { StaffInvitationsPanel } from "@/features/admin-staff-invitations/invitations-panel";
 
-const pending = { status: "pending", roleName: "Administrator", emailMasked: "q•••@•••.", matchesCaller: false } as const;
+const pending = { status: "pending", roleName: "Administrator", emailMasked: "q•••@•••.", matchesCaller: false, consentComplete: false } as const;
 
 describe("StaffInvitationEntry", () => {
   it("signed out: offers registration and sign-in, and no link carries the token", () => {
@@ -35,11 +36,23 @@ describe("StaffInvitationEntry", () => {
     expect(screen.queryByRole("button", { name: en.staffInvitation.accept })).toBeNull();
   });
   it("signed in as the invited address: shows an explicit Accept", () => {
-    renderWithI18n(<StaffInvitationEntry view={{ ...pending, matchesCaller: true }} isSignedIn />, "en");
+    renderWithI18n(<StaffInvitationEntry view={{ ...pending, matchesCaller: true, consentComplete: true }} isSignedIn />, "en");
     expect(screen.getByRole("button", { name: en.staffInvitation.accept })).toBeInTheDocument();
   });
+  it("signed in as the invited address but without consent on record: shows the consent step and NO Accept", () => {
+    renderWithI18n(<StaffInvitationEntry view={{ ...pending, matchesCaller: true, consentComplete: false }} isSignedIn />, "en");
+    expect(screen.queryByRole("button", { name: en.staffInvitation.accept })).toBeNull();
+    const submit = screen.getByRole("button", { name: en.staffInvitation.consent.submit });
+    expect(submit).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(submit).toBeEnabled();
+  });
+  it("the consent step renders in Arabic", () => {
+    renderWithI18n(<StaffInvitationEntry view={{ ...pending, matchesCaller: true, consentComplete: false }} isSignedIn />, "ar");
+    expect(screen.getByRole("button", { name: ar.staffInvitation.consent.submit })).toBeInTheDocument();
+  });
   it.each(["invalid", "expired", "revoked", "accepted"] as const)("a %s invitation says so and offers nothing", (status) => {
-    renderWithI18n(<StaffInvitationEntry view={{ status, roleName: null, emailMasked: null, matchesCaller: false }} isSignedIn={false} />, "en");
+    renderWithI18n(<StaffInvitationEntry view={{ status, roleName: null, emailMasked: null, matchesCaller: false, consentComplete: false }} isSignedIn={false} />, "en");
     expect(document.body.textContent).toContain(en.staffInvitation.states[status]);
     expect(screen.queryByRole("link")).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();

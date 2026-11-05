@@ -11,7 +11,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(97);
+select plan(117);
 
 \set sa1  'b1000000-0000-4000-8000-000000000001'
 \set adm  'b1000000-0000-4000-8000-000000000002'
@@ -28,6 +28,9 @@ select plan(97);
 \set pers 'b1000000-0000-4000-8000-000000000019'
 \set unc  'b1000000-0000-4000-8000-00000000001a'
 \set actv 'b1000000-0000-4000-8000-00000000001b'
+\set c1   'b1000000-0000-4000-8000-00000000001c'
+\set c2   'b1000000-0000-4000-8000-00000000001d'
+\set d1   'b1000000-0000-4000-8000-00000000001e'
 
 create function pg_temp.act_as(p_user uuid) returns void language plpgsql as $$
 begin
@@ -85,12 +88,17 @@ select u, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticate
        case when n = 'unc' then null else now() end, jsonb_build_object('full_name', 'Probe ' || n), now(), now()
   from (values (:'sa1'::uuid, 'sa1'), (:'adm'::uuid, 'adm'), (:'mdr'::uuid, 'mdr'), (:'plain'::uuid, 'plain'),
                (:'n1'::uuid, 'n1'), (:'n2'::uuid, 'n2'), (:'n3'::uuid, 'n3'), (:'n4'::uuid, 'n4'), (:'n5'::uuid, 'n5'), (:'n6'::uuid, 'n6'),
-               (:'n7'::uuid, 'n7'), (:'n8'::uuid, 'n8'), (:'pers'::uuid, 'pers'), (:'unc'::uuid, 'unc'), (:'actv'::uuid, 'actv')) v(u, n);
+               (:'n7'::uuid, 'n7'), (:'n8'::uuid, 'n8'), (:'pers'::uuid, 'pers'), (:'unc'::uuid, 'unc'), (:'actv'::uuid, 'actv'),
+               (:'c1'::uuid, 'c1'), (:'c2'::uuid, 'c2'), (:'d1'::uuid, 'd1')) v(u, n);
 insert into public.admin_role_assignments (user_id, role_id)
 select v.u, r.id from (values (:'sa1'::uuid, 'super_admin'), (:'adm'::uuid, 'administrator'), (:'mdr'::uuid, 'moderator')) v(u, k)
   join public.admin_roles r on r.key = v.k;
 -- Staff accounts are active in the real system; the invitees below are NOT (a fresh sign-up is pending_verification).
 update public.users set status = 'active' where id in (:'sa1', :'adm', :'mdr', :'actv');
+-- Consent: the invitees that are expected to be accepted hold the three CURRENT receipts (c1, c2 and d1 deliberately do not; section G).
+insert into public.consent_receipts (user_id, consent_type, version, locale)
+select u, t, app.current_consent_version(t), 'en'
+  from unnest(array[:'n1', :'n2', :'n6', :'actv', :'pers']::uuid[]) u, unnest(enum_range(null::public.consent_type)) t;
 -- A person who already chose a marketplace persona (not dedicated platform staff).
 update public.users set primary_account_type = (select (enum_range(null::public.persona_type))[1]) where id = :'pers';
 
@@ -260,6 +268,46 @@ select is(pg_temp.call_as(:'sa1', format('public.admin_staff_assign_role(%L::uui
 select is((select count(*)::int from app.admin_staff_invitations where status = 'accepted' and assignment_id is not null), 4, 'F3 each accepted invitation points at its assignment');
 select throws_ok($$update app.admin_staff_invitations set status = 'accepted' where status = 'pending'$$, '23514', null, 'F4 the table refuses an accepted row without an acceptance time');
 select throws_ok($$update app.admin_staff_invitations set expires_at = created_at + interval '30 days' where id = (select id from app.admin_staff_invitations limit 1)$$, '23514', null, 'F5 a lifetime beyond 15 days is refused');
+
+-- ===========================================================================
+-- G. Consent is enforced by the database; activation provenance is accurate
+-- ===========================================================================
+insert into tok select 'c1', (j ->> 'token'), (j ->> 'id')::uuid from (select pg_temp.invite(:'sa1', 'c1@staffinv.test', 'moderator') j) x;
+insert into tok select 'c2', (j ->> 'token'), (j ->> 'id')::uuid from (select pg_temp.invite(:'sa1', 'c2@staffinv.test', 'moderator') j) x;
+select is(pg_temp.accept(:'c1', (select v from tok where k = 'c1')) ->> 'msg', 'staff_invitation: consent_required', 'G1 an account with no consent receipts cannot become staff');
+select is((select count(*)::int from public.admin_role_assignments where user_id = :'c1'), 0, 'G2 the refused account received no assignment');
+select is((select status from public.users where id = :'c1'), 'pending_verification', 'G3 and was not activated');
+select is((select status from app.admin_staff_invitations where id = (select id from tok where k = 'c1')), 'pending', 'G4 and the invitation stays usable (recovery is possible)');
+select is((select count(*)::int from public.audit_log where action = 'account.platform_prepared' and subject_id = :'c1'), 0, 'G5 the refusal wrote no activation audit event (atomic)');
+-- partial and stale consent
+insert into public.consent_receipts (user_id, consent_type, version, locale) values (:'c2', 'terms', app.current_consent_version('terms'), 'en');
+select is(pg_temp.accept(:'c2', (select v from tok where k = 'c2')) ->> 'msg', 'staff_invitation: consent_required', 'G6 partial consent (terms only) is refused');
+insert into public.consent_receipts (user_id, consent_type, version, locale) values (:'c2', 'privacy', '1999-01-01', 'en'), (:'c2', 'pilot', '1999-01-01', 'en');
+select is(pg_temp.accept(:'c2', (select v from tok where k = 'c2')) ->> 'msg', 'staff_invitation: consent_required', 'G7 receipts for an outdated document version do not count');
+-- the lookup reports the caller's own consent state
+select is(pg_temp.call_as(:'c1', format('(select consent_complete from public.staff_invitation_lookup(%L))', (select v from tok where k = 'c1'))) #>> '{}', 'false', 'G8 the lookup tells the invitee that consent is still missing');
+select is(pg_temp.call_anon(format('(select consent_complete from public.staff_invitation_lookup(%L))', (select v from tok where k = 'c1'))) #>> '{}', 'false', 'G9 and never reports consent for a signed-out caller');
+-- recovery: record_consent as the invitee, then accept
+do $$ begin
+  perform pg_temp.act_as('b1000000-0000-4000-8000-00000000001c');
+  perform public.record_consent(array['terms','privacy','pilot']::public.consent_type[], 'en');
+  perform pg_temp.as_dba();
+end $$;
+select is(pg_temp.call_as(:'c1', format('(select consent_complete from public.staff_invitation_lookup(%L))', (select v from tok where k = 'c1'))) #>> '{}', 'true', 'G10 after the consent step the lookup reports it complete');
+select is(pg_temp.accept(:'c1', (select v from tok where k = 'c1')) ->> 'status', 'accepted', 'G11 the same invitation then succeeds');
+-- provenance
+select is((select count(*)::int from public.audit_log where action = 'account.platform_prepared' and subject_id = :'c1'
+             and metadata ->> 'source' = 'staff_invitation' and metadata ->> 'invitation_id' = (select id::text from tok where k = 'c1')), 1, 'G12 the activation is attributed to the invitation, with its id');
+select is((select count(*)::int from public.audit_log where action = 'account.platform_prepared' and metadata ->> 'source' = 'dba_platform_prepare' and subject_id in (:'c1', :'n1', :'n2', :'n6')), 0, 'G13 no invitation-driven activation is labelled as a DBA preparation');
+-- the core is internal and not an activation bypass
+select is((select bool_or(has_function_privilege(r, 'app.admin_prepare_platform_account_core(uuid,text,text,uuid)', 'execute') or has_function_privilege(r, 'app.admin_prepare_platform_account(uuid,text)', 'execute')) from unnest(array['anon','authenticated','service_role']) r), false, 'G14 neither preparation function is executable by any client role');
+select throws_ok(format($q$select app.admin_prepare_platform_account_core(%L::uuid, 'x reason here', 'made_up', null)$q$, :'d1'), '22023', 'unknown preparation source', 'G15 the source is a closed allow-list');
+select throws_ok(format($q$select app.admin_prepare_platform_account_core(%L::uuid, 'x reason here', 'staff_invitation', null)$q$, :'d1'), '22023', null, 'G16 the invitation source requires an invitation id');
+select throws_ok(format($q$select app.admin_prepare_platform_account_core(%L::uuid, 'x reason here', 'dba_platform_prepare', gen_random_uuid())$q$, :'d1'), '22023', null, 'G17 and the DBA source cannot carry one');
+select throws_ok(format($q$select app.admin_prepare_platform_account_core(%L::uuid, 'x reason here', 'staff_invitation', gen_random_uuid())$q$, :'pers'), '22023', 'an account with a personal persona is not a dedicated platform account', 'G18 the strict checks apply to the invitation source too');
+-- the original DBA helper is unchanged
+select is((select app.admin_prepare_platform_account(:'d1', 'dba preparing a dedicated account')), true, 'G19 the original helper still activates a dedicated account');
+select is((select metadata ->> 'source' || '|' || (metadata ? 'invitation_id')::text from public.audit_log where action = 'account.platform_prepared' and subject_id = :'d1'), 'dba_platform_prepare|false', 'G20 and still records the DBA source with no invitation id');
 
 select * from finish();
 rollback;

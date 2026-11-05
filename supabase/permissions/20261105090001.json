@@ -1,6 +1,6 @@
 {
  "version": "20261105090001",
- "source": "20261103090001 plus the eight functions of 20261105090001 (Admin Staff invitations), taken from the real inventory of a local supabase/postgres stack after a clean migration run.",
+ "source": "20261103090001 plus the nine functions of 20261105090001 (Admin Staff invitations), taken from the real inventory of a local supabase/postgres stack (CLI 2.110.0, postgres 17.6.1) after a clean migration run.",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.media_storage_resolve(text,text,text)",
@@ -1576,6 +1576,39 @@
     "supabase_storage_admin": false
    },
    "signature": "app.admin_prepare_platform_account(uuid,text)",
+   "schemaUsage": {
+    "anon": true,
+    "service_role": false,
+    "authenticated": true,
+    "authenticator": false,
+    "dashboard_user": false,
+    "supabase_auth_admin": false,
+    "supabase_storage_admin": false
+   }
+  },
+  {
+   "kind": "f",
+   "owner": "postgres",
+   "config": [
+    "search_path=\"\""
+   ],
+   "grants": [
+    {
+     "role": "postgres",
+     "grantable": false
+    }
+   ],
+   "definer": true,
+   "effective": {
+    "anon": false,
+    "service_role": false,
+    "authenticated": false,
+    "authenticator": false,
+    "dashboard_user": false,
+    "supabase_auth_admin": false,
+    "supabase_storage_admin": false
+   },
+   "signature": "app.admin_prepare_platform_account_core(uuid,text,text,uuid)",
    "schemaUsage": {
     "anon": true,
     "service_role": false,

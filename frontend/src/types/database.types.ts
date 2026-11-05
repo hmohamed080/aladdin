@@ -8603,7 +8603,7 @@ export type Database = {
       }
       staff_invitation_lookup: {
         Args: { p_token: string }
-        Returns: { status: string; role_name: string; email_masked: string; matches_caller: boolean }[]
+        Returns: { status: string; role_name: string; email_masked: string; matches_caller: boolean; consent_complete: boolean }[]
       }
       staff_invitation_registration_check: {
         Args: { p_token: string; p_email: string }

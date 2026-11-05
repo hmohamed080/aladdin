@@ -106,6 +106,87 @@ as $$
 $$;
 revoke all on function app.admin_staff_token_hash(text) from public, anon, authenticated, service_role;
 
+-- Activation provenance. The strict dedicated-account preparation (confirmed e-mail, not banned/suspended, no persona, no active membership;
+-- pending -> active) now lives in ONE core that records WHO prepared the account. The source is a closed two-value allow-list, the core is
+-- executable by nobody but the database owner and the two definer callers below, and it is not a general activation tool: every strict check
+-- runs for both sources. The original two-argument helper keeps its exact signature, behaviour, grants and audit shape (source
+-- 'dba_platform_prepare') and simply delegates; its own tests (85) are unchanged.
+create function app.admin_prepare_platform_account_core(p_user_id uuid, p_reason text, p_source text, p_invitation_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_reason    text := app.admin_clean_reason(p_reason);
+  v_status    public.user_status;
+  v_persona   public.persona_type;
+  v_confirmed timestamptz;
+  v_banned    timestamptz;
+  v_meta      jsonb;
+begin
+  if p_source is null or p_source not in ('dba_platform_prepare', 'staff_invitation') then
+    raise exception 'unknown preparation source' using errcode = '22023';
+  end if;
+  -- The invitation id accompanies the invitation source and nothing else, so provenance cannot be spoofed in either direction.
+  if (p_source = 'staff_invitation') <> (p_invitation_id is not null) then
+    raise exception 'invitation id is required for, and only for, the staff_invitation source' using errcode = '22023';
+  end if;
+  if v_reason is null then
+    raise exception 'a reason is required' using errcode = '22023';
+  end if;
+
+  select u.status, u.primary_account_type into v_status, v_persona
+  from public.users u where u.id = p_user_id for update;
+  if not found then
+    raise exception 'user not found' using errcode = '22023';
+  end if;
+
+  select au.email_confirmed_at, au.banned_until into v_confirmed, v_banned
+  from auth.users au where au.id = p_user_id;
+  if v_confirmed is null then
+    raise exception 'a confirmed email is required' using errcode = '22023';
+  end if;
+  if v_banned is not null and v_banned > now() then
+    raise exception 'a banned account cannot be prepared' using errcode = '22023';
+  end if;
+  if v_status in ('suspended', 'deactivated') then
+    raise exception 'a % account cannot be prepared', v_status using errcode = '22023';
+  end if;
+  if v_persona is not null then
+    raise exception 'an account with a personal persona is not a dedicated platform account' using errcode = '22023';
+  end if;
+  if exists (select 1 from public.memberships m where m.user_id = p_user_id and m.status = 'active') then
+    raise exception 'an account with an active organization membership is not a dedicated platform account' using errcode = '22023';
+  end if;
+
+  if v_status = 'active' then
+    return false;
+  end if;
+
+  update public.users set status = 'active'
+  where id = p_user_id and status = 'pending_verification';
+
+  v_meta := jsonb_build_object('previous_status', v_status, 'reason', v_reason, 'source', p_source);
+  if p_invitation_id is not null then
+    v_meta := v_meta || jsonb_build_object('invitation_id', p_invitation_id);
+  end if;
+  perform app.record_audit_event('account.platform_prepared', 'user', p_user_id, null, v_meta);
+  return true;
+end;
+$$;
+revoke all on function app.admin_prepare_platform_account_core(uuid, text, text, uuid) from public, anon, authenticated, service_role;
+
+create or replace function app.admin_prepare_platform_account(p_user_id uuid, p_reason text)
+returns boolean
+language sql
+security definer
+set search_path = ''
+as $$
+  select app.admin_prepare_platform_account_core(p_user_id, p_reason, 'dba_platform_prepare', null);
+$$;
+revoke all on function app.admin_prepare_platform_account(uuid, text) from public, anon, authenticated, service_role;
+
 -- Creates an invitation and returns the one-time token. The caller must hold admin_staff.manage and be able to hand out the role.
 create function public.admin_staff_invite(p_email text, p_role_id uuid, p_reason text)
 returns jsonb
@@ -244,7 +325,7 @@ $$;
 
 -- Token holder's view: a state and, for a live invitation, the role name and a MASKED address. Unknown tokens look exactly like invalid ones.
 create function public.staff_invitation_lookup(p_token text)
-returns table (status text, role_name text, email_masked text, matches_caller boolean)
+returns table (status text, role_name text, email_masked text, matches_caller boolean, consent_complete boolean)
 language plpgsql
 stable
 security definer
@@ -257,17 +338,21 @@ declare
 begin
   select * into i from app.admin_staff_invitations where token_hash = app.admin_staff_token_hash(p_token);
   if not found then
-    return query select 'invalid'::text, null::text, null::text, false;
+    return query select 'invalid'::text, null::text, null::text, false, false;
     return;
   end if;
   v_st := app.admin_staff_invitation_state(i.status, i.expires_at);
   if v_st <> 'pending' then
-    return query select v_st, null::text, null::text, false;
+    return query select v_st, null::text, null::text, false, false;
     return;
   end if;
   select r.name into v_name from public.admin_roles r where r.id = i.role_id;
   return query select 'pending'::text, v_name, app.mask_email(i.email),
-    coalesce((select u.email_confirmed_at is not null and lower(btrim(u.email)) = i.email from auth.users u where u.id = (select auth.uid())), false);
+    coalesce((select u.email_confirmed_at is not null and lower(btrim(u.email)) = i.email from auth.users u where u.id = (select auth.uid())), false),
+    -- The caller's own consent state (false for anyone signed out): lets the app offer the recovery step instead of a dead end.
+    coalesce((select count(distinct cr.consent_type) = 3 from public.consent_receipts cr
+               where cr.user_id = (select auth.uid()) and cr.consent_type in ('terms', 'privacy', 'pilot')
+                 and cr.version = app.current_consent_version(cr.consent_type)), false);
 end;
 $$;
 
@@ -351,10 +436,18 @@ begin
     raise exception 'staff_invitation: already_holds_role' using errcode = '22023';
   end if;
 
-  -- Dedicated platform staff only: the existing strict helper (confirmed e-mail, not banned/suspended, no persona, no active membership)
-  -- is reused unchanged; a pending account is promoted to active, an active one is left as it is.
+  -- Consent receipts: administrative authority is never granted to an account that has not accepted the CURRENT terms, privacy and pilot
+  -- documents (the same rule my_registration_state applies to the marketplace). Enforced here, in the database, not in the app.
+  if (select count(distinct cr.consent_type) from public.consent_receipts cr
+       where cr.user_id = v_uid and cr.consent_type in ('terms', 'privacy', 'pilot')
+         and cr.version = app.current_consent_version(cr.consent_type)) <> 3 then
+    raise exception 'staff_invitation: consent_required' using errcode = '42501';
+  end if;
+
+  -- Dedicated platform staff only: the strict preparation (confirmed e-mail, not banned/suspended, no persona, no active membership);
+  -- a pending account is promoted to active (audited with source staff_invitation), an active one is left as it is.
   begin
-    v_active := app.admin_prepare_platform_account(v_uid, 'admin staff invitation ' || i.id::text);
+    v_active := app.admin_prepare_platform_account_core(v_uid, 'admin staff invitation ' || i.id::text, 'staff_invitation', i.id);
   exception when sqlstate '22023' then
     raise exception 'staff_invitation: account_not_eligible' using errcode = '42501';
   end;
