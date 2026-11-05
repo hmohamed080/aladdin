@@ -830,14 +830,18 @@ export type Database = {
           description: string | null
           detailed_address: string | null
           display_name: string | null
+          facebook_url: string | null
           governorate: string | null
           id: string
+          instagram_url: string | null
           legal_name: string | null
           org_type: Database["public"]["Enums"]["organization_type"] | null
           organization_id: string | null
           primary_branch_name: string | null
+          tiktok_url: string | null
           updated_at: string
           user_id: string
+          website_url: string | null
         }
         Insert: {
           activity_type?: string | null
@@ -850,14 +854,18 @@ export type Database = {
           description?: string | null
           detailed_address?: string | null
           display_name?: string | null
+          facebook_url?: string | null
           governorate?: string | null
           id?: string
+          instagram_url?: string | null
           legal_name?: string | null
           org_type?: Database["public"]["Enums"]["organization_type"] | null
           organization_id?: string | null
           primary_branch_name?: string | null
+          tiktok_url?: string | null
           updated_at?: string
           user_id: string
+          website_url?: string | null
         }
         Update: {
           activity_type?: string | null
@@ -870,14 +878,18 @@ export type Database = {
           description?: string | null
           detailed_address?: string | null
           display_name?: string | null
+          facebook_url?: string | null
           governorate?: string | null
           id?: string
+          instagram_url?: string | null
           legal_name?: string | null
           org_type?: Database["public"]["Enums"]["organization_type"] | null
           organization_id?: string | null
           primary_branch_name?: string | null
+          tiktok_url?: string | null
           updated_at?: string
           user_id?: string
+          website_url?: string | null
         }
         Relationships: [
           {
@@ -3680,7 +3692,9 @@ export type Database = {
           created_by: string
           deleted_at: string | null
           description: string | null
+          facebook_url: string | null
           id: string
+          instagram_url: string | null
           is_verified: boolean
           legal_name: string | null
           locality_id: string | null
@@ -3694,8 +3708,10 @@ export type Database = {
           slug: string | null
           source: string
           status: Database["public"]["Enums"]["org_status"]
+          tiktok_url: string | null
           timezone: string | null
           updated_at: string
+          website_url: string | null
         }
         Insert: {
           business_verification_id?: string | null
@@ -3706,7 +3722,9 @@ export type Database = {
           created_by: string
           deleted_at?: string | null
           description?: string | null
+          facebook_url?: string | null
           id?: string
+          instagram_url?: string | null
           is_verified?: boolean
           legal_name?: string | null
           locality_id?: string | null
@@ -3720,8 +3738,10 @@ export type Database = {
           slug?: string | null
           source?: string
           status?: Database["public"]["Enums"]["org_status"]
+          tiktok_url?: string | null
           timezone?: string | null
           updated_at?: string
+          website_url?: string | null
         }
         Update: {
           business_verification_id?: string | null
@@ -3732,7 +3752,9 @@ export type Database = {
           created_by?: string
           deleted_at?: string | null
           description?: string | null
+          facebook_url?: string | null
           id?: string
+          instagram_url?: string | null
           is_verified?: boolean
           legal_name?: string | null
           locality_id?: string | null
@@ -3746,8 +3768,10 @@ export type Database = {
           slug?: string | null
           source?: string
           status?: Database["public"]["Enums"]["org_status"]
+          tiktok_url?: string | null
           timezone?: string | null
           updated_at?: string
+          website_url?: string | null
         }
         Relationships: [
           {
@@ -8057,8 +8081,34 @@ export type Database = {
         }
         Returns: string
       }
+      business_draft_save_v3: {
+        Args: {
+          p_activity_type?: string
+          p_city?: string
+          p_city_custom_name?: string
+          p_contact_email?: string
+          p_contact_phone?: string
+          p_description?: string
+          p_detailed_address?: string
+          p_display_name?: string
+          p_draft_id?: string
+          p_facebook_url?: string
+          p_governorate?: string
+          p_instagram_url?: string
+          p_legal_name?: string
+          p_org_type?: Database["public"]["Enums"]["organization_type"]
+          p_primary_branch_name?: string
+          p_tiktok_url?: string
+          p_website_url?: string
+        }
+        Returns: string
+      }
       business_draft_submit: { Args: { p_draft_id?: string }; Returns: string }
       business_draft_submit_v2: {
+        Args: { p_draft_id?: string }
+        Returns: string
+      }
+      business_draft_submit_v3: {
         Args: { p_draft_id?: string }
         Returns: string
       }
