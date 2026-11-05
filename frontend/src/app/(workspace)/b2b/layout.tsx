@@ -5,7 +5,7 @@ import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/provider";
 import { THEME_COOKIE } from "@/lib/theme/config";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { loadWorkspaceContext } from "@/server/queries/context";
+import { loadRequestWorkspaceContext } from "@/server/queries/request-workspace";
 import { loadMandatoryBusinessSetup } from "@/server/queries/business-setup";
 import { MANDATORY_BUSINESS_SETUP_PATH } from "@/lib/onboarding/mandatory-business-setup";
 import { personalEntry } from "@/lib/workspace/model";
@@ -13,7 +13,7 @@ import { WorkspaceShell } from "@/components/layout/workspace-shell";
 import { NoOrgNotice } from "@/components/layout/no-org-notice";
 import { orgBilingualNames } from "@/server/queries/organization-i18n";
 import { resolveBilingualText } from "@/lib/i18n/bilingual";
-import { ShowroomFrame } from "@/features/showroom-shell/frame";
+import { isShowroomDealerOrg } from "@/features/showroom-shell/workspace-model";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +35,8 @@ export default async function B2BLayout({ children }: { children: ReactNode }) {
   const theme = store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light";
 
   const supabase = await getServerSupabase();
-  const workspace = await loadWorkspaceContext(supabase);
+  // Once per request: the `(workspace)` layout above and the Showroom context checks read the same context.
+  const workspace = await loadRequestWorkspaceContext();
 
   if (!workspace.active && personalEntry(workspace.entries)) redirect("/home");
   // No workspace and no Personal home. If this person registered to create a business that does not exist yet, creating it
@@ -43,10 +44,12 @@ export default async function B2BLayout({ children }: { children: ReactNode }) {
   if (!workspace.active && (await loadMandatoryBusinessSetup()).required) redirect(MANDATORY_BUSINESS_SETUP_PATH);
 
   // A Showroom works inside the approved Showroom Suite V2 frame; the finished modules under /b2b keep their
-  // routes, data and permissions and are simply rendered inside that one shell. Supplier, Manufacturer, Importer
-  // and the other account types keep their current workspace until their own interfaces are approved.
-  if (workspace.active && workspace.active.orgType === "showroom_dealer") {
-    return <ShowroomFrame>{children}</ShowroomFrame>;
+  // routes, data and permissions and are simply rendered inside that one shell. The frame itself is drawn by
+  // the `(workspace)` layout ABOVE this one (ShowroomDealerFrame), so it stays mounted while the Showroom moves
+  // between /showroom and /b2b; here the dealer only passes through. Supplier, Manufacturer, Importer and the
+  // other account types keep their current workspace until their own interfaces are approved.
+  if (workspace.active && isShowroomDealerOrg(workspace.active.orgType)) {
+    return <>{children}</>;
   }
 
   // The header's org/branch chips need the SAME Arabic/English preference the

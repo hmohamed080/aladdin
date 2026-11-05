@@ -12,6 +12,13 @@ export type ShowroomBusinessType = keyof typeof SHOWROOM_BUSINESS_LABELS;
 export function isShowroomBusinessType(value: string | null): value is ShowroomBusinessType {
   return value !== null && Object.hasOwn(SHOWROOM_BUSINESS_LABELS, value);
 }
+/**
+ * The one organization type that is framed by the Showroom shell on BOTH route trees (/showroom and /b2b).
+ * The other eligible types see the Showroom shell on /showroom only; see `ShowroomDealerFrame`.
+ */
+export function isShowroomDealerOrg(orgType: string | null): boolean {
+  return orgType === "showroom_dealer";
+}
 export function eligibleWorkspaces(entries: readonly WorkspaceEntry[]) {
   return entries.filter((entry): entry is Extract<WorkspaceEntry, { kind: "business" }> => entry.kind === "business" && isShowroomBusinessType(entry.orgType));
 }

@@ -138,7 +138,7 @@ export const NAV_CAPS: Record<NavKey, string[] | null> = {
 
   // Points is the caller's OWN standing on the platform, not an organization
   // record, so no capability could gate it and none does. The page is SHIPPED —
-  // balance, the one earning rule, and history (`app/b2b/points/page.tsx`).
+  // balance, the one earning rule, and history (`app/(workspace)/b2b/points/page.tsx`).
   //
   // Because it is user-owned, the same page also belongs on the personal home
   // (`/home/points`, `lib/nav/personal-modules.ts`): this entry is the copy that

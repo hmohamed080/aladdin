@@ -1,5 +1,9 @@
 # Runtime State
 
+## Persistent Showroom shell (draft PR, not merged) — 2026-11-05
+- Branch `fix/persistent-workspace-shell-20261105` from `main` `f823d88c`. Frontend routing only: `/b2b/*` and `/showroom/*` now live under the `(workspace)` route group so the Showroom shell stays mounted when a link crosses between them ([ADR-0025](../decisions/ADR-0025-persistent-showroom-shell.md)). No URL, migration, permission, hosted or deploy change.
+- Verified locally: typecheck, lint, production build, focused and full Vitest (see the work log for the 5 failures and why each is or is not this change). Not verified in a browser; the new Playwright spec is unrun.
+
 ## Live site on Cloudflare Workers — 2026-10-27
 - `aladdindecore.com`, `www` and `next` are served by Worker `aladdin-frontend-production` (Custom Domains, attached by the owner 17:23–17:40Z). It binds `aladdin-backend-production` and uses the live Supabase project `kkpkgjrweysgvhvkhzun` (193 migrations). R2 and Redis are off in production.
 - DNS: Cloudflare zone `c90ddcdec7bacd2485e1e5bcbac8afce` (nameservers johnathan/mona.ns.cloudflare.com, registrar GoDaddy). Zoho MX/SPF/DKIM unchanged; wildcard `*` still CNAME to Vercel, DNS only. No DMARC.
