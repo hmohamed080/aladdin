@@ -113,6 +113,7 @@ export const PROFILE_COMPLETION_ITEMS = [
   "activities",
   "bio",
   "organization_address",
+  "organization_links",
   "organization_activities",
   "organization_setup",
   // Installer items (20261024090011_installer_profile_completion.sql).
