@@ -136,7 +136,9 @@ Do not initialize limits, send WhatsApp messages or change `WHATSAPP_DELIVERY_EN
   * Supabase: 7 applied requests, versions 1 to 7, no duplicates; 7 `settings_requested` and 7 `settings_changed` events; no pending, abandoned or failed request (the stale attempt is refused before a request row is created); notification events 0; grant key rows 1.
   * D1: `otp_settings` 150 / 5000 / 70 / 90 at version 7; 7 `otp_settings_audit` rows, 7 distinct request ids, 7 distinct versions (1 to 7); outbox 0; alert state level 0 / failure 0 / episode 0; `whatsapp_hook_events` 6 rows, last row 6 (unchanged from the R-2 baseline).
   * Frontend and Worker versions unchanged (`deae226d-...`, `11b9f694-...`); delivery OFF; Production untouched. Not independently checked: the Meta message log.
-* Not yet done: R-4, R-5, R-10, R-11, R-12 (each behind its own approval), A9, A10.
+* **R-4 negative validation: PASS (2026-11-05).** Five invalid changes, each refused with the expected message and changing nothing: (a) limit above ceiling, (b) ceiling below the daily limit, (c) warning not below critical, (d) reason too short, (e) wrong ceiling confirmation. After R-4: Supabase 7 applied requests only, no pending or failed; D1 150 / 5000 / 70 / 90 at version 7; no new settings change.
+  * Case (d) was stopped by the browser (`minLength=10`). The same rule is enforced **server-side** at three layers and covered by tests: the database function `admin_whatsapp_otp_settings_begin` (reason at least 10 characters, 20 when the ceiling changes; pgTAP `121_whatsapp_otp_admin_settings_test.sql` B18 "reason too short" and B19 "a ceiling change needs at least 20 characters"); the Worker (`reason_too_short`, 422) and its D1 `CHECK (length(reason) BETWEEN 10 AND 500)`; and the app error mapping (`reason_required` to `reasonRequired`, `whatsapp-otp-admin.test.ts`).
+* Not yet done: R-5, R-10, R-11, R-12 (each behind its own approval), A9, A10.
 
 ## 6. Rollback plan
 
