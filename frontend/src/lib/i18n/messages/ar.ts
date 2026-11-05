@@ -6586,6 +6586,7 @@ export const ar: Messages = {
       contact: "التواصل",
       links: "الروابط",
       linksUnverified: "غير موثّق",
+      linksWebsite: "الموقع الإلكتروني",
       reviewer: "المراجع",
       currentReason: "ملاحظة آخر قرار",
       ownOrganization: "هذا نشاطك أنت، لذا لا يمكنك مراجعته.",

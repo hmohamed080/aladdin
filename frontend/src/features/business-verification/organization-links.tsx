@@ -9,11 +9,12 @@ export type OrganizationLinkValues = {
   websiteUrl: string | null;
 };
 
-const PLATFORMS: readonly { platform: SocialPlatform; key: keyof OrganizationLinkValues; label: string }[] = [
+/** Brand names stay as written; only the website label is translated (`label: null`). */
+const PLATFORMS: readonly { platform: SocialPlatform; key: keyof OrganizationLinkValues; label: string | null }[] = [
   { platform: "facebook", key: "facebookUrl", label: "Facebook" },
   { platform: "instagram", key: "instagramUrl", label: "Instagram" },
   { platform: "tiktok", key: "tiktokUrl", label: "TikTok" },
-  { platform: "website", key: "websiteUrl", label: "Web" },
+  { platform: "website", key: "websiteUrl", label: null },
 ];
 
 /**
@@ -34,7 +35,7 @@ export function OrganizationLinks({ links, t }: { links: OrganizationLinkValues;
           const safe = normalizeSocialLink(platform, url).ok && url.startsWith("https://");
           return (
             <li key={platform} className="flex flex-wrap items-center gap-2">
-              <span className="text-label text-fg-secondary">{label}</span>
+              <span className="text-label text-fg-secondary">{label ?? t("businessVerification.admin.linksWebsite")}</span>
               {safe ? (
                 <a href={url} target="_blank" rel="noopener noreferrer nofollow" dir="ltr" className="break-all text-accent hover:underline">{url}</a>
               ) : (

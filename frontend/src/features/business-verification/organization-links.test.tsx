@@ -22,6 +22,15 @@ describe("OrganizationLinks", () => {
     expect(a.getAttribute("dir")).toBe("ltr");
     expect(screen.getAllByRole("link")).toHaveLength(2);
     expect(screen.getAllByText("Unverified").length).toBeGreaterThan(0);
+    // The website label is translated; brand names are not.
+    expect(screen.getByText("Website")).toBeTruthy();
+    expect(screen.queryByText("Web")).toBeNull();
+    expect(screen.getByText("Facebook")).toBeTruthy();
+  });
+
+  it("labels the website link in Arabic", () => {
+    renderWithI18n(<OrganizationLinks links={{ ...none, websiteUrl: "https://show.example.com" }} t={createTranslator("ar")} />, "ar");
+    expect(screen.getByText("الموقع الإلكتروني")).toBeTruthy();
   });
 
   it("renders nothing when there are no links", () => {
