@@ -1,6 +1,6 @@
 # Admin Staff invitations: Acceptance deployment readiness and rollback
 
-Status: **readiness only. Nothing here has been executed.** No hosted migration, no frontend deploy, no invitation or QA account, no Production change. Each numbered step below needs its own explicit owner approval. A8 is not part of this document.
+Status: **step 2 (migration) and step 3 (verification) are DONE on Acceptance (2026-11-05, evidence in section 4a).** Not yet done: frontend deploy, QA invitations, live role checks, A8. No Production change. Each remaining step needs its own explicit owner approval. A8 is not part of this document.
 
 ## 1. Facts established read-only (2026-11-05)
 
@@ -84,6 +84,20 @@ Any other value stops the rollout until explained. `newest_migrations` should st
 2. The permission contract: effective grants of the eight new functions equal `supabase/permissions/20261105090001.json` (the CI gate does this on a fresh database; on Acceptance compare `has_function_privilege` for `anon`, `authenticated`, `service_role`: only `staff_invitation_lookup` and `staff_invitation_registration_check` are executable by `anon`; neither `app.admin_prepare_platform_account` nor `app.admin_prepare_platform_account_core` is executable by any client role).
 3. `ck_audit_action_known` still contains every pre-existing action plus the three `admin_staff.*` ones.
 4. Existing behaviour unchanged: `select app.admin_prepare_platform_account(...)` is not executed on Acceptance; instead confirm its definition now delegates to the core (`pg_get_functiondef`).
+
+### 4a. Evidence: migration applied and verified on Acceptance (2026-11-05)
+
+* Applied by the owner with the pinned CLI (`supabase@2.110.0`) from `feat/admin-staff-invitations-20261105` at `09fdc130`; the dry run listed exactly `20261105090001_admin_staff_invitations.sql`.
+* Preflight (section 3) passed 15/15 before the apply.
+* The read-only post-migration query (20 JSON fields) was run by the owner in the Acceptance SQL Editor: **all 20 matched the expected values.**
+  * Migration `20261105090001` recorded and newest.
+  * `app.admin_staff_invitations` present, RLS on, no `anon`/`authenticated`/`service_role` table privilege, 0 policies, 0 rows; 0 `admin_staff.invit*` audit rows.
+  * 9 new functions present; 7 SECURITY DEFINER with empty `search_path`; 2 internal helpers with empty `search_path`.
+  * `anon` executes only `staff_invitation_lookup` and `staff_invitation_registration_check`; `authenticated` executes exactly the six public functions; `service_role` executes none; neither prepare function is client-executable.
+  * `staff_invitation_lookup` reports `consent_complete`; `ck_audit_action_known` holds the `admin_staff.*`, `whatsapp_otp.*` and `account.platform_prepared` actions.
+  * `admin_require_manageable_target` unchanged; the DBA prepare helper still carries `dba_platform_prepare` and delegates to the core.
+  * Grant Key rows 1; OTP Admin functions 7; active Super Admins 1 (all unchanged).
+* State now: schema ahead of the Acceptance frontend. Safe resting state (additive migration; the current frontend does not call the new functions).
 
 ## 5. Live QA checklist (after steps 2 to 4)
 
