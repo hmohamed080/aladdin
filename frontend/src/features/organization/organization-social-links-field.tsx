@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/controls";
 import { InlineError, InlineSuccess } from "@/components/ui/primitives";
 import { displayLink, SocialLinksCard } from "@/features/onboarding/social-links-card";
-import { normalizeSocialLinks, SOCIAL_PLATFORMS, type SocialLinks, type SocialPlatform } from "@/lib/onboarding/social-links";
+import { normalizeSocialLink, normalizeSocialLinks, SOCIAL_PLATFORMS, type SocialLinks, type SocialPlatform } from "@/lib/onboarding/social-links";
 import { saveSocialLinksAction } from "@/server/actions/organization-profile";
 
 const toValues = (links: SocialLinks) =>
@@ -31,13 +31,20 @@ export function OrganizationSocialLinksField({ orgId, links, canManage }: { orgI
   const changed = checked.ok && SOCIAL_PLATFORMS.some((p) => checked.links[p] !== saved[p]);
   const allBlank = checked.ok && !anyLink;
   const hasSaved = SOCIAL_PLATFORMS.some((p) => saved[p] !== null);
+  const hasProp = SOCIAL_PLATFORMS.some((p) => links[p] !== null);
 
   const onSave = async () => {
     setNotice(null);
     setError(null);
     setBusy(true);
-    const result = await saveSocialLinksAction(orgId, values);
-    setBusy(false);
+    let result: Awaited<ReturnType<typeof saveSocialLinksAction>>;
+    try {
+      result = await saveSocialLinksAction(orgId, values);
+    } catch {
+      result = { ok: false, code: "failed" };
+    } finally {
+      setBusy(false);
+    }
     if (!result.ok) {
       setError(t(`showroomSettings.links.error.${result.code}`));
       return;
@@ -73,17 +80,23 @@ export function OrganizationSocialLinksField({ orgId, links, canManage }: { orgI
             <p className="text-label text-fg-muted">{t("showroomSettings.links.hint")}</p>
           </div>
         </>
-      ) : hasSaved ? (
+      ) : hasProp ? (
         <ul className="flex flex-col gap-1" data-testid="organization-social-links-readonly">
           {SOCIAL_PLATFORMS.map((p) => {
-            const url = saved[p];
+            const url = links[p];
             if (!url) return null;
+            // Only a stored https link becomes an anchor; anything else is shown as inert text.
+            const safe = url.startsWith("https://") && normalizeSocialLink(p, url).ok;
             return (
               <li key={p} className="flex flex-wrap items-baseline gap-2 text-body">
                 <span className="text-fg-secondary">{t(`onboarding.business.links.platform.${p}`)}</span>
-                <a href={url} target="_blank" rel="noopener noreferrer nofollow" dir="ltr" className="break-words text-fg underline">
-                  {displayLink(url)}
-                </a>
+                {safe ? (
+                  <a href={url} target="_blank" rel="noopener noreferrer nofollow" dir="ltr" className="break-words text-fg underline">
+                    {displayLink(url)}
+                  </a>
+                ) : (
+                  <bdi dir="ltr" className="break-words text-fg">{url}</bdi>
+                )}
               </li>
             );
           })}
@@ -91,7 +104,7 @@ export function OrganizationSocialLinksField({ orgId, links, canManage }: { orgI
       ) : (
         <p className="text-body text-fg-muted" data-testid="organization-social-links-readonly-empty">—</p>
       )}
-      <p className="text-label text-fg-muted">{t("showroomSettings.links.unverifiedNote")}</p>
+      {canManage || hasProp ? <p className="text-label text-fg-muted">{t("showroomSettings.links.unverifiedNote")}</p> : null}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { renderWithI18n } from "@/test/render";
 import { OrganizationSocialLinksField } from "./organization-social-links-field";
 import { saveSocialLinksAction } from "@/server/actions/organization-profile";
@@ -60,6 +61,53 @@ describe("OrganizationSocialLinksField", () => {
     expect(screen.getByTestId("organization-social-links-empty")).toHaveTextContent(ar.showroomSettings.links.empty);
     expect(screen.queryByText(ar.onboarding.error.linksRequired)).toBeNull();
     expect(saveButton().disabled).toBe(true);
+  });
+
+  it("does not leave Save stuck busy when the action throws", async () => {
+    save.mockRejectedValueOnce(new Error("network"));
+    renderWithI18n(<OrganizationSocialLinksField orgId="org-1" links={some} canManage />);
+    fireEvent.change(instagramInput(), { target: { value: "alpha.new" } });
+    fireEvent.click(saveButton());
+    expect(await screen.findByText(ar.showroomSettings.links.error.failed)).toBeInTheDocument();
+    expect(saveButton().disabled).toBe(false);
+    expect(saveButton()).toHaveTextContent(ar.showroomSettings.links.save);
+  });
+
+  it("shows the required message only once the last saved link is cleared, and hides it on re-entry", () => {
+    const { unmount } = renderWithI18n(<OrganizationSocialLinksField orgId="org-1" links={none} canManage />);
+    expect(screen.queryByText(ar.onboarding.error.linksRequired)).toBeNull();
+    unmount();
+
+    renderWithI18n(<OrganizationSocialLinksField orgId="org-1" links={some} canManage />);
+    expect(screen.queryByText(ar.onboarding.error.linksRequired)).toBeNull();
+    fireEvent.change(instagramInput(), { target: { value: "" } });
+    expect(screen.getByText(ar.onboarding.error.linksRequired)).toBeInTheDocument();
+    expect(saveButton().disabled).toBe(true);
+    fireEvent.change(instagramInput(), { target: { value: "alpha.new" } });
+    expect(screen.queryByText(ar.onboarding.error.linksRequired)).toBeNull();
+  });
+
+  it("renders a non-https stored value as inert text, never an href", () => {
+    renderWithI18n(<OrganizationSocialLinksField orgId="org-1" links={{ ...none, website: "javascript:alert(1)" }} canManage={false} />);
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText("javascript:alert(1)")).toBeInTheDocument();
+  });
+
+  it("follows the links prop for a non-manager and hides the unverified note when empty", () => {
+    const { rerender } = render(
+      <I18nProvider locale="ar" dir="rtl">
+        <OrganizationSocialLinksField orgId="org-1" links={none} canManage={false} />
+      </I18nProvider>,
+    );
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByText(ar.showroomSettings.links.unverifiedNote)).toBeNull();
+    rerender(
+      <I18nProvider locale="ar" dir="rtl">
+        <OrganizationSocialLinksField orgId="org-1" links={some} canManage={false} />
+      </I18nProvider>,
+    );
+    expect(screen.getByRole("link")).toHaveAttribute("href", some.instagram);
+    expect(screen.getByText(ar.showroomSettings.links.unverifiedNote)).toBeInTheDocument();
   });
 
   it("lists links as safe anchors for a non-manager", () => {

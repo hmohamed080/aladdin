@@ -129,6 +129,12 @@ describe("saveSocialLinksAction", () => {
     expect(await saveSocialLinksAction(ORG, { instagram: "alpha.showroom", website: "alpha.com" })).toEqual({ ok: true, links: canonical });
   });
 
+  it("ignores a returned value that is not a valid https link", async () => {
+    state.rpc.mockResolvedValue({ data: { facebook_url: "javascript:alert(1)", instagram_url: "http://www.instagram.com/x", tiktok_url: null, website_url: canonical.website }, error: null });
+    const res = await saveSocialLinksAction(ORG, { instagram: "alpha.showroom", website: "alpha.com" });
+    expect(res).toEqual({ ok: true, links: canonical });
+  });
+
   it("maps database refusals", async () => {
     const raw = { instagram: "alpha.showroom" };
     state.rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "x" } });

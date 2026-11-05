@@ -5020,7 +5020,7 @@ export const en = {
       saving: "Saving…",
       saved: "Links saved.",
       unverifiedNote: "Shown to the review team. Not verified.",
-      empty: "No links added yet. Add at least one so customers and the review team can find your showroom.",
+      empty: "No links added yet. Add at least one so the review team can find your showroom.",
       error: {
         invalid: "One of the links is not valid. Check it and try again.",
         required: "Keep at least one link. A showroom cannot remove its last link.",
