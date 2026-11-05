@@ -1,6 +1,6 @@
 # WhatsApp OTP: Production infrastructure preparation (B3), security decisions and Acceptance execution sequence
 
-Status: **prepared, nothing applied.** Updated 2026-11-04 on PR #136 (stacked on #127) after the owner's review of the first B3 report. No hosted resource was created, bound, deployed, migrated or changed by this work. Hosted access was read-only (D1 `sqlite_master` SELECT, Secrets Store name listing, Workers list). Every step in the two execution sequences needs its own explicit approval.
+Status: **Acceptance A0–A9 CLOSED; A10 OPEN; Production not started.** Updated 2026-11-05 on PR [#136](https://github.com/hmohamed080/aladdin/pull/136) (stacked on #127) after the read-only Production readiness audit. A9 was closed through the approved no-send path (synthetic `reserved` journal rows, no Meta call); its evidence is in the [Production release plan](../security/WHATSAPP_OTP_PRODUCTION_RELEASE_PLAN.md), [RUNTIME_STATE](RUNTIME_STATE.md) and [AGENT_WORK_LOG](AGENT_WORK_LOG.md). A10 — the evidence pack, rollback drill and hosted-login matrix — is the remaining Acceptance gate and must close before any Production database or frontend change. Nothing was created, bound, deployed, migrated or changed by this documentation update; Production access was read-only (`supabase db push --dry-run`, one D1 `sqlite_master` SELECT). Every step in the two execution sequences still needs its own explicit approval.
 
 ## 1. Owner decisions recorded (2026-11-04)
 
@@ -15,23 +15,23 @@ Status: **prepared, nothing applied.** Updated 2026-11-04 on PR #136 (stacked on
 | F-5 | Callback reachability from the Worker (including Cloudflare WAF and bot protection) is an **explicit release gate** with a built-in check (section 5.4). | gate G-NOTIFY |
 | C-5 | Production callback host is **`aladdindecore.com`**, route `/api/internal/whatsapp-otp/notify`. | `wrangler.production.jsonc` |
 
-Also fixed by the owner: preserve the prepared Production D1 and the eight existing Secrets Store entries; no duplicate resources; no allowlist dependency; no Supabase Send-SMS hook; the existing Admin notification system only (no email, no Resend).
+Also fixed by the owner: preserve the prepared Production D1 and the existing Secrets Store entries; no duplicate resources; no allowlist dependency; no Supabase Send-SMS hook; the existing Admin notification system only (no email, no Resend).
 
-## 2. Hosted inventory (read-only, 2026-11-04)
+## 2. Hosted inventory (read-only, 2026-11-04; refreshed 2026-11-05)
 
 | Resource | State |
 |---|---|
 | D1 `aladdin-whatsapp-otp-production` (`30a16841-1108-47e9-99be-3dc9d827fd87`) | Exists once; 0 rows; no `d1_migrations` table; schema = migration `0001` exactly (section 3) |
 | D1 `aladdin-whatsapp-otp-acceptance` (`da65d5e4-8344-4078-9c2d-8a4bb4907f79`) | Exists, untouched |
 | Workers | `aladdin-whatsapp-otp-preview` exists (public workers.dev today); **`aladdin-whatsapp-otp-production` does not exist yet** |
-| Secrets Store `acfaa67f391e499db6fde398022f50ce` | 8 secrets, all `workers` scope, `active`, none bound to a Production Worker |
+| Secrets Store `acfaa67f391e499db6fde398022f50ce` | 12 secrets, all `workers` scope, `active`, none bound to a Production Worker (there is no Production Worker yet) |
 
 | Environment | Meta token | Send signing | Admin signing | Notify signing | **Admin grant key (new, required)** |
 |---|---|---|---|---|---|
-| Acceptance | `WHATSAPP_ACCESS_TOKEN` | `PHONE_OTP_WORKER_SECRET` | `OTP_ADMIN_SIGNING_SECRET` | `OTP_NOTIFY_SIGNING_SECRET` | `OTP_ADMIN_GRANT_SECRET` (not created) |
-| Production | `WHATSAPP_ACCESS_TOKEN_PRODUCTION` | `PHONE_OTP_WORKER_SECRET_PRODUCTION` | `OTP_ADMIN_SIGNING_SECRET_PRODUCTION` | `OTP_NOTIFY_SIGNING_SECRET_PRODUCTION` | `OTP_ADMIN_GRANT_SECRET_PRODUCTION` (not created) |
+| Acceptance | `WHATSAPP_ACCESS_TOKEN` | `PHONE_OTP_WORKER_SECRET` | `OTP_ADMIN_SIGNING_SECRET` | `OTP_NOTIFY_SIGNING_SECRET` | `OTP_ADMIN_GRANT_SECRET` (created; one row provisioned in A3) |
+| Production | `WHATSAPP_ACCESS_TOKEN_PRODUCTION` | `PHONE_OTP_WORKER_SECRET_PRODUCTION` | `OTP_ADMIN_SIGNING_SECRET_PRODUCTION` | `OTP_NOTIFY_SIGNING_SECRET_PRODUCTION` | `OTP_ADMIN_GRANT_SECRET_PRODUCTION` (created; Production database row still absent) |
 
-The two **grant key** secrets are the only new resources the F-1 hardening needs. Nothing was created; they are listed for the owner to create (checklist C-6). The grant key value must also be inserted once into the matching Supabase database (Acceptance step A3, Production step P-1), because the database is what issues grants.
+The two **grant key** secrets are the only new resources the F-1 hardening needs. Both Secrets Store entries now exist; the Acceptance key was provisioned into the Acceptance database in A3, while the Production database row is still absent (P-1). The grant key value must be inserted once into the matching Supabase database because the database is what issues grants.
 
 Not found: `OTP_ALLOWED_RECIPIENTS_PRODUCTION` is not in this Secrets Store. It is not needed (Production is open mode) and the guard forbids any allowlist binding.
 
@@ -142,20 +142,29 @@ The three `whsec_` values must be identical on both sides, so the owner must ret
 
 | # | Blocker | State |
 |---|---|---|
-| B2 | Mandatory CI on the final combined commit | rerun after the 2026-11-04 security changes |
-| B3 | Production Worker, D1 baseline, secrets, config guard | config + guard prepared; hosted steps pending approval |
-| B3-F1 | Admin grant + unmatched detection + alert | **implemented**; hosted: create grant keys (C-6) |
+| B2 | Mandatory CI on the final combined commit | **open**: #127 is green on `512c3e52`; #136 (`f910bcd0`) has no retrievable check runs; no combined commit exists yet |
+| B3 | Production Worker, D1 baseline, secrets, config guard | config + guard + `wrangler.production.jsonc` prepared; Production D1 = `0001` only; Worker absent; hosted steps pending approval |
+| B3-F1 | Admin grant + unmatched detection + alert | **implemented**; both Secrets Store grant keys exist; Production database row pending (P-1) |
 | B3-F2 | Private service-binding transport | **implemented**; Production frontend deploy gated on the Worker existing |
 | B3-F4 | Environment-bound notifications | **implemented** |
 | G-NOTIFY | Callback reachability incl. WAF/bot, Acceptance and Production | open |
 | G-META | Verified Meta messaging limit for the sender | open |
 | B4 | Production app secrets and bindings | pending approval |
-| B5 | Acceptance rehearsals (below), enforce/observe rollback, build-swap drill, email/Google/Facebook/legacy login on the new build | open |
-| B6/B7 | Upload-only deploy stage; approvals and planned window | open |
+| B5 | Acceptance rehearsals (below), enforce/observe rollback, build-swap drill, email/Google/Facebook/legacy login on the new build | **open — A10 only**: the hosted-login matrix, build-swap and `enforce → observe` drills remain |
+| B6/B7 | Upload-only deploy stage; approvals and planned window | **open**: no upload-only stage; approvals, window, budget and alert channel unconfirmed |
 
 ## 10. Acceptance execution sequence (each step separately approvable; stop after each)
 
-Principles: Acceptance only; no Production resource is read or written; WhatsApp delivery stays **OFF** except inside an explicitly approved send window; no step changes existing registration, which stays on email/Google/Facebook with phone sign-up OFF. Every step lists its verification and rollback.
+**Execution status (2026-11-05):**
+
+| Step | Status | Evidence / remaining work |
+|---|---|---|
+| A0–A8 | **CLOSED** | Acceptance execution record in [RUNTIME_STATE](RUNTIME_STATE.md) and [AGENT_WORK_LOG](AGENT_WORK_LOG.md) |
+| A9 | **CLOSED — approved no-send path** | Synthetic `reserved` journal rows at 105/135/150 produced the warning, critical and exhausted alerts exactly once each (HTTP 200, two recipients); cleanup returned usage to 0, the cron lowered `budget_level` to 0, and `episode=3`, the delivered outbox rows and the A8 evidence were preserved. No Meta message was sent. Full evidence: [Production release plan](../security/WHATSAPP_OTP_PRODUCTION_RELEASE_PLAN.md) |
+| A10 | **OPEN — next Acceptance gate** | Evidence pack; preview frontend and Worker rollback drill; hosted email/Google/Facebook/legacy-phone login on the new build |
+| P-0–P-10 | **NOT STARTED** | Blocked on A10, B2, B6 and the owner approvals in B7 |
+
+Principles: Acceptance only; no Production resource is written (read-only Production checks are allowed and recorded in section 12); WhatsApp delivery stays **OFF** except inside an explicitly approved send window; no step changes existing registration, which stays on email/Google/Facebook with phone sign-up OFF. Every step lists its verification and rollback.
 
 **A0. Migration preflight (read-only).** (a) Confirm CI is green on the final candidate commit (all mandatory workflows plus `migration-policy`); (b) `node scripts/migration-policy.mjs` against the PR base: no problems; (c) `node scripts/migration-permission-gate.mjs` result from `supabase-rls`; (d) read the Acceptance Supabase migration history (`supabase migration list`/`db push --dry-run` against the linked Acceptance project): exactly `20261103090001` is pending and nothing else; (e) `node scripts/d1-baseline-check.mjs aladdin-whatsapp-otp-acceptance`: `tracked_behind` with `schema.different=[]`; (f) confirm the Acceptance preview frontend and Worker current versions (record ids for rollback); (g) confirm Secrets Store holds the Acceptance names including `OTP_ADMIN_GRANT_SECRET` (after C-6). Output: a go/no-go note. *No hosted change.*
 
@@ -175,9 +184,9 @@ Principles: Acceptance only; no Production resource is read or written; WhatsApp
 
 **A8. Rehearsal without any WhatsApp message (R-1..R-6, R-10..R-12).** R-1 initial state (`503 budget_unconfigured` path is covered by tests; the page shows "not configured"); R-2 initialize 150 / 5,000 / 70 / 90 with reason and typed ceiling; R-3 change the daily limit; change the ceiling (typed confirmation, >= 20-char reason); stale-version and double-submit refused; R-4 refusals (limit > ceiling, ceiling < limit, warn >= critical, short reason, wrong confirmation); R-5 permission failures (Administrator view-only, manage-without-ceiling cannot change the ceiling, no-view denied, suspended denied); R-10 reconcile of an applied-but-pending change; R-11 environment isolation (Acceptance credentials do not work against anything Production; the notify environment binding refuses a `production` event); R-12 **unmatched detection**: with approval, insert one audit row directly in the Acceptance D1 (a break-glass simulation), open the page, and confirm one `audit_unmatched` Admin notification, no duplicate on refresh, and that the grant still blocks a forged call. *Rollback:* restore the settings through the Admin page; delete the simulated D1 audit row.
 
-**A9. Alert and exhaustion rehearsal (needs a separate approval for any WhatsApp send).** In an approved window with delivery ON for the allowlisted Acceptance number only: set a small limit, observe warning / critical / exhausted notifications (once each, re-armed after usage falls, no email), then the third attempt answers `budget_exhausted` with no Meta call; R-9 kill-switch independence (delivery OFF blocks sends while the Admin page and settings still work). Restore limit 150 and delivery OFF. Alternative without sending: a D1 console insert of journal rows to reach the thresholds (separate approval).
+**A9. Alert and exhaustion rehearsal (needs a separate approval for any WhatsApp send).** In an approved window with delivery ON for the allowlisted Acceptance number only: set a small limit, observe warning / critical / exhausted notifications (once each, re-armed after usage falls, no email), then the third attempt answers `budget_exhausted` with no Meta call; R-9 kill-switch independence (delivery OFF blocks sends while the Admin page and settings still work). Restore limit 150 and delivery OFF. Alternative without sending: a D1 console insert of journal rows to reach the thresholds (separate approval). **Status: CLOSED (2026-11-05)** through the approved no-send alternative; see the status table above and the [release plan](../security/WHATSAPP_OTP_PRODUCTION_RELEASE_PLAN.md). No Meta send occurred.
 
-**A10. Evidence and rollback drill.** Record the results (screenshots, counts, no secrets); drill the rollback of the preview frontend and Worker to the recorded versions; confirm email/Google/Facebook/legacy sign-in on the new Acceptance build (existing registration undisturbed).
+**A10. Evidence and rollback drill.** Record the results (screenshots, counts, no secrets); drill the rollback of the preview frontend and Worker to the recorded versions; confirm email/Google/Facebook/legacy sign-in on the new Acceptance build (existing registration undisturbed). **Status: OPEN — this is the remaining Acceptance gate before any Production step.**
 
 Stop after A10 and report. Production preparation (P-steps) is planned only after the Acceptance results are accepted:
 
@@ -214,4 +223,32 @@ Stop after A10 and report. Production preparation (P-steps) is planned only afte
 **If the step fails or is interrupted:** nothing is half-written (single transaction). Re-run the dry run; "a grant key already exists" means it is done or needs a reviewed rotation. Rotation is not part of this helper. **Production** uses the same procedure only after a separate approval, with its own prerequisites and a hardened Production variant of the identity checks; this helper refuses Production by design.
 
 **Functional proof (not part of A3):** at A8 a real change through the Admin page must succeed; a key mismatch between the database and `OTP_ADMIN_GRANT_SECRET` makes the Worker answer `grant_invalid`, which fails safely.
+
+## 12. Production migration dry run and D1 baseline (read-only, 2026-11-05)
+
+No migration was applied: the command is a dry run and only reports the pending set. The CLI targeted Production explicitly; the linked Acceptance project was not the target.
+
+**Supabase migration dry run.** From the #136 head (`f910bcd0`), which contains the Admin settings migration:
+
+```
+supabase db push --dry-run --remote=kkpkgjrweysgvhvkhzun
+```
+
+reported **exactly 7** pending migrations, in this order: `20261028090001`, `20261028090003`, `20261029090001`, `20261029090002`, `20261030090001`, `20261030090002`, `20261103090001`. `20261105090001_admin_staff_invitations` (PR #137 lineage) is **absent** and must stay out of the Production push.
+
+The same command from the #127 head (`512c3e52`, plus the local docs commit) lists only **6** — it omits `20261103090001` because #136 is not merged yet. **Consequence: the Production database step must run after #136 is merged into #127 and the combined commit is green; running it from #127 alone would leave the Admin settings schema out of Production.**
+
+Production history remains 193 applied, latest `20261027090001`, zero of the seven present, zero newer versions, zero applied-not-in-repo rows, and no `app.phone_verification_config`.
+
+**D1 baseline** (`node scripts/d1-baseline-check.mjs aladdin-whatsapp-otp-production`, one SELECT):
+
+| Field | Result |
+|---|---|
+| `state` | `untracked_partial` |
+| `tracked` | `false` (no `d1_migrations`) |
+| `presentTables` | `whatsapp_hook_events` only |
+| `missingTables` | `otp_settings`, `otp_settings_audit`, `otp_admin_requests`, `otp_alert_state`, `otp_notification_outbox` |
+| `schema.matching` | `whatsapp_hook_events`, `whatsapp_hook_events_created_at` |
+| `schema.different` / `unexpected` | none |
+| next step (not executed) | `wrangler d1 migrations apply aladdin-whatsapp-otp-production --remote` (records `0001` as a no-op, applies `0002`) |
 
