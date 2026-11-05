@@ -123,6 +123,16 @@ Do not initialize limits, send WhatsApp messages or change `WHATSAPP_DELIVERY_EN
 * **State kept for A8:** both QA accounts stay active (Administrator and Moderator roles). Remove them with the audited Remove role and Disable only after the A8 to A10 rehearsal, with separate approval.
 * **Follow-ups (separate PRs, not blockers):** invitation e-mail reveal (design approved) and automatic invitation e-mail; see `ADMIN_STAFF_INVITATIONS.md` section 10.
 
+### 5b. A8 progress on Acceptance (WhatsApp OTP admin settings rehearsal, 2026-11-05)
+
+* **G-NOTIFY (Super Admin, "Test the alert connection"): PASS** ("The alert connection works."). Page after reload unchanged. R-1 initial state: PASS (limits not configured, environment Acceptance, sending Off, secure connections all in place).
+* **R-2 initialise 150 / 5000 / 70 / 90: PASS.** Success message shown; Usage 0 used, 150 remaining; Change history shows one initial-values entry with the actor, time and reason; sending stays Off.
+  * Supabase (owner, read-only): one `app.whatsapp_otp_settings_requests` row `applied`, version 0 to 1, settings 150 / 5000 / 70 / 90; exactly one `whatsapp_otp.settings_requested` and one `whatsapp_otp.settings_changed`; 0 pending/failed/abandoned; 0 notification events; grant key rows 1.
+  * Acceptance D1 (owner, read-only): one `otp_settings` row at version 1; one `otp_settings_audit` row (`initialize`, matching values, reason length 91); outbox 0; alert state level 0, failure 0, episode 0; `whatsapp_hook_events` 6 rows (baseline recorded; no earlier value to compare).
+  * **The first successful settings change is the functional proof that the database grant key matches the Worker secret** (a mismatch would have answered `grant_invalid`). A3 is therefore fully verified.
+  * Worker `aladdin-whatsapp-otp-preview` still on `11b9f694-1f2e-4e2c-ad41-8a8d0a8ae13e`; frontend on `deae226d-0686-4e0f-a545-db0c073e7db1`; delivery OFF; Production untouched.
+* Not yet done: R-3 to R-5, R-10, R-11, R-12 (each behind its own approval), A9, A10.
+
 ## 6. Rollback plan
 
 Order of preference, least to most invasive. None deletes data.
