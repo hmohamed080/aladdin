@@ -131,7 +131,12 @@ Do not initialize limits, send WhatsApp messages or change `WHATSAPP_DELIVERY_EN
   * Acceptance D1 (owner, read-only): one `otp_settings` row at version 1; one `otp_settings_audit` row (`initialize`, matching values, reason length 91); outbox 0; alert state level 0, failure 0, episode 0; `whatsapp_hook_events` 6 rows (baseline recorded; no earlier value to compare).
   * **The first successful settings change is the functional proof that the database grant key matches the Worker secret** (a mismatch would have answered `grant_invalid`). A3 is therefore fully verified.
   * Worker `aladdin-whatsapp-otp-preview` still on `11b9f694-1f2e-4e2c-ad41-8a8d0a8ae13e`; frontend on `deae226d-0686-4e0f-a545-db0c073e7db1`; delivery OFF; Production untouched.
-* Not yet done: R-3 to R-5, R-10, R-11, R-12 (each behind its own approval), A9, A10.
+* **R-3 change limits: PASS (a to d and the rollback), with a consolidated read-only audit.**
+  * 3a daily limit 150 to 100; 3b hard ceiling 5000 to 4000 (typed confirmation required and shown); 3c stale version (two tabs): tab A 100 to 90 applied, tab B refused with the stale message and nothing applied; 3d double-submit 90 to 100: one applied change and one history entry; rollback in two saves back to 150 / 5000 / 70 / 90. Sending stayed Off throughout; Usage stayed 0 used.
+  * Supabase: 7 applied requests, versions 1 to 7, no duplicates; 7 `settings_requested` and 7 `settings_changed` events; no pending, abandoned or failed request (the stale attempt is refused before a request row is created); notification events 0; grant key rows 1.
+  * D1: `otp_settings` 150 / 5000 / 70 / 90 at version 7; 7 `otp_settings_audit` rows, 7 distinct request ids, 7 distinct versions (1 to 7); outbox 0; alert state level 0 / failure 0 / episode 0; `whatsapp_hook_events` 6 rows, last row 6 (unchanged from the R-2 baseline).
+  * Frontend and Worker versions unchanged (`deae226d-...`, `11b9f694-...`); delivery OFF; Production untouched. Not independently checked: the Meta message log.
+* Not yet done: R-4, R-5, R-10, R-11, R-12 (each behind its own approval), A9, A10.
 
 ## 6. Rollback plan
 
