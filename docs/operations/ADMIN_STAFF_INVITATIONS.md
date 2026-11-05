@@ -84,3 +84,12 @@ The step-by-step Acceptance readiness checklist, preflight queries and precise r
 ## 9. Deactivating or removing staff (never delete)
 
 Use the existing audited controls on **Admin Staff**: **Remove role** (`admin_staff_unassign`) and **Disable** (`admin_staff_set_disabled`, reversible). Withdraw any pending invitation on the Invitations tab. Prefer suspending temporary QA accounts until audit and retention requirements are reviewed. Auth accounts, invitation rows and audit records are never deleted by this feature.
+
+## 10. Planned follow-ups (not A7 blockers; recorded 2026-11-05)
+
+1. **Automated invitation e-mail delivery.** v1 is manual link delivery (confirmed during Acceptance QA: no e-mail is sent). Implement the seam in section 6 with an approved transactional provider and a separate security review. Not required to close A7.
+2. **Reveal the full invited address on Admin Staff, Invitations (separate small change).** The roster is masked by default and stays so. Click the masked address to toggle the full value, only for callers who already pass the invitation-management authority check.
+   * The masking happens inside `admin_staff_invitations_list`, so the full address never reaches the browser today. A reveal therefore needs a new server-checked read (one invitation id in, one address out), not a client-side toggle. That is a new migration, so it needs its own approval and review.
+   * Re-check the caller's authority and the invitation's visibility on every reveal; return nothing otherwise; never return it in the list payload; do not cache it.
+   * Decide whether each reveal writes an audit event (recommended: a new `admin_staff.invitation_email_revealed` action) and whether revealing is limited to `pending` rows.
+   * Do not start it before A7 QA is closed, so the deployed code under test stays fixed.
