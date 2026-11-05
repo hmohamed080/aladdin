@@ -53,6 +53,11 @@ const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   // Arabic sentence — technical samples, not translated prose.
   "authPasswordPreview.error.passwordSequential",
   "onboarding.contact.phonePlaceholder",
+  // Showroom links: literal link / handle samples inside left-to-right inputs.
+  "onboarding.business.links.placeholder.facebook",
+  "onboarding.business.links.placeholder.instagram",
+  "onboarding.business.links.placeholder.tiktok",
+  "onboarding.business.links.placeholder.website",
   // A KEYCAP legend, not prose. The Enter key is engraved "Enter" on Arabic
   // keyboards too, so translating it would name a key the user cannot find.
   "search.enter",

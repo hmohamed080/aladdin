@@ -138,6 +138,8 @@ describe("BusinessFlow — acceptance gates", () => {
     fillNames("Cairo Ceramics", "Cairo Ceramics Trading LLC");
     fireEvent.change(screen.getByLabelText(en.onboarding.business.identity.activityLabel), { target: { value: "decor_showroom" } });
     fireEvent.change(screen.getByLabelText(en.onboarding.business.identity.phoneLabel), { target: { value: "01012345678" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Instagram/ }));
+    fireEvent.change(screen.getByLabelText("Instagram"), { target: { value: "@cairoceramics" } });
     await act(async () => {
       fireEvent.click(continueBtn());
     });
@@ -344,7 +346,7 @@ describe("BusinessFlow — review shows everything that will be saved", () => {
   it("lists the activity, phone, e-mail and description of a showroom before it is submitted", () => {
     renderWithI18n(
       <BusinessFlow
-        answers={names({ orgType: "showroom_dealer", contactEmail: "owner@alnoor.example", description: "Tiles and paint for homes" })}
+        answers={names({ orgType: "showroom_dealer", contactEmail: "owner@alnoor.example", description: "Tiles and paint for homes", instagramUrl: "https://www.instagram.com/alnoor" })}
         presetOrgType="showroom_dealer"
         draftId="draft-1"
       />,
@@ -356,6 +358,7 @@ describe("BusinessFlow — review shows everything that will be saved", () => {
     expect(within(review).getByText("owner@alnoor.example")).toBeTruthy();
     expect(within(review).getByText("Tiles and paint for homes")).toBeTruthy();
     expect(within(review).getByText(/10 Test Street/)).toBeTruthy();
+    expect(within(review).getByText("instagram.com/alnoor")).toBeTruthy();
   });
 
   it("does not ask a supplier to review a showroom phone or activity", () => {
@@ -363,5 +366,109 @@ describe("BusinessFlow — review shows everything that will be saved", () => {
     const review = screen.getByText(en.onboarding.business.review.name).closest("dl") as HTMLElement;
     expect(within(review).queryByText(en.onboarding.business.identity.phoneLabel)).toBeNull();
     expect(within(review).queryByText(en.onboarding.business.identity.activityLabel)).toBeNull();
+  });
+});
+
+describe("BusinessFlow — showroom links (step 1)", () => {
+  const links = en.onboarding.business.links;
+  const instagramToggle = () => screen.getByRole("button", { name: /^Instagram/ });
+  const fillShowroom = () => {
+    fillNames("Cairo Ceramics", "Cairo Ceramics Trading LLC");
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "decor_showroom" } });
+    fireEvent.change(screen.getByLabelText(label.phoneLabel), { target: { value: "01012345678" } });
+  };
+  const rowOf = (text: string) => screen.getByText(text).closest("div")!.parentElement!;
+  const follows = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it("a showroom cannot leave step 1 without a valid link: Next explains, opens and focuses Instagram", async () => {
+    renderWithI18n(<BusinessFlow answers={emptyAnswers} presetOrgType="showroom_dealer" draftId="draft-1" />, "en");
+    fillShowroom();
+    expect(continueBtn()).toBeEnabled();
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(saveBusiness).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(en.onboarding.error.linksRequired);
+    expect(instagramToggle()).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("Instagram")).toHaveFocus();
+
+    fireEvent.change(screen.getByLabelText("Instagram"), { target: { value: "@cairoceramics" } });
+    expect(screen.queryByRole("alert")).toBeNull();
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(saveBusiness).toHaveBeenCalledTimes(1);
+    expect(saveBusiness.mock.calls[0]![0]).toMatchObject({ step: "identity", instagramUrl: "@cairoceramics", facebookUrl: "", tiktokUrl: "", websiteUrl: "" });
+    await waitFor(() => expect(screen.getByText(en.onboarding.business.location.title)).toBeInTheDocument());
+  });
+
+  it("a filled-but-invalid link blocks Next with its own reason", async () => {
+    renderWithI18n(<BusinessFlow answers={emptyAnswers} presetOrgType="showroom_dealer" draftId="draft-1" />, "en");
+    fillShowroom();
+    fireEvent.click(screen.getByRole("button", { name: /^Website/ }));
+    fireEvent.change(screen.getByLabelText("Website"), { target: { value: "javascript:alert(1)" } });
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(saveBusiness).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("alert").map((a) => a.textContent)).toEqual([links.error.unsafeScheme]);
+    expect(screen.getByLabelText("Website")).toHaveFocus();
+  });
+
+  it("every save sends all four links, also from a step other than identity", async () => {
+    const answers = names({ orgType: "showroom_dealer", instagramUrl: "https://www.instagram.com/shop", websiteUrl: "https://shop.example.com" });
+    renderWithI18n(<BusinessFlow answers={answers} presetOrgType="showroom_dealer" draftId="draft-1" />, "en");
+    await act(async () => {
+      fireEvent.click(within(rowOf(en.onboarding.business.review.location)).getByRole("button", { name: en.onboarding.edit }));
+    });
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(saveBusiness).toHaveBeenCalledTimes(1);
+    expect(saveBusiness.mock.calls[0]![0]).toMatchObject({
+      step: "location",
+      facebookUrl: "",
+      instagramUrl: "https://www.instagram.com/shop",
+      tiktokUrl: "",
+      websiteUrl: "https://shop.example.com",
+    });
+  });
+
+  it("the review lists the added links one per line, left-to-right, and Edit returns to them", async () => {
+    const answers = names({ orgType: "showroom_dealer", instagramUrl: "https://www.instagram.com/shop", tiktokUrl: "https://www.tiktok.com/@shop" });
+    renderWithI18n(<BusinessFlow answers={answers} presetOrgType="showroom_dealer" draftId="draft-1" />, "en");
+    const row = rowOf(en.onboarding.business.review.links);
+    const dd = row.querySelector("dd")!;
+    expect(dd).toHaveAttribute("dir", "ltr");
+    expect([...dd.querySelectorAll("span")].map((s) => s.textContent)).toEqual(["instagram.com/shop", "tiktok.com/@shop"]);
+    await act(async () => {
+      fireEvent.click(within(row).getByRole("button", { name: en.onboarding.edit }));
+    });
+    // The resumed draft's saved links are shown in their inputs.
+    expect(screen.getByLabelText("Instagram")).toHaveValue("https://www.instagram.com/shop");
+    expect(screen.getByLabelText("TikTok")).toHaveValue("https://www.tiktok.com/@shop");
+    expect(screen.getByText(links.counterSome.replace("{count}", "2"))).toBeInTheDocument();
+  });
+
+  it("a showroom draft saved without links resumes on step 1, not the review", () => {
+    renderWithI18n(<BusinessFlow answers={names({ orgType: "showroom_dealer" })} presetOrgType="showroom_dealer" draftId="draft-1" />, "en");
+    expect(screen.getByText(links.title)).toBeInTheDocument();
+    expect(screen.queryByText(en.onboarding.business.review.title)).not.toBeInTheDocument();
+  });
+
+  it("orders a showroom's step 1: names, activity, phone, email, links card, then the optional description", () => {
+    renderWithI18n(<BusinessFlow answers={emptyAnswers} presetOrgType="showroom_dealer" draftId="draft-1" />, "en");
+    const order = [
+      screen.getByLabelText(label.displayNameLabel),
+      screen.getByLabelText(label.legalNameLabel),
+      screen.getByLabelText(label.activityLabel),
+      screen.getByLabelText(label.phoneLabel),
+      screen.getByLabelText(starts(label.emailLabel)),
+      screen.getByText(links.title),
+      screen.getByLabelText(starts(label.descriptionLabel)),
+    ];
+    for (let i = 1; i < order.length; i++) expect(follows(order[i - 1]!, order[i]!)).toBe(true);
+  });
+
+  it("a non-showroom business shows no links card and keeps its order", async () => {
+    renderWithI18n(<BusinessFlow answers={emptyAnswers} presetOrgType="supplier" draftId="draft-1" />, "en");
+    expect(screen.queryByText(links.title)).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Instagram/ })).toBeNull();
+    expect(follows(screen.getByLabelText(label.legalNameLabel), screen.getByLabelText(starts(label.descriptionLabel)))).toBe(true);
+    fillNames();
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(saveBusiness).toHaveBeenCalledTimes(1);
   });
 });
