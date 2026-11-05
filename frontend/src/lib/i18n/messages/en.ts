@@ -5016,7 +5016,7 @@ export const en = {
     },
     links: {
       label: "Showroom links",
-      hint: "Your Instagram, Facebook, TikTok or website. At least one link stays on your showroom.",
+      hint: "Your Instagram, Facebook, TikTok or website. Keep at least one link.",
       save: "Save links",
       saving: "Saving…",
       saved: "Links saved.",
