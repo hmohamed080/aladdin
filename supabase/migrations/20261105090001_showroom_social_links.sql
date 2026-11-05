@@ -144,12 +144,13 @@ begin
     p_governorate, p_city, p_primary_branch_name, p_city_custom_name,
     p_contact_phone, p_contact_email, p_activity_type, p_detailed_address);
 
-  -- Links are replaced wholesale: a null clears that link.
+  -- Links are replaced wholesale: a null clears that link. Only a showroom keeps links: any other saved type
+  -- (including one switched to after links were typed) stores none.
   update public.business_creation_drafts set
-    facebook_url  = v_facebook,
-    instagram_url = v_instagram,
-    tiktok_url    = v_tiktok,
-    website_url   = v_website
+    facebook_url  = case when org_type = 'showroom_dealer' then v_facebook end,
+    instagram_url = case when org_type = 'showroom_dealer' then v_instagram end,
+    tiktok_url    = case when org_type = 'showroom_dealer' then v_tiktok end,
+    website_url   = case when org_type = 'showroom_dealer' then v_website end
   where id = v_id;
 
   return v_id;
@@ -205,12 +206,15 @@ begin
 
   v_org_id := public.business_draft_submit_v2(v_d.id);
 
-  update public.organizations set
-    facebook_url  = v_d.facebook_url,
-    instagram_url = v_d.instagram_url,
-    tiktok_url    = v_d.tiktok_url,
-    website_url   = v_d.website_url
-  where id = v_org_id;
+  -- Links belong to a showroom only; a draft of any other type never copies them.
+  if v_d.org_type = 'showroom_dealer' then
+    update public.organizations set
+      facebook_url  = v_d.facebook_url,
+      instagram_url = v_d.instagram_url,
+      tiktok_url    = v_d.tiktok_url,
+      website_url   = v_d.website_url
+    where id = v_org_id;
+  end if;
 
   return v_org_id;
 end;

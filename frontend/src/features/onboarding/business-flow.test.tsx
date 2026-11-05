@@ -517,6 +517,21 @@ describe("BusinessFlow — showroom chosen on the type step", () => {
     await waitFor(() => expect(screen.getByText(en.onboarding.business.location.title)).toBeInTheDocument());
   });
 
+  it("switching to another type after links were typed saves with blank links", async () => {
+    await toTypeStep();
+    fireEvent.click(showroomChoice());
+    await act(async () => { fireEvent.click(continueBtn()); });
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "decor_showroom" } });
+    fireEvent.change(screen.getByLabelText(label.phoneLabel), { target: { value: "01012345678" } });
+    fireEvent.change(screen.getByLabelText("Instagram"), { target: { value: "@cairoceramics" } });
+    await act(async () => { fireEvent.click(continueBtn()); });
+    expect(screen.getByText(en.onboarding.business.type.title)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(en.onboarding.business.orgTypes.supplier) }));
+    await act(async () => { fireEvent.click(continueBtn()); });
+    const sent = saveBusiness.mock.calls.at(-1)![0] as Record<string, unknown>;
+    expect(sent).toMatchObject({ orgType: "supplier", facebookUrl: "", instagramUrl: "", tiktokUrl: "", websiteUrl: "" });
+  });
+
   it("a links-blocked Next on step 1 clears a stale save error", async () => {
     saveBusiness.mockResolvedValueOnce({ ok: false, code: "onboarding.error.saveFailed" } as never);
     renderWithI18n(<BusinessFlow answers={emptyAnswers} presetOrgType="showroom_dealer" draftId="draft-1" />, "en");

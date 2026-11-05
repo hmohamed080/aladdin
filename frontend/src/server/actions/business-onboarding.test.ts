@@ -241,6 +241,24 @@ describe("showroom social links", () => {
     expect(saveArgs()!.p_instagram_url).toBeUndefined();
   });
 
+  it("ignores links entirely when the effective type is not a showroom (a type switched after links were typed)", async () => {
+    state.mandatory = { required: false, orgType: null };
+    const links = { facebookUrl: "fb.com/shopname", instagramUrl: "@shop", tiktokUrl: "@shop", websiteUrl: "example.com" };
+    expect((await saveBusiness({ step: "identity", displayName: "Supply", legalName: "Supply LLC", orgType: "supplier", ...links })).ok).toBe(true);
+    expect(saveArgs()).toMatchObject({ p_org_type: "supplier" });
+    for (const k of ["p_facebook_url", "p_instagram_url", "p_tiktok_url", "p_website_url"]) expect(saveArgs()![k]).toBeUndefined();
+    // Not validated either: an invalid leftover for a non-showroom is not an error.
+    state.rpc.mockClear();
+    expect((await saveBusiness({ step: "identity", displayName: "Supply", legalName: "Supply LLC", orgType: "supplier", websiteUrl: "javascript:alert(1)" })).ok).toBe(true);
+    expect(saveArgs()!.p_website_url).toBeUndefined();
+  });
+
+  it("a registered non-showroom type wins over links and a showroom type posted by the client", async () => {
+    state.mandatory = { required: true, orgType: "supplier" };
+    expect((await saveBusiness({ step: "identity", displayName: "Supply", legalName: "Supply LLC", orgType: "showroom_dealer", instagramUrl: "@shop" })).ok).toBe(true);
+    expect(saveArgs()!.p_instagram_url).toBeUndefined();
+  });
+
   it("submit refuses a showroom with no links before any rpc", async () => {
     expect(await submitBusiness(complete)).toEqual({ ok: false, code: "onboarding.error.linksRequired" });
     expect(state.rpc).not.toHaveBeenCalled();

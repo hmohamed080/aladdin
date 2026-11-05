@@ -152,6 +152,30 @@ reset role;
 select is((select count(*)::int from public.organizations o join public.business_creation_drafts d on d.organization_id=o.id where d.user_id='11600003-0000-4000-8000-000000000116' and o.org_type='supplier'),1,'supplier organization created');
 
 -- ---------------------------------------------------------------------------
+-- 5b. Links belong to a showroom only: a non-showroom type stores and copies none
+-- ---------------------------------------------------------------------------
+insert into auth.users(id,instance_id,aud,role,email,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at) values('11600004-0000-4000-8000-000000000116','00000000-0000-0000-0000-000000000000','authenticated','authenticated','links116-4@example.test',now(),'{}','{}',now(),now());
+insert into public.onboarding_progress(user_id,selected_track,selected_org_type,account_type_completed_at,completed_at) values('11600004-0000-4000-8000-000000000116','business','supplier',now(),now());
+set local role authenticated;
+select set_config('request.jwt.claim.sub','11600004-0000-4000-8000-000000000116',true);
+select set_config('request.jwt.claims','{"sub":"11600004-0000-4000-8000-000000000116","role":"authenticated"}',true);
+select lives_ok($q$select public.business_draft_save_v3(p_display_name=>'Links Supplier B',p_legal_name=>'Links Supplier B Legal',p_org_type=>'supplier',p_governorate=>'cairo',p_city=>'maadi',p_facebook_url=>'https://www.facebook.com/aladdinsupplier',p_website_url=>'https://supplier.example.com')$q$,'save_v3 with a non-showroom type and links is accepted');
+select is((select row(facebook_url,instagram_url,tiktok_url,website_url)::text from public.business_creation_drafts where user_id='11600004-0000-4000-8000-000000000116'),
+  row(null::text,null::text,null::text,null::text)::text,'save_v3 stores NULL links when the saved type is not a showroom');
+reset role;
+-- A draft that already holds links (for example a showroom draft switched to another type) must not copy them to the organization.
+update public.business_creation_drafts set facebook_url='https://www.facebook.com/aladdinsupplier', website_url='https://supplier.example.com' where user_id='11600004-0000-4000-8000-000000000116';
+select is((select facebook_url from public.business_creation_drafts where user_id='11600004-0000-4000-8000-000000000116'),'https://www.facebook.com/aladdinsupplier','setup: the supplier draft holds a link');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','11600004-0000-4000-8000-000000000116',true);
+select set_config('request.jwt.claims','{"sub":"11600004-0000-4000-8000-000000000116","role":"authenticated"}',true);
+select lives_ok($q$select set_config('test.org4', public.business_draft_submit_v3()::text, true)$q$,'submit_v3 of a non-showroom draft that holds links succeeds');
+reset role;
+select is((select row(facebook_url,instagram_url,tiktok_url,website_url)::text from public.organizations where id=current_setting('test.org4')::uuid),
+  row(null::text,null::text,null::text,null::text)::text,'the supplier organization gets no links');
+select is((select org_type::text from public.organizations where id=current_setting('test.org4')::uuid),'supplier','the organization is a supplier');
+
+-- ---------------------------------------------------------------------------
 -- 6. Privileges
 -- ---------------------------------------------------------------------------
 select ok(not has_function_privilege('anon','public.business_draft_save_v3(uuid,text,text,public.organization_type,text,text,text,text,text,text,text,text,text,text,text,text,text)','execute'),'anon cannot execute save_v3');

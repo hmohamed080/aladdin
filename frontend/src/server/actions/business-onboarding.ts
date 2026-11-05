@@ -107,8 +107,12 @@ export async function saveBusiness(input: BusinessInput): Promise<BusinessAction
   if (v.step === "identity" && (v.displayName?.trim().length ?? 0) < 2) return { ok: false, code: "onboarding.error.businessNameRequired" };
   if (v.step === "identity" && legalNameMissing(v.legalName)) return { ok: false, code: "onboarding.error.legalNameRequired" };
   if (orgType === "showroom_dealer" && v.step === "identity") { const error = showroomIdentityError(v); if (error) return { ok: false, code: error }; }
-  // Links are required to finish a showroom's identity step; whatever is entered is always validated, on any step.
-  const rawLinks = { facebook: v.facebookUrl, instagram: v.instagramUrl, tiktok: v.tiktokUrl, website: v.websiteUrl };
+  // Links belong to a showroom only: for any other effective type they are ignored entirely (never validated, never stored),
+  // so a link typed before the type was switched cannot reach another kind of business.
+  // For a showroom they are required to finish the identity step, and whatever is entered is validated on any step.
+  const rawLinks = orgType === "showroom_dealer"
+    ? { facebook: v.facebookUrl, instagram: v.instagramUrl, tiktok: v.tiktokUrl, website: v.websiteUrl }
+    : { facebook: null, instagram: null, tiktok: null, website: null };
   const links = normalizeSocialLinks(rawLinks);
   if (!links.ok) return { ok: false, code: "onboarding.error.linkInvalid" };
   if (orgType === "showroom_dealer" && v.step === "identity") { const error = socialLinksError(rawLinks); if (error) return { ok: false, code: error }; }

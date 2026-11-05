@@ -169,10 +169,11 @@ export function BusinessFlow({
     cityCustomName: s.otherCity ? s.cityCustomName.trim() || null : null,
     primaryBranchName: s.primaryBranchName.trim() || null,
     // v3 saves REPLACE all four links (an omitted one is cleared), so every save sends all four, on every step.
-    facebookUrl: s.links.facebook,
-    instagramUrl: s.links.instagram,
-    tiktokUrl: s.links.tiktok,
-    websiteUrl: s.links.website,
+    // Only a showroom has links: after the type was switched away from it, blanks are sent so the typed values never travel.
+    facebookUrl: s.orgType === "showroom_dealer" ? s.links.facebook : "",
+    instagramUrl: s.orgType === "showroom_dealer" ? s.links.instagram : "",
+    tiktokUrl: s.orgType === "showroom_dealer" ? s.links.tiktok : "",
+    websiteUrl: s.orgType === "showroom_dealer" ? s.links.website : "",
   });
 
   /** Show the card's messages and move focus to the first invalid link, or Instagram when none is valid. */
