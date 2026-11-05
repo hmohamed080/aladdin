@@ -56,6 +56,17 @@ const LABEL = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 const TLD = /^[a-z]{2,}$/;
 const IPV4ISH = /^[0-9.]+$/;
 
+const ALNUM = /[A-Za-z0-9]/;
+const BAD_PERCENT = /%(?![0-9A-Fa-f]{2})/;
+
+function isHandle(platform: Exclude<SocialPlatform, "website">, name: string) {
+  return HANDLE[platform].test(name) && ALNUM.test(name);
+}
+
+function hasPunycodeLabel(host: string): boolean {
+  return host.split(".").some((l) => l.startsWith("xn--"));
+}
+
 const fail = (reason: SocialLinkReason): SocialLinkResult => ({
   ok: false,
   reason,
@@ -86,12 +97,20 @@ export function normalizeSocialLink(
   if (input.length > MAX_LENGTH) return fail("tooLong");
   if (CONTROL_OR_SPACE.test(input)) return fail("invalid");
 
+  // new URL() treats "\\" as "/" for https, so raw-string and parser views
+  // could diverge: refuse it outright.
+  const backslash = input.indexOf("\\");
+  if (backslash !== -1) {
+    const firstSep = input.search(/[/?#]/);
+    return fail(firstSep === -1 || backslash < firstSep ? "badHost" : "invalid");
+  }
+
   // A bare token that fits the platform's handle pattern is a handle.
   if (platform !== "website" && !input.includes("/")) {
     const name = input.replace(/^@/, "");
-    if (HANDLE[platform].test(name)) return finish(canonical(platform, name));
-    // Only host-looking leftovers (port, non-ASCII) get a host diagnosis.
-    if (!input.includes(":") && !NON_ASCII.test(input)) return fail("invalid");
+    if (isHandle(platform, name)) return finish(canonical(platform, name));
+    // Only host-looking leftovers (port, non-ASCII, escapes) get a host diagnosis.
+    if (!/[:%]/.test(input) && !NON_ASCII.test(input)) return fail("invalid");
   }
 
   // Scheme: "x://" is explicit; "x:rest" is a scheme unless rest is a port.
@@ -109,12 +128,15 @@ export function normalizeSocialLink(
 
   const authority = rest.split(/[/?#]/, 1)[0] ?? "";
   if (authority === "") return fail("invalid");
-  if (NON_ASCII.test(authority)) return fail("badHost");
+  if (NON_ASCII.test(authority) || authority.includes("%")) {
+    return fail("badHost");
+  }
   const userinfo = authority.includes("@");
   const hostPart = authority.slice(authority.lastIndexOf("@") + 1);
   if (hostPart.startsWith("[") || hostPart.includes(":")) return fail("badHost");
-  if (hostPart.toLowerCase().split(".").some((l) => l.startsWith("xn--"))) {
-    return fail("badHost");
+  if (hasPunycodeLabel(hostPart.toLowerCase())) return fail("badHost");
+  if (BAD_PERCENT.test(rest.slice(authority.length).split(/[?#]/, 1)[0] ?? "")) {
+    return fail("invalid");
   }
 
   let url: URL;
@@ -124,8 +146,10 @@ export function normalizeSocialLink(
     return fail("invalid");
   }
   const host = url.hostname.toLowerCase();
+  if (NON_ASCII.test(host) || hasPunycodeLabel(host)) return fail("badHost");
   if (IPV4ISH.test(host) || isBannedHost(host)) return fail("badHost");
   if (userinfo) return fail(platform === "website" ? "badHost" : "wrongHost");
+  if (url.username || url.password || url.port) return fail("badHost");
 
   const path = url.pathname.replace(/\/+$/, "");
 
@@ -152,7 +176,7 @@ export function normalizeSocialLink(
     if (!segments.every((s) => /^[A-Za-z0-9._%-]+$/.test(s))) {
       return fail("invalid");
     }
-    if (segments.length === 1 && !HANDLE.facebook.test(segments[0] ?? "")) {
+    if (segments.length === 1 && !isHandle("facebook", segments[0] ?? "")) {
       return fail("invalid");
     }
     return finish(`https://www.facebook.com/${segments.join("/")}`);
@@ -164,7 +188,7 @@ export function normalizeSocialLink(
   if (platform === "tiktok" && !first.startsWith("@")) {
     return fail("invalid");
   }
-  if (!HANDLE[platform].test(name)) return fail("invalid");
+  if (!isHandle(platform, name)) return fail("invalid");
   return finish(canonical(platform, name));
 }
 

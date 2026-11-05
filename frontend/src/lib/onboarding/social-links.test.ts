@@ -26,6 +26,17 @@ describe("normalizeSocialLink accepts", () => {
     ],
     ["website", "Example.COM/path/?a=1", "https://example.com/path"],
     ["website", "https://www.example.com", "https://www.example.com"],
+    ["website", "example.com/a%20b", "https://example.com/a%20b"],
+    ["facebook", "facebook.com/pages/a%20b/123", "https://www.facebook.com/pages/a%20b/123"],
+    ["facebook", "@Name12", "https://www.facebook.com/Name12"],
+    ["facebook", "HTTPS://WWW.FACEBOOK.COM/Page.Name", "https://www.facebook.com/Page.Name"],
+    ["tiktok", "@Name", "https://www.tiktok.com/@Name"],
+    ["tiktok", "HTTPS://M.TIKTOK.COM/@Name", "https://www.tiktok.com/@Name"],
+    [
+      "website",
+      `https://example.com/${"a".repeat(280)}`,
+      `https://example.com/${"a".repeat(280)}`,
+    ],
   ];
   it.each(cases)("%s %j -> %s", (platform, raw, url) => {
     expect(normalizeSocialLink(platform, raw)).toEqual({ ok: true, url });
@@ -63,6 +74,28 @@ describe("normalizeSocialLink rejects", () => {
     ["instagram", "a".repeat(31), "invalid"],
     ["tiktok", "a", "invalid"],
     ["facebook", "abcd", "invalid"],
+    ["website", "f%D0%B0cebook.com", "badHost"],
+    ["website", "https://f%D0%B0cebook.com/x", "badHost"],
+    ["website", "%78n--fcebook-8va.com", "badHost"],
+    ["facebook", "f%D0%B0cebook.com", "badHost"],
+    ["facebook", "https://f%D0%B0cebook.com/x", "badHost"],
+    ["facebook", "%78n--fcebook-8va.com", "badHost"],
+    ["instagram", "..", "invalid"],
+    ["facebook", ".....", "invalid"],
+    ["tiktok", "__", "invalid"],
+    ["facebook", "facebook.com/%", "invalid"],
+    ["facebook", "facebook.com/ab%zzcd", "invalid"],
+    ["website", "example.com/%zz", "invalid"],
+    ["website", "example.com/a%2", "invalid"],
+    ["facebook", "http://127.0.0.1", "badHost"],
+    ["instagram", "http://localhost/x", "badHost"],
+    ["tiktok", "[::1]", "badHost"],
+    ["website", "0x7f.1", "badHost"],
+    ["website", "2130706433", "badHost"],
+    ["website", "\\xn--fcebook-8va.com", "badHost"],
+    ["facebook", "https://facebook.com\\@evil.io/x", "invalid"],
+    ["website", "example.com/a\\b", "invalid"],
+    ["website", `https://example.com/${"a".repeat(281)}`, "tooLong"],
   ];
   it.each(cases)("%s %j -> %s", (platform, raw, reason) => {
     expect(normalizeSocialLink(platform, raw)).toEqual({ ok: false, reason });
