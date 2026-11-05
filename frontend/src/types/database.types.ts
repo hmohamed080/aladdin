@@ -9360,6 +9360,16 @@ export type Database = {
         }
         Returns: Json
       }
+      organization_social_links_set: {
+        Args: {
+          p_facebook_url: string
+          p_instagram_url: string
+          p_org_id: string
+          p_tiktok_url: string
+          p_website_url: string
+        }
+        Returns: Json
+      }
       organization_update_i18n: {
         Args: {
           p_name_ar: string
