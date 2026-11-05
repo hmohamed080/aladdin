@@ -41,6 +41,17 @@ describe("SocialLinksCard", () => {
     expect(screen.getByText(L.counterNone)).toBeInTheDocument();
   });
 
+  it("hides a closed panel with a class, because Tailwind's flex would override the hidden attribute", () => {
+    renderWithI18n(<Harness />, "en");
+    const closed = document.getElementById("social-links-instagram-panel")!;
+    expect(closed).toHaveAttribute("hidden");
+    expect(closed.classList.contains("hidden")).toBe(true);
+    expect(closed.classList.contains("flex")).toBe(false);
+    fireEvent.click(toggle(L.platform.instagram));
+    expect(closed.classList.contains("hidden")).toBe(false);
+    expect(closed.classList.contains("flex")).toBe(true);
+  });
+
   it("pressing Instagram reveals one focused ltr input tied to the toggle", () => {
     renderWithI18n(<Harness />, "en");
     const btn = toggle(L.platform.instagram);

@@ -135,8 +135,9 @@ export function SocialLinksCard({
         const inputId = `${idPrefix}-${p}`;
         const errorId = `${inputId}-error`;
         const previewId = `${inputId}-preview`;
+        // Tailwind's `flex` beats the `hidden` attribute (author CSS over the user-agent rule), so the closed state is a class too.
         return (
-          <div key={p} id={`${inputId}-panel`} hidden={!isOpen(p)} className="flex flex-col gap-1.5">
+          <div key={p} id={`${inputId}-panel`} hidden={!isOpen(p)} className={isOpen(p) ? "flex flex-col gap-1.5" : "hidden"}>
             <label htmlFor={inputId} className="text-label font-medium text-fg-secondary">
               {t(`onboarding.business.links.platform.${p}`)}
             </label>
