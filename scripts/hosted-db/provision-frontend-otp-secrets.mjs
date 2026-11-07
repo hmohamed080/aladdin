@@ -282,9 +282,18 @@ export async function run({ argv, wrangler, hidden, out, ci = false, isTTY = tru
   }
 }
 
+/** The child gets these settings FORCED, whatever the owner's shell says: with WRANGLER_LOG_SANITIZE=false Wrangler writes request bodies (here: the three
+ *  secrets) into its debug log file on disk. WRANGLER_LOG=log keeps the console quiet; metrics off. */
+export function safeWranglerEnv(base) {
+  return { ...base, WRANGLER_LOG_SANITIZE: "true", WRANGLER_LOG: "log", WRANGLER_SEND_METRICS: "false" };
+}
+
+export function spawnWrangler(args, opts = {}, spawn = spawnSync, base = process.env) {
+  return spawn("pnpm", ["exec", "wrangler", ...args], { cwd: FRONTEND, input: opts.input, encoding: "utf8", shell: process.platform === "win32", maxBuffer: 32 * 1024 * 1024, env: safeWranglerEnv(base) });
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const wrangler = (args, opts = {}) =>
-    spawnSync("pnpm", ["exec", "wrangler", ...args], { cwd: FRONTEND, input: opts.input, encoding: "utf8", shell: process.platform === "win32", maxBuffer: 32 * 1024 * 1024 });
+  const wrangler = (args, opts = {}) => spawnWrangler(args, opts);
   run({ argv: process.argv.slice(2), wrangler, hidden: (p) => readHidden(p), out: (s) => console.log(s), ci: Boolean(process.env.CI), isTTY: Boolean(process.stdin.isTTY) })
     .then((code) => { process.exitCode = code; }, () => { process.exitCode = 1; });
 }

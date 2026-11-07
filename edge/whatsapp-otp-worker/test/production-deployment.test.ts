@@ -3,7 +3,7 @@ import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  checkBindings, checkConfigFile, checkDeployment, checkPrivacy, checkSchedules, checkSwitch, expectedBindings, parseJsonc, reachedWorker, run, SWITCH_SQL,
+  checkBindings, checkConfigFile, listAll, checkDeployment, checkPrivacy, checkSchedules, checkSwitch, expectedBindings, parseJsonc, reachedWorker, run, SWITCH_SQL,
 } from "../scripts/check-production-deployment.mjs";
 
 const config = parseJsonc(readFileSync(fileURLToPath(new URL("../wrangler.production.jsonc", import.meta.url)), "utf8"));
@@ -16,7 +16,7 @@ function goodView() {
     if (w.kind === "var") bindings.push({ name, type: "plain_text", text: w.text });
     else if (w.kind === "service") bindings.push({ name, type: "service", service: w.service, environment: "production" });
     else if (w.kind === "secret") bindings.push({ name, type: "secrets_store_secret", store_id: w.store_id, secret_name: w.secret_name });
-    else bindings.push({ name, type: "d1", id: w.id });
+    else bindings.push({ name, type: "d1", database_id: w.id }); // the Workers API field is database_id (id is optional)
   }
   return { resources: { bindings } };
 }
@@ -50,7 +50,7 @@ test("missing, extra and changed bindings and safety variables are refused", () 
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "OTP_RECIPIENT_MODE" ? { ...x, text: "allowlist" } : x))), expected).join(), /OTP_RECIPIENT_MODE/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "APP_NOTIFY" ? { ...x, service: "somewhere-else" } : x))), expected).join(), /must be type=service to aladdin-frontend-production[^]*service=somewhere-else/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "OTP_SIGNING_SECRET" ? { ...x, secret_name: "OTHER" } : x))), expected).join(), /must be type=secrets_store_secret/);
-  assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "IDEMPOTENCY_DB" ? { ...x, id: "other-db" } : x))), expected).join(), /D1 binding/);
+  assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "IDEMPOTENCY_DB" ? { ...x, database_id: "other-db" } : x))), expected).join(), /D1 binding/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "OTP_ENVIRONMENT" ? { ...x, text: "preview" } : x))), expected).join(), /OTP_ENVIRONMENT/);
 });
 
@@ -90,12 +90,14 @@ function fakes(over: { view?: unknown; d1?: unknown; status?: unknown; get?: (ur
   const api = async (p: string) => {
     apiPaths.push(p);
     const ev = { ...goodEvidence, ...(over.evidence ?? {}) } as any;
-    if (p.includes("/subdomain")) return ev.subdomain;
-    if (p.includes("/schedules")) return ev.schedules;
-    if (p.includes("/workers/domains")) return ev.domains;
-    if (p.startsWith("/zones?")) return ev.zones.map((z: any, i: number) => ({ id: `z${i}`, name: z.name }));
+    const one = (result: unknown) => ({ success: true, result });
+    const list = (result: any[]) => ({ success: true, result, result_info: { page: 1, per_page: 50, total_pages: 1, count: result.length, total_count: result.length } });
+    if (p.includes("/subdomain")) return one(ev.subdomain);
+    if (p.includes("/schedules")) return one(ev.schedules);
+    if (p.includes("/workers/domains")) return list(ev.domains);
+    if (p.startsWith("/zones?")) return list(ev.zones.map((z: any, i: number) => ({ id: `z${i}`, name: z.name })));
     const m = /^\/zones\/z(\d+)\/workers\/routes$/.exec(p);
-    if (m) return ev.zones[Number(m[1])].routes;
+    if (m) return list(ev.zones[Number(m[1])].routes);
     throw new Error(`unexpected api path ${p}`);
   };
   return { calls, urls, apiPaths, wrangler, get, api };
@@ -155,7 +157,9 @@ test("binding types and structured fields are validated exactly, not by substrin
   const swap = (name: string, patch: Record<string, unknown>) => checkBindings(withBinding((b) => b.map((x) => (x.name === name ? { ...x, ...patch } : x))), expected).join();
   // right values in the wrong type or the wrong field must fail
   assert.match(swap("IDEMPOTENCY_DB", { type: "kv_namespace" }), /D1 binding/);
-  assert.match(swap("IDEMPOTENCY_DB", { id: undefined, note: expected.IDEMPOTENCY_DB.id }), /D1 binding/);
+  assert.match(swap("IDEMPOTENCY_DB", { database_id: undefined, id: expected.IDEMPOTENCY_DB.id }), /database_id/); // id alone is not the API field
+  assert.match(swap("IDEMPOTENCY_DB", { id: "conflicting" }), /D1 binding/);
+  assert.equal(swap("IDEMPOTENCY_DB", { id: expected.IDEMPOTENCY_DB.id }), ""); // an agreeing optional id is fine
   assert.match(swap("OTP_SIGNING_SECRET", { type: "secret_text" }), /secrets_store_secret/);
   assert.match(swap("OTP_SIGNING_SECRET", { secret_name: undefined, store_id: "other", comment: expected.OTP_SIGNING_SECRET.secret_name }), /secrets_store_secret/);
   assert.match(swap("OTP_SIGNING_SECRET", { store_id: "other-store" }), /store/);
@@ -195,6 +199,35 @@ test("the run uses API evidence, refuses without it, and issues GET only", async
   const code = await run({ argv: [], wrangler: f2.wrangler, get: f2.get, api: null, accountId: undefined, out: (s: string) => lines.push(s), config });
   assert.equal(code, 1);
   assert.match(lines.join("\n"), /CLOUDFLARE_API_TOKEN/);
+});
+
+test("zone and route discovery follows every page and never accepts a partial list", async () => {
+  const page = (n: number, total: number, items: unknown[], totalCount: number) => ({ result: items, result_info: { page: n, per_page: 2, total_pages: total, total_count: totalCount } });
+  const paged = (pages: Record<number, any>) => async (p: string) => { const m = /[?&]page=(\d+)/.exec(p); return pages[m ? Number(m[1]) : 1]; };
+  assert.deepEqual(await listAll(paged({ 1: page(1, 2, [1, 2], 3), 2: page(2, 2, [3], 3) }), "/zones?per_page=2"), [1, 2, 3]);
+  // fewer items than total_count means a page was lost: refuse
+  await assert.rejects(listAll(paged({ 1: page(1, 2, [1, 2], 4), 2: page(2, 2, [3], 4) }), "/zones"), /partial/);
+  // zones must carry result_info, otherwise completeness cannot be proven
+  await assert.rejects(listAll(async () => ({ result: [1] }), "/zones", { requireInfo: true }), /result_info/);
+  await assert.rejects(listAll(async () => ({}), "/zones"), /no result list/);
+  // a Worker route that only exists on a later zone page makes the run FAIL (never private from partial results)
+  const info = (n: number) => ({ page: 1, per_page: 50, total_pages: 1, total_count: n });
+  const calls: string[] = [];
+  const api = async (p: string) => {
+    calls.push(p);
+    if (p.includes("/subdomain")) return { result: { enabled: false, previews_enabled: false } };
+    if (p.includes("/schedules")) return { result: { schedules: [{ cron: "* * * * *" }] } };
+    if (p.includes("/workers/domains")) return { result: [], result_info: info(0) };
+    if (p.startsWith("/zones?")) return /page=2/.test(p) ? page(2, 2, [{ id: "zB", name: "b.example" }], 3) : page(1, 2, [{ id: "zA", name: "a.example" }, { id: "zC", name: "c.example" }], 3);
+    if (p === "/zones/zB/workers/routes") return { result: [{ pattern: "b.example/otp/*", script: "aladdin-whatsapp-otp-production" }], result_info: info(1) };
+    return { result: [], result_info: info(0) };
+  };
+  const f = fakes();
+  const lines: string[] = [];
+  const code = await run({ argv: [], wrangler: f.wrangler, get: f.get, api, accountId: "acct", out: (s: string) => lines.push(s), config });
+  assert.equal(code, 1);
+  assert.match(lines.join("\n"), /route b\.example\/otp\/\* on zone b\.example/);
+  assert.ok(calls.some((c) => /page=2/.test(c)));
 });
 
 test("wrangler is run without a shell, so the D1 SQL reaches it as one argument", () => {

@@ -7323,3 +7323,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Bindings are validated by exact type and structured fields (d1, secrets_store_secret, service, plain_text), not JSON substring matching.
 - Privacy and cron are proven by read-only Cloudflare API calls (workers.dev and previews off, no custom domains, no routes in any account zone, cron equals config); needs a read-only `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`; HTTP probes are supplementary. Worker suite 202/202, tsc clean.
 - No Production writes, no deployment, no P-4 rerun, nothing promoted. WhatsApp delivery OFF.
+
+## 2026-11-07 - PR #144 final blockers (agent)
+
+- BLOCKED cause: the ruleset (`required_review_thread_resolution`) with one unresolved Codex P2 thread (Wrangler secret logging); required checks were green. Fixed in code (child env forced) and the thread is answered on the PR.
+- P-4 run assessed from Wrangler's local debug log (counts and masked structure only): request/response bodies omitted, no secret strings, sanitize unset; exposure ruled out, no rotation recommended.
+- D1 binding validated by `database_id` (API-shaped fixtures); zone/route/domain discovery paginated and refuses partial results; owner commands given for Git Bash.
+- No Production writes, deployment, merge, rotation or P-4 rerun. Delivery OFF.

@@ -95,7 +95,8 @@ export function checkBindings(view, expected) {
         p.push(`secret binding ${name} must be type=secrets_store_secret with store ${want.store_id} and secret ${want.secret_name}; found ${shape(b)}, secret_name=${b.secret_name ?? "?"}`);
       }
     } else if (want.kind === "d1") {
-      if (b.type !== "d1" || b.id !== want.id) p.push(`D1 binding ${name} must be type=d1 with id ${want.id}; found ${shape(b)}`);
+      // The Workers API names the field `database_id` (required); `id` is an optional extra and, if present, must not disagree.
+      if (b.type !== "d1" || b.database_id !== want.id || (b.id !== undefined && b.id !== want.id)) p.push(`D1 binding ${name} must be type=d1 with database_id ${want.id}; found ${shape(b)}`);
     }
   }
   for (const name of got.keys()) if (!(name in expected)) p.push(`unexpected binding ${name} on the deployed version`);
@@ -153,14 +154,37 @@ const parse = (r, what) => {
 };
 
 /** Reads the privacy and cron evidence from the Cloudflare API (GET only). api(path) resolves to the response's `result`. */
+/** Follows result_info to the LAST page and checks the item count against total_count; anything partial throws (a partial list must never read as "private").
+ *  api(path) resolves to the whole response body { result, result_info }. The first request is sent as given; later pages add &page=N. */
+export async function listAll(api, path, { requireInfo = false } = {}) {
+  const items = [];
+  for (let page = 1; page <= 500; page += 1) {
+    const r = await api(page === 1 ? path : `${path}${path.includes("?") ? "&" : "?"}page=${page}`);
+    if (!Array.isArray(r?.result)) throw new Error(`${path.split("?")[0]}: the response has no result list`);
+    items.push(...r.result);
+    const info = r.result_info;
+    if (!info) {
+      if (requireInfo) throw new Error(`${path.split("?")[0]}: no result_info, completeness cannot be proven`);
+      return items;
+    }
+    const pages = info.total_pages ?? (info.per_page ? Math.ceil(info.total_count / info.per_page) : undefined);
+    if (typeof pages !== "number" || Number.isNaN(pages)) throw new Error(`${path.split("?")[0]}: result_info has no page count`);
+    if (page >= pages) {
+      if (info.total_count !== undefined && items.length !== info.total_count) throw new Error(`${path.split("?")[0]}: collected ${items.length} of ${info.total_count} items (partial)`);
+      return items;
+    }
+  }
+  throw new Error(`${path.split("?")[0]}: too many pages`);
+}
+
 export async function collectApiEvidence(api, accountId) {
   const base = `/accounts/${accountId}/workers`;
-  const subdomain = await api(`${base}/scripts/${WORKER}/subdomain`);
-  const schedules = await api(`${base}/scripts/${WORKER}/schedules`);
-  const domains = await api(`${base}/domains?service=${WORKER}`);
-  const zoneList = await api(`/zones?account.id=${accountId}&per_page=50`);
+  const subdomain = (await api(`${base}/scripts/${WORKER}/subdomain`)).result;
+  const schedules = (await api(`${base}/scripts/${WORKER}/schedules`)).result;
+  const domains = await listAll(api, `${base}/domains?service=${WORKER}`);
+  const zoneList = await listAll(api, `/zones?account.id=${accountId}&per_page=50`, { requireInfo: true });
   const zones = [];
-  for (const z of zoneList) zones.push({ name: z.name, routes: await api(`/zones/${z.id}/workers/routes`) });
+  for (const z of zoneList) zones.push({ name: z.name, routes: await listAll(api, `/zones/${z.id}/workers/routes`) });
   return { subdomain, schedules, domains, zones };
 }
 
@@ -217,7 +241,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const r = await fetch(`https://api.cloudflare.com/client/v4${p}`, { method: "GET", headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20000) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || j.success === false) throw new Error(`Cloudflare API GET ${p.split("?")[0]} failed (HTTP ${r.status}; token needs read access)`);
-    return j.result;
+    return j;
   } : null;
   const get = async (url) => {
     const r = await fetch(url, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(20000) });

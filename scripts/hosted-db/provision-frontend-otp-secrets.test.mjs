@@ -344,3 +344,17 @@ test("checkExistingVersion is pure: ok for baseline + four names with normalized
   const f = withCandidate();
   assert.deepEqual(checkExistingVersion({ id: CAND, deployment: f.state.deployment, versions: f.state.versions, baseline: f.state.views[LIVE_VERSION], nv: f.state.views[CAND] }), []);
 });
+
+import { safeWranglerEnv, spawnWrangler } from "./provision-frontend-otp-secrets.mjs";
+
+test("the wrangler child always gets safe logging settings, even if the owner's shell sets unsafe ones", () => {
+  const e = safeWranglerEnv({ WRANGLER_LOG_SANITIZE: "false", WRANGLER_LOG: "debug", WRANGLER_SEND_METRICS: "true", KEEP: "1" });
+  assert.equal(e.WRANGLER_LOG_SANITIZE, "true");
+  assert.equal(e.WRANGLER_LOG, "log");
+  assert.equal(e.WRANGLER_SEND_METRICS, "false");
+  assert.equal(e.KEEP, "1");
+  let seen;
+  spawnWrangler(["versions", "secret", "bulk"], { input: "x" }, (cmd, args, o) => { seen = o; return { status: 0 }; }, { WRANGLER_LOG_SANITIZE: "false" });
+  assert.equal(seen.env.WRANGLER_LOG_SANITIZE, "true");
+  assert.equal(seen.input, "x");
+});
