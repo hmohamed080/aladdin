@@ -20,9 +20,10 @@ check "production uses its own bucket" "$(chk production aladdin-production-db-b
 check "the shared-bucket constant is gone" "$(grep -c HOSTED_BUCKET "$HERE/lib.sh")" 0
 
 # 2. Rule files agree with the constants, and each only touches its own project's prefixes.
-RES="$(python3 - "$HERE" <<'PY'
+R2DIR="$HERE/r2"; [ -d "$R2DIR" ] || R2DIR="$HERE/../r2"   # the built repo keeps r2/ at its root
+RES="$(python3 - "$HERE" "$R2DIR" 2>&1 <<'PY'
 import json, re, subprocess, sys
-here = sys.argv[1]
+here, r2dir = sys.argv[1], sys.argv[2]
 def const(name):
     out = subprocess.check_output(["bash", "-c", f'. "{here}/lib.sh"; echo ${name}'], env={"BACKUP_LABEL": "local-test", "PATH": "/usr/bin:/bin:/usr/local/bin"}, text=True)
     return int(out.strip())
@@ -32,7 +33,7 @@ lock = {"daily": 14, "weekly": 56, "monthly": const("DB_MONTHLY_RETENTION_DAYS")
 r2, legacy = const("R2_MEDIA_RETENTION_DAYS"), const("LEGACY_MEDIA_RETENTION_DAYS")
 bad = []
 for label in ("production", "acceptance"):
-    rules = json.load(open(f"{here}/r2/{label}/lifecycle.json"))["rules"]
+    rules = json.load(open(f"{r2dir}/{label}/lifecycle.json"))["rules"]
     other = "acceptance" if label == "production" else "production"
     seen = {}
     for r in rules:
@@ -46,13 +47,13 @@ for label in ("production", "acceptance"):
     if seen.get(f"media/{label}/supabase/") != legacy * D: bad.append(f"{label} legacy media lifecycle is not {legacy} days")
     if not any("abortMultipartUploadsTransition" in r for r in rules): bad.append(f"{label} lacks the multipart abort rule")
     if len(seen) != 5: bad.append(f"{label} has {len(seen)} expiry rules, wanted 5")
-lock_rules = json.load(open(f"{here}/r2/production/lock.json"))["rules"]
+lock_rules = json.load(open(f"{r2dir}/production/lock.json"))["rules"]
 if {r["prefix"] for r in lock_rules} != {f"db/production/{k}/" for k in want}: bad.append("production lock covers the wrong prefixes")
 for r in lock_rules:
     k = r["prefix"].split("/")[2]
     if r["condition"]["maxAgeSeconds"] != lock[k] * D: bad.append(f"lock {k} is not {lock[k]} days")
 import os
-if os.path.exists(f"{here}/r2/acceptance/lock.json"): bad.append("acceptance must not be locked (disposable trial bucket)")
+if os.path.exists(f"{r2dir}/acceptance/lock.json"): bad.append("acceptance must not be locked (disposable trial bucket)")
 if any(r["prefix"].startswith("media/") for r in lock_rules): bad.append("media copies must never be locked")
 print("\n".join(bad))
 PY
