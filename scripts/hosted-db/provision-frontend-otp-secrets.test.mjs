@@ -235,3 +235,112 @@ test("an error thrown during postflight still reports the verification and the n
   assert.match(r.text, /new-version-1/);
   noPromotion(f);
 });
+
+// ---- Regression: the P-4 production run reported assets.html_handling / not_found_handling as absent -> documented defaults ----
+import { ASSET_DEFAULTS, checkExistingVersion, normalizeRuntime } from "./provision-frontend-otp-secrets.mjs";
+
+const RT_ABSENT = { compatibility_date: "2026-10-01", compatibility_flags: ["nodejs_compat"], assets: { binding: "ASSETS" } };
+const RT_DEFAULTS = { ...RT_ABSENT, assets: { binding: "ASSETS", html_handling: "auto-trailing-slash", not_found_handling: "none" } };
+const withRuntime = (rt) => { const a = goodAfter(); a.newView.resources.script_runtime = rt; return a; };
+const baselineWith = (rt) => ({ resources: { bindings: LIVE_BINDINGS, script_runtime: rt } });
+
+test("the documented defaults are exactly these two keys", () => {
+  assert.deepEqual(ASSET_DEFAULTS, { html_handling: "auto-trailing-slash", not_found_handling: "none" });
+});
+
+test("absent asset handling equals the documented defaults, in either direction", () => {
+  assert.deepEqual(normalizeRuntime(RT_ABSENT), normalizeRuntime(RT_DEFAULTS));
+  const after = withRuntime(RT_DEFAULTS);
+  assert.deepEqual(checkPostflight({ before: beforeState, after, baseline: baselineWith(RT_ABSENT) }), []);
+  const rev = withRuntime(RT_ABSENT);
+  assert.deepEqual(checkPostflight({ before: beforeState, after: rev, baseline: baselineWith(RT_DEFAULTS) }), []);
+  const noAssets = { compatibility_date: "2026-10-01", compatibility_flags: ["nodejs_compat"] };
+  assert.deepEqual(checkPostflight({ before: beforeState, after: withRuntime(noAssets), baseline: baselineWith(noAssets) }), []);
+});
+
+test("an EXPLICIT non-default asset value is still a change", () => {
+  for (const assets of [
+    { binding: "ASSETS", html_handling: "force-trailing-slash", not_found_handling: "none" },
+    { binding: "ASSETS", html_handling: "none", not_found_handling: "none" },
+    { binding: "ASSETS", html_handling: "auto-trailing-slash", not_found_handling: "404-page" },
+    { binding: "ASSETS", html_handling: "auto-trailing-slash", not_found_handling: "single-page-application" },
+  ]) {
+    const p = checkPostflight({ before: beforeState, after: withRuntime({ ...RT_ABSENT, assets }), baseline: baselineWith(RT_ABSENT) });
+    assert.match(p.join(), /script_runtime/, JSON.stringify(assets));
+  }
+});
+
+test("only those two keys are normalized: any other runtime difference still fails", () => {
+  for (const rt of [
+    { ...RT_DEFAULTS, compatibility_date: "2030-01-01" },
+    { ...RT_DEFAULTS, compatibility_flags: [] },
+    { ...RT_DEFAULTS, assets: { ...RT_DEFAULTS.assets, binding: "OTHER" } },
+    { ...RT_DEFAULTS, assets: { ...RT_DEFAULTS.assets, run_worker_first: true } },
+    { ...RT_DEFAULTS, usage_model: "unbound" },
+  ]) {
+    assert.match(checkPostflight({ before: beforeState, after: withRuntime(rt), baseline: baselineWith(RT_ABSENT) }).join(), /script_runtime/, JSON.stringify(rt));
+  }
+});
+
+test("a different script code identity (etag or handlers) is refused", () => {
+  const live = { resources: { bindings: LIVE_BINDINGS, script_runtime: RT_ABSENT, script: { etag: "e1", handlers: ["fetch"] } } };
+  const a = goodAfter(); a.newView.resources.script_runtime = RT_DEFAULTS; a.newView.resources.script = { etag: "e1", handlers: ["fetch"] };
+  assert.deepEqual(checkPostflight({ before: beforeState, after: a, baseline: live }), []);
+  a.newView.resources.script = { etag: "e2", handlers: ["fetch"] };
+  assert.match(checkPostflight({ before: beforeState, after: a, baseline: live }).join(), /code identity/);
+  a.newView.resources.script = { etag: "e1", handlers: ["fetch", "scheduled"] };
+  assert.match(checkPostflight({ before: beforeState, after: a, baseline: live }).join(), /code identity/);
+});
+
+// ---- Read-only verification of an already created version ----
+const CAND = "3fc37397-9157-4fa6-8fce-d32dffe0a194";
+const withCandidate = (over = {}) => {
+  const f = fake();
+  f.state.views[LIVE_VERSION].resources.script_runtime = RT_ABSENT;
+  f.state.versions = [...f.state.versions, { id: CAND, number: 12 }];
+  f.state.views[CAND] = { resources: { bindings: [...LIVE_BINDINGS, ...NEW_NAMES.map((name) => ({ name, type: "secret_text" }))], script_runtime: RT_DEFAULTS } };
+  over.after?.(f.state);
+  return f;
+};
+const verify = (f, arg = `--verify-version=${CAND}`) => go(f, [arg], async () => { throw new Error("must not prompt"); });
+const onlyReads = (f) => {
+  for (const c of f.state.calls) {
+    assert.ok(!c.args.includes("bulk") && !c.args.includes("deploy") && !c.args.includes("rollback") && !c.args.includes("put") && !c.args.includes("delete"), c.args.join(" "));
+    assert.ok(!c.hasInput, "no stdin");
+  }
+};
+
+test("--verify-version verifies an existing version read-only (the real P-4 shape passes)", async () => {
+  const f = withCandidate();
+  const r = await verify(f);
+  assert.equal(r.code, 0, r.text);
+  assert.match(r.text, /VERIFIED \(read-only\)/);
+  assert.match(r.text, /NOT deployed/);
+  onlyReads(f);
+});
+
+test("--verify-version refuses: candidate deployed, another newer version, live not alone, lost binding, unknown id", async () => {
+  const deployedCand = withCandidate({ after: (s) => { s.deployment = { id: "d", versions: [{ version_id: CAND, percentage: 100 }] }; } });
+  assert.equal((await verify(deployedCand)).code, 1);
+  const two = withCandidate({ after: (s) => { s.versions.push({ id: "another", number: 13 }); } });
+  assert.match((await verify(two)).text, /versions newer than the live one/);
+  const split = withCandidate({ after: (s) => { s.deployment = { id: "d", versions: [{ version_id: LIVE_VERSION, percentage: 90 }, { version_id: CAND, percentage: 10 }] }; } });
+  assert.equal((await verify(split)).code, 1);
+  const lost = withCandidate({ after: (s) => { s.views[CAND].resources.bindings = s.views[CAND].resources.bindings.filter((b) => b.name !== "RESEND_API_KEY"); } });
+  assert.match((await verify(lost)).text, /RESEND_API_KEY was LOST/);
+  const unknown = withCandidate();
+  assert.equal((await verify(unknown, "--verify-version=00000000-0000-0000-0000-000000000000")).code, 1);
+  for (const f of [deployedCand, two, split, lost]) onlyReads(f);
+});
+
+test("--verify-version needs a full uuid and cannot be combined with --apply", async () => {
+  const f = withCandidate();
+  assert.equal((await go(f, ["--verify-version=3fc37397"], async () => "x")).code, 2);
+  assert.equal((await go(f, ["--apply", `--verify-version=${CAND}`], async () => "x")).code, 2);
+  assert.equal(f.state.calls.length, 0, "refused before any call");
+});
+
+test("checkExistingVersion is pure: ok for baseline + four names with normalized defaults", () => {
+  const f = withCandidate();
+  assert.deepEqual(checkExistingVersion({ id: CAND, deployment: f.state.deployment, versions: f.state.versions, baseline: f.state.views[LIVE_VERSION], nv: f.state.views[CAND] }), []);
+});

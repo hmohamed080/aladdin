@@ -89,6 +89,38 @@ export function checkEntries(values, grantFp = GRANT_KEY_FP12) {
   return { problems, fps };
 }
 
+/**
+ * Cloudflare documents these two asset defaults. A version that was created by patching another one reports them
+ * explicitly ("auto-trailing-slash", "none") where the source version simply omits them. They are the SAME configuration, so
+ * ONLY these two keys are normalized (absent == the documented default); any explicit different value, and every other
+ * runtime key, still counts as a change.
+ */
+export const ASSET_DEFAULTS = { html_handling: "auto-trailing-slash", not_found_handling: "none" };
+export function normalizeRuntime(rt) {
+  if (!rt || typeof rt !== "object") return rt;
+  const assets = { ...(rt.assets && typeof rt.assets === "object" ? rt.assets : {}) };
+  for (const [k, v] of Object.entries(ASSET_DEFAULTS)) if (assets[k] === undefined) assets[k] = v;
+  return { ...rt, assets };
+}
+
+/** Contents of a candidate version against the live baseline: bindings, runtime settings, script identity. */
+export function checkNewVersionContents({ baseline, nv }) {
+  const p = [];
+  const oldB = new Map((baseline.resources?.bindings ?? []).map((b) => [b.name, b]));
+  const newB = new Map((nv.resources?.bindings ?? []).map((b) => [b.name, b]));
+  for (const [n, b] of oldB) {
+    if (!newB.has(n)) p.push(`binding ${n} was LOST`);
+    else if (!same(b, newB.get(n))) p.push(`binding ${n} CHANGED`);
+  }
+  const extra = [...newB.keys()].filter((n) => !oldB.has(n)).sort();
+  if (!same(extra, [...NEW_NAMES].sort())) p.push(`new bindings are [${extra.join(", ")}], expected exactly [${[...NEW_NAMES].sort().join(", ")}]`);
+  for (const n of NEW_NAMES) if (newB.has(n) && newB.get(n).type !== "secret_text") p.push(`${n} is not a secret_text binding`);
+  if (!same(normalizeRuntime(nv.resources?.script_runtime), normalizeRuntime(baseline.resources?.script_runtime))) p.push("the runtime settings (script_runtime) changed");
+  const id = (v) => ({ etag: v.resources?.script?.etag, handlers: v.resources?.script?.handlers });
+  if (!same(id(nv), id(baseline))) p.push("the script code identity (etag or handlers) differs from the live version");
+  return p;
+}
+
 /** after = { deployment, versions, newView }. */
 export function checkPostflight({ before, after, baseline, live = LIVE_VERSION }) {
   const p = [];
@@ -101,17 +133,30 @@ export function checkPostflight({ before, after, baseline, live = LIVE_VERSION }
   const nv = after.newView;
   if (added.length === 1 && dv.some((v) => v.version_id === added[0].id)) p.push("the new version is in the deployment");
   if (!nv) { p.push("could not read the new version"); return p; }
-  const oldB = new Map((baseline.resources?.bindings ?? []).map((b) => [b.name, b]));
-  const newB = new Map((nv.resources?.bindings ?? []).map((b) => [b.name, b]));
-  for (const [n, b] of oldB) {
-    if (!newB.has(n)) p.push(`binding ${n} was LOST`);
-    else if (!same(b, newB.get(n))) p.push(`binding ${n} CHANGED`);
+  return [...p, ...checkNewVersionContents({ baseline, nv })];
+}
+
+/**
+ * READ-ONLY verification of an ALREADY CREATED version (no `before` snapshot exists): the live version is still alone at 100%,
+ * the candidate is not deployed and is the ONLY version newer than the live one, and its contents are baseline + the four names.
+ */
+export function checkExistingVersion({ id, deployment, versions, baseline, nv, live = LIVE_VERSION }) {
+  const p = [];
+  const dv = deployment?.versions ?? [];
+  if (dv.length !== 1 || dv[0].version_id !== live || dv[0].percentage !== 100) p.push(`the deployment is not exactly ${live} at 100%`);
+  if (dv.some((v) => v.version_id === id)) p.push("the candidate version IS in the deployment");
+  if (id === live) p.push("the candidate is the live version");
+  const list = Array.isArray(versions) ? versions : [];
+  const liveNo = list.find((v) => v.id === live)?.number;
+  const cand = list.find((v) => v.id === id);
+  if (liveNo === undefined) p.push("the live version is not in the version list");
+  if (!cand) p.push(`${id} is not in the version list`);
+  if (liveNo !== undefined) {
+    const newer = list.filter((v) => v.number > liveNo).map((v) => v.id);
+    if (newer.length !== 1 || newer[0] !== id) p.push(`versions newer than the live one are [${newer.join(", ")}], expected exactly [${id}]`);
   }
-  const extra = [...newB.keys()].filter((n) => !oldB.has(n)).sort();
-  if (!same(extra, [...NEW_NAMES].sort())) p.push(`new bindings are [${extra.join(", ")}], expected exactly [${[...NEW_NAMES].sort().join(", ")}]`);
-  for (const n of NEW_NAMES) if (newB.has(n) && newB.get(n).type !== "secret_text") p.push(`${n} is not a secret_text binding`);
-  if (!same(nv.resources?.script_runtime, baseline.resources?.script_runtime)) p.push("the runtime settings (script_runtime) changed");
-  return p;
+  if (!nv) { p.push("could not read the candidate version"); return p; }
+  return [...p, ...checkNewVersionContents({ baseline, nv })];
 }
 
 const parse = (r, what) => {
@@ -153,8 +198,12 @@ export function verifyAfterFailure({ read, before, live }) {
 
 export async function run({ argv, wrangler, hidden, out, ci = false, isTTY = true, live = LIVE_VERSION }) {
   const apply = argv.includes("--apply");
-  const bad = argv.filter((a) => a !== "--apply");
+  const verifyArg = argv.find((a) => a.startsWith("--verify-version="));
+  const bad = argv.filter((a) => a !== "--apply" && a !== verifyArg);
   if (bad.length) { out(`unexpected argument: ${bad[0]}`); return 2; }
+  if (apply && verifyArg) { out("--apply and --verify-version cannot be combined"); return 2; }
+  const verifyId = verifyArg ? verifyArg.slice("--verify-version=".length) : null;
+  if (verifyArg && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(verifyId)) { out("--verify-version needs a full version id (uuid)"); return 2; }
   const secrets = [];
   let maybeWrote = false; // set just before the write: from then on, an unexpected error must be followed by a read-only look
   let ctx = null;
@@ -163,6 +212,20 @@ export async function run({ argv, wrangler, hidden, out, ci = false, isTTY = tru
     if (apply && ci) return refuse("REFUSED: never in CI");
     if (apply && !isTTY) return refuse("REFUSED: an interactive terminal is required (hidden prompts)");
 
+    if (verifyId) {
+      // READ-ONLY: verify a version that already exists. Creates nothing, prompts for nothing, promotes nothing.
+      out(`[verify] read-only check of version ${verifyId} against live ${live.slice(0, 8)}`);
+      const deployment = parse(wrangler(["deployments", "status", "--env", WORKER_ENV, "--json"]), "deployments status");
+      const versions = parse(wrangler(["versions", "list", "--env", WORKER_ENV, "--json"]), "versions list");
+      const baseline = parse(wrangler(["versions", "view", live, "--env", WORKER_ENV, "--json"]), "versions view (live)");
+      const nv = parse(wrangler(["versions", "view", verifyId, "--env", WORKER_ENV, "--json"]), "versions view (candidate)");
+      const probs = checkExistingVersion({ id: verifyId, deployment, versions, baseline, nv, live });
+      if (probs.length) return refuse(["VERIFICATION FAILED:", ...probs.map((x) => `  - ${x}`)].join("\n"));
+      out(`VERIFIED (read-only): ${verifyId} is NOT deployed; the live version ${live.slice(0, 8)} is alone at 100%; it is the only version newer than live; ` +
+        `all ${baseline.resources.bindings.length} existing bindings are identical; exactly the 4 new secret_text bindings were added (${NEW_NAMES.join(", ")}); ` +
+        "script code identity and runtime settings are identical (documented asset defaults normalized).");
+      return 0;
+    }
     const read = () => ({
       deployment: parse(wrangler(["deployments", "status", "--env", WORKER_ENV, "--json"]), "deployments status"),
       versions: parse(wrangler(["versions", "list", "--env", WORKER_ENV, "--json"]), "versions list"),
