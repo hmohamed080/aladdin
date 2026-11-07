@@ -7330,3 +7330,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - P-4 run assessed from Wrangler's local debug log (counts and masked structure only): request/response bodies omitted, no secret strings, sanitize unset; exposure ruled out, no rotation recommended.
 - D1 binding validated by `database_id` (API-shaped fixtures); zone/route/domain discovery paginated and refuses partial results; owner commands given for Git Bash.
 - No Production writes, deployment, merge, rotation or P-4 rerun. Delivery OFF.
+
+## 2026-11-07 - P-6 recorded complete; P-7 prepared (agent)
+
+- Recorded P-6 (private OTP Worker version `4415c515`) with the owner's independent Cloudflare API evidence and an agent read-only re-check (config, one version at 100%, bindings, D1 switch tables empty, frontend `a3b08a22` still alone at 100%).
+- Verified `main` (`5861d879`) contains the integration branch, #143 and #144 with green CI. Found: `CLOUDFLARE_PRODUCTION_ENABLED=false`, no required reviewer on `cloudflare-production`, Acceptance preview on an older build (`47d4fe0b`).
+- Added `scripts/hosted-db/verify-frontend-upload.mjs` (+7 tests): read-only post-upload check of secrets and bindings by name and type; checklist now has the A to D execution sequence, L3/L4/P-7a tests and rollback.
+- No upload, deployment, merge, promotion, WhatsApp enablement or Production data change.

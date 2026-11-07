@@ -83,7 +83,7 @@ No already-applied file or history row is modified. `migration-policy` accepts t
 | **P-3** | `wrangler d1 migrations apply aladdin-whatsapp-otp-production --remote` (records `0001` as a no-op, applies `0002`, `0003`) | `node scripts/d1-baseline-check.mjs aladdin-whatsapp-otp-production` reports `current`; 0 rows everywhere (no switch row = OFF) | additive and idempotent, tables empty: leave them |
 | **P-4** | **COMPLETED 2026-11-07 (owner ran `--apply`): undeployed version `3fc37397-9157-4fa6-8fce-d32dffe0a194`; the live frontend `a3b08a22` is still alone at 100%. Verified read-only with `node scripts/hosted-db/provision-frontend-otp-secrets.mjs --verify-version=3fc37397-9157-4fa6-8fce-d32dffe0a194` (and independently by the owner against Cloudflare): not deployed, the only version newer than live, all 18 existing bindings identical, exactly the 4 new `secret_text` bindings, script etag and handlers identical, runtime identical after normalizing two documented asset defaults. Do NOT run `--apply` again.** How it is done: owner runs `node scripts/hosted-db/provision-frontend-otp-secrets.mjs` (read-only preflight), then `... --apply`. It creates **ONE undeployed frontend version (0% of traffic)** carrying `PHONE_OTP_ADMIN_SECRET`, `PHONE_OTP_NOTIFY_SECRET`, `PHONE_OTP_WORKER_SECRET` (each the SAME value as its Secrets Store twin `OTP_ADMIN_SIGNING_SECRET_PRODUCTION`, `OTP_NOTIFY_SIGNING_SECRET_PRODUCTION`, `PHONE_OTP_WORKER_SECRET_PRODUCTION`) and `PHONE_OTP_WORKER_URL` = placeholder `https://aladdin-whatsapp-otp.internal/v1/otp/send`, using `wrangler versions secret bulk` fed through **stdin** from hidden prompts (nothing on disk, in a command line, an environment variable or a log). **Never** `wrangler secret put` (it deploys immediately), never `OTP_ADMIN_GRANT_SECRET*` on the frontend. Leave `PHONE_VERIFICATION_ENABLED`, `PHONE_SIGNUP_VERIFICATION_ENABLED`, `PHONE_OTP_DELIVERY`, `PHONE_OTP_HMAC_KEYS` unset. | the script's postflight: deployment unchanged (the live version still alone at 100%), exactly one new version not in the deployment, its bindings = the live version's plus exactly the 4 new names (every other secret, var and service binding deep-equal, runtime settings unchanged). Independently: `wrangler deployments status --env production`, `wrangler versions view <new id> --env production` | nothing live changes, so nothing to undo: ignore the version (versions are inert until deployed). To drop the names anyway: `wrangler versions secret delete <NAME> --env production` (another undeployed version). Live rollback is always `wrangler rollback --env production`. |
 | **P-5** | `node edge/whatsapp-otp-worker/scripts/check-production-config.mjs` (PASS) and `wrangler deploy -c wrangler.production.jsonc --dry-run`: 5 Secrets Store bindings, `IDEMPOTENCY_DB`, `APP_NOTIFY`, cron `* * * * *`, no routes | PASS and that binding list | none (nothing uploaded) |
-| **P-6** | Owner deploys the **private** Production Worker (delivery OFF): from `edge/whatsapp-otp-worker`, `pnpm exec wrangler deploy -c wrangler.production.jsonc`. It must exist before any frontend version is uploaded or deployed. | **read-only:** `node edge/whatsapp-otp-worker/scripts/check-production-deployment.mjs` (see P-6 details). **Not** `worker-preflight.mjs`: it needs a public URL and assumes allowlist mode, and this Worker is private with recipient mode `open`. The authenticated runtime probe is P-7a, after the frontend upload. | before a frontend binds to it: `wrangler delete aladdin-whatsapp-otp-production` (nothing depends on it yet). Afterwards: roll back to the previous version, never delete. |
+| **P-6 COMPLETED 2026-11-07** (version `4415c515-cfe9-4e85-b2e5-1e5852ad8cc0`; see "P-6 result") | Owner deployed the **private** Production Worker (delivery OFF): from `edge/whatsapp-otp-worker`, `pnpm exec wrangler deploy -c wrangler.production.jsonc`. It must exist before any frontend version is uploaded or deployed. | **read-only:** `node edge/whatsapp-otp-worker/scripts/check-production-deployment.mjs` (see P-6 details). **Not** `worker-preflight.mjs`: it needs a public URL and assumes allowlist mode, and this Worker is private with recipient mode `open`. The authenticated runtime probe is P-7a, after the frontend upload. | before a frontend binds to it: `wrangler delete aladdin-whatsapp-otp-production` (nothing depends on it yet). Afterwards: roll back to the previous version, never delete. |
 | **P-8** | After Phase 2: Super Admin initialises limits **150 / 5,000 / 70 / 90** on `/admin/whatsapp-otp` (typed ceiling confirmation, reason). Needs P-1 and the new frontend. | limits and one audit row shown; **the Sending switch stays OFF and disabled** (`environment_not_permitted`) | audited setting: change it through the page |
 | **P-9** | G-NOTIFY: "Test the alert connection" on the Admin page; confirm the attestation cron (section 6); review Security Events | probe reachable; `delivery_attestation_age` 0 to 120 s; no `whatsapp_otp_attestation_failed` lines | none |
 
@@ -148,6 +148,73 @@ Run it from the owner's machine: dry run first (`node provision-grant-key-produc
 | **P-7a** (L4a) | Production, **uploaded version via the override header**, after P-6 | **authenticated runtime probe through the private service binding:** a Super Admin opens `/admin/whatsapp-otp`; the "Sending service" panel (the signed `/v1/admin/usage` answer) must show environment `production`, recipient mode `open`, the delivery permit `false`, no switch row, and the expected bindings present (never a value). "Test the alert connection" must succeed. A 401 means a secret mismatch; an `unavailable` message means the `OTP_WORKER` binding or `PHONE_OTP_WORKER_URL` is missing on that version. Read-only; do not switch anything ON. | owner, in a browser with the override header |
 | L5 | after promotion | repeat L3/L4 without the header within minutes; keep the previous version id ready for rollback | owner |
 
+### P-6 result (recorded 2026-11-07)
+
+- **Deployed by the owner:** `aladdin-whatsapp-otp-production`, version `4415c515-cfe9-4e85-b2e5-1e5852ad8cc0`, delivery OFF (`WHATSAPP_DELIVERY_ENABLED="false"`).
+- **Owner's local `check-production-deployment.mjs`:** every check passed except the one that needs Cloudflare API credentials (not set in that shell).
+- **Owner's independent Cloudflare API verification:** private routing (no workers.dev, no routes, no custom domains), preview URLs disabled, bindings correct, cron registered, the live frontend unchanged, D1 switch tables empty, delivery OFF.
+- **Agent read-only re-check (no credentials):** configuration file, one version at 100%, deployed bindings equal to `wrangler.production.jsonc`, D1 `otp_delivery_switch`/`otp_delivery_audit`/`otp_delivery_attestation` = 0 and `otp_alert_state` = 1: all ok. Frontend: `a3b08a22` alone at 100%; newest version is the undeployed P-4 version `3fc37397`.
+
+### P-7 prerequisites (read-only, verified 2026-11-07)
+
+| Prerequisite | Result |
+|---|---|
+| `main` holds the integrated OTP, registration, authentication and UI changes | **yes:** `main` = `5861d879`; `integration/otp-main-20261107` (`a54bdf95`), #143 (`de64476a`) and #144 are ancestors; CI on `main` is green. #137, #140 and #142 stay out by decision. |
+| `frontend-upload` stage is on `main` and runs only from `main` | yes (`if: github.ref == 'refs/heads/main'`); it also requires the private OTP Worker (now deployed) and the backend Worker |
+| Upload switch | **closed:** `CLOUDFLARE_PRODUCTION_ENABLED=false` in the `cloudflare-production` environment; without it every stage only builds |
+| Reviewer on the `cloudflare-production` environment | **none configured** (this document said "owner reviewer"): the `workflow_dispatch` run starts without an approval prompt. Recommended: add the owner as a required reviewer before enabling. |
+| Acceptance preview build (L1/L2) | **older than `main`:** `aladdin-frontend-preview` was last uploaded from run `47d4fe0b` (2026-11-05). L1/L2 need `main`'s build on the preview first (`cloudflare-preview` environment: enabled, `main` is an allowed branch, Acceptance only). |
+| Hosted Acceptance E2E (L1) | `hosted-acceptance-e2e.yml` already signs in through the one-field `/auth/sign-in` form and checks `/installer/sign-in`; the three test-account secrets exist in `acceptance-e2e` |
+| Post-upload verification of secrets and bindings | **new, read-only:** `scripts/hosted-db/verify-frontend-upload.mjs --version=<id>` (7 tests; also run against real Production data, where it correctly refuses the P-4 version as "not a new upload") |
+
+### P-7 owner-approved execution sequence (Git Bash, repository root; every step needs its own approval)
+
+**A. Acceptance (L1/L2), no Production resource involved**
+
+```bash
+gh workflow run cloudflare-frontend-preview.yml --ref main          # A1: main's build to the Acceptance preview
+gh run watch                                                         # wait for green
+gh workflow run hosted-acceptance-e2e.yml --ref main                # A2: L1, read-only sign-in of the 3 test accounts
+gh run watch
+```
+
+A3 (L2, owner, manual, on `https://aladdin-frontend-preview.bstalent9.workers.dev`): Google, Facebook, legacy phone number, username, forgot password, sign out; `/installer/*` and `/showroom/*` redirect to `/auth/*`; no account is created. Any failure stops the rollout.
+
+**B. Production upload only (0% of traffic)**
+
+```bash
+gh variable set CLOUDFLARE_PRODUCTION_ENABLED --env cloudflare-production --body true     # B0: the only switch (add a required reviewer first)
+gh workflow run cloudflare-production.yml --ref main -f stage=frontend-upload              # B1: new version, not deployed
+gh run watch                                                                               # the run summary prints the version id
+gh variable set CLOUDFLARE_PRODUCTION_ENABLED --env cloudflare-production --body false    # B2: close the switch again
+node scripts/hosted-db/verify-frontend-upload.mjs --version=<UPLOADED_VERSION_ID>          # B3: read-only; stop if it says REFUSED
+```
+
+B3 proves: all P-4 secrets kept and nothing lost (names and types; values cannot be read), the four `PHONE_OTP_*` secrets present, plain variables equal to live, `BACKEND`/`WORKER_SELF_REFERENCE`/assets/images unchanged, exactly one new binding (`OTP_WORKER` to `aladdin-whatsapp-otp-production`), no `PHONE_`/`WHATSAPP_`/`OTP_` plain switch, the live version still alone at 100% and the upload at 0%.
+
+**C. Production tests of the uploaded version (override header; delivery stays OFF; no sign-up, no data change)**
+
+```bash
+V=<UPLOADED_VERSION_ID>; H="Cloudflare-Workers-Version-Overrides: aladdin-frontend-production=\"$V\""
+curl -s -o /dev/null -w '%{http_code}\n' -H "$H" https://aladdindecore.com/auth/sign-in                               # L4: 200
+curl -s -o /dev/null -w '%{http_code}\n' -H "$H" https://aladdindecore.com/auth/sign-up                               # L4: 200
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H "$H" https://aladdindecore.com/api/internal/whatsapp-otp/delivery-attest   # L4: 401 (not 404/500)
+```
+
+- **L3 (owner, browser with a header extension and CAPTCHA):** sign in with an owner-designated existing Production account by email, username and legacy phone number.
+- **P-7a (owner, same browser and header):** as Super Admin open `/admin/whatsapp-otp`. "Sending service" must show environment `production`, recipient mode `open`, permit `false`, no switch row; "Test the alert connection" must succeed. 401 = secret mismatch; "unavailable" = missing `OTP_WORKER` binding or `PHONE_OTP_WORKER_URL`. Do not switch anything ON.
+- **Stop conditions:** any failure in A, B3, L3, L4 or P-7a. Nothing has been promoted; leave the version at 0%.
+
+**D. Promotion (separate approval), then L5 and rollback**
+
+```bash
+(cd frontend && pnpm exec wrangler versions deploy <UPLOADED_VERSION_ID>@100% --env production)   # D1: goes live
+# L5: repeat L3/L4 without the header within minutes. The cron attestation noise (app_404) should stop within a minute.
+# ROLLBACK, if anything is wrong:
+(cd frontend && pnpm exec wrangler rollback a3b08a22-f82e-4851-9786-9442c01e43c8 --env production -m "rollback P-7")
+```
+
+Rollback never touches the OTP Worker or D1 (delivery is OFF); never `wrangler delete` the frontend. Before promotion there is nothing to roll back.
 ## 6. Expected ON/OFF behaviour and monitoring
 
 | Condition | Result |
@@ -174,11 +241,11 @@ There is **no automated paging** today: the events are searchable but nobody is 
 
 ## 7. First Production step, rollback, remaining blockers
 
-**Done in Production so far (owner-run, all with delivery OFF):** P-2 (203 migrations applied), P-1 (grant key, fingerprint `f52afdd8b900`), P-3 (D1 current, switch tables empty), P-4 (undeployed frontend version `3fc37397-9157-4fa6-8fce-d32dffe0a194` with the three `PHONE_OTP_*` secrets and the placeholder URL; the live frontend `a3b08a22` is still alone at 100%). **Next step (for separate approval): P-6**, `pnpm exec wrangler deploy -c wrangler.production.jsonc` from `edge/whatsapp-otp-worker`, then `check-production-deployment.mjs` (with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` set to a read-only token). It is the first Production deployment of anything; no user-facing change happens before P-7 and its gate.
+**Done in Production so far (owner-run, all with delivery OFF):** P-2 (203 migrations applied), P-1 (grant key, fingerprint `f52afdd8b900`), P-3 (D1 current, switch tables empty), P-4 (undeployed frontend version `3fc37397-9157-4fa6-8fce-d32dffe0a194` with the three `PHONE_OTP_*` secrets and the placeholder URL; the live frontend `a3b08a22` is still alone at 100%). P-6 (private OTP Worker `4415c515-cfe9-4e85-b2e5-1e5852ad8cc0`, verified; see "P-6 result"). **Next step (for separate approval): P-7**, steps A to D in "P-7 owner-approved execution sequence". No user-facing change happens before D1.
 
 **Rollback summary:** P-2 is additive: forward-fix with a new migration, or restore from the P-0b snapshot (hours, loses writes since the snapshot); P-1 delete one row; P-3 leave empty tables; P-4 nothing live changes (ignore the undeployed version); P-6 delete the new Worker (before the frontend binds to it); frontend: uploaded versions serve 0% until promoted, and `wrangler rollback --env production` returns to `a3b08a22`.
 
-**Remaining blockers:** (1) approval of P-6 and its read-only verification; (2) owner approval to merge to `main` (the `frontend-upload` stage and the Cloudflare workflow run only from `main`); (3) the hosted login gate L1 to L5 and the P-7a runtime probe before any frontend promotion (section 5); (4) P-8 limits initialisation and P-9 alert-connection and attestation checks after promotion; (5) alert recipients and A10, which block only live activation.
+**Remaining blockers (checked 2026-11-07):** (1) `CLOUDFLARE_PRODUCTION_ENABLED` is `false` (owner switch, step B0) and the `cloudflare-production` environment has no required reviewer; (2) the Acceptance preview runs an older build, so L1/L2 need step A1 first; (3) the hosted login gate L1 to L5 and the P-7a runtime probe before any promotion; (4) P-8 limits initialisation and P-9 alert-connection and attestation checks after promotion; (5) alert recipients and A10, which block only live activation. Resolved: `main` holds the integrated build (`5861d879`), P-6 is done and verified.
 
 ## 8. A10 and activation (not part of this checklist)
 
