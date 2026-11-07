@@ -108,7 +108,9 @@ for b in "" PRODUCTION_BACKUP_ENABLED=true; do for r in "" PRODUCTION_RESTORE_SC
 done; done
 check "restore: an unknown event is refused" "$(rest EVENT=push)" ERROR
 # The workflow must use that decision, and nothing else, to start the restore job; isolation settings stay as they were.
-W="$HERE/workflows/restore-test.yml"
+# The kit lives in ops/backups/ (workflows/) here and in backup/ (workflows at ../.github/workflows) in the backup repo.
+WDIR="$HERE/workflows"; [ -d "$WDIR" ] || WDIR="$HERE/../.github/workflows"
+W="$WDIR/restore-test.yml"
 check "restore workflow: the control job and the restore job both wait for the plan" "$(grep -c "needs.plan.outputs.run == 'true'" "$W")" 2
 check "restore workflow: no inline vars.PRODUCTION_BACKUP_ENABLED shortcut" "$(grep -c "if:.*vars.PRODUCTION_BACKUP_ENABLED" "$W")" 0
 # shellcheck disable=SC2016

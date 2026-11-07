@@ -66,6 +66,7 @@ jobs:
         id: control
         run: python3 backup/runtime-schedule.py
       - name: Claim run
+        if: steps.control.outputs.run == 'true'
         run: python3 backup/report-run.py
 
   restore:

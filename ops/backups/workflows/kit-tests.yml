@@ -1,0 +1,47 @@
+# The kit's own offline tests, run in the backup repo itself (no secrets, no environments, read-only token).
+# They prove the scripts, the schedule gate, the retention contract and the credential isolation of the other
+# workflows without touching any bucket or database. Paths are the backup repo's layout (backup/).
+name: Kit tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: kit-tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  kit-tests:
+    name: kit-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: false
+      - name: actionlint (workflows)
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -color .github/workflows/*.yml
+      - name: shellcheck (scripts)
+        run: shellcheck -S warning backup/*.sh
+      - name: Schedule, Production gate and target checks
+        run: bash backup/plan-test.sh
+      - name: Retention contract
+        run: bash backup/retention-test.sh
+      - name: Wrong-target guards stop before any tool runs
+        run: bash backup/target-guard-test.sh
+      - name: Credential isolation (service-role key never next to the age restore identity)
+        run: python3 backup/workflow-isolation-test.py
+      - name: Runtime schedule (pauses, overrides, slot dates)
+        run: python3 backup/runtime-schedule-test.py
+      - name: Run ledger bridge (claims, completion, cancellation, refusals)
+        run: python3 backup/report-run-test.py
+      - name: Restore stack pin and strict Auth/Storage guard
+        run: bash backup/restore-pin-test.sh
+      - name: Media record validator
+        run: python3 backup/media-record-test.py
+      - name: Request photos and verification documents are always required
+        run: python3 backup/r2-new-namespaces-test.py

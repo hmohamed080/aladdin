@@ -88,6 +88,7 @@ jobs:
         id: control
         run: python3 backup/runtime-schedule.py
       - name: Claim run
+        if: steps.control.outputs.run == 'true'
         run: python3 backup/report-run.py
 
   # No secrets here: only turns the control job's per-label answers into the list of labels that may run

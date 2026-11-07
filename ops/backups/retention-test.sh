@@ -72,7 +72,8 @@ check "a hosted label refuses VERIFY_NOW" "$( ( export BACKUP_LABEL=production V
 check "a garbage date fails closed" "$( ( export BACKUP_LABEL=local-test; . "$HERE/lib.sh"; outside_media_guarantee r2 notadate ) >/dev/null 2>&1 && echo ran || echo refused)" refused
 
 # 4. The README states the window.
-check "README states the 59-day guaranteed window" "$(grep -c '59 days' "$HERE/README.md" | awk '{print ($1>0)?"yes":"no"}')" yes
+README="$HERE/README.md"; [ -f "$README" ] || README="$HERE/../README.md"
+check "README states the 59-day guaranteed window" "$(grep -c '59 days' "$README" | awk '{print ($1>0)?"yes":"no"}')" yes
 
 echo "retention-test: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

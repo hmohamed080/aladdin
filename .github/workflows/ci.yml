@@ -182,6 +182,10 @@ jobs:
         run: bash ops/backups/target-guard-test.sh
       - name: Credential isolation (service-role key never next to the age restore identity)
         run: python3 ops/backups/workflow-isolation-test.py
+      - name: Runtime schedule (pauses, overrides, slot dates)
+        run: python3 ops/backups/runtime-schedule-test.py
+      - name: Run ledger bridge (claims, completion, cancellation, refusals)
+        run: python3 ops/backups/report-run-test.py
       - name: Restore stack pin and strict Auth/Storage guard
         run: bash ops/backups/restore-pin-test.sh
       - name: The built backup repo holds the whole kit

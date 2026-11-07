@@ -18,6 +18,8 @@ import sys
 import yaml
 
 HERE = pathlib.Path(__file__).resolve().parent
+# Source layout: ops/backups/workflows. Backup-repo layout: backup/ next to ../.github/workflows.
+WF = HERE / "workflows" if (HERE / "workflows").is_dir() else HERE.parent / ".github" / "workflows"
 SERVICE = "SUPABASE_SERVICE_ROLE_KEY"
 AGE = "AGE_RESTORE_TEST_IDENTITY"
 OTHER_SECRETS = re.compile(r"secrets\.(R2_[A-Z_]+|BACKUP_DB_URL|AGE_[A-Z_]+|RESEND_API_KEY)")
@@ -35,7 +37,7 @@ def secrets_in(node):
 
 
 total_service_jobs = 0
-for path in sorted((HERE / "workflows").glob("*.yml")):
+for path in sorted(WF.glob("*.yml")):
     doc = yaml.safe_load(path.read_text())
     text = path.read_text()
     check("secrets: inherit" not in text, f"{path.name}: no `secrets: inherit`")
@@ -58,15 +60,18 @@ for path in sorted((HERE / "workflows").glob("*.yml")):
 check(total_service_jobs >= 3, f"service-role key is used by the control jobs and the reconciler only ({total_service_jobs} jobs)")
 
 # The reconciler reads job names; they must exist exactly as report-run.py looks them up.
-daily = yaml.safe_load((HERE / "workflows/daily-backup.yml").read_text())["jobs"]
-restore = yaml.safe_load((HERE / "workflows/restore-test.yml").read_text())["jobs"]
+daily = yaml.safe_load((WF / "daily-backup.yml").read_text())["jobs"]
+restore = yaml.safe_load((WF / "restore-test.yml").read_text())["jobs"]
 src = (HERE / "report-run.py").read_text()
-check("name: control (${{ matrix.label }})" in (HERE / "workflows/daily-backup.yml").read_text() and "f'control ({label})'" in src,
+check("name: control (${{ matrix.label }})" in (WF / "daily-backup.yml").read_text() and "f'control ({label})'" in src,
       "report-run.py finds the backup's control job by the name the workflow gives it")
-check("name: restore-control (" in (HERE / "workflows/restore-test.yml").read_text() and "f'restore-control ({label})'" in src,
+check("name: restore-control (" in (WF / "restore-test.yml").read_text() and "f'restore-control ({label})'" in src,
       "report-run.py finds the restore's control job by the name the workflow gives it")
 check("Claim run" in [s.get("name") for s in daily["control"]["steps"]] and "Claim run" in [s.get("name") for s in restore["restore-control"]["steps"]],
       "both control jobs have the `Claim run` step the reconciler looks for")
+claims = [next(x for x in job["steps"] if x.get("name") == "Claim run") for job in (daily["control"], restore["restore-control"])]
+check(all(x.get("if") == "steps.control.outputs.run == 'true'" for x in claims),
+      "a run is claimed only when the schedule decision is true (a paused or not-due poll leaves no ledger row)")
 check("Verify complete coverage" in [s.get("name") for s in daily["backup"]["steps"]] and "Verify complete coverage" in [s.get("name") for s in restore["restore"]["steps"]],
       "both data jobs end with `Verify complete coverage`")
 # The data jobs are gated on their control job and fail closed when it fails or does not authorize.
