@@ -19,25 +19,25 @@ Take the verified Acceptance result (real OTP delivered, code verified, single-u
 ## Production Worker and app configuration
 | Item | Production value | Note |
 |---|---|---|
-| Worker | `aladdin-whatsapp-otp-production`, workers.dev only, no zone routes | separate deployment, never a rename of the preview Worker |
+| Worker | `aladdin-whatsapp-otp-production`, **private** (no workers.dev address, no preview URLs, no routes); reached only through the Production frontend's service binding `OTP_WORKER` | separate deployment, never a rename of the preview Worker; decision of 2026-11-04 |
 | D1 | new `aladdin-whatsapp-otp-production`, migrations `0001` and the settings migration | never the Acceptance database `da65d5e4-...` |
 | Vars | `OTP_ENVIRONMENT=production`, `OTP_RECIPIENT_MODE=open`, `WHATSAPP_DELIVERY_ENABLED=false`, `WHATSAPP_PHONE_NUMBER_ID=1458603463983505`, `WHATSAPP_OTP_TEMPLATE=aladdin_otp`, `WHATSAPP_OTP_LANGUAGES=ar`, Graph `v25.0` | delivery is flipped ON only inside the cutover window |
 | Meta token | a **dedicated** Secrets Store secret (not `WHATSAPP_ACCESS_TOKEN`), from a System User that has the sender's WhatsApp Account assigned with full control, generated **after** that assignment, `whatsapp_business_messaging` and `whatsapp_business_management`, no expiry | the root cause of every Acceptance failure was a token without the granular send permission, so verify with the owner-run direct send before storing it |
 | Signing secret | a **dedicated** Secrets Store secret; the Production app holds the same value as `PHONE_OTP_WORKER_SECRET` | never the Acceptance value |
-| Admin secret | a dedicated `OTP_ADMIN_SIGNING_SECRET` (see the Admin plan) | separate from the send secret |
+| Admin, notify and grant secrets | three more dedicated Secrets Store secrets (`OTP_ADMIN_SIGNING_SECRET_PRODUCTION`, `OTP_NOTIFY_SIGNING_SECRET_PRODUCTION`, `OTP_ADMIN_GRANT_SECRET_PRODUCTION`); the Production app holds the same values as `PHONE_OTP_ADMIN_SECRET` and `PHONE_OTP_NOTIFY_SECRET`; the **grant key is held only by the Supabase database and the Worker, never by the app** | five distinct secrets in all (Meta token, send, admin, notify, grant); none shared with Acceptance; the admin and notify secrets exist, the grant key is still to be created (see docs/operations/WHATSAPP_OTP_PRODUCTION_B3_PREPARATION.md) |
 | App flags | `PHONE_VERIFICATION_ENABLED`, `PHONE_SIGNUP_VERIFICATION_ENABLED`, `PHONE_OTP_DELIVERY=worker` | `PHONE_*` secrets are set on the Production frontend only when it is ready; the live build ignores them |
 | App secrets | `PHONE_OTP_WORKER_URL` (the Production Worker), `PHONE_OTP_WORKER_SECRET`, `PHONE_OTP_HMAC_KEYS` (at most 3 keys), `PHONE_SIGNUP_COOKIE_SECRET` (32+ characters) | names verified, values never printed |
 | Database | `app.phone_verification_config`: `enabled`, `signup_enabled`, `alias_guard_mode` per phase; limits at the reviewed defaults | the per-phone, per-IP, cooldown and attempt limits are unchanged |
 | Retention | the Worker's scheduled run purges journal rows older than 7 days (replaces "no cron is installed") | part of the Admin plan's cron |
 
-A configuration guard for Production (`check-production-config.mjs`, with tests and a CI step) will assert every row above, including that **no allowlist var, no Send-SMS-hook binding and no Acceptance identifier** exist. It is part of blocker B3.
+The configuration guard for Production (`check-production-config.mjs`, with tests and a CI step; prepared) asserts every row above, including that **no allowlist var, no Send-SMS-hook binding and no Acceptance identifier** exist. It is part of blocker B3. Final security decisions (database-issued grant, private service binding, environment-bound alerts, callback reachability gate, unmatched-change detection) are recorded in docs/operations/WHATSAPP_OTP_PRODUCTION_B3_PREPARATION.md.
 
 **Shared sender caveat.** There is one Meta sender number. Its quality rating and messaging tier are per number, so Acceptance sends also count against the same Meta limits. Acceptance delivery stays OFF by default and allowlisted; Meta-side volume is the sum of both.
 
 ## The send budget as a release gate
-- **Authority:** the limit lives in the **Production Worker's D1** (`otp_settings`) next to the atomic claim, so enforcement costs no external request and cannot be stale. The environment variable in the current candidate is the interim form and is removed by the Admin PR.
+- **Authority:** the limit lives in the **Production Worker's D1** (`otp_settings`) next to the atomic claim, so enforcement costs no external request and cannot be stale. The interim environment variable is removed by the Admin settings PR (implemented, see [Admin settings plan](WHATSAPP_OTP_ADMIN_SETTINGS_PLAN.md)); the Super Admin changes the limit, the Hard Ceiling and the alert thresholds from `/admin/whatsapp-otp`, with no redeploy.
 - **Fail closed:** no settings row, an invalid row, or an unreadable database means `503 budget_unconfigured` before the token is read. **Delivery and the budget are independent switches**: turning delivery OFF never needs the budget, and raising the budget never turns delivery on.
-- **Initialization:** the budget is **never** seeded by code. An owner step writes the approved value through the signed admin endpoint (or one reviewed `wrangler d1 execute`), recorded in the audit table.
+- **Initialization:** the budget is **never** seeded by code. The first value (150 / ceiling 5,000 / 70 % / 90 %, after your approval) is written by a Super Admin from the dashboard (this needs `whatsapp_otp.ceiling_manage`, the typed ceiling confirmation and a reason of 20 or more characters) and recorded in the Worker's audit table and in Supabase. Until then the Worker answers `503 budget_unconfigured`.
 - **Gate before activation (all must pass):** signed preflight shows `daily_send_limit` equal to the approved value and `delivery_enabled=false`; the fail-closed tests pass in CI; the dashboard shows usage 0; a synthetic over-limit test passes on Acceptance.
 
 ### Proposed initial Production value (for your approval)
@@ -70,10 +70,10 @@ A configuration guard for Production (`check-production-config.mjs`, with tests 
 | Migrations | not rolled back: all additive; the legacy table is removed later by RF-001 | by design |
 
 ## Mandatory launch blockers (open)
-B2 mandatory CI on the final combined commit; **the Admin settings PR** (a launch requirement now); B3 the Production Worker, D1, secrets and config guard; B4 the Production app secrets; B5 the Acceptance rehearsals (enforce mode with rollback to `observe`, the build-swap drill, hosted email / Google / Facebook / legacy-account login on the new build); B6 the upload-only deploy stage; B7 approvals and a planned window. Decision still needed: confirm the initial budget (above) and the alert channel.
+B2 mandatory CI on the final combined commit; **the Admin settings PR** (implemented and stacked on #127, awaiting CI and your review; applying its Supabase migration `20261103090001` to each hosted environment is a separate approval); B3 the Production Worker, D1, secrets and config guard (config and guard prepared; the admin-grant hardening, private service binding and environment-bound alerts are implemented; hosted steps pending approval); gates G-NOTIFY (alert callback reachable from the Worker through Cloudflare WAF/bot protection, on Acceptance and Production) and G-META (verified Meta messaging limit for the sender); B4 the Production app secrets; B5 the Acceptance rehearsals (enforce mode with rollback to `observe`, the build-swap drill, hosted email / Google / Facebook / legacy-account login on the new build); B6 the upload-only deploy stage; B7 approvals and a planned window. Decision still needed: confirm the initial budget (above) and the alert channel.
 
 ## Recommended after launch (not blockers)
-Meta delivery webhooks (needs the app published), display-name activation, a service binding between the app and the Worker, a second alert channel, a Meta-side spend alert, leaked-password protection, the redirect allow-list cleanup, deleting the Acceptance test account.
+Meta delivery webhooks (needs the app published), display-name activation, a scheduled app-side trigger for unmatched-change detection (today it runs when an admin opens the page or changes a setting), a second alert channel, a Meta-side spend alert, leaked-password protection, the redirect allow-list cleanup, deleting the Acceptance test account.
 
 ## What is deferred
 Everything executable. This plan changes no hosted state.
@@ -83,3 +83,11 @@ The Production launch is gated by a configurable, audited, fail-closed budget an
 
 ## Related files
 [R2 release plan](PHONE_SIGNUP_R2_RELEASE_PLAN.md) · [Admin settings plan](WHATSAPP_OTP_ADMIN_SETTINGS_PLAN.md) · [B1 report](B1_REGISTRATION_RECONCILIATION_REPORT.md) · [Release follow-ups](../operations/RELEASE_FOLLOWUPS.md) · [Worker README](../../edge/whatsapp-otp-worker/README.md)
+
+## Admin-controlled limits: what remains before Production (added with the Admin settings PR)
+1. Apply Supabase migration `20261103090001` to Acceptance, then Production (separate approvals; additive; permission contract `20261103090001.json`).
+2. Production D1 `aladdin-whatsapp-otp-production` has no `d1_migrations` table (created by hand, empty). Run `node scripts/d1-baseline-check.mjs` (read-only; reports `untracked_partial`), then `wrangler d1 migrations apply --remote`: `0001` is `IF NOT EXISTS`, so it is safe, and `0002` is additive.
+3. The admin and notify signing secrets now exist in the Secrets Store (both environments); still to create: the two admin grant keys (`OTP_ADMIN_GRANT_SECRET`, `OTP_ADMIN_GRANT_SECRET_PRODUCTION`), also inserted into the matching Supabase database. Then set the matching `PHONE_OTP_ADMIN_SECRET` / `PHONE_OTP_NOTIFY_SECRET` on the Production app; set `OTP_NOTIFY_URL` to the Production app's `/api/internal/whatsapp-otp/notify`.
+4. `wrangler.production.jsonc` and `check-production-config.mjs` are written and tested (private Worker, five `*_PRODUCTION` bindings, delivery OFF, open mode, no allowlist).
+5. Verify the real Meta messaging limit of the WhatsApp Business Portfolio in Business Settings. The dashboard limits never override it.
+6. Acceptance rehearsal: initialize, change, lower the ceiling (refusal), exhaust the budget, observe the alert in the notification panel, kill-switch independence. No real message is needed for most of it.

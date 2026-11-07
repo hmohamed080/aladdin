@@ -31,11 +31,17 @@ export async function signedSend(
   });
 }
 
-export function memoryReplayDb(): ReplayDb & { rows: Map<string, string>; seed(hash: string, createdAt: number): void } {
+export type SettingsRow = { daily_limit: number; hard_ceiling: number; warn_percent: number; critical_percent: number; version: number; updated_at: number; updated_by: string };
+export const DEFAULT_SETTINGS: SettingsRow = { daily_limit: 100, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90, version: 1, updated_at: 0, updated_by: "00000000-0000-4000-8000-000000000001" };
+
+/** A fake D1 for the SEND path: the replay claim, the outcome update and the settings row. Admin and maintenance tests use real SQL (Miniflare). */
+export function memoryReplayDb(opts: { settings?: SettingsRow | null; deliverySwitch?: boolean | null | "unreadable"; attestation?: false; attestationEnv?: string } = {}): ReplayDb & { rows: Map<string, string>; seed(hash: string, createdAt: number): void; settings: SettingsRow | null } {
   const rows = new Map<string, string>();
   const created = new Map<string, number>();
+  const settings = opts.settings === undefined ? { ...DEFAULT_SETTINGS } : opts.settings;
   return {
     rows,
+    settings,
     /** Test helper: a pre-existing claim created at the given epoch second (state "accepted"). */
     seed(hash: string, createdAt: number) { rows.set(hash, "accepted"); created.set(hash, createdAt); },
     prepare(sql: string) {
@@ -46,11 +52,12 @@ export function memoryReplayDb(): ReplayDb & { rows: Map<string, string>; seed(h
               if (sql.startsWith("INSERT OR IGNORE")) {
                 const id = String(values[0]);
                 if (rows.has(id)) return { success: true, meta: { changes: 0 } };
-                if (sql.includes("WHERE (SELECT COUNT(*)")) {
-                  // The budgeted form: binds are (id, now, since, limit); insert only while fewer than limit rows are inside the window.
-                  const [, , since, limit] = values as number[];
-                  const inside = [...created.values()].filter((t) => t >= Number(since)).length;
-                  if (inside >= Number(limit)) return { success: true, meta: { changes: 0 } };
+                if (sql.includes("FROM otp_settings")) {
+                  // The budgeted form: binds are (id, now, since). A missing settings row inserts nothing, exactly like the real statement.
+                  if (!settings) return { success: true, meta: { changes: 0 } };
+                  const limit = Math.min(settings.daily_limit, settings.hard_ceiling);
+                  const inside = [...created.values()].filter((t) => t >= Number(values[2])).length;
+                  if (inside >= limit) return { success: true, meta: { changes: 0 } };
                 }
                 rows.set(id, "reserved");
                 created.set(id, Number(values[1]));
@@ -65,6 +72,23 @@ export function memoryReplayDb(): ReplayDb & { rows: Map<string, string>; seed(h
               throw new Error("Unexpected SQL");
             },
             async first<T>() {
+              if (sql.includes("FROM otp_delivery_switch")) {
+                // The Super Admin switch. Default ON so send-path tests stay about the send path; null = no row; "unreadable" = D1 error.
+                const flag = opts.deliverySwitch === undefined ? true : opts.deliverySwitch;
+                if (flag === "unreadable") throw new Error("D1 unavailable");
+                return (flag === null ? null : { enabled: flag ? 1 : 0, version: 1, updated_at: 0, updated_by: DEFAULT_SETTINGS.updated_by }) as T | null;
+              }
+              if (sql.includes("FROM otp_delivery_attestation")) {
+                // The Aladdin database's signed attestation of version 1. Default valid so send-path tests stay about the send path; false = none.
+                if (opts.attestation === false) return null;
+                const { attestationCanonical } = await import("../src/attest.ts");
+                const { signPayload } = await import("../src/signing.ts");
+                const issuedAt = Math.floor(Date.now() / 1000);
+                const nonce = "ab".repeat(16);
+                const mac = await signPayload(SUPPORT_NOTIFY_SECRET, "attest", issuedAt, attestationCanonical({ env: opts.attestationEnv ?? "acceptance", enabled: true, version: 1, issuedAt, nonce }));
+                return { enabled: 1, version: 1, issued_at: issuedAt, nonce, mac } as T;
+              }
+              if (sql.includes("FROM otp_settings WHERE id = 1")) return (settings ? { ...settings } : null) as T | null;
               if (sql.startsWith("SELECT 1")) return { ok: 1 } as T;
               const id = String(values[0]);
               return (rows.has(id) ? { state: rows.get(id) } : null) as T | null;
@@ -75,6 +99,9 @@ export function memoryReplayDb(): ReplayDb & { rows: Map<string, string>; seed(h
     },
   };
 }
+
+/** The notify secret of the test environment (same bytes as NOTIFY_SECRET in d1.ts). */
+export const SUPPORT_NOTIFY_SECRET = "whsec_" + btoa(String.fromCharCode(...new Uint8Array(32).fill(55)));
 
 export type MetaCall = { url: string; headers: Record<string, string>; body: { messaging_product: string; to: string; type: string; template: { name: string; language: { code: string }; components: unknown[] } } };
 export function mockMeta(success = true) {
@@ -98,10 +125,10 @@ export function baseEnv(over: Partial<Env> & { tokenReads?: { n: number } } = {}
     WHATSAPP_GRAPH_API_VERSION: "v25.0",
     WHATSAPP_DELIVERY_ENABLED: "true",
     OTP_ENVIRONMENT: "acceptance",
+    OTP_NOTIFY_SIGNING_SECRET: { get: async () => SUPPORT_NOTIFY_SECRET },
     OTP_RECIPIENT_MODE: "allowlist",
     OTP_ALLOWED_RECIPIENTS: PHONE,
-    OTP_DAILY_SEND_LIMIT: "100",
-    IDEMPOTENCY_DB: memoryReplayDb(),
+    IDEMPOTENCY_DB: memoryReplayDb({ attestationEnv: rest.OTP_ENVIRONMENT ?? "acceptance" }),
     ...rest,
   };
 }

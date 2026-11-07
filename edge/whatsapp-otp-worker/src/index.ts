@@ -14,11 +14,23 @@
  *
  * Order of checks (each cheaper than the next; Meta is called only after ALL pass):
  *   method/path -> content type -> size -> signing secret bound -> signature+clock window -> body schema -> id binds to delivery_id ->
- *   delivery switch -> recipient policy -> D1 reachable -> atomic claim (INSERT OR IGNORE on the hash of the id) -> Meta, no retry.
+ *   delivery permit -> recipient policy -> D1 reachable -> Super Admin switch (D1) -> atomic claim (INSERT OR IGNORE on the hash of the id) -> Meta, no retry.
  * Idempotency identity = the challenge (delivery_id): the same signed delivery can never produce a second Meta message, and a failed or
  * ambiguous attempt is never retried here (a resend is a NEW challenge decided by the authority's cooldowns).
  * Nothing logs a code, a number, a header or a body.
  */
+
+import { handleAdminRequest, isAdminPath } from "./admin.ts";
+import type { Db } from "./db.ts";
+import { attestationFacts, deliveryEffectivelyOn } from "./attest.ts";
+import { notifyTransportAvailable } from "./notify-transport.ts";
+import { deliveryBlockers, readDeliverySwitch } from "./delivery.ts";
+import { runMaintenance } from "./maintenance.ts";
+import { type OtpSettings, readSettings } from "./settings.ts";
+import { verifySignature } from "./signing.ts";
+
+// Kept as a public export: tests and the app contract test import it from here.
+export { verifySignature };
 
 /** Minimal Cloudflare D1 interface for atomic, durable replay claims. */
 export interface ReplayDb {
@@ -41,18 +53,35 @@ export interface Env {
   /** Comma list of template languages Meta has APPROVED for the template (default "ar"). A locale outside it is sent in "ar". */
   WHATSAPP_OTP_LANGUAGES?: string;
   WHATSAPP_GRAPH_API_VERSION: string;
-  /** Master switch. Anything but the literal "true" means nothing is sent. */
+  /**
+   * The ENVIRONMENT PERMIT: whether this deployment may ever deliver. Anything but the literal "true" means nothing is sent and the Super
+   * Admin switch cannot be turned ON. It is necessary, not sufficient: the runtime ON/OFF switch (D1 otp_delivery_switch, changed only by the
+   * grant-protected admin route) must ALSO be on. No row = OFF.
+   */
   WHATSAPP_DELIVERY_ENABLED: string;
   /** "acceptance" | "production" | "local". Only "production" may use recipient mode "open"; only "local" may redirect the Graph URL. */
   OTP_ENVIRONMENT?: string;
   /** "allowlist" (default; no list = no send) | "open" (production only, explicit). */
   OTP_RECIPIENT_MODE?: string;
   /**
-   * Maximum deliveries claimed in any rolling 24 hours across ALL recipients: the Meta message budget and the cost cap against a
-   * distributed start flood (per-number, per-registration and per-IP limits live in the authority). A positive integer; a missing or
-   * invalid value means nothing is sent (fail closed), in every environment.
+   * The global rolling-24h send budget is NOT configured here: its authoritative value (the Daily Send Limit, bounded by the Hard Ceiling)
+   * lives in this Worker's D1 (otp_settings) and is changed by the Super Admin through the signed admin routes, with no redeploy. A missing
+   * or invalid row means nothing is sent (fail closed), in every environment.
    */
-  OTP_DAILY_SEND_LIMIT?: string;
+  /** Secrets Store binding for the signed ADMIN routes. Separate from OTP_SIGNING_SECRET: neither can call the other's routes. */
+  OTP_ADMIN_SIGNING_SECRET?: { get(): Promise<string> };
+  /** Secrets Store binding that signs the outbound operational-alert calls to the app. Separate from the send and admin secrets. */
+  OTP_NOTIFY_SIGNING_SECRET?: { get(): Promise<string> };
+  /** Third admin secret: verifies the database-issued grant that authorizes a settings change. The app server does not hold it. */
+  OTP_ADMIN_GRANT_SECRET?: { get(): Promise<string> };
+  /**
+   * Private Service Binding to the app's own Worker: the ONLY route for the alert callback (probe and real alerts). A same-account workers.dev
+   * Worker cannot be reached with global fetch (Cloudflare 1042) and the public hostname is behind Access, which a binding does not traverse.
+   * Missing binding = nothing is sent (fail closed); there is no public fallback.
+   */
+  APP_NOTIFY?: { fetch(input: string, init?: RequestInit): Promise<Response> };
+  /** https URL of the app's notification endpoint (this Worker holds no database credential; it only posts signed statistics there). */
+  OTP_NOTIFY_URL?: string;
   /** Exact E.164 numbers, comma separated. Set in the Worker dashboard, never in the repository. */
   OTP_ALLOWED_RECIPIENTS?: string;
   /** LOCAL rigs only (OTP_ENVIRONMENT=local): a loopback http URL standing in for graph.facebook.com. */
@@ -72,31 +101,6 @@ const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache
 function answer(status: number, obj: Record<string, string | number | boolean> = {}): Response {
   return new Response(JSON.stringify(obj), { status, headers: JSON_HEADERS });
 }
-function decode64(value: string): Uint8Array | null {
-  try { return Uint8Array.from(atob(value), (c) => c.charCodeAt(0)); } catch { return null; }
-}
-
-/** Check the raw body against a Standard Webhooks style signature with a 5-minute clock window. */
-export async function verifySignature(body: string, headers: Headers, secret: string, now = Date.now()): Promise<boolean> {
-  const id = headers.get("webhook-id");
-  const stamp = headers.get("webhook-timestamp");
-  const signatures = headers.get("webhook-signature");
-  if (!id || id.length > 128 || id.includes(".") || !stamp || !signatures) return false;
-  if (!/^\d{10}$/.test(stamp) || Math.abs(now - Number(stamp) * 1000) > 300_000) return false;
-  const encoded = secret.startsWith("v1,") ? secret.slice(3) : secret;
-  if (!encoded.startsWith("whsec_")) return false;
-  const secretBytes = decode64(encoded.slice(6));
-  if (!secretBytes || secretBytes.length < 32) return false;
-  const key = await crypto.subtle.importKey("raw", secretBytes as BufferSource, { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
-  const signed = new TextEncoder().encode(id + "." + stamp + "." + body);
-  for (const part of signatures.split(" ")) {
-    if (!part.startsWith("v1,")) continue;
-    const sig = decode64(part.slice(3));
-    if (sig?.length === 32 && (await crypto.subtle.verify("HMAC", key, sig as BufferSource, signed))) return true;
-  }
-  return false;
-}
-
 /** Retain only a hash of the opaque delivery id, never a code or phone detail. */
 async function replayHash(eventId: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(eventId));
@@ -105,33 +109,29 @@ async function replayHash(eventId: string): Promise<string> {
 
 const DAY_SECONDS = 86_400;
 
-/** The configured rolling-24h budget, or null when it is missing or invalid (which fails closed). */
-export function dailySendLimit(env: Pick<Env, "OTP_DAILY_SEND_LIMIT">): number | null {
-  const v = env.OTP_DAILY_SEND_LIMIT;
-  return typeof v === "string" && /^[1-9][0-9]{0,5}$/.test(v) ? Number(v) : null;
-}
-
 export type ClaimOutcome = "new" | "accepted" | "blocked" | "budget" | "error";
 
 /**
- * The unique insert is the concurrency boundary; any storage problem fails closed. With a `dailyLimit` the SAME statement also enforces
- * the global rolling-24h budget: it inserts only while fewer than `dailyLimit` rows were claimed in the last 24 hours, so concurrent
- * requests cannot overshoot (D1 serializes writes). A repeat of an existing id is still reported as accepted/blocked, never as "budget".
+ * The unique insert is the concurrency boundary; any storage problem fails closed. When `budgeted` the SAME statement also enforces the
+ * global rolling-24h budget from the settings row in D1: it inserts only while fewer than min(daily_limit, hard_ceiling) claims exist in
+ * the last 24 hours. The limit is read INSIDE the statement, so a dashboard change applies to the very next claim, concurrent requests
+ * cannot overshoot (D1 serializes writes), and a missing settings row inserts nothing. A repeat of an existing id is still reported as
+ * accepted/blocked, never as "budget".
  */
-export async function claimEvent(db: ReplayDb, eventId: string, dailyLimit?: number): Promise<{ outcome: ClaimOutcome; idHash: string }> {
+export async function claimEvent(db: ReplayDb, eventId: string, budgeted = false): Promise<{ outcome: ClaimOutcome; idHash: string }> {
   const idHash = await replayHash(eventId);
   try {
     const now = Math.floor(Date.now() / 1000);
-    const result = dailyLimit === undefined
-      ? await db.prepare("INSERT OR IGNORE INTO whatsapp_hook_events (event_hash, created_at, state) VALUES (?1, ?2, 'reserved')").bind(idHash, now).run()
-      : await db
-          .prepare("INSERT OR IGNORE INTO whatsapp_hook_events (event_hash, created_at, state) SELECT ?1, ?2, 'reserved' WHERE (SELECT COUNT(*) FROM whatsapp_hook_events WHERE created_at >= ?3) < ?4")
-          .bind(idHash, now, now - DAY_SECONDS, dailyLimit)
-          .run();
+    const result = budgeted
+      ? await db
+          .prepare("INSERT OR IGNORE INTO whatsapp_hook_events (event_hash, created_at, state) SELECT ?1, ?2, 'reserved' WHERE (SELECT COUNT(*) FROM whatsapp_hook_events WHERE created_at >= ?3) < (SELECT min(daily_limit, hard_ceiling) FROM otp_settings WHERE id = 1)")
+          .bind(idHash, now, now - DAY_SECONDS)
+          .run()
+      : await db.prepare("INSERT OR IGNORE INTO whatsapp_hook_events (event_hash, created_at, state) VALUES (?1, ?2, 'reserved')").bind(idHash, now).run();
     if (result.success !== true || typeof result.meta?.changes !== "number") return { outcome: "error", idHash };
     if (result.meta.changes === 1) return { outcome: "new", idHash };
     const saved = await db.prepare("SELECT state FROM whatsapp_hook_events WHERE event_hash = ?1").bind(idHash).first<{ state: string }>();
-    if (!saved && dailyLimit !== undefined) return { outcome: "budget", idHash };
+    if (!saved && budgeted) return { outcome: "budget", idHash };
     return { outcome: saved?.state === "accepted" ? "accepted" : "blocked", idHash };
   } catch {
     return { outcome: "error", idHash };
@@ -351,29 +351,67 @@ export async function submitOtp(req: SendRequest, env: Env, fetcher: typeof fetc
 }
 
 /** Signed, side-effect-free runtime check: reports whether each binding is PRESENT and the switches' state. Never a value. */
-async function preflight(env: Env): Promise<Response> {
+async function preflightReport(env: Env): Promise<Record<string, string | number | boolean>> {
   let tokenBound = false;
   try { tokenBound = Boolean(await env.WHATSAPP_ACCESS_TOKEN?.get()); } catch { tokenBound = false; }
   let d1 = false;
   try { d1 = Boolean(env.IDEMPOTENCY_DB && (await env.IDEMPOTENCY_DB.prepare("SELECT 1 AS ok").bind().first<{ ok: number }>())?.ok === 1); } catch { d1 = false; }
-  return answer(200, {
+  let settings: OtpSettings | null = null;
+  try { settings = env.IDEMPOTENCY_DB ? await readSettings(env.IDEMPOTENCY_DB as unknown as Db) : null; } catch { settings = null; }
+  let adminBound = false;
+  try { adminBound = Boolean(await env.OTP_ADMIN_SIGNING_SECRET?.get()); } catch { adminBound = false; }
+  let grantBound = false;
+  try { grantBound = Boolean(await env.OTP_ADMIN_GRANT_SECRET?.get()); } catch { grantBound = false; }
+  let notifyConfigured = false;
+  // "Configured" means a URL, a secret AND a private transport (the APP_NOTIFY binding): the alert callback and the delivery attestation both need all three.
+  try { notifyConfigured = Boolean(env.OTP_NOTIFY_URL) && Boolean(await env.OTP_NOTIFY_SIGNING_SECRET?.get()) && notifyTransportAvailable(env); } catch { notifyConfigured = false; }
+  let sw: Awaited<ReturnType<typeof readDeliverySwitch>> = null;
+  try { sw = env.IDEMPOTENCY_DB ? await readDeliverySwitch(env.IDEMPOTENCY_DB as unknown as Db) : null; } catch { sw = null; }
+  const permitted = env.WHATSAPP_DELIVERY_ENABLED === "true";
+  // The EFFECTIVE switch: ON and accounted for by its audit row (the same check the send path makes), never the raw stored flag.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const switchOn = env.IDEMPOTENCY_DB ? await deliveryEffectivelyOn(env as never, env.IDEMPOTENCY_DB as unknown as Db, nowSec) : false;
+  const attested = await attestationFacts(env as never, env.IDEMPOTENCY_DB as unknown as Db | undefined, nowSec);
+  const facts: Record<string, string | number | boolean> = {
     signing_secret_bound: true,
+    admin_secret_bound: adminBound,
+    admin_grant_secret_bound: grantBound,
+    notify_configured: notifyConfigured,
     meta_token_bound: tokenBound,
     d1_reachable: d1,
-    delivery_enabled: env.WHATSAPP_DELIVERY_ENABLED === "true",
+    delivery_permitted: permitted,
+    delivery_switch: switchOn,
+    delivery_switch_version: sw?.version ?? 0,
+    delivery_attested: attested.delivery_attested,
+    delivery_attestation_age: attested.delivery_attestation_age,
+    delivery_enabled: permitted && switchOn, // effective: both the permit and the audited Super Admin switch
     environment: env.OTP_ENVIRONMENT ?? "unset",
     recipient_mode: env.OTP_RECIPIENT_MODE === "open" && env.OTP_ENVIRONMENT === "production" ? "open" : "allowlist",
     allowlist_entries: allowedRecipients(env).length,
-    daily_send_limit: dailySendLimit(env) ?? 0, // 0 = missing/invalid, which makes the Worker send nothing
+    settings_initialized: settings !== null,
+    daily_send_limit: settings?.dailyLimit ?? 0, // 0 = missing/invalid, which makes the Worker send nothing
+    hard_ceiling: settings?.hardCeiling ?? 0,
+    warn_percent: settings?.warnPercent ?? 0,
+    critical_percent: settings?.criticalPercent ?? 0,
     template: env.WHATSAPP_OTP_TEMPLATE,
     languages: (env.WHATSAPP_OTP_LANGUAGES ?? "ar"),
     graph_version: env.WHATSAPP_GRAPH_API_VERSION,
     sender_id_suffix: String(env.WHATSAPP_PHONE_NUMBER_ID ?? "").slice(-4),
-  });
+  };
+  facts.delivery_blockers = deliveryBlockers(facts).join(",");
+  return facts;
+}
+
+/** Signed, side-effect-free runtime check: reports whether each binding is PRESENT and the switches' state. Never a value. */
+async function preflight(env: Env): Promise<Response> {
+  return answer(200, await preflightReport(env));
 }
 
 export async function handleRequest(request: Request, env: Env, fetcher: typeof fetch = fetch): Promise<Response> {
   const path = new URL(request.url).pathname;
+  // its own secret, its own checks; the admin usage answer also carries the same non-secret runtime facts as the signed preflight, because a
+  // private Worker (no public address) cannot be preflighted from outside
+  if (isAdminPath(path)) return handleAdminRequest(request, env, Date.now(), () => preflightReport(env), fetcher);
   if (request.method !== "POST" || (path !== SEND_PATH && path !== PREFLIGHT_PATH)) return answer(404);
   if (request.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") return answer(415);
   if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY) return answer(413);
@@ -395,16 +433,22 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
   if (eventId !== `otp_${req.deliveryId}`) return answer(400);
   if (env.WHATSAPP_DELIVERY_ENABLED !== "true") return answer(503, { error: "delivery_disabled" });
   if (!recipientAllowed(req.to, env)) return answer(403);
-  const dailyLimit = dailySendLimit(env);
-  if (dailyLimit === null) return answer(503, { error: "budget_unconfigured" }); // fail closed: no budget, no message
   const db = env.IDEMPOTENCY_DB;
   if (!db) return answer(503, { error: "idempotency_unavailable" });
-  const claim = await claimEvent(db, eventId, dailyLimit);
+  // The Super Admin switch, read from D1 on EVERY send (no cache, so an OFF takes effect on the next request). Missing, OFF and unreadable
+  // are indistinguishable from outside: nothing is sent and neither the token nor Meta is touched.
+  if (!(await deliveryEffectivelyOn(env as never, db as unknown as Db, Math.floor(Date.now() / 1000)))) return answer(503, { error: "delivery_disabled" });
+  // Fail closed: the limits are read from D1 and validated BEFORE the token is read or Meta is called. Missing, invalid or unreadable = nothing is sent.
+  // (The delivery switch above is independent of this: turning delivery off never needs the budget.)
+  let settings: OtpSettings | null = null;
+  try { settings = await readSettings(db as unknown as Db); } catch { settings = null; }
+  if (!settings) return answer(503, { error: "budget_unconfigured" });
+  const claim = await claimEvent(db, eventId, true);
   if (claim.outcome === "error") return answer(503, { error: "idempotency_unavailable" });
   if (claim.outcome === "accepted") return answer(200, { status: "duplicate" }); // the same delivery, never re-sent
   if (claim.outcome === "blocked") return answer(409, { error: "already_attempted" });
   if (claim.outcome === "budget") {
-    console.warn(JSON.stringify({ event: "whatsapp_otp_budget_exhausted", limit: dailyLimit })); // numbers only: nothing sensitive
+    console.warn(JSON.stringify({ event: "whatsapp_otp_budget_exhausted", limit: Math.min(settings.dailyLimit, settings.hardCeiling) })); // numbers only
     return answer(503, { error: "budget_exhausted" });
   }
   // The reservation is written BEFORE Meta is called. Even an ambiguous network failure is never retried by this Worker.
@@ -414,8 +458,15 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
   return accepted ? answer(200, { status: "accepted" }) : answer(502, { error: "delivery_unavailable" });
 }
 
+interface ScheduledController { scheduledTime: number; cron: string }
+interface ExecContext { waitUntil(promise: Promise<unknown>): void }
+
 export default {
   fetch(request: Request, env: Env): Promise<Response> {
     return handleRequest(request, env);
+  },
+  /** Cron: journal retention, threshold evaluation, alert delivery. Isolated from the send path; it can never throw into a delivery. */
+  scheduled(_event: ScheduledController, env: Env, ctx: ExecContext): void {
+    ctx.waitUntil(runMaintenance(env, (db, now) => purgeExpiredReplayClaims(db as unknown as ReplayDb, now)).then(() => undefined, () => undefined));
   },
 };

@@ -14,6 +14,9 @@ import { z } from "zod";
  *   server-only switch; it is never derived from NEXT_PUBLIC_APP_ENV, which is public and also selects test keys.
  * - PHONE_OTP_OUTBOX_DIR: where the local outbox writes (default .local/phone-otp-outbox, git-ignored).
  * - PHONE_OTP_WORKER_URL / PHONE_OTP_WORKER_SECRET: where the "worker" delivery mode posts, and the whsec_ key that signs it. Server-only.
+ * - PHONE_OTP_ADMIN_SECRET: the whsec_ key that signs the Admin settings calls to the Worker (/v1/admin/*). SEPARATE from PHONE_OTP_WORKER_SECRET (send) and
+ *   from PHONE_OTP_NOTIFY_SECRET, so no one secret opens two doors. The Worker holds the same value as OTP_ADMIN_SIGNING_SECRET. Server-only.
+ * - PHONE_OTP_NOTIFY_SECRET: the whsec_ key the Worker signs its alert callback with (verified by /api/internal/whatsapp-otp/notify). Server-only.
  * - PHONE_SIGNUP_COOKIE_SECRET: >= 32 characters, server-only. Keys ONLY the sealed pending-sign-up cookie (it holds the password for <= 10
  *   minutes). Separate from the code keyring and from AUTH_PASSWORD_PREVIEW_GRANT_SECRET so that no other secret's exposure opens this cookie.
  *   Required whenever phone sign-up is enabled (the sign-up action refuses to request a code without it).
@@ -27,6 +30,8 @@ export const phoneVerificationEnvSchema = z.object({
   PHONE_SIGNUP_COOKIE_SECRET: z.string().trim().min(32).max(512).optional(),
   PHONE_OTP_WORKER_URL: z.string().trim().url().max(300).optional(),
   PHONE_OTP_WORKER_SECRET: z.string().trim().regex(/^whsec_[A-Za-z0-9+/=]{43,200}$/).optional(),
+  PHONE_OTP_ADMIN_SECRET: z.string().trim().regex(/^whsec_[A-Za-z0-9+/=]{43,200}$/).optional(),
+  PHONE_OTP_NOTIFY_SECRET: z.string().trim().regex(/^whsec_[A-Za-z0-9+/=]{43,200}$/).optional(),
 });
 
 export type PhoneVerificationEnv = {
@@ -41,6 +46,10 @@ export type PhoneVerificationEnv = {
   workerUrl: string | undefined;
   /** "whsec_" + base64 (>= 32 bytes): signs requests to the Worker. The Worker holds the same value in its Secrets Store. Never the Meta token. */
   workerSecret: string | undefined;
+  /** Signs Admin settings calls to the Worker. Never the send secret and never the notify secret. */
+  adminSecret: string | undefined;
+  /** Verifies the Worker's signed alert callback. */
+  notifySecret: string | undefined;
 };
 
 export function parsePhoneVerificationEnv(source: Record<string, string | undefined>): PhoneVerificationEnv {
@@ -60,6 +69,8 @@ export function parsePhoneVerificationEnv(source: Record<string, string | undefi
     signupCookieSecret: result.data.PHONE_SIGNUP_COOKIE_SECRET,
     workerUrl: result.data.PHONE_OTP_WORKER_URL,
     workerSecret: result.data.PHONE_OTP_WORKER_SECRET,
+    adminSecret: result.data.PHONE_OTP_ADMIN_SECRET,
+    notifySecret: result.data.PHONE_OTP_NOTIFY_SECRET,
   };
 }
 
@@ -73,5 +84,7 @@ export function readPhoneVerificationEnv(): PhoneVerificationEnv {
     PHONE_SIGNUP_COOKIE_SECRET: process.env.PHONE_SIGNUP_COOKIE_SECRET,
     PHONE_OTP_WORKER_URL: process.env.PHONE_OTP_WORKER_URL,
     PHONE_OTP_WORKER_SECRET: process.env.PHONE_OTP_WORKER_SECRET,
+    PHONE_OTP_ADMIN_SECRET: process.env.PHONE_OTP_ADMIN_SECRET,
+    PHONE_OTP_NOTIFY_SECRET: process.env.PHONE_OTP_NOTIFY_SECRET,
   });
 }

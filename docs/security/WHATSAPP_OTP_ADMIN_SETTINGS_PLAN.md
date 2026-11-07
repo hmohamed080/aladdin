@@ -1,95 +1,80 @@
-# Admin-controlled WhatsApp OTP send budget: implementation plan
+# Admin-controlled WhatsApp OTP limits: implementation plan (v2)
 
-**Status:** plan for review, **not implemented**. This is the focused plan and the "smallest safe approach" you asked for before any change. It adds no code to the current candidate.
+**Status:** approved architecture, implemented in the dependent PR stacked on #127. Version 2 (2026-11-02) replaces the first plan after the owner's decisions: a **Super Admin-configurable Hard Ceiling** (no fixed code-level maximum), **no email or Resend**, and notifications through the **existing** centralized notification system only.
 
 ## Purpose
-Let authorized administrators view and change the global rolling-24-hour OTP send limit (and its warning thresholds) from the existing Admin Dashboard, per environment, **without deploying the frontend or the Worker**, with a full audit trail, while the budget stays atomic and fail-closed.
+Give the Primary Administrator (Super Admin) full control of the OTP limits from the existing Admin Dashboard, per environment, **without redeploying the Worker or the frontend**, while the global rolling-24-hour budget stays atomic and fail-closed, and every change is authorized, confirmed, concurrency-safe and audited.
 
-## Current decision (proposed, for approval)
-**Authoritative settings live in the Worker's own D1, next to the atomic claim.** The Admin Dashboard changes them through a **signed, server-to-server admin endpoint on the Worker**, gated first by the **existing** admin permission and audit infrastructure. Deliver it as **one dependent PR stacked on #127's final head**, then rerun the mandatory CI on the final combined commit.
+## Current decision
+**Authoritative settings live in the Worker's own D1, next to the atomic claim.** The Admin Dashboard changes them through a **signed server-to-server Worker endpoint**, after a Supabase RPC has proven the caller's permission and identity from the verified session. Operational alerts are written into the **existing** `public.notifications` inbox through one signed, narrow, idempotent app endpoint. Nothing else is introduced.
 
-### Why this is the smallest safe approach
-| Option | Verdict |
-|---|---|
-| Keep `OTP_DAILY_SEND_LIMIT` as an env var | needs a Worker redeploy per change: rejected by requirement 4 |
-| Store the limit in Supabase and read it per OTP | one external database request on every OTP, a new availability dependency in the send path: rejected by requirement 5 |
-| **Store it in the Worker's D1, change it through a signed admin endpoint** | **no per-OTP external call, no staleness (same database as the claim), no redeploy; reuses Supabase only for authorization and audit** |
+## Settings (all configurable from the dashboard)
+| Setting | Initial value | Rule |
+|---|---|---|
+| Daily Send Limit | 150 | maximum **claimed** sends in any rolling 24 hours, all recipients; `1 <= limit <= ceiling` |
+| Hard Ceiling | 5,000 | the Super Admin-configurable maximum for the Daily Send Limit; **a value in D1, not a constant** |
+| Warning Threshold | 70 % | `1..99`, strictly below Critical |
+| Critical Threshold | 90 % | `2..100` |
 
-### Is it "small"?
-It touches four layers (Worker, one Supabase migration, the frontend, tests), so it is not a one-file change and should **not** be folded into the current integration. It is, however, self-contained and additive: no existing authority, grant or verification logic changes. One dependent PR with four reviewable commits is the right unit; splitting it into two PRs would only add a second CI cycle.
+The initial values are **never seeded by code or migration**: the row is created by an explicit, audited owner action (the dashboard, or a reviewed one-off), so an unconfigured environment sends nothing.
+
+**Sanity bounds that are not policy.** Integers only, `1 <= ceiling <= 1,000,000`, enforced identically in the RPC, the Worker and a D1 `CHECK`, to stop typos, overflow and absurd values. This is an integer bound, not an operational maximum, and changing the operational ceiling never needs a deploy. Independent safety limits stay in force: Meta's own messaging tier (verified separately before activation), and the per-phone, per-IP, cooldown, Turnstile, replay and verification protections, none of which this feature touches.
 
 ## Architecture
 ```
-Admin browser ──▶ Next.js server action (server-only) ──▶ Supabase RPC  begin   [permission check + validation + audit "requested"]
-                                   │
-                                   └─▶ signed POST  Worker /v1/admin/settings   [separate admin secret, replay claim, optimistic version]
-                                                       │ one D1 batch: UPDATE otp_settings + INSERT otp_settings_audit
-                                   ┌─◀ result {old, new, version} ◀┘
-                                   └─▶ Supabase RPC  finish  [audit "changed" with actor, old, new, time]
-Worker send path:  gates ▶ read settings (fail closed) ▶ ONE atomic D1 statement: claim only while claims in 24 h < otp_settings.daily_limit ▶ Meta
+Admin browser
+  -> Next.js server action (server-only; same-origin protected by Next)
+       0. the server derives the ACTOR from the verified session (getUser) and reads the current settings from the Worker's signed usage endpoint
+       1. service-role RPC admin_whatsapp_otp_settings_begin   [the database checks THAT ACTOR's effective permissions: manage, and ceiling_manage when the ceiling changes (judged from the server-read current settings); validation; pending ledger + audit "requested" attributed to the actor]
+       2. signed POST Worker /v1/admin/settings   [separate admin secret; replay claim; expected_version; ceiling_authorized set only after step 1 confirmed ceiling_manage; actor from step 0, never from the browser]
+            one D1 batch: audit INSERT (old values) + UPDATE ... WHERE version = expected
+       3. RPC admin_whatsapp_otp_settings_finish  [service role, server-only; audit "changed" with actor, old, new, time]
+Send path:  gates -> read settings (fail closed) -> ONE atomic D1 statement: claim only while claims in 24 h < min(daily_limit, hard_ceiling) -> Meta
+Cron (every minute, never in the send path): purge journal -> evaluate usage -> D1 outbox -> signed POST app /api/internal/whatsapp-otp/notify -> app RPC -> app.notify -> public.notifications (admins with whatsapp_otp.view)
 ```
 
-## Worker changes (`edge/whatsapp-otp-worker`)
-**D1 migration `0002_otp_settings.sql`** (additive; Production and Acceptance each apply it to their own D1):
-- `otp_settings` (one row, `id = 1`): `daily_limit` (CHECK 1..5000), `warn_percent`, `critical_percent` (CHECK `warn < critical`), `alert_email` (optional), `alert_level`, `version`, `updated_at`, `updated_by` (the Supabase user id, opaque).
-- `otp_settings_audit`: `at`, `actor`, `request_id` (UNIQUE), old and new limit and thresholds, `reason`. This is the authoritative record of what was applied.
-- `otp_admin_requests`: hashed request ids for replay protection.
+## Worker (`edge/whatsapp-otp-worker`)
+**D1 migration `0002_otp_admin.sql`** (additive, idempotent `IF NOT EXISTS`): `otp_settings` (singleton, CHECK `daily_limit <= hard_ceiling`, `warn < critical`, integer bounds, `version`), `otp_settings_audit` (request id UNIQUE, actor, old and new values, version, reason, time: the authoritative record), `otp_admin_requests` (replay claims), `otp_alert_state` and `otp_notification_outbox` (event key UNIQUE, delivery state, attempts, next attempt).
+**Baseline.** Production D1 was created by hand: 0001 is present (table and index, 0 rows) and there is **no `d1_migrations` tracking table**. 0001 is idempotent, so `wrangler d1 migrations apply` is a safe baseline: it records 0001 as a no-op and then applies 0002. The read-only checker `scripts/d1-baseline-check.mjs` prints the state before any apply.
+**Enforcement.** The claim statement reads the limit inside the same statement: `WHERE (SELECT COUNT(*) ...) < (SELECT min(daily_limit, hard_ceiling) FROM otp_settings WHERE id = 1)`. A change applies to the very next claim; concurrent requests cannot overshoot; a missing row inserts nothing. A pre-read also validates the row in code; missing, invalid or unreadable means `503 budget_unconfigured` **before the token is read**. `WHATSAPP_DELIVERY_ENABLED` is checked first and never consults the budget, so the kill switch is independent. The `OTP_DAILY_SEND_LIMIT` env var of the interim candidate is removed.
+**Admin endpoints (signed POST, separate secret, same timestamp window and constant-time check as the send route):**
+- `/v1/admin/usage`: settings and version, accepted, failed, reserved, consumed, remaining, percent, level, failure rates (1 h, 24 h, 7 d), last failure time, outbox state and the last 20 audit rows.
+- `/v1/admin/settings`: strict schema `{ request_id, actor_id, expected_version, daily_limit, hard_ceiling, warn_percent, critical_percent, reason, ceiling_confirmation? }`; unknown keys rejected; request id replay-claimed; stale version answers `409`.
+**Hard Ceiling rules (sensitive).** Changing the ceiling needs the elevated permission, a reason of at least 20 characters, and a typed confirmation equal to the new number. The Daily Send Limit must never exceed the ceiling. If lowering the ceiling would invalidate the current limit, the request is **rejected with an explanation** (`ceiling_below_current_limit`) unless the same request explicitly and atomically sets a lower limit too. Both values are always sent together and written in one D1 batch.
+**Scheduled run (every minute).** Purges journal rows older than 7 days and old replay claims; evaluates usage; writes alert events to the outbox; delivers the outbox. It is isolated from the send path: any failure is caught and logged and never blocks a delivery.
 
-**Enforcement:** the claim statement reads the limit **inside the same statement** (`... WHERE (SELECT COUNT(*) ...) < (SELECT daily_limit FROM otp_settings WHERE id = 1)`), so a change applies to the very next claim and concurrent requests cannot overshoot. A pre-read validates the row (integer in `1..MAX_DAILY_LIMIT`, a constant in code so a compromised administrator account cannot set an unbounded value; raising the ceiling needs a reviewed deploy). Missing, invalid or unreadable means `503 budget_unconfigured` **before the token is read**. `WHATSAPP_DELIVERY_ENABLED` stays a separate switch: it is checked first and never consults the budget.
+## Notifications (existing system only, no email, no Resend)
+- **Target:** the existing per-person inbox `public.notifications`, written only through `app.notify`, rendered by the existing header panel and `NotificationList` (unread/read, history). The `ck_notifications_event_type_known` constraint, `KNOWN_NOTIFICATION_EVENTS` and the EN/AR copy get four events: `whatsapp_otp.budget_warning`, `.budget_critical`, `.budget_exhausted`, `.failure_rate`.
+- **Recipients:** only users with an active platform role holding `whatsapp_otp.view` and a non-suspended account.
+- **Path:** the Worker holds **no database credential**. It posts a signed event (its own notify secret, separate from the send and admin secrets) to one app route; the route verifies the signature, timestamp and a strict allow-listed payload (numbers only), then calls one service-role RPC that records the event in a dedupe ledger and fans out through `app.notify`. The Worker can only cause these four event kinds.
+- **No duplicates, re-armed correctly:** the Worker keeps an alert level and an episode counter and raises an event only when the level rises; it falls back with 5 percentage points of hysteresis so a rolling window hovering around a threshold does not flap. Each event key is unique (`kind:episode`) in the outbox **and** in the app ledger, so a retry or replay is a no-op.
+- **Content:** operational statistics only (limit, consumed, remaining, percent, failure percent, window), never a code, number, credential or secret.
+- **Failures never interrupt delivery; nothing is lost:** a failed delivery stays in the D1 outbox with exponential backoff and is retried every minute for up to 7 days; the dashboard shows pending and undelivered events; a structured, numbers-only log line records each failure.
+- **Acceptance note:** the preview app is behind Cloudflare Access, so the Worker's call to `/api/internal/whatsapp-otp/notify` needs an Access bypass for that single path (an owner step), otherwise events wait in the outbox. Production is not behind Access.
 
-**Admin endpoints (signed POST, never reachable without the admin secret):**
-- `POST /v1/admin/usage`: returns the settings, consumed in 24 h (split `accepted / failed / reserved`), remaining, percentage, level, failure ratio (24 h and 7 d), last failure time, and the last 20 audit rows.
-- `POST /v1/admin/settings`: body `{ expected_version, daily_limit, warn_percent, critical_percent, alert_email?, reason, actor_id }`. One D1 `batch`: `UPDATE ... WHERE id = 1 AND version = expected_version` then the audit `INSERT ... WHERE changes() = 1`. A stale version answers `409` and changes nothing, so two administrators cannot overwrite each other. First-time initialization uses `expected_version = 0`.
-- **Authentication:** a **separate** `OTP_ADMIN_SIGNING_SECRET` (a Secrets Store binding), not the send secret; the same timestamp window and constant-time comparison as the send route; request id `adm_<uuid>` claimed once in `otp_admin_requests`. The send secret can never call an admin route, and the admin secret can never send a message.
+## Permissions and security
+- `whatsapp_otp.view`: Administrator and higher. `whatsapp_otp.manage`: **Super Admin only**. `whatsapp_otp.ceiling_manage`: a distinct elevated permission, **Super Admin only by default**, delegable only through the existing role-management model.
+- Everything is enforced on the server and again in the database: the route rule, the RPCs (`app.admin_require`) and the Worker. UI visibility is never the control.
+- **Identity** comes from the verified authenticated session on the server (`getUser`), never a client-supplied actor id. The server passes it to **service-role-only** RPCs, so no browser session can call `begin` or `finish` at all, and the database judges the permissions of that actor. The privilege decision (does this change the Hard Ceiling?) rests on the current settings the server read from the Worker, never on browser input; the Worker independently refuses a ceiling change not marked `ceiling_authorized` by the server and compares `expected_version`. (Found and fixed by the automated security review of the first draft, which had made `begin` and `finish` callable by a signed-in session with a caller-supplied "old" value.) CSRF and same-origin protection are Next.js server-action behavior; replay is blocked by one-time request ids at the Worker; tampering fails the HMAC; privilege escalation is blocked by the RPCs and the locked role grants.
+- **Separate credentials:** send secret, admin secret and notify secret are three different Secrets Store secrets per environment. The send secret cannot call an admin route and vice versa.
+- **Concurrency:** `expected_version` compare-and-set inside one atomic D1 batch; two administrators cannot overwrite each other.
+- **Audit integrity:** D1 `otp_settings_audit` is authoritative. Supabase gets `requested` (before) and `changed` or `failed` (after) events. If D1 succeeded but the Supabase completion step failed, the pending ledger row is reconciled from the D1 audit rows (returned by the signed usage endpoint) the next time the dashboard loads, using a service-role-only RPC so it cannot be forged from a browser.
+- **Isolation:** Acceptance and Production each have their own Worker, D1, three secrets, settings row and notify target. An environment's dashboard talks only to its own Worker.
 
-**Alerts and retention:** a Cron Trigger (every 5 minutes) computes usage; when the level worsens (`ok` to `warn` to `critical` to `exhausted`) it records `alert_level`, writes a structured `whatsapp_otp_budget_level` log line (numbers only) and emails `alert_email` through the Resend API with a Worker-only Secrets Store key. It also alerts on a high Meta failure ratio over the last hour. The same run purges journal rows older than 7 days. The level resets when usage drops.
+## Frontend and database changes
+Supabase forward migration `20261103090001`: the three permissions and their locked role grants, the extended notification event constraint, the pending ledger and the notification ledger (RLS on, no grants), and the RPCs `admin_whatsapp_otp_view_check` (the caller's own session) and the service-role-only `admin_whatsapp_otp_settings_begin`, `..._finish`, `..._reconcile` and `whatsapp_otp_notification_record`. Frontend: the permission keys and route rule, nav entry, the `/admin/whatsapp-otp` page (settings, usage, failure rates, thresholds, history, pending notifications), server actions, the signed Worker client, the internal notify route, EN/AR copy including the four notification events.
 
-## Supabase changes (one forward migration, reusing existing infrastructure)
-Following the precedent of `phones.cooldown_override` (`20261021090004`): permission rows in `public.admin_permissions` and the role grants, `app.admin_require(...)` inside `SECURITY DEFINER` RPCs with `search_path = ''`, `app.record_audit_event(...)` for the audit trail, and `service_role`-only execution where the app server is the caller.
-- **Permissions:** `whatsapp_otp.view` (Administrator and above) and `whatsapp_otp.manage` (Super Admin by default; the owner decides the mapping). There is **no new authorization system**.
-- **RPC `admin_whatsapp_otp_settings_begin(...)`:** checks `manage`, validates bounds and a mandatory reason (10 to 500 characters), writes the audit event `whatsapp_otp.settings_requested` (actor, requested values), returns a request id. A non-administrator never reaches the Worker call.
-- **RPC `admin_whatsapp_otp_settings_finish(...)`:** records `whatsapp_otp.settings_changed` (or `..._failed`) with the **authorized actor, the old value, the new value and the timestamp**.
-- Regenerate `supabase/permissions/<version>.json` (the permission gate) and the generated types.
+## Production resources (inspected read-only 2026-11-02)
+Present: D1 `aladdin-whatsapp-otp-production` (0001 table and index, 0 rows, no migration tracking table), Secrets Store `WHATSAPP_ACCESS_TOKEN_PRODUCTION`, `PHONE_OTP_WORKER_SECRET_PRODUCTION`. **Not present:** `OTP_ALLOWED_RECIPIENTS_PRODUCTION` in the Secrets Store (not needed and must never be bound), the admin and notify secrets, and the Production Worker. Production runs `OTP_ENVIRONMENT=production`, `OTP_RECIPIENT_MODE=open`, delivery OFF until the approved cutover, and no `SUPABASE_SEND_SMS_HOOK_SECRET`. R2 remains the single authority for verification and single-use grants.
 
-## Frontend changes (`frontend`)
-- `src/lib/permissions/admin.ts`: the two keys and the route map entry `/admin/whatsapp-otp`.
-- `src/server/actions/whatsapp-otp-settings.ts` (server only): re-checks permission through the RPC, calls the Worker with the admin secret, then records the result. The admin secret `PHONE_OTP_ADMIN_SECRET` is added to `src/lib/env/phone-verification.ts` and is **never** sent to the browser or logged.
-- `src/app/admin/whatsapp-otp/page.tsx`, modeled on `phone-cooldowns`: current limit, consumed, remaining, percentage and level; delivery-failure statistics; thresholds and alert email; a form with a mandatory reason and a typed confirmation of the new number; the change history. A view-only user sees no form.
-- Admin navigation entry and English / Arabic strings.
-
-## Validation and fail-closed matrix
-| Case | Result |
-|---|---|
-| Limit not an integer, `< 1`, `> MAX`, thresholds out of order, reason missing | refused by the RPC, the Worker and the D1 CHECK (three layers) |
-| Stale `expected_version` (two admins, double click) | `409`, nothing changes |
-| Replay of a signed admin request | refused by the replay claim |
-| Worker unreachable, D1 unreadable, settings row missing or invalid | sends nothing (`503 budget_unconfigured`); the dashboard shows the state |
-| Concurrent OTP requests at the limit | exactly the limit are claimed (real-SQL test) |
-| Admin without `manage` | refused at the RPC and the route; the Worker is never called |
-| Budget exhausted | `503 budget_exhausted` before Meta; delivery switch untouched |
-
-The per-phone, per-IP, cooldown, attempt, Turnstile, replay and verification protections are **unchanged**; this adds a layer and removes none.
-
-## Per-environment
-Acceptance and Production each have their own Worker, D1 database, admin secret and settings row. An environment's dashboard talks only to that environment's Worker (derived from its `PHONE_OTP_WORKER_URL`), so a change in Acceptance can never reach Production.
-
-## Testing plan
-Worker real-SQL tests (concurrent claims against a changing limit, concurrent updates with one winner, stale version, replay, invalid values, missing row, boundaries, cron thresholds); pgTAP (permissions, begin/finish gating, audit rows with actor and old/new, anon and non-admin denied); Vitest (actions, no secret in client output); Playwright with the local rig (Administrator is read-only, Super Admin updates, audit shown). The full mandatory CI then reruns on the final combined commit.
-
-## Suggested delivery
-One PR, four commits: Worker, Supabase, frontend, docs and runbook. Interim: the current candidate keeps the env-var budget; the PR removes it. Launch is blocked until this PR is merged and its CI is green.
-
-## Decisions needed from the owner
-1. Approve the proposed initial values in the [Production release plan](WHATSAPP_OTP_PRODUCTION_RELEASE_PLAN.md) (150 per 24 h, 70 % and 90 %).
-2. The alert channel and recipient (email by default) and whether a Worker-only Resend key is acceptable.
-3. Which roles hold `whatsapp_otp.view` and `whatsapp_otp.manage`.
-4. The hard ceiling `MAX_DAILY_LIMIT` (proposed 5000).
+## Testing
+Worker real-SQL tests (concurrent claims against a changing limit and ceiling, concurrent updates with one winner, stale version, replay, tampered body, invalid values, ceiling rules, missing row, outbox dedupe, hysteresis, delivery failure and retry, send unaffected by notification failure); pgTAP (permissions and locked grants, begin/finish/reconcile gating, audit rows with actor and old/new, anon, non-admin and Administrator denied, notification fan-out only to `whatsapp_otp.view` holders, ledger idempotency); Vitest (signing, the notify route negatives, actions, view model and copy parity); then every mandatory CI workflow on the final combined commit.
 
 ## What is deferred
-All implementation; the second alert channel; Meta delivery receipts.
+Meta delivery receipts, a second alert channel, the Production Worker deployment (hosted changes need separate approval), verifying the actual Meta messaging tier.
 
 ## Consequences
-A launch-blocking but contained feature that keeps enforcement where the cost is incurred, uses the existing admin authorization and audit systems, and needs no deploy to adjust the limit.
+A launch-blocking but contained feature that keeps enforcement where the cost is incurred, uses only the existing admin authorization, audit and notification systems, and lets the Super Admin tune limits with no deploy.
 
 ## Related files
-[Production release plan](WHATSAPP_OTP_PRODUCTION_RELEASE_PLAN.md) · [B1 report](B1_REGISTRATION_RECONCILIATION_REPORT.md) · [Worker README](../../edge/whatsapp-otp-worker/README.md) · [work log](../operations/AGENT_WORK_LOG.md)
+[Production release plan](WHATSAPP_OTP_PRODUCTION_RELEASE_PLAN.md) · [B1 report](B1_REGISTRATION_RECONCILIATION_REPORT.md) · [Worker README](../../edge/whatsapp-otp-worker/README.md) · [Notifications core](../database/notifications-core.md) · [work log](../operations/AGENT_WORK_LOG.md)

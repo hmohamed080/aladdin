@@ -1,5 +1,11 @@
 # Runtime State
 
+## WhatsApp OTP admin-controlled limits (stacked PR on #127, code only) — 2026-11-02
+
+- Branch `feat/whatsapp-otp-admin-settings-20261103` (worktree `D:/projects/aladdin-b1-recon`) adds Super Admin control of the Daily Send Limit, the Hard Ceiling and the 70 % / 90 % alert thresholds from `/admin/whatsapp-otp`: Worker D1 migration `0002`, signed `/v1/admin/*` routes, a cron-driven alert outbox, Supabase migration `20261103090001` and the app page, action and `/api/internal/whatsapp-otp/notify` callback.
+- **Nothing hosted changed.** No migration applied, no Worker deployed, no secret created or rotated, no message sent. Production Worker and D1 are untouched (D1 inspected read-only: empty table, no `d1_migrations`).
+- The `OTP_DAILY_SEND_LIMIT` variable is gone; the limit lives only in D1. Until a Super Admin sets it, sending answers `503 budget_unconfigured`.
+
 ## WhatsApp OTP Phase C CLOSED on Acceptance — 2026-11-02 (everything OFF)
 
 - **Pilot PASS:** the Worker delivered a real OTP from Meta sender `1458603463983505` (template `aladdin_otp`, `ar`) and an end-to-end sign-up was verified (grant consumed, `auth.users` 14, profile `phone_verified_at` set). Root cause of the earlier Meta code 10: the System User token lacked the granular `whatsapp_business_messaging` permission for the sender's WhatsApp Account; fixed by assigning the account and regenerating the token. Details: [work log 2026-11-02](AGENT_WORK_LOG.md).

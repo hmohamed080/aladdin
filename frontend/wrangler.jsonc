@@ -26,7 +26,9 @@
       "preview_urls": true,
       "services": [
         { "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend-preview" },
-        { "binding": "BACKEND", "service": "aladdin-backend-preview" }
+        { "binding": "BACKEND", "service": "aladdin-backend-preview" },
+        // Private route to the WhatsApp delivery Worker (it has no public URL). The target Worker must exist before this Worker is deployed.
+        { "binding": "OTP_WORKER", "service": "aladdin-whatsapp-otp-preview" }
       ],
       "images": { "binding": "IMAGES" },
       "version_metadata": { "binding": "CF_VERSION_METADATA" },
@@ -57,7 +59,10 @@
       "workers_dev": false,
       "services": [
         { "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend-production" },
-        { "binding": "BACKEND", "service": "aladdin-backend-production" }
+        { "binding": "BACKEND", "service": "aladdin-backend-production" },
+        // Private route to the WhatsApp delivery Worker (workers_dev off, no routes). DEPLOY ORDER GATE: `aladdin-whatsapp-otp-production` must
+        // already exist, or this Worker's deploy is refused. See docs/operations/WHATSAPP_OTP_PRODUCTION_B3_PREPARATION.md.
+        { "binding": "OTP_WORKER", "service": "aladdin-whatsapp-otp-production" }
       ],
       "images": { "binding": "IMAGES" },
       "version_metadata": { "binding": "CF_VERSION_METADATA" },

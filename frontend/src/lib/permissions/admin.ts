@@ -43,6 +43,10 @@ export const ADMIN_PERMISSIONS = [
   "verification.approve",
   // Secondary phones: lift a number's 30-day cooldown (Super Admin; granted to authorized Support through a role).
   "phones.cooldown_override",
+  // WhatsApp OTP budget: view = Administrator and higher; manage + ceiling_manage = Super Admin only (by default).
+  "whatsapp_otp.view",
+  "whatsapp_otp.manage",
+  "whatsapp_otp.ceiling_manage",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
@@ -108,6 +112,7 @@ export const ADMIN_ROUTE_RULES: Readonly<Record<string, AdminRequirement>> = {
   "/admin/verifications": ["users.read", "organizations.read"],
   "/admin/business-verification": ["organizations.read", "organizations.verify", "verification.approve"],
   "/admin/phone-cooldowns": "phones.cooldown_override",
+  "/admin/whatsapp-otp": "whatsapp_otp.view",
   "/admin/points": "points.read",
   "/admin/analytics": "analytics.read",
   "/admin/audit": "audit.read",

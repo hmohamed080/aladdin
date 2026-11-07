@@ -1,4 +1,5 @@
 import "server-only";
+import { resolveWorkerTransport } from "@/server/whatsapp-otp/worker-binding";
 import { createClient } from "@supabase/supabase-js";
 import { after } from "next/server";
 import { parseServerEnv, readPublicEnv } from "@/lib/env";
@@ -26,7 +27,11 @@ function build() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const db: PhoneVerificationDb = { rpc: (fn, args) => client.rpc(fn, args) as unknown as ReturnType<PhoneVerificationDb["rpc"]> };
-  const transport = selectTransport({ mode: parseDeliveryMode(env.delivery, process.env.NODE_ENV), outboxDir: env.outboxDir, nodeEnv: process.env.NODE_ENV, workerUrl: env.workerUrl, workerSecret: env.workerSecret });
+  const mode = parseDeliveryMode(env.delivery, process.env.NODE_ENV);
+  // Only the Worker mode needs a route to the Worker; in production that is the private service binding, never a public URL.
+  const route = mode === "worker" ? resolveWorkerTransport() : null;
+  if (route && !route.ok) throw new Error("the WhatsApp delivery Worker is not reachable through its service binding");
+  const transport = selectTransport({ mode, outboxDir: env.outboxDir, nodeEnv: process.env.NODE_ENV, workerUrl: env.workerUrl, workerSecret: env.workerSecret, fetchImpl: route?.ok ? route.fetchImpl : undefined });
   return { env, keyring, db, transport };
 }
 

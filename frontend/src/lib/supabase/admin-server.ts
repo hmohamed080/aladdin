@@ -2,7 +2,7 @@ import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readPublicEnv, parseServerEnv } from "@/lib/env";
-import type { Database } from "@/types/database.types";
+import type { Database, Json } from "@/types/database.types";
 import { signupCreateUserPayload, type SignupGrant } from "@/server/phone-verification/signup-service";
 
 /** The one authoritative security flag canonical password auth stamps into `app_metadata` — never `user_metadata`. The value keeps its historical `preview` wording: it is stored on existing accounts and must not change. */
@@ -73,6 +73,59 @@ export function getInstallerSecurityAdminClient(): SupabaseClient<Database> {
  */
 export function getContactEmailAdminClient(): SupabaseClient<Database> {
   return getAdminClient();
+}
+
+/**
+ * The WhatsApp OTP limit RPCs. Every one of them is service_role ONLY by design (see 20261103090001): the app server verifies the session,
+ * derives the actor, reads the current settings from the Worker's signed endpoint and passes them in; the database checks that actor's
+ * effective permissions. Named helpers, not a general client, so nothing else can borrow the service role through this door.
+ */
+type RpcOutcome<T> = { data: T | null; code: string | null; message: string | null };
+async function whatsappOtpRpc<T>(call: (c: SupabaseClient<Database>) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>): Promise<RpcOutcome<T>> {
+  const { data, error } = await call(getAdminClient(15_000));
+  return { data: error ? null : (data as T), code: error?.code ?? null, message: error?.message ?? null };
+}
+
+export function whatsappOtpSettingsBegin(a: { actor: string; expectedVersion: number; old: Json; next: Json; reason: string }) {
+  return whatsappOtpRpc<{ request_id: string; actor_id: string; ceiling_changed: boolean; reason: string; grant: string; grant_expires: number }>((c) =>
+    c.rpc("admin_whatsapp_otp_settings_begin", { p_actor: a.actor, p_expected_version: a.expectedVersion, p_old: a.old, p_new: a.next, p_reason: a.reason }),
+  );
+}
+
+export function whatsappOtpSettingsFinish(a: { actor: string; request: string; status: "applied" | "failed"; version?: number; code?: string }) {
+  return whatsappOtpRpc<string>((c) =>
+    c.rpc("admin_whatsapp_otp_settings_finish", { p_actor: a.actor, p_request: a.request, p_status: a.status, p_version: a.version, p_code: a.code }),
+  );
+}
+
+export function whatsappOtpDeliveryBegin(a: { actor: string; expectedVersion: number; old: boolean | null; next: boolean; reason: string }) {
+  return whatsappOtpRpc<{ request_id: string; actor_id: string; reason: string; grant: string; grant_expires: number }>((c) =>
+    c.rpc("admin_whatsapp_otp_delivery_begin", { p_actor: a.actor, p_expected_version: a.expectedVersion, p_old: a.old, p_new: a.next, p_reason: a.reason }),
+  );
+}
+
+export function whatsappOtpDeliveryFinish(a: { actor: string; request: string; status: "applied" | "failed"; version?: number; code?: string }) {
+  return whatsappOtpRpc<string>((c) =>
+    c.rpc("admin_whatsapp_otp_delivery_finish", { p_actor: a.actor, p_request: a.request, p_status: a.status, p_version: a.version, p_code: a.code }),
+  );
+}
+
+export function whatsappOtpDeliveryReconcile(applied: Json, drift: Json = null) {
+  return whatsappOtpRpc<{ applied: number; abandoned: number; unmatched: number }>((c) => c.rpc("admin_whatsapp_otp_delivery_reconcile", drift ? { p_applied: applied, p_drift: drift } : { p_applied: applied }));
+}
+
+export function whatsappOtpDeliveryAuthorized() {
+  return whatsappOtpRpc<{ enabled: boolean; version: number }>((c) => c.rpc("admin_whatsapp_otp_delivery_authorized"));
+}
+
+export function whatsappOtpSettingsReconcile(applied: Json) {
+  return whatsappOtpRpc<{ applied: number; abandoned: number; unmatched: number }>((c) => c.rpc("admin_whatsapp_otp_settings_reconcile", { p_applied: applied }));
+}
+
+export function whatsappOtpNotificationRecord(a: { eventKey: string; kind: string; sourceEnv: string; occurredAt: number; stats: Json }) {
+  return whatsappOtpRpc<{ status: "recorded" | "duplicate"; recipients: number }>((c) =>
+    c.rpc("whatsapp_otp_notification_record", { p_event_key: a.eventKey, p_kind: a.kind, p_source_env: a.sourceEnv, p_occurred_at: a.occurredAt, p_stats: a.stats }),
+  );
 }
 
 /**

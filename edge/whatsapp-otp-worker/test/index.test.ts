@@ -1,7 +1,7 @@
 import { test, describe } from "node:test";
 import { strict as assert } from "node:assert";
 import { buildMetaPayload, handleRequest, parseSend, readBounded, recipientAllowed, templateLanguage, verifySignature, type Env } from "../src/index.ts";
-import { DELIVERY, FAKE_TOKEN, PHONE, SECRET, baseEnv, goodBody, memoryReplayDb, mockMeta, sign, signedSend } from "./support.ts";
+import { DEFAULT_SETTINGS, DELIVERY, FAKE_TOKEN, PHONE, SECRET, baseEnv, goodBody, memoryReplayDb, mockMeta, sign, signedSend } from "./support.ts";
 
 const OTHER = "7c2e5d2d-1e4b-4d6f-8b88-3a7e4a1b0c22";
 
@@ -150,11 +150,12 @@ describe("idempotency bound to the challenge (delivery_id)", () => {
   });
 });
 
-describe("global rolling-24h send budget (ported from #116's WhatsApp sign-up hardening)", () => {
+describe("global rolling-24h send budget (settings row in D1)", () => {
   const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const withSettings = (over: Partial<typeof DEFAULT_SETTINGS> = {}) => memoryReplayDb({ settings: { ...DEFAULT_SETTINGS, ...over } });
   test("the (limit+1)th delivery inside 24 h is refused BEFORE Meta and before the token is read; earlier ones are sent", async () => {
     const meta = mockMeta(); const reads = { n: 0 };
-    const env = baseEnv({ OTP_DAILY_SEND_LIMIT: "2", tokenReads: reads });
+    const env = baseEnv({ IDEMPOTENCY_DB: withSettings({ daily_limit: 2 }), tokenReads: reads });
     assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(1) })), env, meta.fetcher)).status, 200);
     assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(2) })), env, meta.fetcher)).status, 200);
     const refused = await handleRequest(await signedSend(goodBody({ delivery_id: id(3) })), env, meta.fetcher);
@@ -163,32 +164,52 @@ describe("global rolling-24h send budget (ported from #116's WhatsApp sign-up ha
     assert.equal(meta.calls.length, 2);
     assert.equal(reads.n, 2, "the refused delivery never read the Meta token");
   });
+  test("the effective limit is the Daily Send Limit; the ceiling only bounds what an administrator may set, it never raises the limit", async () => {
+    const meta = mockMeta();
+    const env = baseEnv({ IDEMPOTENCY_DB: withSettings({ daily_limit: 1, hard_ceiling: 5000 }) });
+    assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(1) })), env, meta.fetcher)).status, 200);
+    assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(2) })), env, meta.fetcher)).status, 503);
+  });
   test("a replay of an already-accepted delivery stays a harmless duplicate even when the budget is exhausted; claims older than 24 h do not count", async () => {
-    const meta = mockMeta(); const db = memoryReplayDb(); const env = baseEnv({ OTP_DAILY_SEND_LIMIT: "1", IDEMPOTENCY_DB: db });
+    const meta = mockMeta(); const db = withSettings({ daily_limit: 1 }); const env = baseEnv({ IDEMPOTENCY_DB: db });
     assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(1) })), env, meta.fetcher)).status, 200);
     assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(1) })), env, meta.fetcher)).status, 200, "duplicate, not budget_exhausted");
     assert.equal(meta.calls.length, 1);
-    const old = memoryReplayDb(); old.seed("a".repeat(64), Math.floor(Date.now() / 1000) - 86_401);
-    const env2 = baseEnv({ OTP_DAILY_SEND_LIMIT: "1", IDEMPOTENCY_DB: old });
-    assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(2) })), env2, meta.fetcher)).status, 200, "a 24h+1s-old claim is outside the window");
-    const recent = memoryReplayDb(); recent.seed("b".repeat(64), Math.floor(Date.now() / 1000) - 3_600);
-    assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(3) })), baseEnv({ OTP_DAILY_SEND_LIMIT: "1", IDEMPOTENCY_DB: recent }), meta.fetcher)).status, 503);
+    const old = withSettings({ daily_limit: 1 }); old.seed("a".repeat(64), Math.floor(Date.now() / 1000) - 86_401);
+    assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(2) })), baseEnv({ IDEMPOTENCY_DB: old }), meta.fetcher)).status, 200, "a 24h+1s-old claim is outside the window");
+    const recent = withSettings({ daily_limit: 1 }); recent.seed("b".repeat(64), Math.floor(Date.now() / 1000) - 3_600);
+    assert.equal((await handleRequest(await signedSend(goodBody({ delivery_id: id(3) })), baseEnv({ IDEMPOTENCY_DB: recent }), meta.fetcher)).status, 503);
   });
-  test("a missing or invalid limit fails closed in every environment: nothing is sent, the token is never read", async () => {
-    for (const bad of [undefined, "", "0", "-1", "abc", "1e3", "2.5", " 5", "1000000", "05"]) {
+  test("a missing settings row fails closed in every environment: nothing is sent and the token is never read", async () => {
+    for (const environment of ["acceptance", "production"]) {
       const meta = mockMeta(); const reads = { n: 0 };
-      for (const environment of ["acceptance", "production"]) {
-        const res = await handleRequest(await signedSend(), baseEnv({ OTP_DAILY_SEND_LIMIT: bad, OTP_ENVIRONMENT: environment, tokenReads: reads }), meta.fetcher);
-        assert.equal(res.status, 503, `limit ${JSON.stringify(bad)} in ${environment}`);
-        assert.deepEqual(await res.json(), { error: "budget_unconfigured" });
-      }
+      const res = await handleRequest(await signedSend(), baseEnv({ IDEMPOTENCY_DB: memoryReplayDb({ settings: null, attestationEnv: environment }), OTP_ENVIRONMENT: environment, tokenReads: reads }), meta.fetcher);
+      assert.equal(res.status, 503, environment);
+      assert.deepEqual(await res.json(), { error: "budget_unconfigured" });
       assert.equal(meta.calls.length, 0); assert.equal(reads.n, 0);
     }
   });
-  test("it does not change the answer order for a disabled Worker or a number outside the allowlist", async () => {
+  test("an invalid settings row (limit above the ceiling, thresholds out of order, non-integers, out-of-range) is treated as unconfigured", async () => {
+    const bad: Array<Partial<typeof DEFAULT_SETTINGS>> = [
+      { daily_limit: 10, hard_ceiling: 5 }, { warn_percent: 90, critical_percent: 70 }, { warn_percent: 0 }, { critical_percent: 101 },
+      { daily_limit: 0 }, { daily_limit: 2.5 }, { hard_ceiling: 1_000_001 }, { version: 0 },
+    ];
+    for (const over of bad) {
+      const meta = mockMeta();
+      const res = await handleRequest(await signedSend(), baseEnv({ IDEMPOTENCY_DB: withSettings(over) }), meta.fetcher);
+      assert.equal(res.status, 503, JSON.stringify(over));
+      assert.deepEqual(await res.json(), { error: "budget_unconfigured" });
+      assert.equal(meta.calls.length, 0);
+    }
+  });
+  test("the delivery kill switch is independent of the budget: with delivery OFF the answer is delivery_disabled whatever the settings are", async () => {
     const meta = mockMeta();
-    assert.equal((await handleRequest(await signedSend(), baseEnv({ WHATSAPP_DELIVERY_ENABLED: "false", OTP_DAILY_SEND_LIMIT: undefined }), meta.fetcher)).status, 503);
-    assert.equal((await handleRequest(await signedSend(goodBody({ to: "+201099999999" })), baseEnv({ OTP_DAILY_SEND_LIMIT: undefined }), meta.fetcher)).status, 403);
+    for (const db of [memoryReplayDb({ settings: null }), withSettings({ daily_limit: 1 })]) {
+      const res = await handleRequest(await signedSend(), baseEnv({ WHATSAPP_DELIVERY_ENABLED: "false", IDEMPOTENCY_DB: db }), meta.fetcher);
+      assert.equal(res.status, 503);
+      assert.deepEqual(await res.json(), { error: "delivery_disabled" });
+    }
+    assert.equal((await handleRequest(await signedSend(goodBody({ to: "+201099999999" })), baseEnv({ IDEMPOTENCY_DB: memoryReplayDb({ settings: null }) }), meta.fetcher)).status, 403);
     assert.equal(meta.calls.length, 0);
   });
 });
@@ -249,7 +270,7 @@ describe("preflight (signed, side-effect free) and leak checks", () => {
     const ok = await handleRequest(await signedSend('{"check":"preflight"}', { id: "preflight_1", path: "/v1/preflight" }), env, meta.fetcher);
     assert.equal(ok.status, 200);
     const text = await ok.text(); const out = JSON.parse(text);
-    assert.deepEqual({ ...out, sender_id_suffix: undefined }, { signing_secret_bound: true, meta_token_bound: true, d1_reachable: true, delivery_enabled: false, environment: "acceptance", recipient_mode: "allowlist", allowlist_entries: 1, daily_send_limit: 100, template: "aladdin_otp", languages: "ar", graph_version: "v25.0", sender_id_suffix: undefined });
+    assert.deepEqual({ ...out, sender_id_suffix: undefined, delivery_attestation_age: undefined }, { signing_secret_bound: true, admin_secret_bound: false, admin_grant_secret_bound: false, notify_configured: false, meta_token_bound: true, d1_reachable: true, delivery_permitted: false, delivery_switch: true, delivery_switch_version: 1, delivery_attested: true, delivery_attestation_age: undefined, delivery_enabled: false, environment: "acceptance", recipient_mode: "allowlist", allowlist_entries: 1, settings_initialized: true, daily_send_limit: 100, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90, template: "aladdin_otp", languages: "ar", graph_version: "v25.0", sender_id_suffix: undefined, delivery_blockers: "environment_not_permitted,admin_secret_missing,grant_secret_missing,notify_not_configured" });
     assert.equal(out.sender_id_suffix, "5492");
     for (const secret of [FAKE_TOKEN, SECRET, PHONE, "1012345678", "1415528588305492"]) assert.ok(!text.includes(secret), "preflight must not contain " + secret.slice(0, 6));
     assert.equal(meta.calls.length, 0);
