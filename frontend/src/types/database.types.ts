@@ -3836,6 +3836,39 @@ export type Database = {
           },
         ]
       }
+      phone_verification_challenges: {
+        Row: {
+          attempts: number
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          phone_e164: string
+          purpose: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          phone_e164: string
+          purpose: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone_e164?: string
+          purpose?: string
+        }
+        Relationships: []
+      }
       platform_flags: {
         Row: {
           enabled: boolean
@@ -4687,6 +4720,8 @@ export type Database = {
           available_for_work: boolean
           avatar_media_id: string | null
           bio: string | null
+          city_custom_name: string | null
+          city_key: string | null
           cover_media_id: string | null
           created_at: string
           deleted_at: string | null
@@ -4694,6 +4729,7 @@ export type Database = {
           display_name_ar: string | null
           display_name_confirmed_at: string | null
           display_name_en: string | null
+          governorate_key: string | null
           headline: string | null
           id: string
           languages: string[] | null
@@ -4713,6 +4749,8 @@ export type Database = {
           available_for_work?: boolean
           avatar_media_id?: string | null
           bio?: string | null
+          city_custom_name?: string | null
+          city_key?: string | null
           cover_media_id?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -4720,6 +4758,7 @@ export type Database = {
           display_name_ar?: string | null
           display_name_confirmed_at?: string | null
           display_name_en?: string | null
+          governorate_key?: string | null
           headline?: string | null
           id?: string
           languages?: string[] | null
@@ -4739,6 +4778,8 @@ export type Database = {
           available_for_work?: boolean
           avatar_media_id?: string | null
           bio?: string | null
+          city_custom_name?: string | null
+          city_key?: string | null
           cover_media_id?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -4746,6 +4787,7 @@ export type Database = {
           display_name_ar?: string | null
           display_name_confirmed_at?: string | null
           display_name_en?: string | null
+          governorate_key?: string | null
           headline?: string | null
           id?: string
           languages?: string[] | null
@@ -6220,6 +6262,7 @@ export type Database = {
       }
       users: {
         Row: {
+          birth_date: string | null
           created_at: string
           id: string
           is_verified: boolean
@@ -6231,6 +6274,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          birth_date?: string | null
           created_at?: string
           id: string
           is_verified?: boolean
@@ -6242,6 +6286,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          birth_date?: string | null
           created_at?: string
           id?: string
           is_verified?: boolean
@@ -7644,6 +7689,15 @@ export type Database = {
       }
     }
     Functions: {
+      account_basics_set: {
+        Args: {
+          p_city: string
+          p_city_custom: string
+          p_governorate: string
+          p_specialties: string[]
+        }
+        Returns: undefined
+      }
       account_entry_allowed: { Args: { p_kind: string }; Returns: boolean }
       account_password_confirm: {
         Args: { p_operation: string; p_password: string; p_target: string }
@@ -7808,6 +7862,30 @@ export type Database = {
         Returns: string
       }
       admin_phone_cooldown_status: { Args: { p_phone: string }; Returns: Json }
+      admin_whatsapp_otp_view_check: { Args: never; Returns: boolean }
+      admin_whatsapp_otp_settings_begin: {
+        Args: { p_actor: string; p_expected_version: number; p_old: Json; p_new: Json; p_reason: string }
+        Returns: Json
+      }
+      admin_whatsapp_otp_settings_finish: {
+        Args: { p_actor: string; p_request: string; p_status: string; p_version?: number; p_code?: string }
+        Returns: string
+      }
+      admin_whatsapp_otp_settings_reconcile: { Args: { p_applied: Json }; Returns: Json }
+      admin_whatsapp_otp_delivery_begin: {
+        Args: { p_actor: string; p_expected_version: number; p_old: boolean | null; p_new: boolean; p_reason: string }
+        Returns: Json
+      }
+      admin_whatsapp_otp_delivery_finish: {
+        Args: { p_actor: string; p_request: string; p_status: string; p_version?: number; p_code?: string }
+        Returns: string
+      }
+      admin_whatsapp_otp_delivery_reconcile: { Args: { p_applied: Json; p_drift?: Json }; Returns: Json }
+      admin_whatsapp_otp_delivery_authorized: { Args: never; Returns: Json }
+      whatsapp_otp_notification_record: {
+        Args: { p_event_key: string; p_kind: string; p_source_env: string; p_occurred_at: number; p_stats: Json }
+        Returns: Json
+      }
       admin_rbac_permissions: {
         Args: never
         Returns: {
@@ -8560,6 +8638,41 @@ export type Database = {
         }
         Returns: string
       }
+      admin_staff_invite: {
+        Args: { p_email: string; p_role_id: string; p_reason: string }
+        Returns: Json
+      }
+      admin_staff_invitation_revoke: {
+        Args: { p_id: string; p_reason: string }
+        Returns: undefined
+      }
+      admin_staff_invitations_list: {
+        Args: never
+        Returns: {
+          id: string
+          email_masked: string
+          role_key: string
+          role_name: string
+          status: string
+          expires_at: string
+          created_at: string
+          invited_by: string
+          invited_by_name: string
+          inviter_authorized: boolean
+        }[]
+      }
+      staff_invitation_lookup: {
+        Args: { p_token: string }
+        Returns: { status: string; role_name: string; email_masked: string; matches_caller: boolean; consent_complete: boolean }[]
+      }
+      staff_invitation_registration_check: {
+        Args: { p_token: string; p_email: string }
+        Returns: boolean
+      }
+      staff_invitation_accept: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       invitation_lookup: {
         Args: { p_token: string }
         Returns: {
@@ -8999,6 +9112,7 @@ export type Database = {
         }[]
       }
       my_profile_completion: { Args: never; Returns: Json }
+      my_account_basics: { Args: never; Returns: Json }
       my_registration_state: { Args: never; Returns: string }
       my_review_monthly: {
         Args: { p_months?: number }
@@ -9449,7 +9563,7 @@ export type Database = {
         Returns: {
           audience_kind: Database["public"]["Enums"]["activity_audience_kind"]
           audience_value: string
-          username: string
+          username: string | null
         }[]
       }
       pending_registration_save: {
@@ -9460,7 +9574,7 @@ export type Database = {
           p_user_id: string
           p_username: string
         }
-        Returns: undefined
+        Returns: boolean
       }
       phone_auth_consume_limit: {
         Args: { p_action: string; p_ip_key: string; p_phone_key: string }

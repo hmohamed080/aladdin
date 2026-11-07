@@ -4,7 +4,7 @@ import { SECURITY_HEADERS } from "./src/lib/security/response-headers";
 
 // Set by open-next.config.ts `buildCommand` for the Cloudflare Workers build only.
 // That build swaps the image engine (sharp cannot load in workerd) so the Worker
-// bundle never contains sharp; Vercel and `next build` keep the Node module.
+// bundle never contains sharp; the plain `next build` keeps the Node module.
 const WORKERS_BUILD = process.env.ALADDIN_BUILD_TARGET === "workers";
 const IMAGE_RUNTIME = /[\\/]server[\\/]storage[\\/]image-processing[\\/]runtime\.ts$/;
 
@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
     return config;
   },
 
-  // Baseline security headers on every response, on Vercel and on Workers (security audit 2026-10-22).
+  // Baseline security headers on every response (security audit 2026-10-22).
   async headers() {
     return [{ source: "/:path*", headers: [...SECURITY_HEADERS] }];
   },
@@ -40,8 +40,14 @@ const nextConfig: NextConfig = {
   // validate anything they read from it (e.g. `next` via sanitizeNext).
   async redirects() {
     return [
-      { source: "/temporary/craftsman/sign-up", destination: "/installer/sign-up", permanent: true },
-      { source: "/temporary/craftsman/sign-in", destination: "/installer/sign-in", permanent: true },
+      // The separate craftsman and showroom phone pages were retired (2026-10-28): one sign-in
+      // takes a mobile number, username or email, and one sign-up takes a mobile number or email.
+      { source: "/temporary/craftsman/sign-up", destination: "/auth/sign-up?type=installer_technician", permanent: true },
+      { source: "/temporary/craftsman/sign-in", destination: "/auth/sign-in", permanent: true },
+      { source: "/installer/sign-up", destination: "/auth/sign-up?type=installer_technician", permanent: true },
+      { source: "/installer/sign-in", destination: "/auth/sign-in", permanent: true },
+      { source: "/showroom/sign-up", destination: "/auth/sign-up?type=showroom_dealer", permanent: true },
+      { source: "/showroom/sign-in", destination: "/auth/sign-in", permanent: true },
       // Showroom V2 was reviewed under /preview/showroom-suite-v2; it now lives at /showroom (links stay valid).
       { source: "/preview/showroom-suite-v2", destination: "/showroom", permanent: true },
       { source: "/preview/showroom-suite-v2/:path*", destination: "/showroom/:path*", permanent: true },

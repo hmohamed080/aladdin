@@ -68,10 +68,11 @@ One person can legitimately relate to the platform in several capacities (End Co
 
 ## Canonical Identity Model
 - **One person = one user ID.** A human has exactly **one** authentication/user identity. Creating or joining another business **never** creates a second user for the same person.
-- **One canonical identity per person**, regardless of sign-in method (Email + Password, or the installer Phone + Password exception). No duplicate accounts per role, per contact channel, or per business.
+- **One canonical identity per person**, regardless of sign-in method (email, mobile number or username + password, or Google / Facebook). No duplicate accounts per role, per contact channel, or per business.
 - **Email + Password is canonical** (since 2026-09-28, see Change History):
-  - *General accounts* — sign up with Full Name + Email + Username + Account Type + Password, then Email OTP verification; sign in with Email + Password; Forgot Password via Email OTP recovery.
-  - *Installer/Technician exception* — `/installer/sign-up`: Full Name + Phone + Password (no email, OTP or username in that flow); `/installer/sign-in`: Phone + Password; same canonical user/persona model; installer Forgot Password deferred.
+  - *Sign in* (`/auth/sign-in`) — one field, "Mobile number, username or email", + Password; or Google / Facebook. Forgot Password via Email OTP recovery.
+  - *Sign up* (`/auth/sign-up`) — Google / Facebook, or Mobile number or email + Password + Birthday (required, 18+, private) + Full Name + Username + Account Type under one agreement line. Email is verified by an Email OTP; a mobile number (any account type) by a WhatsApp OTP before the account exists (2026-10-28, see Change History).
+  - ~~*Installer/Technician exception* — separate `/installer/*` (and `/showroom/*`) phone pages~~ — *retired 2026-10-28; old links redirect to `/auth/*`.*
   - *CAPTCHA* — Cloudflare Turnstile on Create Account, Resend, Sign In (email and phone), email code, Forgot Password, Change Password and phone sign-up; invisible unless Cloudflare needs interaction on Sign In, resends and Change Password. Supabase Auth verifies the tokens (also for direct API calls); the app verifies only the phone sign-up's account creation. In effect on a hosted project only once the owner switches its CAPTCHA protection on ([ADR-0023](../decisions/ADR-0023-supabase-auth-verifies-turnstile.md)).
 - ~~**Passwordless.** No passwords, and no password/forgot/reset flows anywhere~~ — *superseded 2026-09-28.*
 - A general account verifies its email at account creation; further contacts (e.g. phone) are added later from profile settings.
@@ -362,7 +363,7 @@ During every account review, Landing Page review, Registration review, and featu
 
 ## What Agents Must NEVER Do
 - **Never** build commerce/marketplace framing (add-to-cart, checkout, price-war bidding) — this is consultation-first.
-- **Never** add a sign-up, sign-in or recovery path outside the canonical model: Email + Password with Email OTP verification and Email OTP recovery for general accounts; Phone + Password at `/installer/sign-up` / `/installer/sign-in` for installers/technicians (Change History 2026-09-28). *(Superseded 2026-09-28: the earlier rule "never add password/forgot/reset UI or flows — the product is passwordless".)*
+- **Never** add a sign-up, sign-in or recovery path outside the canonical model: `/auth/sign-in` (mobile number, username or email + password, or Google / Facebook) and `/auth/sign-up` (email verified by Email OTP, or mobile number verified by WhatsApp OTP), with Email OTP recovery (Change History 2026-10-28 and 2026-09-28). *(Superseded 2026-09-28: the earlier rule "never add password/forgot/reset UI or flows — the product is passwordless".)*
 - **Never** merge roles, and **never** add a Profile Switcher / "Use As" mode or any persona/account-identity-switching UI — roles stay separate in the taxonomy; navigation is **derived**, not toggled. One current primary account type at a time. *(Switching the active **work context** between the personal surface and organizations where the user has an active membership is a different, allowed concept — see [Switching](#switching-what-is-forbidden-what-is-allowed).)*
 - **Never** create a second user/auth identity for the same person — not for another role, another contact channel, or another business. A business is an **Organization**, never a second account.
 - **Never** copy business identity onto the user, or personal identity into organization records, as a second source of truth; after a draft is committed, read from the owning entity.
@@ -379,6 +380,12 @@ During every account review, Landing Page review, Registration review, and featu
 
 ## Change History
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
+
+### 2026-10-28 — Instagram-style sign-in and sign-up; mobile sign-up for every account type
+- **What:** `/auth/sign-in` takes one field, "Mobile number, username or email", plus the password, with Google / Facebook under an "OR". `/auth/sign-up` is a centred form: Google / Facebook, then Mobile number or email, Password, Birthday (required, 18+, private), Full Name, Username and Account Type, under one agreement line instead of three checkboxes (consents still recorded). Every account type may sign up with a mobile number, verified by a 6-digit WhatsApp code (Meta WhatsApp Cloud API) before the account is created. The separate installer and showroom phone pages and their links are removed; old URLs redirect. Auth pages no longer show the photo.
+- **Supersedes:** the installer Phone + Password exception's separate pages (2026-09-28) and the showroom phone entry (ADR-0014). Existing phone accounts sign in on `/auth/sign-in` with their number.
+- **Implementation:** [ADR-0025](../decisions/ADR-0025-one-field-sign-in-whatsapp-sign-up.md), PR #113 branch.
+- **Approved by:** the owner, 2026-10-28 (Instagram-style request; "every account type"; "Meta WhatsApp Cloud API").
 
 ### 2026-10-26 — Sign-in CAPTCHA is verified by Supabase Auth, Sign In included
 - **What:** Turnstile runs on Sign In too (email and phone, invisible unless Cloudflare needs interaction), as well as Create Account, Resend, email code, Forgot Password, Change Password and phone sign-up. Supabase Auth verifies every token it receives, which also blocks direct API calls; the app keeps its own Cloudflare check only for the phone sign-up's account creation. Supersedes "Sign In has no CAPTCHA" and "Supabase global CAPTCHA off" (2026-09-24 / 2026-09-28 entries).

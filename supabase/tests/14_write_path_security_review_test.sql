@@ -126,8 +126,8 @@ select is(
        'users','profiles','verifications','verification_documents','memberships',
        'membership_capabilities','membership_branch_access','branches',
        'platform_role_grants','audit_log']) and privilege_type='UPDATE'),
-  array['users.locale'],
-  'service_role has exactly one reviewed column update grant: users.locale');
+  array['users.birth_date','users.locale'],
+  'service_role has exactly the reviewed column update grants: users.birth_date (sign-up birthday, ADR-0025) and users.locale');
 select is(has_table_privilege('authenticated','public.memberships','select'), true,
   'authenticated retains membership SELECT');
 select is(has_table_privilege('service_role','public.memberships','select'), true,
@@ -135,7 +135,7 @@ select is(has_table_privilege('service_role','public.memberships','select'), tru
 select is(has_column_privilege('service_role','public.users','primary_account_type','update'), false,
   'service_role lacks UPDATE on users.primary_account_type');
 select is(has_column_privilege('service_role','public.users','locale','update'), true,
-  'service_role may update only the non-privileged users.locale column');
+  'service_role may update the non-privileged users.locale column');
 select is(has_column_privilege('service_role','public.profiles','public_profile_status','update'), false,
   'service_role lacks UPDATE on profiles.public_profile_status');
 select is(has_column_privilege('service_role','public.verifications','status','update'), false,

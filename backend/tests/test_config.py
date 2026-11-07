@@ -1,4 +1,4 @@
-"""Deployed configuration: a Vercel deployment never runs as `local`, and a
+"""Deployed configuration: a Cloudflare container never runs as `local`, and a
 misconfigured one stays up but closed (health 503, authenticated endpoints 503).
 """
 
@@ -18,7 +18,6 @@ from app.main import API_PREFIX, create_app
 
 CONFIG_VARS = (
     "APP_ENV",
-    "VERCEL_ENV",
     "CLOUDFLARE_APPLICATION_ID",
     "SUPABASE_URL",
     "SUPABASE_ANON_KEY",
@@ -29,29 +28,17 @@ CONFIG_VARS = (
 
 
 @pytest.mark.parametrize(
-    ("app_env", "vercel_env", "expected"),
+    ("app_env", "expected"),
     [
-        ("", "", "local"),
-        ("local", "", "local"),
-        ("staging", "", "staging"),
-        ("", "production", "production"),
-        ("", "preview", "staging"),
-        ("", "development", "local"),
-        # A deployment can never be talked down to `local`.
-        ("local", "production", "production"),
-        ("LOCAL", "preview", "staging"),
-        # An explicit deployed value wins (e.g. a staging project on a Production deployment).
-        ("staging", "production", "staging"),
-        ("production", "preview", "production"),
-        # Unknown VERCEL_ENV: fail closed.
-        ("", "something-new", "production"),
+        ("", "local"),
+        ("local", "local"),
+        ("LOCAL", "local"),
+        ("staging", "staging"),
+        ("production", "production"),
     ],
 )
-def test_environment_is_derived_from_vercel_when_app_env_is_missing(
-    app_env: str, vercel_env: str, expected: str
-) -> None:
-    settings = Settings(_env_file=None, app_env=app_env, vercel_env=vercel_env)
-    assert settings.environment == expected
+def test_environment_outside_a_container_is_app_env_or_local(app_env: str, expected: str) -> None:
+    assert Settings(_env_file=None, app_env=app_env).environment == expected
 
 
 @pytest.mark.parametrize(
@@ -72,18 +59,12 @@ def test_cloudflare_container_never_runs_as_local(app_env: str, expected: str) -
 
 def test_cloudflare_container_without_app_env_still_checks_secrets() -> None:
     bare = Settings(_env_file=None, cloudflare_application_id="a1b2c3")
-    assert bare.missing_configuration == ["SUPABASE_URL", "SUPABASE_ANON_KEY"]
-
-
-@pytest.mark.parametrize("vercel_env", ["production", "preview"])
-def test_deployed_without_app_env_still_checks_secrets(vercel_env: str) -> None:
-    bare = Settings(_env_file=None, vercel_env=vercel_env)
     assert bare.is_production_like
     assert bare.missing_configuration == ["SUPABASE_URL", "SUPABASE_ANON_KEY"]
 
     ready = Settings(
         _env_file=None,
-        vercel_env=vercel_env,
+        cloudflare_application_id="a1b2c3",
         supabase_url="https://ref.supabase.co",
         supabase_anon_key="anon",
     )
@@ -104,15 +85,15 @@ def test_unknown_app_env_is_a_configuration_error_held_to_deployed_rules() -> No
 
 
 def test_local_development_needs_nothing() -> None:
-    assert Settings(_env_file=None, vercel_env="development").missing_configuration == []
+    assert Settings(_env_file=None).missing_configuration == []
 
 
 @pytest.fixture
 def deployed_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[pytest.MonkeyPatch]:
-    """A Production deployment with no APP_ENV and no secrets, as Vercel runs it today."""
+    """A Cloudflare container with no APP_ENV and no secrets."""
     for name in CONFIG_VARS:
         monkeypatch.setenv(name, "")
-    monkeypatch.setenv("VERCEL_ENV", "production")
+    monkeypatch.setenv("CLOUDFLARE_APPLICATION_ID", "a1b2c3")
     get_settings.cache_clear()
     auth.get_token_verifier.cache_clear()
     yield monkeypatch

@@ -1,0 +1,5 @@
+db reset: ok (193 migrations applied from scratch)
+A2 suite: {"suite":"phone-identity-a2-local","PASS":61,"FAIL":0,"GAP":10,"EVAL":10,"total":81} exit=0
+pgTAP regression (12 files): Files=12, Tests=606,  4 wallclock secs ( 0.19 usr  0.05 sys +  0.26 cusr  0.28 csys =  0.78 CPU) Result: PASS  exit=0
+installer phone-change concurrency: installer phone change concurrency proof passed exit=0
+OVERALL: PASS (0 FAIL; GAP/EVAL rows are expected, see evidence.json)

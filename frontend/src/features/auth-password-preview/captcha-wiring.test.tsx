@@ -21,17 +21,14 @@ vi.mock("@/server/actions/auth-password-preview", () => ({
   verifyPasswordSignUp: vi.fn(),
 }));
 vi.mock("@/server/actions/auth", () => ({ requestEmailOtp: vi.fn(), verifyEmailOtp: vi.fn(), requestSignUpOtp: vi.fn(), verifySignUpOtp: vi.fn() }));
-vi.mock("@/server/actions/installer-phone-auth", () => ({ craftsmanSignIn: vi.fn(), craftsmanSignUp: vi.fn() }));
-vi.mock("@/server/actions/showroom-phone-auth", () => ({ showroomSignIn: vi.fn(), showroomSignUp: vi.fn() }));
+vi.mock("@/server/actions/sign-up", () => ({ requestSignUp: vi.fn(), resendPhoneSignUpCode: vi.fn(), verifyPhoneSignUp: vi.fn() }));
+vi.mock("@/server/actions/entry-oauth", () => ({ startEntryOAuth: vi.fn() }));
 
 import { PasswordSignInForm } from "./sign-in-form";
 import { ChangePasswordForm } from "./change-password-form";
 import { RecoveryVerifyForm } from "./recovery-verify-form";
 import { ForgotPasswordForm } from "./forgot-password-form";
 import { PasswordSignUpForm } from "./sign-up-form";
-import { CraftsmanSignInForm } from "@/features/installer-phone-auth/sign-in-form";
-import { CraftsmanSignUpForm } from "@/features/installer-phone-auth/sign-up-form";
-import { ShowroomAuthForm } from "@/features/showroom-auth/form";
 import { VerifyForm } from "@/features/auth/verify-form";
 import { RecoveryForm } from "@/features/auth/recovery-form";
 
@@ -61,32 +58,10 @@ const tokenFields = () => [...document.querySelectorAll<HTMLInputElement>("input
 const actions = () => renders.map((r) => r.action);
 
 describe("which Turnstile token each auth form submits", () => {
-  it("email sign-in: one interaction-only token (GoTrue judges the password grant)", async () => {
+  it("sign-in (mobile, username or email): one interaction-only token (GoTrue judges the password grant)", async () => {
     await mount(<PasswordSignInForm next="/b2b" />);
     expect(tokenFields()).toEqual(["captchaToken"]);
     expect(renders).toEqual([expect.objectContaining({ action: "sign-in", appearance: "interaction-only" })]);
-  });
-
-  it("installer sign-in: one interaction-only token", async () => {
-    await mount(<CraftsmanSignInForm next="/home" />);
-    expect(tokenFields()).toEqual(["captchaToken"]);
-    expect(renders).toEqual([expect.objectContaining({ action: "phone-sign-in", appearance: "interaction-only" })]);
-  });
-
-  it("Showroom sign-in: one interaction-only token", async () => {
-    await mount(<ShowroomAuthForm variant="signIn" next="/b2b" />);
-    expect(tokenFields()).toEqual(["captchaToken"]);
-    expect(renders).toEqual([expect.objectContaining({ action: "phone-sign-in", appearance: "interaction-only" })]);
-  });
-
-  it.each([
-    ["installer", () => <CraftsmanSignUpForm />],
-    ["Showroom", () => <ShowroomAuthForm variant="signUp" next="/b2b" />],
-  ])("%s phone sign-up: TWO independent tokens - A (Aladdin-verified) and B (forwarded to GoTrue)", async (_label, make) => {
-    await mount(make());
-    expect(tokenFields()).toEqual(["captchaToken", "captchaSessionToken"]);
-    expect(renders[0]).toMatchObject({ action: "phone-sign-up", appearance: "always" });
-    expect(renders[1]).toMatchObject({ action: "phone-sign-up-session", appearance: "interaction-only" });
   });
 
   it("change password: one interaction-only token for the current-password check", async () => {
@@ -104,7 +79,7 @@ describe("which Turnstile token each auth form submits", () => {
     expect(actions()).toEqual(["recovery-resend"]);
   });
 
-  it("password sign-up: the visible challenge on the send form carries the sign-up action", async () => {
+  it("sign-up (mobile or email): one visible challenge with the sign-up action, judged by GoTrue for an email and by Siteverify for a mobile", async () => {
     await mount(<PasswordSignUpForm />);
     expect(actions()).toEqual(["sign-up"]);
     expect(tokenFields()).toEqual(["captchaToken"]);

@@ -17,14 +17,14 @@ The rule from ADR-0001 stands: FastAPI is for AI, OCR, RAG, documents and worker
 |---|---|---|
 | Pages, CRUD, RLS-scoped reads and writes | Next.js + Supabase | Already there; moving it would duplicate every permission path |
 | Upload authorization, presigned URLs, media/video tickets | Next.js | Needs the caller's session at request time; one signer only |
-| Byte delivery and per-request authorization | Media Worker + Postgres | Bytes never through Vercel |
+| Byte delivery and per-request authorization | Media Worker + Postgres | Bytes never through the web app |
 | Media jobs: historical purge, video transcode and purge, variant backfill | FastAPI codebase (`backend/app/workers`) | Long-running, CPU-heavy, service-role, idempotent |
 | AI (OpenAI), OCR of certificates and documents, RAG/embeddings | FastAPI | ADR-0001 scope |
 | Job coordination | Postgres leases + optional Redis wake-ups/locks (ADR-0019) | No queue product needed yet |
 
 ## Proposed work, in order
 
-1. **One worker image.** The jobs run from the backend codebase but **not** inside the Vercel FastAPI function (time limits, no ffmpeg, no bytes through Vercel). Package `uv sync --group video-worker` plus ffmpeg as one container with three entry points: `video_transcode --loop`, `video_transcode --purge` (hourly), `historical_media_purge` (manual). Host choice needs approval (ADR-0020, "Deployment dependencies").
+1. **One worker image.** The jobs run from the backend codebase but **not** inside the request-serving FastAPI container (no ffmpeg there, no bytes through the web app). Package `uv sync --group video-worker` plus ffmpeg as one container with three entry points: `video_transcode --loop`, `video_transcode --purge` (hourly), `historical_media_purge` (manual). Host choice needs approval (ADR-0020, "Deployment dependencies").
 2. **Variant backfill job** (`backend/app/workers/variant_backfill.py`): regenerate missing WebP variants from verified R2 originals and record them with `media_storage_record_variants`, so the app's best-effort variant step can stay best-effort.
 3. **Job health endpoint** on the existing FastAPI service (`/api/backend/jobs/health`, service-authenticated): last successful run per job, queue depth (`processing` videos, unpurged deletions). Read-only.
 4. **Document OCR** for business-verification evidence, preserving the caller's JWT (ADR-0005) and never moving those files out of their Supabase bucket.

@@ -1,5 +1,7 @@
 # Installer/technician phone + password authentication
 
+> **Superseded 2026-10-28 (ADR-0025).** The `/installer/sign-in` and `/installer/sign-up` pages are retired and permanently redirect to `/auth/sign-in` and `/auth/sign-up?type=installer_technician`. Every account type now signs up with a mobile number (WhatsApp code) or email on `/auth/sign-up`, and signs in with one "Mobile number, username or email" field. See [ADR-0025](../decisions/ADR-0025-one-field-sign-in-whatsapp-sign-up.md). The text below is kept as history; the phone login alias it describes is still used.
+
 **Status:** the approved, permanent, role-specific authentication entry point for
 installer/technician (الصنايعية) accounts. The current authentication model is
 **General = Email + Password** (`/auth/*`) and **Installer = Phone + Password**
@@ -192,7 +194,7 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
   target project (the flow uses `profile_set_username`, `profile_set_phone`,
   `access_ready`, and the declared-persona assignment). Check the hosted state first.
 - `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`
-  set in the Vercel environment. Without the Turnstile secret sign-up fails closed.
+  set on the Cloudflare Worker. Without the Turnstile secret sign-up fails closed.
 - Hosted Auth minimum password length should be ≥ 10 to match the app policy.
 
 ## Local verification

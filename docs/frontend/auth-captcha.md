@@ -31,8 +31,8 @@ The approved behaviour, per [ADR-0023](../decisions/ADR-0023-supabase-auth-verif
 
 | Where | Supabase Auth CAPTCHA protection | Effect |
 |---|---|---|
-| Hosted (Acceptance, Production) | Must be ON (Turnstile, the secret matching `NEXT_PUBLIC_TURNSTILE_SITE_KEY`), set by the owner in Dashboard → Authentication → Attack Protection after this code is live | Every protected call is verified, including direct `/auth/v1` calls |
-| Hosted, while the switch is OFF | — | Tokens are only checked for presence. Do not describe the project as CAPTCHA-verified. |
+| Hosted (Acceptance, Production) | ON since 2026-10-28 (Turnstile, the secret matching `NEXT_PUBLIC_TURNSTILE_SITE_KEY`), set by the owner in Dashboard → Authentication → Attack Protection | Every protected call is verified, including direct `/auth/v1` calls |
+| Hosted, if the switch is ever turned OFF (the rollback) | — | Tokens are only checked for presence. Do not describe the project as CAPTCHA-verified while it is off. |
 | Local (`supabase/config.toml`) | OFF by default | A local stack often cannot reach Cloudflare. To try it: add the `[auth.captcha]` block shown in `config.toml` with the always-pass test secret. |
 | CI, `auth-captcha-e2e.yml` | ON with Cloudflare's public test secrets (`scripts/ci/enable-gotrue-captcha.sh`) | Browser suites run through Supabase Auth's check; `frontend/e2e-gotrue-captcha/` calls `/auth/v1` directly |
 

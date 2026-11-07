@@ -4,6 +4,10 @@ import { getBusinessOnboardingData } from "@/server/queries/onboarding";
 import { BusinessFlow } from "@/features/onboarding/business-flow";
 import { businessOrgTypeFromAccountType } from "@/lib/onboarding/account-types";
 import { loadMandatoryBusinessSetup } from "@/server/queries/business-setup";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { loadAccountBasics, missingBasics } from "@/server/queries/account-basics";
+import { loadSpecialtySource } from "@/server/queries/specialty-source";
+import type { BusinessBasics } from "@/features/onboarding/business-flow";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +27,10 @@ export const dynamic = "force-dynamic";
  * Creating the business makes them its owner (`app.organization_create_owned`), selects it as the active workspace, and
  * lands them in /b2b. Anyone else who reaches this page (an existing owner adding a business) gets the same flow, as at
  * /business/new. An invited employee never lands here: they join an existing organization via their invitation link.
+ *
+ * A business registration also answers its account basics here (ADR-0026, owner decision 2026-10-29), never on a
+ * separate page: the business location counts as theirs once the business exists, and a step asks only the owner's
+ * phone and specialties (from their business type's list) still missing.
  */
 export default async function BusinessOnboardingPage() {
   const state = await getRegistrationState();
@@ -37,5 +45,17 @@ export default async function BusinessOnboardingPage() {
   const presetOrgType = mandatory.required ? mandatory.orgType : businessOrgTypeFromAccountType(data.selectedAccountType);
   const answers = mandatory.required ? { ...data.business, orgType: mandatory.orgType } : data.business;
 
-  return <BusinessFlow answers={answers} presetOrgType={presetOrgType} draftId={data.draftId} />;
+  const basics = mandatory.required ? await loadOwnerBasics() : null;
+
+  return <BusinessFlow answers={answers} presetOrgType={presetOrgType} draftId={data.draftId} basics={basics} />;
+}
+
+/** The owner's missing phone and specialties, or null when nothing is owed (or the read fails: never a lock-out). */
+async function loadOwnerBasics(): Promise<BusinessBasics | null> {
+  const basics = await loadAccountBasics(await getServerSupabase()).catch(() => null);
+  if (!basics) return null;
+  const missing = missingBasics(basics);
+  if (!missing.phone && !missing.specialties) return null;
+  const source = missing.specialties ? await loadSpecialtySource(basics.specialtyKind) : null;
+  return { phone: missing.phone, specialties: missing.specialties && source !== null, source };
 }

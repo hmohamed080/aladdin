@@ -88,6 +88,14 @@ export const AUDIT_ACTIONS = [
   "secondary_phone.changed",
   "secondary_phone.converted",
   "phone_cooldown.overridden",
+  // 20261103090001: Super Admin control of the WhatsApp OTP limits.
+  "whatsapp_otp.settings_requested",
+  "whatsapp_otp.settings_changed",
+  "whatsapp_otp.settings_change_failed",
+  // 20261105100001: Super Admin delivery ON/OFF switch.
+  "whatsapp_otp.delivery_requested",
+  "whatsapp_otp.delivery_changed",
+  "whatsapp_otp.delivery_change_failed",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
