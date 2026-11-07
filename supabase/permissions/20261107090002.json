@@ -1,6 +1,6 @@
 {
  "version": "20261107090002",
- "source": "local supabase/postgres:17 replay of every migration through this version (feat/showroom-social-links-20261105, isolated stack aladdin_sociallinks) UNION with the WhatsApp OTP stack (#127/#136: 32 functions of 20261030090001, 20261030090002, 20261103090001 and 20261105100001, copied unchanged from 20261105100001.json) so the highest-numbered manifest describes every function when both lineages are merged. Verified against a replay of the merged migrations.",
+ "source": "local supabase/postgres:17 replay of every migration through this version (feat/showroom-social-links-20261105, isolated stack aladdin_sociallinks) UNION with the WhatsApp OTP stack (#127/#136: 27 functions of 20261030090001, 20261030090002 and 20261103090001, copied unchanged from 20261103090001.json) so the highest-numbered manifest describes every function when both lineages are merged. Verified against a replay of the merged migrations.",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.media_storage_resolve(text,text,text)",
@@ -25966,117 +25966,6 @@
     "supabase_auth_admin": false,
     "supabase_storage_admin": false
    },
-   "signature": "public.admin_whatsapp_otp_delivery_begin(uuid,integer,boolean,boolean,text)",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": true,
-    "authenticated": true,
-    "authenticator": true,
-    "dashboard_user": true,
-    "supabase_auth_admin": true,
-    "supabase_storage_admin": true
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
-     "role": "postgres",
-     "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": true,
-    "authenticated": false,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
-   "signature": "public.admin_whatsapp_otp_delivery_finish(uuid,uuid,text,integer,text)",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": true,
-    "authenticated": true,
-    "authenticator": true,
-    "dashboard_user": true,
-    "supabase_auth_admin": true,
-    "supabase_storage_admin": true
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
-     "role": "postgres",
-     "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": true,
-    "authenticated": false,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
-   "signature": "public.admin_whatsapp_otp_delivery_reconcile(jsonb,jsonb)",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": true,
-    "authenticated": true,
-    "authenticator": true,
-    "dashboard_user": true,
-    "supabase_auth_admin": true,
-    "supabase_storage_admin": true
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
-     "role": "postgres",
-     "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": true,
-    "authenticated": false,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
    "signature": "public.admin_whatsapp_otp_settings_begin(uuid,integer,jsonb,jsonb,text)",
    "schemaUsage": {
     "anon": true,
@@ -26226,76 +26115,6 @@
     "supabase_storage_admin": false
    },
    "signature": "public.whatsapp_otp_notification_record(text,text,text,bigint,jsonb)",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": true,
-    "authenticated": true,
-    "authenticator": true,
-    "dashboard_user": true,
-    "supabase_auth_admin": true,
-    "supabase_storage_admin": true
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
-     "role": "postgres",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": false,
-    "authenticated": false,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
-   "signature": "app.whatsapp_otp_record_delivery_unmatched(integer,bigint)",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": false,
-    "authenticated": true,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
-     "role": "postgres",
-     "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": true,
-    "authenticated": false,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
-   "signature": "public.admin_whatsapp_otp_delivery_authorized()",
    "schemaUsage": {
     "anon": true,
     "service_role": true,

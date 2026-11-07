@@ -41,13 +41,13 @@ To reproduce the read-only checks without touching any repo checkout: copy `supa
 | 6 | `20261030090002_phone_signup_authority` | phone sign-up authority (dormant, ships OFF) | #125 / #126 | Dormant OTP chain |
 | 7 | `20261103090001_whatsapp_otp_admin_settings` | limits, alerts, grant key table, notification vocabulary | #136 | **Yes** |
 | 8 | `20261105090001_admin_staff_invitations` | Admin Staff invitations | #137 | **No** (unrelated) |
-| 9 | `20261105100001_whatsapp_otp_delivery_switch` | delivery switch ledger, reconcile, authorized-state function | #136 | **Yes** |
+| 9 | `20261107090003_whatsapp_otp_delivery_switch` | delivery switch ledger, reconcile, authorized-state function | #136 | **Yes** |
 | 10 | `20261107090001_showroom_social_links` | showroom social links | #139, already on `main` | **No** |
 | 11 | `20261107090002_showroom_social_links_settings` | showroom social links settings | #139, already on `main` | **No** |
 
 **Dependencies (verified by CI):** #9 depends on #7 only (the grant-key table, notification tables and permissions). It does **not** depend on #8: the stack is green with and without it, and the union manifest passes the permission gate. #8 depends on nothing in the OTP work. Production applies them in version order in one push, so nothing is out of order (Production's latest is `20261027090001`).
 
-**Decision D1 (#137):** including #8 now is the clean order (version order, no `--include-all`). Excluding it means that when #137 is promoted later its migration is older than the already-applied `20261105100001` and needs `migration-policy: out-of-order-reviewed` plus `db push --include-all`, or a rename through `retired-versions.json`. The permission manifest `20261105100001.json` on the union branch is already the union of both (732 contracts); on #136 alone it is 723.
+**Decision D1 (#137):** including #8 now is the clean order (version order, no `--include-all`). Excluding it means that when #137 is promoted later its migration is older than the already-applied `20261107090003` and needs `migration-policy: out-of-order-reviewed` plus `db push --include-all`, or a rename through `retired-versions.json`. The permission manifest `20261107090003.json` on the union branch is already the union of both (732 contracts); on #136 alone it is 723.
 
 **Unrelated-change warning:** migrations #1 to #4, #8, #10 and #11, and most of the frontend delta, are not WhatsApp delivery. They ship because the stack is stacked on them and because the Production frontend deploys from `main`. They change live sign-in and onboarding (`/auth/sign-in`, `/auth/sign-up`, `/onboarding/*`, retired `/installer/*` and `/showroom/*` sign-in pages). Deploying the frontend is therefore **not** "infrastructure only": see P-7.
 

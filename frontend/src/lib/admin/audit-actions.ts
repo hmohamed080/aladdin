@@ -92,7 +92,7 @@ export const AUDIT_ACTIONS = [
   "whatsapp_otp.settings_requested",
   "whatsapp_otp.settings_changed",
   "whatsapp_otp.settings_change_failed",
-  // 20261105100001: Super Admin delivery ON/OFF switch.
+  // 20261107090003: Super Admin delivery ON/OFF switch.
   "whatsapp_otp.delivery_requested",
   "whatsapp_otp.delivery_changed",
   "whatsapp_otp.delivery_change_failed",
