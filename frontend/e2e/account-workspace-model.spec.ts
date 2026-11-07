@@ -63,6 +63,9 @@ async function createBusiness(page: Page, name: string, branch: string, opts: { 
   if (opts.showroom) {
     await page.locator("#bactivity").selectOption("decor_showroom");
     await page.locator("#bphone").fill(`10${String(Date.now()).slice(-8)}`);
+    // A showroom needs at least one valid link to leave step 1.
+    await page.locator('button[aria-controls="blinks-instagram-panel"]').click();
+    await page.locator("#blinks-instagram").fill("@shop");
   }
   await next();
   if (opts.orgType) {

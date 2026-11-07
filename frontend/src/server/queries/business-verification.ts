@@ -155,6 +155,7 @@ export type BvDetail = {
     id: string; name: string; nameAr: string | null; nameEn: string | null; legalName: string | null; orgType: OrgType;
     status: string; isVerified: boolean; businessVerifiedAt: string | null; createdAt: string;
     contactPhone: string | null; contactEmail: string | null;
+    facebookUrl: string | null; instagramUrl: string | null; tiktokUrl: string | null; websiteUrl: string | null;
     owner: { id: string; displayName: string | null; email: string | null } | null;
   };
   submissions: BvSubmission[];
@@ -179,6 +180,8 @@ export async function loadBusinessVerificationDetail(supabase: Supabase, id: str
       orgType: str(o.org_type) as OrgType, status: str(o.status), isVerified: o.is_verified === true,
       businessVerifiedAt: strOrNull(o.business_verified_at), createdAt: str(o.created_at),
       contactPhone: strOrNull(o.contact_phone), contactEmail: strOrNull(o.contact_email),
+      facebookUrl: strOrNull(o.facebook_url), instagramUrl: strOrNull(o.instagram_url),
+      tiktokUrl: strOrNull(o.tiktok_url), websiteUrl: strOrNull(o.website_url),
       owner: owner ? { id: str(owner.id), displayName: strOrNull(owner.display_name), email: strOrNull(owner.email) } : null,
     },
     submissions: parseSubmissions(r.submissions),

@@ -202,7 +202,9 @@ insert into feature_actions values
   ('profile.phone_change_needs_attention'),
   ('profile.phone_changed'),
   -- Cover photo (20261024090009).
-  ('profile.cover_set');
+  ('profile.cover_set'),
+  -- Showroom social links edited from Settings (20261107090002).
+  ('organization.social_links_changed');
 -- Actions the PR stack (#88 business verification + secondary phone, #91 media purge) and main's #96 added.
 create temp table stack_actions(a text primary key) on commit drop;
 insert into stack_actions values

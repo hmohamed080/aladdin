@@ -21,6 +21,12 @@ describe("CompleteProfileCard", () => {
     expect(screen.getByRole("link", { name: "Confirm your display name" })).toBeTruthy();
   });
 
+  it("links the organization_links item to the showroom settings", () => {
+    renderWithI18n(<CompleteProfileCard completion={{ percent: 80, missing: ["organization_links"] }} />, "en");
+    const a = screen.getByRole("link", { name: "Add a link to your showroom's social media or website" });
+    expect(a.getAttribute("href")).toBe("/b2b/settings");
+  });
+
   it("disappears entirely at 100%", () => {
     const { container } = renderWithI18n(<CompleteProfileCard completion={{ percent: 100, missing: [] }} />, "en");
     expect(container.textContent).toBe("");

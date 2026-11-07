@@ -1,5 +1,10 @@
 # Runtime State
 
+## Showroom social links (draft PR) — 2026-11-05
+- Branch `feat/showroom-social-links-20261105` (from `main` `f823d88c`): migrations `20261107090001` and `20261107090002` plus the frontend. Draft PR opened 2026-11-07; not applied to Acceptance or Production; both migrations are expand-only. Deploy order when approved: migrations first, then the frontend. Rollback: revert the frontend, the migrations may stay.
+- Review fix wave (local): links limited to showrooms in the RPCs, action and wizard; completion item mirrors the address rule; i18n and accessibility fixes. pgTAP now 145 files / 6513 tests PASS.
+- Local verification: pgTAP 145 files / 6499 tests PASS, migration policy PASS, permission contract 695 exact PASS, Playwright journey 6 passed on a private local stack. Details in the work log.
+
 ## Persistent Showroom shell (draft PR, not merged) — 2026-11-05
 - Branch `fix/persistent-workspace-shell-20261105` from `main` `f823d88c`. Frontend routing only: `/b2b/*` and `/showroom/*` now live under the `(workspace)` route group so the Showroom shell stays mounted when a link crosses between them ([ADR-0025](../decisions/ADR-0025-persistent-showroom-shell.md)). No URL, migration, permission, hosted or deploy change.
 - Verified locally: typecheck, lint, production build, focused and full Vitest (see the work log for the 5 failures and why each is or is not this change). Not verified in a browser; the new Playwright spec is unrun.

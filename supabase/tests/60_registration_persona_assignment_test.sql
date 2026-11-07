@@ -20,7 +20,7 @@ create function pg_temp.attest_owned_fixture() returns void language sql securit
   on conflict(namespace,object_key) do nothing;
 $$;
 
-select plan(149);
+select plan(150);
 
 
 insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data,
@@ -144,10 +144,11 @@ select throws_ok($$ select public.user_activities_set(array['sales_rep']) $$, '2
 select set_config('test.draft_showroom', public.business_draft_save(p_legal_name => 'P60 showroom LLC', p_display_name => 'P60 showroom', p_org_type => 'showroom_dealer', p_primary_branch_name => 'HQ')::text, true);
 select set_config('test.org_showroom', public.business_draft_submit(current_setting('test.draft_showroom')::uuid)::text, true);
 select is((select org_type::text from public.organizations where id = current_setting('test.org_showroom')::uuid), 'showroom_dealer', 'showroom: the organization is created only by the explicit business flow, with the intended type');
-select is((select array_agg(x order by x) from jsonb_array_elements_text(public.my_profile_completion() -> 'missing') x), array['organization_activities','organization_address'], 'showroom: the owner is now asked for activities and the optional onboarding address');
+select is((select array_agg(x order by x) from jsonb_array_elements_text(public.my_profile_completion() -> 'missing') x), array['organization_activities','organization_address','organization_links'], 'showroom: the owner is now asked for activities, the optional onboarding address and a social or website link');
 select lives_ok(format($$ select public.organization_activities_set(%L, array['decor_showroom']) $$, current_setting('test.org_showroom')), 'showroom: sets an organization subtype');
-select is((public.my_profile_completion() ->> 'percent')::int, 86, 'showroom: missing address still prevents profile completion');
+select is((public.my_profile_completion() ->> 'percent')::int, 75, 'showroom: missing address and link still prevent profile completion');
 select lives_ok(format($$ select public.branch_update_i18n(%L, null, null, '60 Profile Completion Street', null, 'Africa/Cairo') $$, (select id from public.branches where organization_id=current_setting('test.org_showroom')::uuid and deleted_at is null limit 1)), 'showroom: owner completes address through the authorized branch editor RPC');
+select lives_ok(format($$ select public.organization_social_links_set(%L, null, null, null, 'https://p60-showroom.example.com') $$, current_setting('test.org_showroom')), 'showroom: owner adds a website link from Settings');
 select is((public.my_profile_completion() ->> 'percent')::int, 100, 'showroom: reaches 100%');
 select is(public.my_registration_state(), 'active_personal', 'showroom: a REAL membership is what yields active_personal');
 reset role;

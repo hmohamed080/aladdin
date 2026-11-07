@@ -25,6 +25,7 @@ import { loadOrganizationImageUrl } from "@/server/queries/organization-image";
 import { OrganizationImageField } from "@/features/organization/organization-image-field";
 import { OrganizationDescriptionField } from "@/features/organization/organization-description-field";
 import { OrganizationLegalNameField } from "@/features/organization/organization-legal-name-field";
+import { OrganizationSocialLinksField } from "@/features/organization/organization-social-links-field";
 import { OrganizationContactCard } from "@/features/organization/organization-contact-card";
 import { getOwnOrganizationContact } from "@/server/queries/contacts";
 import { setOrganizationActivitiesAction } from "@/server/actions/activities";
@@ -133,7 +134,7 @@ async function BusinessSection({ ctx, locale, canManageOrg }: { ctx: Ctx; locale
   const [{ data: record }, identityState, imageUrl, ownContact] = await Promise.all([
     supabase
       .from("organizations")
-      .select("name, org_type, status, business_verified_at, name_ar, name_en, timezone, description, legal_name, contact_phone, contact_email")
+      .select("name, org_type, status, business_verified_at, name_ar, name_en, timezone, description, legal_name, contact_phone, contact_email, facebook_url, instagram_url, tiktok_url, website_url")
       .eq("id", org.organizationId)
       .maybeSingle(),
     // A verified organization's name changes only through a review request (never a direct edit).
@@ -159,6 +160,15 @@ async function BusinessSection({ ctx, locale, canManageOrg }: { ctx: Ctx; locale
         <div className="mt-md"><OrganizationImageField orgId={org.organizationId} imageUrl={imageUrl} canManage={canManageOrg} /></div>
         <div className="mt-md"><OrganizationDescriptionField orgId={org.organizationId} description={record?.description ?? null} canManage={canManageOrg} /></div>
         <div className="mt-md"><OrganizationLegalNameField orgId={org.organizationId} legalName={record?.legal_name ?? null} canManage={canManageOrg} locked={identityState?.locked ?? false} /></div>
+        {record?.org_type === "showroom_dealer" ? (
+          <div className="mt-md">
+            <OrganizationSocialLinksField
+              orgId={org.organizationId}
+              canManage={canManageOrg}
+              links={{ facebook: record.facebook_url ?? null, instagram: record.instagram_url ?? null, tiktok: record.tiktok_url ?? null, website: record.website_url ?? null }}
+            />
+          </div>
+        ) : null}
         <dl className="mt-md grid gap-md tablet:grid-cols-2">
           <Field label={m.settings.field.name}>{resolveBilingualText(locale, record?.name ?? org.organizationName, record?.name_ar ?? null, record?.name_en ?? null)}</Field>
           <Field label={m.settings.field.type}>{record?.org_type ? m.directory.orgType[record.org_type] : "—"}</Field>

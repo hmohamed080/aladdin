@@ -291,7 +291,7 @@ test("complete showroom journey: optional address, admin activation and seller a
  await expect(page.getByRole("button",{name:"متابعة",exact:true})).toBeDisabled();
  await page.locator('#bactivity').selectOption("paint_showroom");
  await expect(page.getByRole("button",{name:"متابعة",exact:true})).toBeDisabled();
- await page.locator('#bphone').fill("01012345678");await page.locator('#bemail').fill(" Contact@Example.test ");
+ await page.locator('#bphone').fill("01012345678");await page.locator('button[aria-controls="blinks-instagram-panel"]').click();await page.locator('#blinks-instagram').fill("@shop");await page.locator('#bemail').fill(" Contact@Example.test ");
  await page.getByRole("button",{name:"متابعة",exact:true}).click();await expect(page.locator('#bgov')).toBeVisible();await page.reload();
  await page.getByRole("button",{name:"رجوع",exact:true}).click();
  await expect(page.locator('#bname')).toHaveValue("معرض الاختبار المحلي");
