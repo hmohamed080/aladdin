@@ -230,6 +230,7 @@ declare
   v_applied integer := 0;
   v_abandoned integer := 0;
   v_unmatched integer := 0;
+  v_claims text := coalesce(current_setting('request.jwt.claims', true), '');   -- restored after every audit event: no actor ever leaks into the next step
 begin
   if p_applied is null or jsonb_typeof(p_applied) <> 'array' or jsonb_array_length(p_applied) > 100 then
     raise exception 'whatsapp_otp: invalid_reconcile_input' using errcode = '22023';
@@ -253,6 +254,7 @@ begin
       perform app.record_audit_event('whatsapp_otp.delivery_changed', 'whatsapp_otp_delivery', v_row.id, null,
         jsonb_build_object('request_id', v_row.id, 'actor_id', v_row.actor_id, 'old', v_row.old_enabled, 'new', v_row.new_enabled,
                            'reason', v_row.reason, 'version', v_row.result_version, 'reconciled', true));
+      perform set_config('request.jwt.claims', v_claims, true);
       v_applied := v_applied + 1;
     elsif not exists (
       select 1 from app.whatsapp_otp_delivery_requests r
@@ -274,6 +276,7 @@ begin
     perform set_config('request.jwt.claims', json_build_object('sub', v_row.actor_id, 'role', 'authenticated')::text, true);
     perform app.record_audit_event('whatsapp_otp.delivery_change_failed', 'whatsapp_otp_delivery', v_row.id, null,
       jsonb_build_object('request_id', v_row.id, 'actor_id', v_row.actor_id, 'code', 'not_applied', 'reconciled', true));
+    perform set_config('request.jwt.claims', v_claims, true);
     v_abandoned := v_abandoned + 1;
   end loop;
   -- DRIFT: the Worker's switch row is not accounted for by ANY audit row (a direct write to D1 that bypassed the audit). The Worker already
