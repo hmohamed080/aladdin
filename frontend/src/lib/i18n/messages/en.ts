@@ -2716,6 +2716,7 @@ export const en = {
       onHelp: "Sending is on. Verification codes are delivered by WhatsApp, within the daily limit below. Turn it off at any time to stop all codes immediately.",
       offHelp: "Sending is off. No verification code is sent by WhatsApp, so sign-ups and phone checks that need a code cannot finish. Settings and this page keep working.",
       offByEnvironmentHelp: "The switch is on, but this environment does not allow sending, so nothing is sent.",
+      attestationOverdueHelp: "The switch is on, but the Aladdin database has not confirmed it for several minutes, so nothing is being sent. Check the delivery service logs (whatsapp_otp_attestation_failed) and the alerts.",
       awaitingConfirmationHelp: "The switch is on. Sending starts once the Aladdin database confirms it, normally within a minute. Nothing is sent until then; if this does not change, check the alerts.",
       blockedHelp: "Sending cannot be turned on yet. Still missing: {items}.",
       confirmOnTitle: "Turn WhatsApp code sending on?",

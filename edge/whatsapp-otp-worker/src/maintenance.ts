@@ -161,7 +161,13 @@ export async function runMaintenance(
   try { await evaluateAlerts(db, nowSeconds); summary.evaluated = true; } catch { summary.errors.push("evaluate"); }
   try { const r = await deliverOutbox(env, db, fetcher, nowSeconds); summary.delivered = r.delivered; summary.failed = r.failed; } catch { summary.errors.push("deliver"); }
   // Independent reconciliation against the Aladdin database (signed attestation the send path requires; see attest.ts). Never throws.
-  try { summary.attested = (await runAttestation(env, db, fetcher, nowSeconds)).attested; } catch { summary.errors.push("attest"); }
+  try {
+    const a = await runAttestation(env, db, fetcher, nowSeconds);
+    summary.attested = a.attested;
+    // MONITORING: one structured line per failed round trip, a fixed reason code only (never a value, header or body). Search Workers Logs for
+    // event = "whatsapp_otp_attestation_failed"; sustained failures stop delivery from being ON (fail closed) and are shown on the Admin page.
+    if (!a.attested) console.warn(JSON.stringify({ event: "whatsapp_otp_attestation_failed", reason: a.skipped ?? "unknown" }));
+  } catch { summary.errors.push("attest"); console.warn(JSON.stringify({ event: "whatsapp_otp_attestation_failed", reason: "exception" })); }
   if (summary.errors.length) console.warn(JSON.stringify({ event: "whatsapp_otp_maintenance_errors", steps: summary.errors }));
   return summary;
 }

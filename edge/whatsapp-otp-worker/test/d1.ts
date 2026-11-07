@@ -40,6 +40,8 @@ export function envFor(d1: unknown, over: Partial<Env> = {}): Env {
     OTP_ADMIN_GRANT_SECRET: { get: async () => GRANT_SECRET },
     OTP_NOTIFY_SIGNING_SECRET: { get: async () => NOTIFY_SECRET },
     OTP_NOTIFY_URL: NOTIFY_URL,
+    // a private transport exists by default (answers 503: nothing reachable); tests that need none pass APP_NOTIFY: undefined
+    APP_NOTIFY: { fetch: async () => new Response(null, { status: 503 }) } as never,
     ...over,
   });
 }

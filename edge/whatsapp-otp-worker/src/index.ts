@@ -23,6 +23,7 @@
 import { handleAdminRequest, isAdminPath } from "./admin.ts";
 import type { Db } from "./db.ts";
 import { attestationFacts, deliveryEffectivelyOn } from "./attest.ts";
+import { notifyTransportAvailable } from "./notify-transport.ts";
 import { deliveryBlockers, readDeliverySwitch } from "./delivery.ts";
 import { runMaintenance } from "./maintenance.ts";
 import { type OtpSettings, readSettings } from "./settings.ts";
@@ -362,7 +363,8 @@ async function preflightReport(env: Env): Promise<Record<string, string | number
   let grantBound = false;
   try { grantBound = Boolean(await env.OTP_ADMIN_GRANT_SECRET?.get()); } catch { grantBound = false; }
   let notifyConfigured = false;
-  try { notifyConfigured = Boolean(env.OTP_NOTIFY_URL) && Boolean(await env.OTP_NOTIFY_SIGNING_SECRET?.get()); } catch { notifyConfigured = false; }
+  // "Configured" means a URL, a secret AND a private transport (the APP_NOTIFY binding): the alert callback and the delivery attestation both need all three.
+  try { notifyConfigured = Boolean(env.OTP_NOTIFY_URL) && Boolean(await env.OTP_NOTIFY_SIGNING_SECRET?.get()) && notifyTransportAvailable(env); } catch { notifyConfigured = false; }
   let sw: Awaited<ReturnType<typeof readDeliverySwitch>> = null;
   try { sw = env.IDEMPOTENCY_DB ? await readDeliverySwitch(env.IDEMPOTENCY_DB as unknown as Db) : null; } catch { sw = null; }
   const permitted = env.WHATSAPP_DELIVERY_ENABLED === "true";

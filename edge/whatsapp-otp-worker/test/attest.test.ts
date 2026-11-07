@@ -122,7 +122,7 @@ describe("the scheduled attestation round trip", () => {
         assert.equal(r.attested, false, label);
         assert.equal(await stored(d1), null, label);
       }
-      assert.deepEqual(await runAttestation(envFor(d1) as never, d1 as never, fetch, now()), { attested: false, skipped: "notify_transport_unavailable" }, "no binding: nothing sent, no public fetch");
+      assert.deepEqual(await runAttestation(envFor(d1, { APP_NOTIFY: undefined }) as never, d1 as never, fetch, now()), { attested: false, skipped: "notify_transport_unavailable" }, "no binding: nothing sent, no public fetch");
       assert.deepEqual(await runAttestation(envFor(d1, { OTP_NOTIFY_URL: undefined, APP_NOTIFY: app() as never }) as never, d1 as never, fetch, now()), { attested: false, skipped: "notify_unconfigured" });
       const throwing = { fetch: async () => { throw new Error("service unavailable"); } };
       assert.equal((await runAttestation(envFor(d1, { APP_NOTIFY: throwing as never }) as never, d1 as never, fetch, now())).attested, false);
@@ -136,6 +136,31 @@ describe("the scheduled attestation round trip", () => {
       const summary = await runMaintenance(env as never, async () => undefined, fetch);
       assert.equal(summary.attested, true);
       assert.deepEqual(summary.errors, []);
+    });
+  });
+});
+
+describe("monitoring: a failed attestation leaves one structured line with a fixed reason code and nothing else", () => {
+  test("app 503, unsigned answer, no transport and unreachable app are each logged; a success logs nothing", async () => {
+    await withD1(async (d1) => {
+      await configure(d1);
+      const lines: string[] = [];
+      const warn = console.warn;
+      console.warn = (m: unknown) => { lines.push(String(m)); };
+      try {
+        const run = (over: object) => runMaintenance(envFor(d1, over as never) as never, async () => undefined, fetch);
+        await run({ APP_NOTIFY: app({ status: 503 }) });
+        await run({ APP_NOTIFY: app({ badMac: true }) });
+        await run({ APP_NOTIFY: undefined });
+        await run({ APP_NOTIFY: { fetch: async () => { throw new Error("secret-looking-detail whsec_x"); } } });
+        const before = lines.length;
+        await run({ APP_NOTIFY: app({ authorized: { enabled: false, version: 0 } }) });
+        assert.equal(lines.filter((l) => l.includes("attestation")).length, before, "a success adds no attestation line");
+      } finally { console.warn = warn; }
+      const events = lines.map((l) => JSON.parse(l)).filter((e) => e.event === "whatsapp_otp_attestation_failed");
+      assert.deepEqual(events.map((e) => e.reason), ["app_503", "answer_unsigned", "notify_transport_unavailable", "attest_failed"]);
+      assert.ok(events.every((e) => Object.keys(e).sort().join() === "event,reason"), "only an event name and a reason code");
+      assert.ok(!lines.join("").includes("whsec_") && !lines.join("").includes("secret-looking"));
     });
   });
 });
