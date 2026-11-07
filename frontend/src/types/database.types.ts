@@ -7741,6 +7741,60 @@ export type Database = {
         Args: { p_assignment_id: string; p_reason?: string; p_scope_id: string }
         Returns: undefined
       }
+      admin_backup_activate: {
+        Args: {
+          p_actor: string
+          p_confirmation: string
+          p_enabled: boolean
+          p_reason: string
+          p_receipt: string
+        }
+        Returns: boolean
+      }
+      admin_backup_initialize: {
+        Args: { p_actor: string; p_environment: string }
+        Returns: string
+      }
+      admin_backup_mark_dispatched: {
+        Args: {
+          p_actor: string
+          p_code?: string
+          p_github_run_id?: number
+          p_github_run_url?: string
+          p_ok: boolean
+          p_run: string
+        }
+        Returns: string
+      }
+      admin_backup_reconcile: {
+        Args: {
+          p_actor: string
+          p_conclusion: string
+          p_github_run_id: number
+          p_github_run_url: string
+          p_run: string
+          p_status: string
+          p_summary: Json
+        }
+        Returns: string
+      }
+      admin_backup_request: {
+        Args: { p_actor: string; p_kind: string; p_reason: string; p_receipt: string }
+        Returns: Json
+      }
+      admin_backup_status: { Args: never; Returns: Json }
+      admin_backup_update_schedule: {
+        Args: {
+          p_acceptance_schedule: string
+          p_config?: Json;
+          p_actor: string
+          p_expected_version: number
+          p_production_restore_schedule_enabled: boolean
+          p_reason: string
+          p_receipt: string
+        }
+        Returns: number
+      }
       admin_case_create: {
         Args: {
           p_contact_email?: string
@@ -8062,6 +8116,19 @@ export type Database = {
         Args: { p_content_type: string }
         Returns: string
       }
+      backup_report_run: {
+        Args: {
+          p_code?: string
+          p_conclusion?: string
+          p_environment: string
+          p_github_run_id: number
+          p_kind: string
+          p_status: string
+          p_summary?: Json
+        }
+        Returns: string
+      }
+      backup_schedule_read: { Args: never; Returns: Json }
       branch_assign: {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: string

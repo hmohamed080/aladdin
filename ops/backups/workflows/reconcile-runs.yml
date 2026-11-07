@@ -1,0 +1,31 @@
+# Runs after the data job finishes, independently of frontend availability.
+name: Reconcile backup evidence
+on:
+  workflow_run:
+    workflows: [Daily backup, Monthly restore test]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile:
+    if: github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.repository.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        label: [acceptance, production]
+    runs-on: ubuntu-24.04
+    environment: backup-${{ matrix.label }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Verify and record actual job outcome
+        env:
+          BACKUP_LABEL: ${{ matrix.label }}
+          BACKUP_KIND: ${{ github.event.workflow_run.name == 'Daily backup' && 'backup' || 'restore_test' }}
+          TARGET_RUN_ID: ${{ github.event.workflow_run.id }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python3 backup/report-run.py --complete

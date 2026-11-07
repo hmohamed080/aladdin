@@ -1,6 +1,7 @@
 # Monthly restore test into a throwaway local Supabase stack on the runner. Touches no hosted project.
 # The restore-test private key lives only in the per-project `restore-test-<label>` environment, never next to the write token.
 name: Monthly restore test
+run-name: restore (${{ inputs.label || 'production' }}) ${{ inputs.request_id }}
 on:
   schedule:
     - cron: "0 4 2 * *"        # 06:00 Cairo on the 2nd
@@ -10,6 +11,10 @@ on:
         type: choice
         options: [production, acceptance]
         default: production
+      request_id:
+        type: string
+        required: false
+        default: ""
       backup_key:
         description: "Optional: a specific retained snapshot (db/<label>/.../<name>.tar.age) instead of the newest"
         type: string
@@ -36,6 +41,7 @@ jobs:
           if [ "$run" != true ]; then echo "NO RESTORE TEST RAN: the scheduled Production restore needs PRODUCTION_BACKUP_ENABLED=true and PRODUCTION_RESTORE_SCHEDULE_ENABLED=true." | tee -a "$GITHUB_STEP_SUMMARY"; fi
 
   restore:
+    name: restore (${{ inputs.label || 'production' }})
     needs: plan
     # A manual run restores what it is asked to. A scheduled run restores Production only when plan.sh says so (both switches).
     if: needs.plan.outputs.run == 'true'
@@ -43,6 +49,12 @@ jobs:
     timeout-minutes: 60
     environment: restore-test-${{ inputs.label || 'production' }}
     env:
+      EVENT: ${{ github.event_name }}
+      BACKUP_KIND: restore_test
+      TARGET_RUN_ID: ${{ github.run_id }}
+      REQUEST_ID: ${{ inputs.request_id }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       BACKUP_LABEL: ${{ inputs.label || 'production' }}
       BACKUP_KEY: ${{ inputs.backup_key }}
       BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
@@ -55,10 +67,17 @@ jobs:
       REPO_ROOT: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
+      - name: Read runtime schedule
+        id: control
+        run: python3 backup/runtime-schedule.py
       - name: Work folder on the runner
         run: echo "OUT=$RUNNER_TEMP/restore-test" >> "$GITHUB_ENV"
+      - name: Claim run
+        if: steps.control.outputs.run == 'true'
+        run: python3 backup/report-run.py
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq age >/dev/null
       - name: Restore and verify
+        if: steps.control.outputs.run == 'true'
         run: |
           umask 077; printf '%s\n' "$AGE_IDENTITY" > "$RUNNER_TEMP/restore.key"
           [ -n "$BACKUP_KEY" ] || unset BACKUP_KEY
@@ -66,3 +85,6 @@ jobs:
       - name: Report (counts and hashes only)
         if: always()
         run: cat "$OUT/REPORT.txt" >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Verify complete coverage
+        if: steps.control.outputs.run == 'true'
+        run: bash backup/verify-complete.sh

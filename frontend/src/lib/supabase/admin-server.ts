@@ -122,6 +122,93 @@ export function whatsappOtpSettingsReconcile(applied: Json) {
   return whatsappOtpRpc<{ applied: number; abandoned: number; unmatched: number }>((c) => c.rpc("admin_whatsapp_otp_settings_reconcile", { p_applied: applied }));
 }
 
+/**
+ * The Admin backup-control RPCs (20261107090005). Every mutation is service_role ONLY by design: the app server verifies the
+ * session, derives the actor and spends a current-password receipt; the database re-checks that actor's effective
+ * permissions. Named helpers, not a general client, so nothing else can borrow the service role through this door.
+ */
+export function adminBackupRequest(a: { actor: string; kind: "backup" | "restore_test"; reason: string; receipt: string }) {
+  return whatsappOtpRpc<{ id: string; environment: string; kind: string; trigger: string }>((c) =>
+    c.rpc("admin_backup_request", { p_actor: a.actor, p_kind: a.kind, p_reason: a.reason, p_receipt: a.receipt }),
+  );
+}
+
+export function adminBackupMarkDispatched(a: {
+  actor: string;
+  run: string;
+  ok: boolean;
+  githubRunId?: number;
+  githubRunUrl?: string;
+  code?: string;
+}) {
+  return whatsappOtpRpc<string>((c) =>
+    c.rpc("admin_backup_mark_dispatched", {
+      p_actor: a.actor,
+      p_run: a.run,
+      p_ok: a.ok,
+      p_github_run_id: a.githubRunId,
+      p_github_run_url: a.githubRunUrl,
+      p_code: a.code,
+    }),
+  );
+}
+
+export function adminBackupReconcile(a: {
+  actor: string;
+  run: string;
+  status: "running" | "succeeded" | "failed" | "skipped" | "unknown";
+  conclusion: string | null;
+  summary: Json;
+  githubRunId: number;
+  githubRunUrl: string;
+}) {
+  return whatsappOtpRpc<string>((c) =>
+    c.rpc("admin_backup_reconcile", {
+      p_actor: a.actor,
+      p_run: a.run,
+      p_status: a.status,
+      p_conclusion: a.conclusion ?? "unknown",
+      p_summary: a.summary,
+      p_github_run_id: a.githubRunId,
+      p_github_run_url: a.githubRunUrl,
+    }),
+  );
+}
+
+export function adminBackupUpdateSchedule(a: {
+  actor: string;
+  acceptanceSchedule: "off" | "daily" | "weekly";
+  config: Json;
+  productionRestoreScheduleEnabled: boolean;
+  expectedVersion: number;
+  reason: string;
+  receipt: string;
+}) {
+  return whatsappOtpRpc<number>((c) =>
+    c.rpc("admin_backup_update_schedule", {
+      p_actor: a.actor,
+      p_acceptance_schedule: a.acceptanceSchedule,
+      p_config: a.config,
+      p_production_restore_schedule_enabled: a.productionRestoreScheduleEnabled,
+      p_expected_version: a.expectedVersion,
+      p_reason: a.reason,
+      p_receipt: a.receipt,
+    }),
+  );
+}
+
+export function adminBackupActivate(a: { actor: string; enabled: boolean; confirmation: string; reason: string; receipt: string }) {
+  return whatsappOtpRpc<boolean>((c) =>
+    c.rpc("admin_backup_activate", {
+      p_actor: a.actor,
+      p_enabled: a.enabled,
+      p_confirmation: a.confirmation,
+      p_reason: a.reason,
+      p_receipt: a.receipt,
+    }),
+  );
+}
+
 export function whatsappOtpNotificationRecord(a: { eventKey: string; kind: string; sourceEnv: string; occurredAt: number; stats: Json }) {
   return whatsappOtpRpc<{ status: "recorded" | "duplicate"; recipients: number }>((c) =>
     c.rpc("whatsapp_otp_notification_record", { p_event_key: a.eventKey, p_kind: a.kind, p_source_env: a.sourceEnv, p_occurred_at: a.occurredAt, p_stats: a.stats }),

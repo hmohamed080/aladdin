@@ -33,6 +33,10 @@ umask 077
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 # Day boundaries follow Cairo, where the owner reads them.
 read -r Y M D DOW <<< "$(cairo_day)"
+if [ -n "${BACKUP_SLOT_DATE:-}" ]; then
+  [[ "$BACKUP_SLOT_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || die 'invalid schedule slot'
+  read -r Y M D DOW <<< "$(TZ=Africa/Cairo date -d "$BACKUP_SLOT_DATE 12:00" +'%Y %m %d %u')"
+fi
 NAME="aladdin-$BACKUP_LABEL-$STAMP"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 B="$WORK/$NAME"; mkdir -p "$B"

@@ -1,5 +1,5 @@
 -- Purchase-request photos and business-verification documents on the central media system
--- (20261103090002): ids-only keys, the same reservation/receipt/resolver path as the other namespaces,
+-- (20261107090004): ids-only keys, the same reservation/receipt/resolver path as the other namespaces,
 -- compliance evidence never offered to cleanup, and no cross-account access.
 create extension if not exists pgtap;
 begin;

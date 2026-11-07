@@ -9,10 +9,10 @@ import { verifyImageWithSharp } from "../frontend/src/server/storage/image-proce
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-export const NAMESPACES = ["avatar", "certificate", "portfolio", "product", "organization"];
+export const NAMESPACES = ["avatar", "certificate", "portfolio", "product", "organization", "request", "verification"];
 const BUCKETS = { avatar: "avatars", portfolio: "professional-portfolio", certificate: "professional-certificates",
-  product: "product-images", organization: "organization-images" };
-const STAGING_PROJECT = "kkpkgjrweysgvhvkhzun";
+  product: "product-images", organization: "organization-images", request: "purchase-request-images", verification: "business-verification-documents" };
+const ACCEPTANCE_PROJECT = "nxossqhdfltcqdwvbewi";
 /** Supabase response bytes per copied object besides the object itself (inventory row, metadata
  * lookup, signed URL, switch RPC, headers). Deliberately generous so the egress estimate errs high. */
 export const OVERHEAD_BYTES_PER_OBJECT = 4096;
@@ -31,7 +31,7 @@ export class JournalWriteFailed extends OperatorError {
 
 // ---------- arguments ----------
 
-const COMMANDS = ["plan", "migrate", "rollback", "rehash", "cleanup"];
+const COMMANDS = ["plan", "migrate", "rollback", "rehash", "delta", "cleanup"];
 const VALUE_OPTIONS = ["--project", "--namespace", "--batch-size", "--max-batches", "--max-bytes",
   "--remaining-egress-bytes", "--egress-safety-fraction", "--journal", "--key", "--limit"];
 const FLAG_OPTIONS = ["--execute", "--from-ledger", "--retry-rolled-back", "--json", "--help"];
@@ -86,7 +86,7 @@ export function parseArgs(argv) {
     if (!namespaces) throw new OperatorError("migrate --execute requires an explicit --namespace list (cheap namespaces first)");
     if (!options.maxBytes) throw new OperatorError("migrate --execute requires a hard --max-bytes budget");
   }
-  if ((options.execute && ["migrate", "rollback"].includes(command)) || command === "rehash") {
+  if ((options.execute && ["migrate", "rollback"].includes(command)) || command === "rehash" || command === "delta") {
     if (!options.journal) throw new OperatorError(`${command} requires --journal <path> (append-only JSON-lines run journal)`);
   }
   if (command === "rollback" && !options.fromLedger && !options.journal) throw new OperatorError("rollback needs --journal, or --from-ledger with --namespace");
@@ -241,6 +241,52 @@ export async function buildPlan(io, journalState, { namespaces, batchSize, maxBy
   return { perNamespace, total, runsAtMaxBytes: runs, objectsLargerThanMaxBytes: tooLarge };
 }
 
+/**
+ * Read-only DELTA between the migration journal and the live inventory. It answers "what changed since the snapshot":
+ *   newObjects        - uploaded to Supabase and never copied (the next `migrate` run picks them up)
+ *   replacedAfterCopy - already copied and switched, but the Supabase source has since changed size or ETag. The R2 copy
+ *                       is NEVER overwritten (immutable); these are listed for an explicit, reviewed re-adoption.
+ *   unchanged         - copied, switched and the source still matches the journal
+ *   r2Native          - written straight to R2 (no Supabase source to compare)
+ *   notInJournal      - on R2 but absent from this journal: cannot be compared, so it is reported, never assumed fine
+ * It writes nothing: no download, no put, no switch, no journal entry.
+ */
+export async function buildDelta(io, journalState, { namespaces, retryRolledBack = false, sampleLimit = 50 }) {
+  const zero = () => ({ ready: 0, newObjects: 0, replacedAfterCopy: 0, unchanged: 0, r2Native: 0, notInJournal: 0, missingSource: 0, rolledBack: 0, unknownSize: 0 });
+  const perNamespace = Object.fromEntries(namespaces.map((ns) => [ns, zero()]));
+  const replaced = [];
+  for await (const row of inventoryRows(io, namespaces)) {
+    const ns = perNamespace[row.namespace];
+    ns.ready++;
+    const state = journalState.get(`${row.namespace}/${row.object_key}`);
+    if (row.provider === "r2") {
+      if (!row.source_exists && !state?.switched) { ns.r2Native++; continue; }
+      if (!state?.switched) { ns.notInJournal++; continue; }
+      if (!row.source_exists) { ns.missingSource++; continue; }
+      const meta = await sourceMetadata(io, row);
+      if (!meta) { ns.unknownSize++; continue; }
+      const changed = meta.size !== state.size || Boolean(state.etag && meta.etag && state.etag !== meta.etag);
+      if (changed) {
+        ns.replacedAfterCopy++;
+        if (replaced.length < sampleLimit) replaced.push({ namespace: row.namespace, key: row.object_key, journalSize: state.size, sourceSize: meta.size });
+      } else ns.unchanged++;
+      continue;
+    }
+    const kind = classify(row, journalState, retryRolledBack);
+    if (kind === "candidate") ns.newObjects++;
+    else if (kind === "missingSource") ns.missingSource++;
+    else if (kind === "rolledBack") ns.rolledBack++;
+    else ns.unchanged++;
+  }
+  const total = zero();
+  for (const counts of Object.values(perNamespace)) for (const k of Object.keys(total)) total[k] += counts[k];
+  return {
+    perNamespace, total, replaced,
+    // The cutover gate: nothing is waiting to be copied and nothing was replaced after its copy.
+    cutoverReady: total.newObjects === 0 && total.replacedAfterCopy === 0 && total.notInJournal === 0 && total.unknownSize === 0,
+  };
+}
+
 /** Picks this run's objects from metadata sizes, stopping before the hard byte budget would be exceeded. */
 export async function selectRun(io, journalState, { namespaces, maxBytes, batchSize, maxBatches, retryRolledBack = false }) {
   const maxObjects = maxBatches ? maxBatches * batchSize : Infinity;
@@ -286,6 +332,10 @@ export async function migrateRows(selected, io, journal, { maxBytes, batchSize, 
       let stage = "readback";
       const switchTo = async (verified) => {
         stage = "switch";
+        const latest = await sourceMetadata(io, row);
+        if (!latest || latest.size !== size || (etag && latest.etag !== etag)) {
+          throw new OperatorError("Source changed during migration; adoption refused");
+        }
         await io.switchReference(row, verified);
         record("switch", { ok: true, sha256: verified.sha256, size: verified.size });
         result.switched++;
@@ -487,6 +537,9 @@ const HELP = `Supabase -> R2 media migration. Dry-run unless --execute. Never de
            media_migration_rollback per entry. Supabase sources and R2 copies are both kept.
   rehash   --project <ref|local> --journal f [--namespace a,b | --key ns/key]
            Re-reads R2 copies and confirms sha256 + size against the journal. Read-only.
+  delta    --project <ref|local> --journal f [--namespace a,b] [--json]
+           Read-only. New uploads not yet copied, and sources replaced AFTER their copy (never auto-overwritten).
+           cutoverReady is true only when nothing is waiting and nothing changed. Run it again right before cutover.
   cleanup  --project <ref|local> [--limit 25] [--execute]
            Deletes ONLY retired R2 objects. Legacy Supabase objects are never removed.
 
@@ -522,7 +575,7 @@ export async function main(argv = process.argv.slice(2)) {
   const local = ["localhost", "127.0.0.1"].includes(url.hostname);
   const project = local ? "local" : url.hostname.split(".")[0];
   if (options.project !== project) throw new OperatorError("Requested project does not match configured environment");
-  if (options.execute && !local && project !== STAGING_PROJECT) throw new OperatorError("Production execution requires separate verified approval");
+  if (options.execute && !local && project !== ACCEPTANCE_PROJECT && env.MEDIA_MIGRATION_APPROVED_PROJECT !== project) throw new OperatorError("Production execution requires separate verified approval");
   const { createClient } = require("@supabase/supabase-js");
   const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const db = supabaseIo(supabase);
@@ -538,6 +591,12 @@ export async function main(argv = process.argv.slice(2)) {
     if (error) throw new OperatorError("Source inventory failed");
     if (options.json) console.log(JSON.stringify({ project, namespaces, ...plan, sourceInventory: inventory }));
     else printPlan(project, options, plan, inventory);
+    return;
+  }
+
+  if (options.command === "delta") {
+    const delta = await buildDelta(db, readJournalState(options.journal), { namespaces, retryRolledBack });
+    console.log(JSON.stringify({ project, namespaces, readOnly: true, ...delta }));
     return;
   }
 

@@ -6,7 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
-  assertEgressGuard, buildPlan, foldJournal, JournalWriteFailed, journalTargets, migrateRows, openJournal, OperatorError, parseArgs,
+  assertEgressGuard, buildDelta, buildPlan, foldJournal, JournalWriteFailed, journalTargets, migrateRows, openJournal, OperatorError, parseArgs,
   parseBytes, parseJournal, QuotaExceeded, rehashTargets, rollbackTargets, selectRun, objectsToDelete, reconciliation, runCleanup,
 } from "./media-storage.mjs";
 
@@ -342,4 +342,40 @@ test("objectsToDelete covers ids-only and legacy layouts", () => {
   assert.deepEqual(objectsToDelete(`u/${U}/portfolio/${ID}/original.png`).slice(2), [
     `u/${U}/portfolio/${ID}/v/thumb.webp`, `u/${U}/portfolio/${ID}/v/card.webp`, `u/${U}/portfolio/${ID}/v/full.webp`]);
   assert.equal(objectsToDelete("portfolio/x.png")[2], "v/portfolio/x.png/thumb.webp");
+});
+
+test("delta is read-only: reports new uploads and sources replaced after their copy, and gates the cutover", async () => {
+  const w = await world(avatars(3));
+  const journal = memoryJournal();
+  await run(w, journal);
+  const state = () => foldJournal(journal.entries);
+  const opts = { namespaces: ["avatar"] };
+
+  const clean = await buildDelta(w.io, state(), opts);
+  assert.equal(clean.total.unchanged, 3);
+  assert.equal(clean.cutoverReady, true, "nothing new and nothing replaced: ready");
+
+  // A replacement in Supabase after the copy, and a brand-new upload.
+  w.objects.get("avatar/u1/a.png").bytes = new Uint8Array(await png(200, 8));
+  w.objects.set("avatar/u9/a.png", { ns: "avatar", key: "u9/a.png", bytes: new Uint8Array(await png(90)), provider: "supabase", sourceExists: true, owner: "owner-9" });
+  const before = { download: w.calls.download.length, put: w.calls.put.length, switch: w.calls.switch.length, entries: journal.entries.length };
+
+  const delta = await buildDelta(w.io, state(), opts);
+  assert.equal(delta.total.newObjects, 1, "the new upload waits for the next migrate run");
+  assert.equal(delta.total.replacedAfterCopy, 1, "the replaced source is reported, not silently trusted");
+  assert.equal(delta.total.unchanged, 2);
+  assert.deepEqual(delta.replaced.map((r) => `${r.namespace}/${r.key}`), ["avatar/u1/a.png"]);
+  assert.equal(delta.cutoverReady, false, "a pending upload or a replacement blocks the cutover");
+
+  assert.equal(w.calls.download.length, before.download, "delta downloads nothing");
+  assert.equal(w.calls.put.length, before.put, "delta writes nothing to R2");
+  assert.equal(w.calls.switch.length, before.switch, "delta switches nothing");
+  assert.equal(journal.entries.length, before.entries, "delta appends no journal entry");
+});
+
+test("delta never assumes an R2 object it cannot compare is fine", async () => {
+  const w = await world(avatars(2, { provider: "r2" }));
+  const delta = await buildDelta(w.io, foldJournal([]), { namespaces: ["avatar"] });
+  assert.equal(delta.total.notInJournal + delta.total.r2Native, 2);
+  assert.equal(delta.cutoverReady, delta.total.notInJournal === 0, "an uncompared R2 row blocks readiness");
 });

@@ -501,6 +501,7 @@ describe("BusinessFlow — showroom chosen on the type step", () => {
   it("picking Showroom with no links returns to step 1 with the required message and Instagram focused, saving nothing", async () => {
     await toTypeStep();
     fireEvent.click(showroomChoice());
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "decor_showroom" } });
     await act(async () => { fireEvent.click(continueBtn()); });
     expect(saveBusiness).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(en.onboarding.business.location.title)).toBeNull();
@@ -512,6 +513,7 @@ describe("BusinessFlow — showroom chosen on the type step", () => {
   it("picking a non-showroom type advances normally", async () => {
     await toTypeStep();
     fireEvent.click(screen.getByRole("button", { name: new RegExp(en.onboarding.business.orgTypes.supplier) }));
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "wholesaler" } });
     await act(async () => { fireEvent.click(continueBtn()); });
     expect(saveBusiness).toHaveBeenCalledTimes(2);
     await waitFor(() => expect(screen.getByText(en.onboarding.business.location.title)).toBeInTheDocument());
@@ -520,8 +522,8 @@ describe("BusinessFlow — showroom chosen on the type step", () => {
   it("once step 1 holds the showroom details and a valid link, the type step advances", async () => {
     await toTypeStep();
     fireEvent.click(showroomChoice());
-    await act(async () => { fireEvent.click(continueBtn()); });
     fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "decor_showroom" } });
+    await act(async () => { fireEvent.click(continueBtn()); });
     fireEvent.change(screen.getByLabelText(label.phoneLabel), { target: { value: "01012345678" } });
     fireEvent.change(screen.getByLabelText("Instagram"), { target: { value: "@cairoceramics" } });
     await act(async () => { fireEvent.click(continueBtn()); });
@@ -535,13 +537,14 @@ describe("BusinessFlow — showroom chosen on the type step", () => {
   it("switching to another type after links were typed saves with blank links", async () => {
     await toTypeStep();
     fireEvent.click(showroomChoice());
-    await act(async () => { fireEvent.click(continueBtn()); });
     fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "decor_showroom" } });
+    await act(async () => { fireEvent.click(continueBtn()); });
     fireEvent.change(screen.getByLabelText(label.phoneLabel), { target: { value: "01012345678" } });
     fireEvent.change(screen.getByLabelText("Instagram"), { target: { value: "@cairoceramics" } });
     await act(async () => { fireEvent.click(continueBtn()); });
     expect(screen.getByText(en.onboarding.business.type.title)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: new RegExp(en.onboarding.business.orgTypes.supplier) }));
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "wholesaler" } });
     await act(async () => { fireEvent.click(continueBtn()); });
     const sent = saveBusiness.mock.calls.at(-1)![0] as Record<string, unknown>;
     expect(sent).toMatchObject({ orgType: "supplier", facebookUrl: "", instagramUrl: "", tiktokUrl: "", websiteUrl: "" });

@@ -1,0 +1,133 @@
+{
+  "captured_at": "2026-11-07T12:09:00.3797+00:00",
+  "scope": "all rows in one read-only statement",
+  "rows": 1317,
+  "summary": [
+    {
+      "records": 172,
+      "namespace": "avatar",
+      "protected": 0,
+      "classification": "active",
+      "metadata_bytes": 11198205,
+      "storage_objects": 172,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 73,
+      "namespace": "avatar",
+      "protected": 0,
+      "classification": "deleted",
+      "metadata_bytes": 0,
+      "storage_objects": 0,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 150,
+      "namespace": "avatar",
+      "protected": 0,
+      "classification": "missing",
+      "metadata_bytes": 0,
+      "storage_objects": 0,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 1,
+      "namespace": "avatar",
+      "protected": 0,
+      "classification": "orphaned",
+      "metadata_bytes": 0,
+      "storage_objects": 1,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 24,
+      "namespace": "avatar",
+      "protected": 0,
+      "classification": "pending",
+      "metadata_bytes": 1170627,
+      "storage_objects": 22,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 4,
+      "namespace": "certificate",
+      "protected": 0,
+      "classification": "missing",
+      "metadata_bytes": 0,
+      "storage_objects": 0,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 3,
+      "namespace": "certificate",
+      "protected": 0,
+      "classification": "orphaned",
+      "metadata_bytes": 0,
+      "storage_objects": 3,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 652,
+      "namespace": "portfolio",
+      "protected": 0,
+      "classification": "active",
+      "metadata_bytes": 156823485,
+      "storage_objects": 652,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 165,
+      "namespace": "portfolio",
+      "protected": 0,
+      "classification": "missing",
+      "metadata_bytes": 0,
+      "storage_objects": 0,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 40,
+      "namespace": "portfolio",
+      "protected": 0,
+      "classification": "orphaned",
+      "metadata_bytes": 184202,
+      "storage_objects": 4,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 29,
+      "namespace": "portfolio",
+      "protected": 0,
+      "classification": "pending",
+      "metadata_bytes": 582044,
+      "storage_objects": 3,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 2,
+      "namespace": "product",
+      "protected": 0,
+      "classification": "active",
+      "metadata_bytes": 568117,
+      "storage_objects": 2,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 1,
+      "namespace": "product",
+      "protected": 0,
+      "classification": "missing",
+      "metadata_bytes": 0,
+      "storage_objects": 0,
+      "ownership_conflicts": 0
+    },
+    {
+      "records": 1,
+      "namespace": "product",
+      "protected": 0,
+      "classification": "orphaned",
+      "metadata_bytes": 0,
+      "storage_objects": 1,
+      "ownership_conflicts": 0
+    }
+  ]
+}
