@@ -123,7 +123,7 @@ export function whatsappOtpSettingsReconcile(applied: Json) {
 }
 
 /**
- * The Admin backup-control RPCs (20261107090005). Every mutation is service_role ONLY by design: the app server verifies the
+ * The Admin backup-control RPCs (20261107090006). Every mutation is service_role ONLY by design: the app server verifies the
  * session, derives the actor and spends a current-password receipt; the database re-checks that actor's effective
  * permissions. Named helpers, not a general client, so nothing else can borrow the service role through this door.
  */

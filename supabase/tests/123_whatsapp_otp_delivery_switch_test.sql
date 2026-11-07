@@ -1,4 +1,4 @@
--- pgTAP: the Super Admin WhatsApp OTP delivery switch (20261105100001_whatsapp_otp_delivery_switch.sql).
+-- pgTAP: the Super Admin WhatsApp OTP delivery switch (20261107090003_whatsapp_otp_delivery_switch.sql).
 --
 --   A. begin: service role only; the ACTOR's whatsapp_otp.manage is judged in the database; refusals record nothing
 --   B. begin: the ledger row, the "requested" audit event with actor / old / new / reason, the "v1d" grant, validation

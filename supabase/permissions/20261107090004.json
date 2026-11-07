@@ -1,6 +1,6 @@
 {
  "version": "20261107090004",
- "source": "Exact function permission contract after 20261107090004_request_and_verification_media.sql (request and verification namespaces; create-or-replace bodies only, so signatures and grants are unchanged from 20261107090003).",
+ "source": "Exact function permission contract after 20261107090004_media_id_storage_keys.sql (ids-only R2 storage keys; adds app.media_storage_key_for and the assignment trigger function; no grant changes).",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.media_storage_resolve(text,text,text)",

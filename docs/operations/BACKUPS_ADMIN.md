@@ -28,7 +28,7 @@ remain unchanged. No deletion UI is provided.
 
 Hosted Acceptance currently has 203 migrations through 20261107090002; Production
 has 193 through 20261027090001 (read-only inspection on November 7). Proposed R2
-migrations use 20261107090003/4; backup control uses 20261107090005, none applied.
+migrations use 20261107090004/4; backup control uses 20261107090006, none applied.
 Acceptance writes for seven-flow E2E require separate owner approval under this
 task's explicit prohibition on hosted changes. Local tests do not substitute for
 that evidence. Infrastructure and runtime credentials remain owner-controlled.

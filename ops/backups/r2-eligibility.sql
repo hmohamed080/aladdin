@@ -13,7 +13,7 @@
 --   4. no other media_storage_locations row (any provider, cleaned or not) resolves to the same physical key;
 --   5. nothing active points at it: profiles.avatar_media_id / cover_media_id for an avatar upload,
 --      organizations.logo_media_id for an organization image.
--- (to_jsonb: storage_key exists only after migration 20261107090003; cover_media_id after 20261024090009.)
+-- (to_jsonb: storage_key exists only after migration 20261107090004; cover_media_id after 20261024090009.)
 with canon as (
   select 'avatar'::text ns, object_key k, state::text st, owner_user_id owner, id from public.avatar_uploads
   union all select 'portfolio', object_key, state::text, owner_user_id, id from public.portfolio_items

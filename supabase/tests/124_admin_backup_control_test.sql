@@ -1,4 +1,4 @@
--- pgTAP: Admin backup control (20261107090005_admin_backup_control.sql).
+-- pgTAP: Admin backup control (20261107090006_admin_backup_control.sql).
 --
 --   A. Permissions: catalog, locked Super Admin grants, Administrator = view only, nobody else
 --   B. Status read: backup.view only; fails visibly closed before the environment is bound

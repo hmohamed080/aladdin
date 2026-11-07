@@ -56,8 +56,8 @@ Originals are never deleted before: verified adoption, a restore-tested backup, 
 
 ## 4. Merge and migration dependency
 
-Migration versions on this candidate: `20261107090003` (ids-only storage keys), `20261107090004` (request and verification media),
-`20261107090005` (Admin backup control). The earlier R2 versions `20261103090001` and `20261103090002` are retired from this
+Migration versions on this candidate: `20261107090004` (ids-only storage keys), `20261107090005` (request and verification media),
+`20261107090006` (Admin backup control). The earlier R2 versions `20261103090001` and `20261103090002` are retired from this
 line: `20261103090001` is the already-applied OTP version and is never reused.
 
 Order: OTP and Admin invitations (#136, #137) and the stacked account-basics line first, then this integration PR. New
@@ -67,7 +67,7 @@ migrations apply forward only, in order, after the owner approves; history is ne
 
 Each is a separate owner decision. None is implied by this document.
 
-- GO-1 Apply `20261107090003`-`005` to Acceptance (forward only).
+- GO-1 Apply `20261107090004`-`005` to Acceptance (forward only).
 - GO-2 Seven-flow Acceptance E2E on that Acceptance state, with evidence.
 - GO-3 Create Production R2 private and site buckets, tokens and environment guards.
 - GO-4 Production backup activation: bind environment, schedule, first restore test.
