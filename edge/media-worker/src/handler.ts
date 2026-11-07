@@ -9,7 +9,11 @@ const TYPES: Record<string, readonly string[]> = {
   certificate: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
   product: ["image/jpeg", "image/png", "image/webp"],
   organization: ["image/jpeg", "image/png", "image/webp"],
+  request: ["image/jpeg", "image/png", "image/webp"],
+  verification: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
 };
+// Compliance documents are never stored in the shared edge byte cache (folder segment of the ids-only key).
+const NEVER_EDGE_CACHED = new Set(["verification"]);
 const PUBLIC_NAMESPACES = ["portfolio", "avatar"];
 
 const SECURITY = {
@@ -33,13 +37,37 @@ function log(reason: string, mode: string) {
   console.log(JSON.stringify({ event: "media.denied", reason, mode }));
 }
 
+// Ids-only keys of uploads made from 2026-10-29 (migration 20261103090001), per namespace:
+// <u|o>/<owner id>/<folder>/[<product id>/]<media id>/(original.<ext> | v/<variant>.webp).
+const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const ID_KEY_FOLDERS: Record<string, string> = {
+  avatar: `u/${ID}/profile/${ID}`,
+  portfolio: `u/${ID}/portfolio/${ID}`,
+  certificate: `u/${ID}/certificates/${ID}`,
+  product: `[uo]/${ID}/products/${ID}/${ID}`,
+  organization: `o/${ID}/profile/${ID}`,
+  request: `[uo]/${ID}/requests/${ID}/${ID}`,
+  verification: `o/${ID}/verification/${ID}`,
+};
+const ID_KEYS = Object.fromEntries(Object.entries(ID_KEY_FOLDERS).map(([namespace, folder]) =>
+  [namespace, new RegExp(`^${folder}/(original\\.[a-z0-9]{2,5}|v/(thumb|card|full)\\.webp)$`)]));
+
+/** True for a variant object; false for an original; null when the key does not belong to the namespace. */
+function objectKind(object: string, namespace: string): boolean | null {
+  if (object.startsWith(`${namespace}/`)) return false;
+  if (object.startsWith(`v/${namespace}/`)) return true;
+  const m = ID_KEYS[namespace]?.exec(object);
+  return m ? m[2] !== undefined : null;
+}
+
 function parseGrant(value: unknown, namespace: string): MediaGrant | null {
   const g = typeof value === "string" ? (JSON.parse(value) as unknown) : value;
   if (!g || typeof g !== "object") return null;
   const { object, contentType, size, sha256 } = g as Record<string, unknown>;
-  if (typeof object !== "string" || !(object.startsWith(`${namespace}/`) || object.startsWith(`v/${namespace}/`))
-    || object.includes("..") || object.length > 300) return null;
-  const allowed = object.startsWith("v/") ? ["image/webp"] : TYPES[namespace] ?? [];
+  if (typeof object !== "string" || object.includes("..") || object.length > 300) return null;
+  const variant = objectKind(object, namespace);
+  if (variant === null) return null;
+  const allowed = variant ? ["image/webp"] : TYPES[namespace] ?? [];
   if (typeof contentType !== "string" || !allowed.includes(contentType)) return null;
   if (typeof sha256 !== "string" || !/^[0-9a-f]{64}$/.test(sha256)) return null;
   const n = typeof size === "string" ? Number(size) : size;
@@ -102,7 +130,7 @@ async function serve(request: Request, env: Env, ctx: ExecutionContextLike, byte
   }
   // Edge byte cache: only whole-object GETs of a known, bounded size. The response
   // the browser receives keeps its private headers; only the stored copy is public.
-  const cacheable = bytes !== null && env.EDGE_CACHE === "on" && !range && grant.size !== null
+  const cacheable = bytes !== null && env.EDGE_CACHE === "on" && !NEVER_EDGE_CACHED.has(grant.object.split("/")[2] ?? "") && !range && grant.size !== null
     && grant.size <= EDGE_CACHE_MAX_BYTES;
   const key = edgeCacheKey(grant);
   if (cacheable) {

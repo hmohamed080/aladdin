@@ -3,6 +3,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/env/storage", () => ({ readStorageEnv: () => ({
   R2_ACCOUNT_ID: "a".repeat(32), R2_ACCESS_KEY_ID: "test-key", R2_SECRET_ACCESS_KEY: "test-secret", R2_PRIVATE_BUCKET: "isolated-private", R2_PUBLIC_BUCKET: "isolated-public", R2_PUBLIC_BASE_URL: "https://media.example.test",
 }) }));
+vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_SUPABASE_URL: "https://localhost.invalid" }) }));
 const send = vi.hoisted(() => vi.fn());
 vi.mock("@aws-sdk/client-s3", async (original) => {
   const sdk = await original<typeof import("@aws-sdk/client-s3")>();
@@ -86,5 +87,18 @@ describe("R2 immutable promotion", () => {
     const keys = send.mock.calls.map((call) => call[0].input.Key);
     expect(keys).toEqual(["product/o/p/i.webp", "pending/product/o/p/i.webp",
       "v/product/o/p/i.webp/thumb.webp", "v/product/o/p/i.webp/card.webp", "v/product/o/p/i.webp/full.webp"]);
+  });
+  it("keeps a new upload's original, upload stage and variants under its ids-only key", async () => {
+    const object = "o/10000000-0000-4000-8000-000000000001/products/20000000-0000-4000-8000-000000000002/30000000-0000-4000-8000-000000000003/original.png";
+    const provider = new CloudflareR2StorageProvider("product", "private", object);
+    const grant = await provider.createUploadUrl("ignored.png", "image/png", 93);
+    expect(grant.provider === "r2" && new URL(grant.url).pathname).toBe(`/isolated-private/pending/${object}`);
+    await provider.commitVerifiedObject("ignored.png", new Uint8Array([1]), "image/png");
+    await provider.putVariant("ignored.png", "card", new Uint8Array([9]));
+    send.mockClear();
+    await provider.deleteObject("ignored.png");
+    const folder = object.replace("/original.png", "");
+    expect(send.mock.calls.map((call) => call[0].input.Key)).toEqual([object, `pending/${object}`,
+      `${folder}/v/thumb.webp`, `${folder}/v/card.webp`, `${folder}/v/full.webp`]);
   });
 });

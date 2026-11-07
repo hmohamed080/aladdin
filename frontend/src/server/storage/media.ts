@@ -2,7 +2,7 @@ import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { readPublicEnv } from "@/lib/env";
-import { readStorageEnv } from "@/lib/env/storage";
+import { legacyStorageWritesOpen, readStorageEnv } from "@/lib/env/storage";
 import { mediaPolicy, isOrganizationMedia } from "@/lib/storage/media-policy";
 import type { MediaNamespace, StorageProviderName } from "@/lib/storage/provider-types";
 import { SupabaseStorageProvider } from "./supabase-provider";
@@ -26,9 +26,16 @@ export async function resolveMedia(client: SupabaseClient, namespace: MediaNames
   return descriptor.parse(data);
 }
 
-export function mediaProvider(client: SupabaseClient, namespace: MediaNamespace, provider: StorageProviderName) {
-  return provider === "r2" ? new CloudflareR2StorageProvider(namespace)
-    : new SupabaseStorageProvider(client, mediaPolicy(namespace).bucket);
+/**
+ * The provider for one reserved record. For R2 the physical key comes from the
+ * database (ids-only `u/…`/`o/…` for new uploads, the legacy key otherwise), so
+ * old and new objects are both found. Callers authorize through the resolvers first.
+ */
+export async function mediaProvider(client: SupabaseClient, namespace: MediaNamespace, provider: StorageProviderName, key: string) {
+  if (provider !== "r2") return new SupabaseStorageProvider(client, mediaPolicy(namespace).bucket);
+  const { data, error } = await privilegedStorageClient().rpc("media_storage_object", { p_namespace: namespace, p_key: key });
+  if (error || typeof data !== "string" || !data) throw new Error("media unavailable");
+  return new CloudflareR2StorageProvider(namespace, "private", data);
 }
 
 export function privilegedStorageClient() {
@@ -43,6 +50,15 @@ function requireWriteApproval(provider: StorageProviderName) {
     && !readStorageEnv().R2_PRODUCTION_WRITES_APPROVED) throw new Error("production R2 writes are not approved");
 }
 
+/**
+ * R2 is the only home of new application media. Once R2 routing is on (or legacy writes are
+ * closed explicitly) a Supabase-backed write fails closed: there is no automatic fallback when R2
+ * is down, uploads simply pause and the user retries. Reads and deletes of legacy objects stay open.
+ */
+function requireWritableProvider(provider: StorageProviderName) {
+  if (provider === "supabase" && !legacyStorageWritesOpen(readStorageEnv())) throw new Error("media uploads are unavailable");
+}
+
 export async function authorizeMediaUpload(client: SupabaseClient, namespace: MediaNamespace, key: string, expectedBytes?: number) {
   const media = await resolveMedia(client, namespace, key, "upload");
   // An extra per-user brake ahead of the reservation quota (Redis, or per-instance memory when Redis is down).
@@ -53,6 +69,7 @@ export async function authorizeMediaUpload(client: SupabaseClient, namespace: Me
   const env = readStorageEnv();
   // Existing R2 records remain R2 when routing is disabled. Reserve is authoritative and rejects provider changes.
   const provider = media.reserved ? media.provider : env.R2_STORAGE_ENABLED ? "r2" : "supabase";
+  requireWritableProvider(provider);
   requireWriteApproval(provider);
   const maxBytes = mediaPolicy(namespace).maxBytes;
   if (provider === "r2" && (!expectedBytes || !Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > maxBytes)) {
@@ -65,7 +82,7 @@ export async function authorizeMediaUpload(client: SupabaseClient, namespace: Me
       p_provider: provider, ...(backendReservation ? { p_owner: media.owner } : {}) });
     if (error) throw new Error("upload limit or reservation failure");
   }
-  return mediaProvider(client, namespace, provider).createUploadUrl(key, media.contentType, expectedBytes);
+  return (await mediaProvider(client, namespace, provider, key)).createUploadUrl(key, media.contentType, expectedBytes);
 }
 
 /**
@@ -104,6 +121,7 @@ export async function verifyPendingMedia(client: SupabaseClient, namespace: Medi
   }
   const pending = await resolveMedia(client, namespace, key, "upload");
   if (!pending.owner) throw new Error("owner required");
+  requireWritableProvider(pending.provider);
   if (!pending.reserved) {
     const reserveClient = isOrganizationMedia(namespace) ? privilegedStorageClient() : client;
     const { error: reserveError } = await reserveClient.rpc("media_storage_reserve", {
@@ -112,7 +130,7 @@ export async function verifyPendingMedia(client: SupabaseClient, namespace: Medi
     });
     if (reserveError) throw new Error("reservation failed");
   }
-  const provider = mediaProvider(pending.provider === "supabase" ? privilegedStorageClient() : client, namespace, pending.provider);
+  const provider = await mediaProvider(pending.provider === "supabase" ? privilegedStorageClient() : client, namespace, pending.provider, key);
   requireWriteApproval(pending.provider);
   const maxBytes = mediaPolicy(namespace).maxBytes;
   const bytes = await provider.readObject(key, maxBytes);
@@ -143,7 +161,17 @@ export async function readMediaUrl(client: SupabaseClient, namespace: MediaNames
   return applicationMediaUrl(namespace, key);
 }
 
+/**
+ * Deletes the bytes (original, variants and any pending copy) of a retired record and, for R2,
+ * records that the physical cleanup finished (`cleaned_at`). Recording is what stops the retry worker
+ * and the backup eligibility rule from treating the object as still pending. It is idempotent: a
+ * repeat finds no object, deletes nothing and records the same completion. If recording fails the
+ * bytes are already gone, so the error is logged and the reconciliation job completes it later.
+ */
 export async function removeMedia(client: SupabaseClient, namespace: MediaNamespace, key: string) {
   const media = await resolveMedia(client, namespace, key, "delete");
-  await mediaProvider(media.provider === "supabase" ? privilegedStorageClient() : client, namespace, media.provider).deleteObject(key);
+  await (await mediaProvider(media.provider === "supabase" ? privilegedStorageClient() : client, namespace, media.provider, key)).deleteObject(key);
+  if (media.provider !== "r2" || !media.owner) return;
+  const { error } = await privilegedStorageClient().rpc("media_cleanup_complete", { p_namespace: namespace, p_key: key, p_owner: media.owner });
+  if (error) console.warn(JSON.stringify({ event: "media.cleanup_unrecorded", namespace }));
 }

@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   assertEgressGuard, buildPlan, foldJournal, JournalWriteFailed, journalTargets, migrateRows, openJournal, OperatorError, parseArgs,
-  parseBytes, parseJournal, QuotaExceeded, rehashTargets, rollbackTargets, selectRun,
+  parseBytes, parseJournal, QuotaExceeded, rehashTargets, rollbackTargets, selectRun, objectsToDelete, reconciliation, runCleanup,
 } from "./media-storage.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -269,4 +269,77 @@ test("plan reports counts, bytes, batches and egress per namespace without downl
   assert.ok(plan.total.estimatedEgressBytes > bytes);
   assert.ok(plan.runsAtMaxBytes >= Math.ceil(bytes / 1000));
   assert.deepEqual(w.calls.download, []);
+});
+
+// ---------- cleanup lifecycle: retire, delete, confirm, complete; retries are idempotent ----------
+
+const U = "11111111-1111-4111-8111-111111111111";
+const ID = "33333333-3333-4333-8333-333333333333";
+function cleanupWorld(rows, { failDelete = new Set(), stillThere = new Set(), failComplete = new Set() } = {}) {
+  const log = { rpc: [], deleted: [], completed: [], retired: [] };
+  const supabase = {
+    async rpc(name, args) {
+      log.rpc.push(name);
+      if (name === "media_storage_object") return { data: `o/${U}/verification/${ID}/original.pdf`.replace("verification", args.p_namespace === "request" ? "requests" : "verification"), error: null };
+      if (name === "media_cleanup_retire") { log.retired.push(args.p_key); return { error: null }; }
+      if (name === "media_cleanup_complete") {
+        if (failComplete.has(args.p_key)) return { error: { message: "x" } };
+        log.completed.push(args.p_key); return { error: null };
+      }
+      throw new Error(name);
+    },
+  };
+  const r2 = {
+    bucket: "b", DeleteObjectCommand: class { constructor(input) { this.input = input; } },
+    s3: { async send(command) {
+      if ([...failDelete].some((k) => command.input.Key.includes(k))) throw new Error("R2 down");
+      log.deleted.push(command.input.Key);
+    } },
+    exists: async (key) => [...stillThere].some((k) => key.includes(k)),
+  };
+  return { supabase, r2, log, rows };
+}
+const row = (namespace, key, provider = "r2") => ({ namespace, object_key: key, owner_user_id: U, provider });
+
+test("cleanup deletes the original, the pending copy and every variant, then completes", async () => {
+  const w = cleanupWorld();
+  const result = await runCleanup(w.supabase, w.r2, [row("request", "k1")]);
+  assert.deepEqual(result, { retired: 1, failed: 0, preservedLegacy: 0 });
+  assert.equal(w.log.deleted.length, 5);
+  assert.ok(w.log.deleted.some((k) => k.startsWith("pending/")));
+  assert.deepEqual(w.log.completed, ["k1"]);
+});
+
+test("cleanup never completes a row whose bytes are still there, and isolates one row's failure from the next", async () => {
+  const w = cleanupWorld([], { stillThere: new Set(["requests"]) });
+  const result = await runCleanup(w.supabase, w.r2, [row("request", "k1"), row("verification", "k2")]);
+  assert.deepEqual(result, { retired: 1, failed: 1, preservedLegacy: 0 });
+  assert.deepEqual(w.log.completed, ["k2"]);
+  const down = cleanupWorld([], { failDelete: new Set(["verification"]) });
+  const r = await runCleanup(down.supabase, down.r2, [row("verification", "k3"), row("request", "k4")]);
+  assert.deepEqual(r, { retired: 1, failed: 1, preservedLegacy: 0 });
+  assert.deepEqual(down.log.completed, ["k4"], "an R2 outage leaves the record retired but not completed, so the next run retries it");
+});
+
+test("cleanup retry after a failed completion is safe (retire is idempotent, deleting an absent object is a no-op)", async () => {
+  const first = cleanupWorld([], { failComplete: new Set(["k5"]) });
+  assert.deepEqual(await runCleanup(first.supabase, first.r2, [row("request", "k5")]), { retired: 0, failed: 1, preservedLegacy: 0 });
+  const second = cleanupWorld();
+  assert.deepEqual(await runCleanup(second.supabase, second.r2, [row("request", "k5")]), { retired: 1, failed: 0, preservedLegacy: 0 });
+});
+
+test("cleanup never touches a legacy Supabase object and reconciliation reports counts only", async () => {
+  const w = cleanupWorld();
+  assert.deepEqual(await runCleanup(w.supabase, w.r2, [row("request", "legacy", "supabase")]), { retired: 0, failed: 0, preservedLegacy: 1 });
+  assert.equal(w.log.deleted.length, 0);
+  assert.equal(w.log.rpc.length, 0);
+  const report = reconciliation([row("request", "a"), row("verification", "b"), row("request", "c", "supabase")]);
+  assert.deepEqual(report, { candidates: 3, providers: { r2: 2, supabase: 1 }, namespaces: { request: 2, verification: 1 } });
+  assert.ok(!JSON.stringify(report).includes(U));
+});
+
+test("objectsToDelete covers ids-only and legacy layouts", () => {
+  assert.deepEqual(objectsToDelete(`u/${U}/portfolio/${ID}/original.png`).slice(2), [
+    `u/${U}/portfolio/${ID}/v/thumb.webp`, `u/${U}/portfolio/${ID}/v/card.webp`, `u/${U}/portfolio/${ID}/v/full.webp`]);
+  assert.equal(objectsToDelete("portfolio/x.png")[2], "v/portfolio/x.png/thumb.webp");
 });

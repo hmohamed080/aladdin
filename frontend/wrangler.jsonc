@@ -41,6 +41,7 @@
         // deploy workflow; the bucket-scoped keys and SUPABASE_SERVICE_ROLE_KEY are Worker secrets.
         "R2_STORAGE_ENABLED": "true",
         "R2_PRODUCTION_WRITES_APPROVED": "false",
+        "MEDIA_LEGACY_STORAGE_WRITES": "false",
         "R2_PRIVATE_BUCKET": "aladdin-r2-acceptance-20261011-private",
         // Siteverify must report this hostname, or the CAPTCHA check fails closed.
         "TURNSTILE_ALLOWED_HOSTNAMES": "aladdin-frontend-preview.bstalent9.workers.dev",

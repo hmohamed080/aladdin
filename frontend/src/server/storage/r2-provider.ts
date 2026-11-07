@@ -3,13 +3,18 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { StorageProvider, UploadGrant } from "@/lib/storage/provider-types";
 import { readStorageEnv } from "@/lib/env/storage";
+import { readPublicEnv } from "@/lib/env";
+import { assertMediaEnvironment } from "@/lib/storage/environment-guard";
 import { readBoundedBody } from "./validation";
-import { MEDIA_VARIANTS, variantStorageKey, type MediaVariant } from "@/lib/media/image-variants";
+import { MEDIA_VARIANTS, variantObjectKey, type MediaVariant } from "@/lib/media/image-variants";
 
 /** The one S3 client configuration for R2 (images here, video in r2-multipart.ts). */
 export function createR2Client(): S3Client {
   const env = readStorageEnv();
   if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY) throw new Error("R2 credentials are not configured");
+  // Every R2 client (images, video, backfills) passes the same wrong-environment check first.
+  assertMediaEnvironment({ appEnv: env.APP_ENV, accountId: env.R2_ACCOUNT_ID, supabaseUrl: readPublicEnv().NEXT_PUBLIC_SUPABASE_URL,
+    privateBucket: env.R2_PRIVATE_BUCKET, publicBucket: env.R2_PUBLIC_BUCKET, siteBucket: env.R2_SITE_BUCKET });
   return new S3Client({ region: "auto", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED", responseChecksumValidation: "WHEN_REQUIRED",
     endpoint: env.R2_LOCAL_S3_ENDPOINT ?? `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY },
@@ -21,7 +26,13 @@ export class CloudflareR2StorageProvider implements StorageProvider {
   private readonly bucket: string;
   private readonly uploadBucket: string;
   private readonly publicBaseUrl: string | undefined;
-  constructor(private readonly namespace: string, private readonly visibility: "private" | "public" = "private") {
+  /**
+   * `objectKey` is the physical key of the original as the database recorded it
+   * (`media_storage_object`): ids-only `u/…`/`o/…` for new uploads, else the legacy
+   * `<namespace>/<key>`, which is also the default.
+   */
+  constructor(private readonly namespace: string, private readonly visibility: "private" | "public" = "private",
+    private readonly objectKey?: string) {
     const env = readStorageEnv();
     if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_PRIVATE_BUCKET) {
       throw new Error("R2 credentials are not configured");
@@ -37,8 +48,8 @@ export class CloudflareR2StorageProvider implements StorageProvider {
     this.publicBaseUrl = env.R2_PUBLIC_BASE_URL;
     this.client = createR2Client();
   }
-  private finalKey(key: string) { return `${this.namespace}/${key}`; }
-  private pendingKey(key: string) { return `pending/${this.namespace}/${key}`; }
+  private finalKey(key: string) { return this.objectKey ?? `${this.namespace}/${key}`; }
+  private pendingKey(key: string) { return `pending/${this.finalKey(key)}`; }
   async createUploadUrl(key: string, contentType: string, expectedBytes?: number): Promise<UploadGrant> {
     if (!expectedBytes || expectedBytes <= 0 || !Number.isSafeInteger(expectedBytes)) throw new Error("upload size is required");
     const url = await getSignedUrl(this.client, new PutObjectCommand({ Bucket: this.uploadBucket,
@@ -75,7 +86,7 @@ export class CloudflareR2StorageProvider implements StorageProvider {
    */
   async putVariant(key: string, variant: MediaVariant, bytes: Uint8Array) {
     try {
-      await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: variantStorageKey(this.namespace, key, variant),
+      await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: variantObjectKey(this.finalKey(key), variant),
         Body: bytes, ContentType: "image/webp", IfNoneMatch: "*",
         CacheControl: this.visibility === "public" ? "public, max-age=31536000, immutable" : "private, no-store" }));
     } catch (error) {
@@ -88,7 +99,7 @@ export class CloudflareR2StorageProvider implements StorageProvider {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.uploadBucket, Key: this.pendingKey(key) }));
     // Derivatives go with the original; deleting an absent key is a no-op in S3/R2.
     for (const variant of MEDIA_VARIANTS) {
-      await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: variantStorageKey(this.namespace, key, variant) }));
+      await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: variantObjectKey(this.finalKey(key), variant) }));
     }
   }
 }
