@@ -288,6 +288,8 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 6. Grants: service role only; nothing is executable by anon, authenticated or PUBLIC
 -- ---------------------------------------------------------------------------
+-- The internal recorder is reachable only from the reconcile function (same owner): nobody else, not even the service role.
+revoke all on function app.whatsapp_otp_record_delivery_unmatched(integer, bigint) from public, anon, authenticated, service_role;
 revoke all on function public.admin_whatsapp_otp_delivery_begin(uuid, integer, boolean, boolean, text) from public, anon, authenticated, service_role;
 revoke all on function public.admin_whatsapp_otp_delivery_finish(uuid, uuid, text, integer, text) from public, anon, authenticated, service_role;
 revoke all on function public.admin_whatsapp_otp_delivery_reconcile(jsonb, jsonb) from public, anon, authenticated, service_role;
