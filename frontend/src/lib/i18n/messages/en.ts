@@ -1026,6 +1026,14 @@ export const en = {
       started: "Review started.",
       approved: "Approved. The applicant will see the result.",
       rejected: "Rejected. The applicant will see the reason.",
+      listPublicly: "Also list this profile publicly",
+      listPubliclyHint: "Lists the profile and its public portfolio in the public directory. Leave unticked to verify the account without publishing it; it can be hidden again later.",
+      noPending: "No pending verification request for this account.",
+      approveTitle: "Approve this account?",
+      approveBody: "The applicant is notified and the account is upgraded. This follows the same review process as the Verifications queue.",
+      rejectTitle: "Reject this verification?",
+      rejectBody: "A reason is required and is shared with the applicant.",
+      alreadyDecided: "This request was already decided.",
       error: {
         notAuthorized: "You don't have reviewer authority.",
         ownReview: "You can't review your own request.",
@@ -1123,7 +1131,7 @@ export const en = {
       liveBannerTitle: "Live — changes here are real",
       liveBannerBody: "This area is connected to Admin Core: every change is saved immediately, enforced on the server and recorded in the audit log. Other Preview areas are unchanged.",
       liveReadBannerTitle: "Live — changes here are saved",
-      liveReadBannerBody: "Rows, details and history are read live. Suspend and restore, notes, follow-ups, internal cases and duplicate links are saved immediately, checked on the server and recorded in the audit log. Verify and Reject here are still Preview — decide verifications in Verifications.",
+      liveReadBannerBody: "Rows, details and history are read live. Suspend and restore, notes, follow-ups, internal cases and duplicate links are saved immediately, checked on the server and recorded in the audit log. Approve and Reject on an account with a pending verification request are real decisions, made through the same review process as Verifications and recorded in the audit log.",
       ops: {
         error: {
           lastSuperAdmin: "This is the last active Super Admin — the account cannot be suspended.",
