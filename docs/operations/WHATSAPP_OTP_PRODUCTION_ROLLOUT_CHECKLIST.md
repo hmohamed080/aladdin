@@ -21,28 +21,28 @@ Semantic follow-ups the merge exposed (not textual conflicts): main's 5 `busines
 
 | # | Blocker | State |
 |---|---|---|
-| G1 | **Another integration candidate exists:** `integration/admin-backups-20261107` (draft PR #140) also carries the delivery switch (relabelled `20261107090003`) bundled with unrelated Admin Backup and R2 media work, and resolved the same onboarding conflict the same way. Only one should reach `main` first, or they must be reconciled. For Production the OTP-only branch has the smaller blast radius. | **owner decision** |
-| G2 | Mandatory CI on the final combined commit: run on `integration/otp-main-20261107` (see section 1). `migration-policy` will list 6 already-applied older migrations as "older than main's newest": expected (new to Production, already on Acceptance), needs an owner decision on how to accept it rather than editing applied files. | partly open |
-| G3 | **Backups / recovery point (new, important).** Production reports `pitr_enabled: false` and **no physical backups listed**. There is no confirmed recovery point for P-2. The owner must either enable PITR, or confirm a recent backup in the Supabase dashboard, or approve a pre-P-2 logical backup and restore rehearsal. | **open: blocks P-2** |
+| G1 | **Integration branch decided:** `integration/otp-main-20261107` (a54bdf95 plus the commits of this round) is the OTP release candidate. #137 and #140 stay separate; #142 is non-blocking. | decided (owner, 2026-11-07) |
+| G2 | Mandatory CI on the final commit. `migration-policy`: the 6 older migrations are accepted through hash-pinned reviews in `supabase/migration-policy-reviewed.json` (files stay byte-for-byte unchanged). Local run: no problems. | CI on the final SHA pending |
+| G3 | **Recovery point.** An encrypted logical backup of Production exists (owner-confirmed). A **fresh quick snapshot is taken immediately before P-2** with `scripts/hosted-db/production-recovery-snapshot.sh` (dump only, no restore rehearsal; section 3, P-0b). | covered by P-0b |
 | G4 | P-1 (Production grant key) tool: **built** (section 4), reviewed by tests; needs your approval of the code and the written approval reference to run. | ready for review |
 | G5 | #137 stays out; decision recorded in section 2. | decided (recommendation) |
-| G6 | Owner approvals and window (B7), alert recipients, **A10 only for live activation**, hosted login matrix before P-7 (section 5). | open |
+| G6 | Owner approvals and window (B7), alert recipients, **A10 only for live activation**; the new `frontend-upload` stage must first reach `main` (it cannot run from a branch); hosted login matrix before P-7 (section 5). | open |
 
 ## 1. Read-only hosted facts (verified 2026-11-07)
 
 | Area | Fact |
 |---|---|
-| Supabase **Production** (`kkpkgjrweysgvhvkhzun`, Postgres 17.6.1) | **193** applied, latest `20261027090001`, no drift. The integration branch has exactly **10 pending** (section 2). |
+| Supabase **Production** (`kkpkgjrweysgvhvkhzun`, Postgres 17.6.1) | **195** applied, latest `20261107090002` (both #139 migrations applied), **no remote-only rows**. Exactly **8 pending** on this branch (section 2); **7 of them sort below the latest applied version**, so P-2 needs `--include-all`. |
 | Supabase **Acceptance** (`nxossqhdfltcqdwvbewi`, Postgres 17.11) | **203** applied, latest `20261107090002`, **#137's `20261105090001` already applied**. The delivery migration's old version `20261105100001` would be pending *below* the latest: out of order there. Hence the relabel in section 2. |
 | Production D1 `aladdin-whatsapp-otp-production` | untracked, `whatsapp_hook_events` table only; 8 tables missing (incl. `otp_delivery_switch`, `otp_delivery_audit`, `otp_delivery_attestation`) |
 | Workers | `aladdin-whatsapp-otp-production` **does not exist**. `aladdin-frontend-production` last modified **2026-10-30**. |
 | Secrets Store | all five `*_PRODUCTION` secrets exist and are active. The Production frontend has **no `PHONE_OTP_*` secrets**. |
-| Production backups | `pitr_enabled: false`, `backups: null` (G3) |
+| Production backups | `pitr_enabled: false`; an encrypted logical backup exists; a fresh snapshot is taken at P-0b |
 | Production Worker config | `check-production-config.mjs` PASS, including the `APP_NOTIFY` service binding added in #136 |
 
 Reproduce without touching any checkout: copy `supabase/migrations`, `supabase/templates` and `supabase/config.toml` to a scratch folder, `supabase link --project-ref <ref> --workdir <scratch>`, then `migration list --linked --output-format json` and `db push --linked --dry-run` with the same `--workdir`. **Never run `db push --linked` without `--dry-run` outside an approved P-2.**
 
-## 2. The complete pending Supabase list (10), apply order, and the #137 decision
+## 2. The complete pending Supabase list (8), apply order, and the #137 decision
 
 | # | Version | What | Lineage | WhatsApp delivery? |
 |---|---|---|---|---|
@@ -53,28 +53,32 @@ Reproduce without touching any checkout: copy `supabase/migrations`, `supabase/t
 | 5 | `20261030090001_phone_verification_authority` | phone verification authority (dormant, OFF) | #121/#125 | dormant OTP chain |
 | 6 | `20261030090002_phone_signup_authority` | phone sign-up authority (dormant, OFF) | #125/#126 | dormant OTP chain |
 | 7 | `20261103090001_whatsapp_otp_admin_settings` | limits, alerts, grant-key table, vocabulary | #136 | **Yes** |
-| 8 | `20261107090001_showroom_social_links` | showroom social links | #139 (on `main`) | No |
-| 9 | `20261107090002_showroom_social_links_settings` | showroom social links settings | #139 (on `main`) | No |
-| 10 | `20261107090003_whatsapp_otp_delivery_switch` | delivery switch ledger, reconcile, authorized-state function | #136 | **Yes** |
+| 8 | `20261107090003_whatsapp_otp_delivery_switch` | delivery switch ledger, reconcile, authorized-state function | #136 | **Yes** |
 
-**Order is clean:** Production's latest is `20261027090001`, so all ten apply in version order in one push; nothing is out of order. Verified by replay (203 applied locally = 193 + 10), permission gate **PASS 727 contracts**, pgTAP **153 files / 7,047 tests** pass, and `db push --dry-run` against Production lists exactly these ten.
+**Order: out of order by design, resolved with `--include-all`.** Production's latest applied version is `20261107090002`. Versions 1 to 7 are older than it (they were applied to Acceptance first and cannot be renumbered or edited), so a plain `db push` stops with `DbPushMissingRemoteError`. `db push --linked --include-all` applies all 8 in version order (verified today by dry run: exactly these 8, nothing else, no remote-only rows). Checked against the CURRENT Production schema (read-only queries, 2026-11-07):
+- none of the created tables or columns exists on Production; the 7 functions the migrations replace exist with the expected signatures (`pending_registration_save` is the reviewed drop-and-recreate), the other 7 `create or replace` functions are new there;
+- **no object overlap** with #139's `20261107090001/2` (`business_draft_save_v3`, `business_draft_submit_v3`, `app.profile_completion`, `business_verification_detail`, `organization_social_links_set`, `app.social_link_valid` and the new social-link columns) or with any other applied migration, so the final schema equals the sorted-order replay that CI and pgTAP test;
+- #139's v3 functions only *call* `business_draft_save_v2` / `business_draft_submit_v2` by name at run time; the older `20261029090002` replaces those two with the same signatures, so Social Links v3 keeps working and additionally accepts the generalized business activity;
+- permission gate **PASS 727 contracts**, pgTAP **153 files / 7,047 tests** pass on the integrated branch (reused CI evidence; no code under test changed in this round).
+No already-applied file or history row is modified. `migration-policy` accepts the 6 older files only through the hash pins in `supabase/migration-policy-reviewed.json`; editing any of them breaks the pin.
 
 **Relabel (done in this branch):** the delivery migration was `20261105100001`. It was never applied anywhere, but Acceptance had already applied through `20261107090002`, so the old version would be out of order there. It is now `20261107090003` (matching draft PR #140), and the old version is registered in `supabase/permissions/retired-versions.json` so a merge of #136 cannot reintroduce it. Dependencies: it depends only on #7.
 
 **#137 (`20261105090001_admin_staff_invitations`): not required now, can ship separately.**
 - Nothing in the OTP stack depends on it (verified by CI with and without it). It is unrelated to WhatsApp delivery.
 - A trial merge of #137 onto this branch conflicts only in `docs/operations/AGENT_WORK_LOG.md` and `supabase/tests/108_installer_integration_compat_test.sql` (same union resolution as before).
-- **Cost of shipping it later:** on Production its version sorts below the then-latest applied version, so it needs `migration-policy: out-of-order-reviewed` and `db push --include-all`, and the latest permission manifest must be re-unioned (9 functions). **Cost of shipping it now:** it adds an unrelated Admin feature and a `create or replace` of `app.admin_prepare_platform_account` to the same release. Recommendation: keep it out unless the owner wants Admin Staff invitations in this release.
+- **Cost of shipping it later:** the same as the 7 older files here: out of order on Production, needs `db push --include-all` and a hash pin, and the latest permission manifest must be re-unioned (9 functions). **Cost of shipping it now:** it adds an unrelated Admin feature and a `create or replace` of `app.admin_prepare_platform_account` to the same release. Recommendation: keep it out unless the owner wants Admin Staff invitations in this release.
 - Acceptance already has it applied (remote-only relative to this branch), which is harmless.
 
 ## 3. Phase 1: infrastructure with delivery OFF
 
-**Execution order:** P-0, P-2, P-1, P-3, P-4, P-5, P-6, then P-8, P-9. Delivery stays OFF in every step: `WHATSAPP_DELIVERY_ENABLED = "false"` (the guard refuses anything else) and no switch row exists.
+**Execution order:** P-0, P-0b, P-2, P-1, P-3, P-4, P-5, P-6, then P-8, P-9. Delivery stays OFF in every step: `WHATSAPP_DELIVERY_ENABLED = "false"` (the guard refuses anything else) and no switch row exists.
 
 | Step | Action (needs approval) | Verify | Rollback |
 |---|---|---|---|
-| **P-0** | Repeat section 1 from the final commit; CI green on that SHA; **resolve G3** and record the recovery point. | the pending list equals section 2; no remote-only rows | none (read-only) |
-| **P-2** | `supabase db push --linked` from the approved commit. The old frontend keeps running (all ten are additive except the two reviewed exceptions). | `migration list --linked`: 203 matched, none pending; `count(*) from public.admin_permissions where key like 'whatsapp_otp.%'` = 3; `app.whatsapp_otp_grant_key` exists, RLS on, **empty**; sign-in still works on the OLD frontend | **no automatic down.** Forward-fix with a new migration, or restore to the recovery point recorded in P-0. Each file is its own transaction, so a failure stops at the first failing file; a re-run resumes. |
+| **P-0** | Read-only: repeat section 1 from the final commit; CI green on that SHA. Confirm Production still shows 195 applied, latest `20261107090002`, and the dry run with `--include-all` lists exactly the 8. | the pending list equals section 2; no remote-only rows | none (read-only) |
+| **P-0b** | Read-only, **immediately before P-2** (same sitting, at most 60 minutes before): `bash scripts/hosted-db/production-recovery-snapshot.sh`, then `bash scripts/hosted-db/encrypt-backup.sh <folder>`. The script refuses unless history is 195 / `20261107090002`. The recovery point is this snapshot (restore with the existing `restore-acceptance.sh` procedure). | `snapshot-meta.txt` OK, checksums verified, encrypted file recreated and verified | none (read-only) |
+| **P-2** | `supabase db push --linked --include-all` from the approved commit (never without `--include-all`: it would stop before applying anything). The old frontend keeps running (all eight are additive except the two reviewed exceptions). | `migration list --linked`: 203 matched (195 + 8), none pending; `count(*) from public.admin_permissions where key like 'whatsapp_otp.%'` = 3; `app.whatsapp_otp_grant_key` exists, RLS on, **empty**; sign-in still works on the OLD frontend | **no automatic down.** Forward-fix with a new migration, or restore from the P-0b snapshot. Each file is its own transaction, so a failure stops at the first failing file; a re-run resumes. |
 | **P-1** | Owner provisions the Production grant key with the **Production helper** (section 4). | one row, fingerprint matches the owner's record, schema signature and history unchanged | delete that one row; the Worker then answers `grant_invalid` and every change fails safely |
 | **P-3** | `wrangler d1 migrations apply aladdin-whatsapp-otp-production --remote` (records `0001` as a no-op, applies `0002`, `0003`) | `node scripts/d1-baseline-check.mjs aladdin-whatsapp-otp-production` reports `current`; 0 rows everywhere (no switch row = OFF) | additive and idempotent, tables empty: leave them |
 | **P-4** | Owner sets Production frontend secrets with `wrangler secret put <NAME> --env production`: `PHONE_OTP_ADMIN_SECRET`, `PHONE_OTP_NOTIFY_SECRET`, `PHONE_OTP_WORKER_SECRET` (each the SAME value as its `*_PRODUCTION` Secrets Store twin) and `PHONE_OTP_WORKER_URL` = placeholder `https://aladdin-whatsapp-otp.internal/v1/otp/send`. **Never** `OTP_ADMIN_GRANT_SECRET*` on the frontend. Leave `PHONE_VERIFICATION_ENABLED`, `PHONE_SIGNUP_VERIFICATION_ENABLED`, `PHONE_OTP_DELIVERY`, `PHONE_OTP_HMAC_KEYS` unset. | `wrangler secret list --env production` shows the four new names and no OFF flags | `wrangler secret delete <NAME> --env production` |
@@ -140,11 +144,11 @@ There is **no automated paging** today: the events are searchable but nobody is 
 
 ## 7. First Production step, rollback, remaining blockers
 
-**First Production step: none until G3 is resolved and Phase-1 approval is given.** The first *hosted write* is **P-2** (the database migrations); it is preceded by the read-only **P-0** (repeat section 1 from the final commit). The first *Production deployment of anything* is **P-6** (the private OTP Worker, delivery OFF); no user-facing change happens before P-7 and its gate.
+**First Production step (for separate approval): P-0b then P-2**, in one sitting: the read-only P-0b recovery snapshot, followed by `supabase db push --linked --include-all` from the approved `main` commit. Before that: this branch is merged to `main` by the owner (so CI, the `frontend-upload` stage and the Cloudflare workflow exist on `main`). Nothing user-facing changes at P-2: the old frontend `a3b08a22` keeps serving, and it is the rollback baseline for P-7.
 
-**Rollback summary:** P-2 forward-fix or restore to the P-0 recovery point (there is none today: G3); P-1 delete one row; P-3 leave empty tables; P-4 delete secrets; P-6 delete the new Worker (before the frontend binds to it); frontend `wrangler rollback --env production`.
+**Rollback summary:** P-2 is additive: forward-fix with a new migration, or restore from the P-0b snapshot (hours, loses writes since the snapshot); P-1 delete one row; P-3 leave empty tables; P-4 delete secrets; P-6 delete the new Worker (before the frontend binds to it); frontend: uploaded versions serve 0% until promoted, and `wrangler rollback --env production` returns to `a3b08a22`.
 
-**Remaining blockers:** G1 (which integration branch, #140 vs this), G2 (final CI and the migration-policy acceptance), G3 (no recovery point), approval of the Production grant helper and its written reference, owner approvals and window, the hosted login gate (section 5), and A10 for live activation only.
+**Remaining blockers:** (1) owner approval to merge to `main`; (2) approval of P-0b/P-2 and a window; (3) written approval reference and code approval for the Production grant helper (P-1); (4) final CI on the pushed SHA; (5) the hosted login gate L1 to L5 before P-7 (needs the OTP Worker deployed and the upload-only version, therefore after `main`); (6) alert recipients and A10, which block only live activation.
 
 ## 8. A10 and activation (not part of this checklist)
 

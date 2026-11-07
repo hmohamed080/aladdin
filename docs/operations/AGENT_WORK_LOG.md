@@ -7300,3 +7300,11 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Built the Super Admin delivery switch end to end: Worker D1 `0003_delivery_switch.sql`, `src/delivery.ts` and `POST /v1/admin/delivery` (v1d grant, atomic audit, prerequisites); the send path now requires the environment permit AND the D1 switch (fail closed). Supabase `20261105100001` (begin/finish/reconcile, three audit actions, permissions manifest derived by hand). Frontend action, change flow, `role="switch"` component with a reason-required confirmation, i18n en/ar, Administrator read-only; `ConfirmDialog` gained an optional `renderTrigger`.
 - Consequences recorded in docs/operations/WHATSAPP_OTP_PRODUCTION_B3_PREPARATION.md section 13: Production now lists EIGHT migrations; #137's `20261105090001` sorts before the new version; an environment with the permit already "true" is OFF until a Super Admin turns the switch on.
 - Validation: Worker 172/172 and tsc; frontend tsc, eslint, 58 focused tests; migration-policy clean. NOT run: pgTAP 123 (54 planned), full pgTAP, permission gate, browser (no free Docker network pool for a second Supabase stack). Two image-processing tests fail in the full frontend run; this change does not touch them and they were not checked on the base branch.
+
+
+## 2026-11-07 - OTP Production rollout, round 5 (integration/otp-main-20261107, nothing applied)
+
+- Production is now at 195 applied (latest `20261107090002`, both #139 migrations in). 8 pending, 7 older than the latest: `db push --include-all` is required (dry run lists exactly the 8). Read-only checks against the CURRENT schema found no created object already present and no overlap with #139's objects; #139's v3 functions only call the v2 functions the older migrations replace.
+- `migration-policy` now accepts a reviewed out-of-order migration through a sha256 pin in `supabase/migration-policy-reviewed.json` (applied files stay byte-for-byte unchanged); 6 pins, test added.
+- Added `scripts/hosted-db/production-recovery-snapshot.sh` (dump-only reuse of the rehearsal backup commands, refuses unless history is 195 / `20261107090002`). Checklist updated (P-0b, `--include-all`, first step, blockers).
+- NOT done: any Production write, merge, deploy, secret or activation; script not run against a database (syntax checked only).
