@@ -136,6 +136,14 @@ describe("every approved event type has real bilingual copy", () => {
       "job.assignment.cancelled": { job_title: "T", reason: "R" },
       // Increment 12: one review, one recipient — the professional it is about.
       "job.review.received": { org_name: "C", job_title: "T" },
+      // Statistics only; the database allow-lists these keys per kind (whatsapp_otp_notification_record).
+      "whatsapp_otp.budget_warning": { percent: 72, consumed: 108, limit: 150, remaining: 42, environment: "production" },
+      "whatsapp_otp.budget_critical": { percent: 91, consumed: 137, limit: 150, remaining: 13, environment: "production" },
+      "whatsapp_otp.budget_exhausted": { limit: 150, environment: "production" },
+      "whatsapp_otp.failure_rate": { attempts: 20, failed: 8, failure_percent: 40, window_minutes: 60, environment: "production" },
+      // The version number only; no actor, value or reason is ever placed in a notification.
+      "whatsapp_otp.audit_unmatched": { version: 7 },
+      "whatsapp_otp.delivery_unmatched": { version: 7 },
     };
 
     const unfilled: string[] = [];

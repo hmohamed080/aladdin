@@ -18,39 +18,21 @@ Run this command when deploying to any environment (staging or production).
 ## Build
 
 ```bash
-# Replace with your actual build command
-npm run build
-# or
-yarn build
-# or
-python -m build
+cd frontend && pnpm cf:build   # OpenNext build of the Cloudflare Worker
 ```
 
 ---
 
 ## Deploy
 
-```bash
-# Replace with your deployment method
+Aladdin runs on Cloudflare (ADR-0021, ADR-0022, ADR-0024; Vercel is retired).
 
-# Vercel
-vercel --prod
-
-# Netlify
-netlify deploy --prod
-
-# Railway / Render / Fly.io
-railway up
-# or
-flyctl deploy
-
-# Docker
-docker build -t <image>:<tag> .
-docker push <image>:<tag>
-
-# SSH / Server
-rsync -avz ./dist user@server:/var/www/app
-```
+- **Preview** (Acceptance data): the `Cloudflare frontend preview` and `Cloudflare backend preview` workflows.
+- **Production**: the manual `Cloudflare production` workflow from `main` (stage `check`, then `backend`, then
+  `frontend`), behind the `cloudflare-production` environment's owner approval. See
+  `docs/guides/cloudflare-frontend.md`.
+- A variable added in the Cloudflare dashboard only uploads a new version: it goes live after **Promote version**.
+  Mirror every dashboard variable in `frontend/wrangler.jsonc`, or the next workflow deploy drops it.
 
 ---
 
@@ -71,10 +53,9 @@ rsync -avz ./dist user@server:/var/www/app
 git revert HEAD
 git push
 
-# Or redeploy previous version
-vercel rollback
-# or re-deploy the previous Docker image tag
-docker pull <image>:<previous_tag>
+# Or roll the Worker back to its previous version
+cd frontend && pnpm exec wrangler rollback --env production
+# (or Worker > Deployments in the Cloudflare dashboard)
 ```
 
 ---

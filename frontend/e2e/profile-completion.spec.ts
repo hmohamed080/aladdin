@@ -1,5 +1,6 @@
+import { execFileSync } from "node:child_process";
 import { test, expect, type Page, type APIRequestContext, type BrowserContext } from "@playwright/test";
-import { IDENTITIES, messageIdsFor, readNewOtp, selectAccountType, signIn, stubTurnstileWhenOffline } from "./helpers/auth";
+import { fillBirthDate, IDENTITIES, reachLanding, messageIdsFor, readNewOtp, selectAccountType, signIn, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline } from "./helpers/auth";
 
 // Offline sandboxes only (E2E_STUB_TURNSTILE=1); a no-op in CI, where the real widget runs.
 test.beforeEach(async ({ page }) => {
@@ -15,6 +16,11 @@ test.beforeEach(async ({ page }) => {
  * reload persistence, neutral duplicate), avatar crop/upload/replace/cancel.
  */
 
+const DB = process.env.E2E_DB_CONTAINER ?? "supabase_db_aladdin";
+/** Test-fixture SQL against the local stack only (see installer-profile-completion.spec.ts). */
+function sql(query: string): string {
+  return execFileSync("docker", ["exec", "-i", DB, "psql", "-U", "postgres", "-d", "postgres", "-qAt", "-v", "ON_ERROR_STOP=1"], { input: query }).toString().trim();
+}
 const STRONG_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
 
 /**
@@ -52,21 +58,18 @@ function uniqueEgMobile(): string {
 
 async function fillSignUp(page: Page, email: string, username: string, accountType: RegExp = SALES): Promise<void> {
   await page.goto("/auth/sign-up");
+  await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(email);
+  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
+  await fillBirthDate(page);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-  await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
   await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
   await selectAccountType(page, accountType);
-  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-  await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-  await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
   await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30000 });
 }
 
 async function submitSignUp(page: Page, request: APIRequestContext, email: string): Promise<Set<string>> {
   const seen = await messageIdsFor(request, email);
-  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+  await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
   // Real Siteverify → Server Action → signUp() → email round trip; scoped
   // longer timeout for this transition only (see auth-password-preview.spec.ts).
   await expect(page.getByText(/next step|الخطوة التالية/i)).toBeVisible({ timeout: 20_000 });
@@ -86,7 +89,7 @@ async function register(page: Page, request: APIRequestContext, tag: string, acc
   await fillSignUp(page, email, username, accountType);
   const seen = await submitSignUp(page, request, email);
   await verify(page, request, email, seen);
-  await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
+  await reachLanding(page, /\/home(\/|$|\?)/);
   return { email, username };
 }
 
@@ -215,14 +218,25 @@ test.describe("Direct entry after registration", () => {
     const emailB = uniqueEmail("raceb");
     await fillSignUp(pageA, emailA, shared, TRADESPEOPLE);
     const seenA = await submitSignUp(pageA, request, emailA);
+
+    // A's unconfirmed registration holds a lease on the name (20261028090003):
+    // while it is active, B is told the name is taken and gets no account.
+    await fillSignUp(pageB, emailB, shared, TRADESPEOPLE);
+    await expect(pageB.getByText(/this username is taken|اسم المستخدم هذا مستخدم بالفعل/i)).toBeVisible({ timeout: 10_000 });
+    expect(sql(`select count(*) from auth.users where email = '${emailB}'`)).toBe("0");
+
+    // A lease lasts 30 minutes. Stand in for that wait by backdating A's lease
+    // (test fixture only); the name is then free for B.
+    expect(sql(`update app.pending_registrations set username_reserved_at = now() - interval '31 minutes'
+                 where user_id = (select id from auth.users where email = '${emailA}') returning 1`)).toBe("1");
     await fillSignUp(pageB, emailB, shared, TRADESPEOPLE);
     const seenB = await submitSignUp(pageB, request, emailB);
 
     // B verifies first and claims the name; A's claim now collides.
     await verify(pageB, request, emailB, seenB);
-    await pageB.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
-    // Both passed the Step-1 pre-flight (it is not a reservation); the
-    // post-OTP claim is the authority, so A — verifying second — collides.
+    await reachLanding(pageB, /\/home(\/|$|\?)/);
+    // A's lease has expired, so the post-OTP claim decides: B claimed the
+    // name first, so A — verifying second — collides.
     await verify(pageA, request, emailA, seenA);
     await pageA.waitForURL(/\/auth\/finish-registration\?reason=username_unavailable/, { waitUntil: "commit" });
     const noLongerAvailable = /no longer available|لم يعد متاحًا/;
@@ -240,7 +254,7 @@ test.describe("Direct entry after registration", () => {
     await expect(pageA.getByLabel(/email address|البريد الإلكتروني/i)).toHaveCount(0);
     await pageA.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("racefix"));
     await pageA.getByRole("button", { name: /continue|متابعة/i }).click();
-    await pageA.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
+    await reachLanding(pageA, /\/home(\/|$|\?)/);
     // Recovery keeps the registration choice: A is still a Tradesperson, so it gets the approved Installer profile page.
     await pageA.goto("/home/profile");
     await expect(pageA.getByTestId("profile-hero")).toBeVisible();
@@ -259,8 +273,10 @@ test.describe("Complete your profile", () => {
     // A fresh Sales Team member: 4 shared items + the 4 professional ones — headline, years, about,
     // and an activity (supabase/migrations/20260924090003 seeds sales_rep and sales_manager, so activities
     // count for this persona) — = 8. The username AND the Full Name entered at sign-up (confirmed through
-    // profile_set_display_name after the OTP) are done — 2/8 = 25%; the phone makes 3/8 = 38%; the photo 4/8 = 50%.
-    await expect(percent).toHaveText("25% complete");
+    // profile_set_display_name after the OTP) are done, and since ADR-0026 the phone and an activity are given on the
+    // "Complete your account" screen right after sign-up — so editing them here moves nothing, and the photo adds one item.
+    await expect(percent).toHaveText(/^\d+% complete$/);
+    const startPercent = parseInt((await percent.textContent()) ?? "0", 10);
     await expect(page.getByText(/preferred language|اللغة المفضّلة/i)).toHaveCount(0);
 
     // Display name: the sign-up Full Name is already the confirmed value, and
@@ -273,7 +289,7 @@ test.describe("Complete your profile", () => {
     await page.reload();
     await expect(page.getByLabel("Display name")).toHaveValue("E2E Tester Renamed");
     await expect(page.getByTestId("display-name-status")).toHaveText("Confirmed");
-    await expect(percent).toHaveText("25% complete");
+    await expect(percent).toHaveText(`${startPercent}% complete`);
 
     // Phone: Egypt is the default, not the only choice.
     await expect(phoneCountry(page)).toContainText("+20");
@@ -287,7 +303,7 @@ test.describe("Complete your profile", () => {
     await page.reload();
     await expect(page.locator("#phone-national")).toHaveValue(national);
     await expect(phoneCountry(page)).toContainText("+20");
-    await expect(percent).toHaveText("38% complete");
+    await expect(percent).toHaveText(`${startPercent}% complete`);
 
     // Avatar: cancel uploads nothing.
     const red = await pngBytes(page, "red");
@@ -315,7 +331,7 @@ test.describe("Complete your profile", () => {
     await page.reload();
     await expect(page.getByTestId("avatar-current")).toBeVisible();
 
-    await expect(percent).toHaveText("50% complete");
+    await expect.poll(async () => parseInt((await percent.textContent()) ?? "0", 10)).toBeGreaterThan(startPercent);
     // Still incomplete, still visible, and it never blocked anything on the page.
     await expect(page.getByTestId("complete-profile-card")).toBeVisible();
     await expect(page.getByTestId("complete-profile-missing").locator("[data-item=avatar]")).toHaveCount(0);

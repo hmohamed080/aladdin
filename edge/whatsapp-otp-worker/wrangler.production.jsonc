@@ -1,0 +1,52 @@
+{
+  // PRODUCTION delivery Worker for WhatsApp verification codes. PREPARED, NOT DEPLOYED. Deploying it needs a separate, explicit owner approval,
+  // and `scripts/check-production-config.mjs` must print PASS first. Isolated from Acceptance: its own Worker name, its own D1 database and
+  // dedicated *_PRODUCTION secret names. It shares nothing with the Acceptance Worker except the account's Secrets Store (distinct secrets).
+  //
+  // Reachability: PRIVATE. workers_dev is off and there are no routes, so the Worker has no public address; the Production frontend reaches it
+  // through the service binding OTP_WORKER (frontend/wrangler.jsonc). Deploy this Worker BEFORE that frontend.
+  //
+  // Shipped state: WHATSAPP_DELIVERY_ENABLED=false. Turning it on is the approved cutover, made by a reviewed change to this file AND the guard.
+  // Recipient mode is "open" (any valid mobile number, no allowlist): there is deliberately NO OTP_ALLOWED_RECIPIENTS variable or binding.
+  // The daily limit and hard ceiling are NOT here: they are Super Admin settings stored in this Worker's D1 (table otp_settings).
+  "$schema": "../../frontend/node_modules/wrangler/config-schema.json",
+  "name": "aladdin-whatsapp-otp-production",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  // PRIVATE: no workers.dev address, no preview URLs, no routes. Reached only through the frontend's service binding OTP_WORKER.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [],
+  "observability": { "enabled": true },
+  "vars": {
+    "WHATSAPP_PHONE_NUMBER_ID": "1458603463983505",
+    "WHATSAPP_OTP_TEMPLATE": "aladdin_otp",
+    "WHATSAPP_OTP_LANGUAGES": "ar",
+    "WHATSAPP_GRAPH_API_VERSION": "v25.0",
+    "OTP_ENVIRONMENT": "production",
+    "OTP_RECIPIENT_MODE": "open",
+    "OTP_NOTIFY_URL": "https://aladdindecore.com/api/internal/whatsapp-otp/notify",
+    "WHATSAPP_DELIVERY_ENABLED": "false"
+  },
+  "triggers": { "crons": ["* * * * *"] },
+  "secrets_store_secrets": [
+    { "binding": "WHATSAPP_ACCESS_TOKEN", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "WHATSAPP_ACCESS_TOKEN_PRODUCTION" },
+    { "binding": "OTP_SIGNING_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "PHONE_OTP_WORKER_SECRET_PRODUCTION" },
+    { "binding": "OTP_ADMIN_SIGNING_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_ADMIN_SIGNING_SECRET_PRODUCTION" },
+    { "binding": "OTP_NOTIFY_SIGNING_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_NOTIFY_SIGNING_SECRET_PRODUCTION" },
+    { "binding": "OTP_ADMIN_GRANT_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_ADMIN_GRANT_SECRET_PRODUCTION" }
+  ],
+  // PRIVATE route to the Production app for the alert callback AND the periodic delivery attestation (src/attest.ts). Without this binding
+  // nothing can ever be attested, so delivery could never be turned ON (it fails closed), and no alert would be delivered.
+  "services": [
+    { "binding": "APP_NOTIFY", "service": "aladdin-frontend-production" }
+  ],
+  "d1_databases": [
+    {
+      "binding": "IDEMPOTENCY_DB",
+      "database_name": "aladdin-whatsapp-otp-production",
+      "database_id": "30a16841-1108-47e9-99be-3dc9d827fd87",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

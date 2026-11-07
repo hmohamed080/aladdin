@@ -11,7 +11,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(32);
+select plan(33);
 
 -- ===========================================================================
 -- 1. Vocabulary
@@ -242,8 +242,16 @@ select is((select count(*)::int from stack_actions x where not exists (select 1 
 select cmp_ok((select count(*)::int from live_actions), '>=', 186, 'the vocabulary is at least main + feature');
 select is((select count(*)::int from live_actions l where not exists (select 1 from main_actions m where m.a = l.a)
             and not exists (select 1 from feature_actions f where f.a = l.a)
-            and not exists (select 1 from stack_actions x where x.a = l.a)), 0,
+            and not exists (select 1 from stack_actions x where x.a = l.a)
+            -- Phase B1 (20261030090001_phone_verification_authority.sql) adds exactly these two; extend this list for any later addition.
+            and l.a not in ('phone_verification.started', 'phone_verification.completed')
+            -- 20261103090001 (admin-controlled WhatsApp OTP limits) adds exactly these three.
+            and l.a not in ('whatsapp_otp.settings_requested', 'whatsapp_otp.settings_changed', 'whatsapp_otp.settings_change_failed')
+            -- 20261107090003 (the delivery ON/OFF switch) adds exactly these three.
+            and l.a not in ('whatsapp_otp.delivery_requested', 'whatsapp_otp.delivery_changed', 'whatsapp_otp.delivery_change_failed')), 0,
   'nothing else was added: only feature actions on top of main (a later migration that adds more must extend this fixture)');
+select is((select count(*)::int from live_actions l where l.a in ('phone_verification.started', 'phone_verification.completed')), 2,
+  'Phase B1 added exactly its two phone verification audit actions');
 select ok((select convalidated from pg_constraint where conname = 'ck_audit_action_known' and conrelid = 'public.audit_log'::regclass),
   'the constraint is validated');
 

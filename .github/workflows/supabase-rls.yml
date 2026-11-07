@@ -99,6 +99,9 @@ jobs:
       - name: Prove the installer phone-change journal (and its coexistence with secondary phones) under simultaneous requests
         run: bash supabase/tests/installer_phone_change_concurrency_test.sh
 
+      - name: Prove pending-registration username leases and claims serialize per name
+        run: bash supabase/tests/registration_username_lease_concurrency_test.sh
+
       - name: Prove repeatability (second clean reset + tests)
         run: |
           pnpm exec supabase db reset

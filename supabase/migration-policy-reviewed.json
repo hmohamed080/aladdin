@@ -1,0 +1,29 @@
+{
+  "description": "Out-of-order migrations reviewed by a person and pinned to the exact file content (sha256 of the LF-normalised text). The migration-policy check accepts a version older than the base branch's newest ONLY while the file still hashes to the pinned value, so these files can stay byte-for-byte unchanged (they are already applied on Acceptance, which makes them immutable history) and any later edit fails the check.",
+  "out_of_order": {
+    "supabase/migrations/20261028090001_sign_up_birthday_and_phone_codes.sql": {
+      "sha256": "9e65d2076293b94af1209eac9822f1288bbde4f30feb0e0b98e19d48fb9706c1",
+      "reason": "Applied on Acceptance before main added 20261107090001/2; not on Production. Production applies it with db push --include-all. Reviewed 2026-11-07: touches no object that those two migrations or any later applied migration define, so the result does not depend on apply order."
+    },
+    "supabase/migrations/20261029090001_account_basics.sql": {
+      "sha256": "4c331a3f1f9874193ee4b545880b0f4a7b9465791139f9ae6bb883b158448d40",
+      "reason": "Applied on Acceptance before main added 20261107090001/2; not on Production. Production applies it with db push --include-all. Reviewed 2026-11-07: no object overlap with the later applied migrations."
+    },
+    "supabase/migrations/20261029090002_account_basics_specialty_lists.sql": {
+      "sha256": "305f37f554c8eaeb759d248429a55448db5f4d194642f2be363b94be886141bd",
+      "reason": "Applied on Acceptance before main added 20261107090001/2; not on Production. Replaces business_draft_save_v2/submit_v2 (same signatures), which main's Social Links v3 functions only CALL by name at run time, so apply order does not change the final definitions. Reviewed 2026-11-07."
+    },
+    "supabase/migrations/20261030090001_phone_verification_authority.sql": {
+      "sha256": "008354e94b711608acdf04ad00a4f2c671c3800d57944c34296259afdb05d29c",
+      "reason": "Applied on Acceptance before main added 20261107090001/2; not on Production. Production applies it with db push --include-all. Reviewed 2026-11-07: no object overlap with the later applied migrations."
+    },
+    "supabase/migrations/20261030090002_phone_signup_authority.sql": {
+      "sha256": "9a1e867d4e3fdbd5136152b6d50076147b139bae65ac2f93e603c74a1673f628",
+      "reason": "Applied on Acceptance before main added 20261107090001/2; not on Production. Production applies it with db push --include-all. Reviewed 2026-11-07: no object overlap with the later applied migrations."
+    },
+    "supabase/migrations/20261103090001_whatsapp_otp_admin_settings.sql": {
+      "sha256": "37ca6e3baf5053f8861a55e3e7f6a21474a759cddc478f7465a4d9df4ef4fe03",
+      "reason": "Applied on Acceptance before main added 20261107090001/2; not on Production. Production applies it with db push --include-all. Reviewed 2026-11-07: no object overlap with the later applied migrations."
+    }
+  }
+}

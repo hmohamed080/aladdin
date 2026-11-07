@@ -16,7 +16,7 @@ import { createR2Client } from "./r2-provider";
 
 /**
  * Multipart uploads of video originals straight from the browser to the PRIVATE
- * R2 bucket. The server only signs: no video byte passes through Vercel.
+ * R2 bucket. The server only signs: no video byte passes through the web app.
  *
  * Each part URL is signed for one part number and its exact length, valid for
  * ten minutes. Completion never trusts client ETags: the server lists the parts R2

@@ -1,0 +1,78 @@
+{
+ "summary": {
+  "suite": "phone-signup-concurrency",
+  "toolchain": "local",
+  "PASS": 9,
+  "FAIL": 0,
+  "XFAIL": 0,
+  "XPASS": 0,
+  "EVAL": 0,
+  "N/A": 0,
+  "total": 9
+ },
+ "results": [
+  {
+   "id": "STRESS-S1",
+   "area": "concurrency",
+   "title": "24 complete sign-ups in parallel all succeed and are verified for their own number",
+   "status": "PASS",
+   "evidence": ""
+  },
+  {
+   "id": "STRESS-S1b",
+   "area": "concurrency",
+   "title": "...and every verified number equals its own account's alias (no cross-binding)",
+   "status": "PASS",
+   "evidence": "mismatched=0"
+  },
+  {
+   "id": "STRESS-S2",
+   "area": "concurrency",
+   "title": "6 groups x 5 racers: exactly one creation and exactly one attach per grant",
+   "status": "PASS",
+   "evidence": "[{\"creates\":1,\"attached\":1,\"rows\":1},{\"creates\":1,\"attached\":1,\"rows\":1},{\"creates\":1,\"attached\":1,\"rows\":1},{\"creates\":1,\"attached\":1,\"rows\":1},{\"creates\":1,\"attached\":1,\"rows\":1},{\"creates\":1,\"attached\":1,\"rows\":1}]"
+  },
+  {
+   "id": "STRESS-S3",
+   "area": "concurrency",
+   "title": "6 groups x 6 verifiers of one correct code: exactly one grant each",
+   "status": "PASS",
+   "evidence": "[{\"verified\":1,\"grants\":1},{\"verified\":1,\"grants\":1},{\"verified\":1,\"grants\":1},{\"verified\":1,\"grants\":1},{\"verified\":1,\"grants\":1},{\"verified\":1,\"grants\":1}]"
+  },
+  {
+   "id": "STRESS-S4",
+   "area": "concurrency",
+   "title": "8 parallel starts for one number from 8 registrations: the hourly per-number cap (5) holds exactly",
+   "status": "PASS",
+   "evidence": "challenges=5 limited=3"
+  },
+  {
+   "id": "STRESS-S5",
+   "area": "concurrency",
+   "title": "12 parallel wrong guesses: nobody verifies, attempts never exceed the limit (5), and the correct code is refused afterwards",
+   "status": "PASS",
+   "evidence": "attempts=5 later=invalid"
+  },
+  {
+   "id": "STRESS-I1",
+   "area": "invariant",
+   "title": "No deadlock was detected by Postgres during the whole run",
+   "status": "PASS",
+   "evidence": "deadlocks 0 -> 0"
+  },
+  {
+   "id": "STRESS-I2",
+   "area": "invariant",
+   "title": "No user consumed two grants and no alias exists twice",
+   "status": "PASS",
+   "evidence": "twice=0 dupAlias=0"
+  },
+  {
+   "id": "STRESS-I3",
+   "area": "invariant",
+   "title": "No attached grant points at a missing user",
+   "status": "PASS",
+   "evidence": "orphans=0"
+  }
+ ]
+}

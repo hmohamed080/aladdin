@@ -28,6 +28,9 @@ vi.mock("@/server/actions/business-onboarding", () => ({
   submitBusiness: (input: Input) => submitBusiness(input),
 }));
 
+const saveBusinessBasicsStep = vi.fn(async () => ({ ok: true as const }));
+vi.mock("@/server/actions/account-basics", () => ({ saveBusinessBasicsStep: () => saveBusinessBasicsStep() }));
+
 import { BusinessFlow } from "./business-flow";
 
 const emptyAnswers: BusinessAnswers = {
@@ -50,7 +53,8 @@ const emptyAnswers: BusinessAnswers = {
 const names = (overrides: Partial<BusinessAnswers> = {}): BusinessAnswers => ({
   ...emptyAnswers,
   governorate: "cairo", city: "maadi", detailedAddress: "10 Test Street",
-  contactPhone: "+201012345678", activityType: "decor_showroom",
+  // Each business type answers its own activity list.
+  contactPhone: "+201012345678", activityType: overrides.orgType === "supplier" ? "distributor" : "decor_showroom",
   displayName: "Al-Noor Supply",
   legalName: "Al-Noor Supply Trading LLC",
   ...overrides,
@@ -126,6 +130,9 @@ describe("BusinessFlow — acceptance gates", () => {
     expect(saveBusiness.mock.calls[0]![0]).toMatchObject({ draftId: null });
 
     fireEvent.click(screen.getByRole("button", { name: new RegExp(en.onboarding.business.orgTypes.supplier) }));
+    // Picking the type asks for that type's own activity before Continue.
+    expect(continueBtn()).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(en.onboarding.business.identity.activityLabel), { target: { value: "wholesaler" } });
     await act(async () => {
       fireEvent.click(continueBtn());
     });
@@ -180,7 +187,7 @@ describe("BusinessFlow — review summary", () => {
     renderWithI18n(<BusinessFlow answers={names({ orgType: "supplier" })} presetOrgType={null} draftId="draft-1" />, "en");
     const r = en.onboarding.business.review;
     const labels = [...document.querySelectorAll("dt")].map((d) => d.textContent);
-    expect(labels).toEqual([r.name, r.legalName, r.type, r.location, r.branch]);
+    expect(labels).toEqual([r.name, r.legalName, r.type, en.onboarding.business.identity.activityLabel, r.location, r.branch]);
     expect(within(rowOf(r.legalName)).getByText("Al-Noor Supply Trading LLC")).toBeInTheDocument();
     // the other rows still render their values
     expect(within(rowOf(r.name)).getByText("Al-Noor Supply")).toBeInTheDocument();
@@ -217,7 +224,8 @@ describe("BusinessFlow — review summary", () => {
 describe("BusinessFlow — location step", () => {
   /** Resume at the location step: a fully-answered draft opens on review, so go back to the location row. */
   async function atLocation(answers: BusinessAnswers = names({ governorate: null, city: null }), locale: "en" | "ar" = "en") {
-    renderWithI18n(<BusinessFlow answers={answers} presetOrgType="supplier" draftId="draft-1" />, locale);
+    const supplier = { ...answers, orgType: "supplier" as const, activityType: "distributor" as const };
+    renderWithI18n(<BusinessFlow answers={supplier} presetOrgType="supplier" draftId="draft-1" />, locale);
     if (screen.queryByRole("heading", {name: locale === "en" ? en.onboarding.business.location.title : ar.onboarding.business.location.title})) return;
     const loc = locale === "en" ? en.onboarding.business.review.location : ar.onboarding.business.review.location;
     const row = screen.getByText(loc).closest("div")!.parentElement!;
@@ -361,11 +369,18 @@ describe("BusinessFlow — review shows everything that will be saved", () => {
     expect(within(review).getByText("instagram.com/alnoor")).toBeTruthy();
   });
 
-  it("does not ask a supplier to review a showroom phone or activity", () => {
+  it("asks a supplier for its own activity, never a showroom phone", () => {
     renderWithI18n(<BusinessFlow answers={names({ orgType: "supplier" })} presetOrgType="supplier" draftId="draft-1" />, "en");
     const review = screen.getByText(en.onboarding.business.review.name).closest("dl") as HTMLElement;
     expect(within(review).queryByText(en.onboarding.business.identity.phoneLabel)).toBeNull();
-    expect(within(review).queryByText(en.onboarding.business.identity.activityLabel)).toBeNull();
+    expect(within(review).getByText(en.onboarding.business.identity.activityLabel)).toBeInTheDocument();
+    expect(within(review).getByText(en.onboarding.business.activities.distributor)).toBeInTheDocument();
+  });
+
+  it("offers each business type only its own activities", () => {
+    renderWithI18n(<BusinessFlow answers={{ ...emptyAnswers, orgType: "importer" }} presetOrgType="importer" draftId={null} />, "en");
+    const select = screen.getByLabelText(en.onboarding.business.identity.activityLabel) as HTMLSelectElement;
+    expect(Array.from(select.options).map((o) => o.value).slice(1)).toEqual(["decor_supplies_importer", "paint_importer"]);
   });
 });
 
@@ -468,6 +483,7 @@ describe("BusinessFlow — showroom links (step 1)", () => {
     expect(screen.queryByRole("button", { name: /^Instagram/ })).toBeNull();
     expect(follows(screen.getByLabelText(label.legalNameLabel), screen.getByLabelText(starts(label.descriptionLabel)))).toBe(true);
     fillNames();
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "distributor" } }); // a preset type asks its own activity with the identity
     await act(async () => { fireEvent.click(continueBtn()); });
     expect(saveBusiness).toHaveBeenCalledTimes(1);
   });
@@ -486,6 +502,7 @@ describe("BusinessFlow — showroom chosen on the type step", () => {
   it("picking Showroom with no links returns to step 1 with the required message and Instagram focused, saving nothing", async () => {
     await toTypeStep();
     fireEvent.click(showroomChoice());
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "decor_showroom" } });
     await act(async () => { fireEvent.click(continueBtn()); });
     expect(saveBusiness).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(en.onboarding.business.location.title)).toBeNull();
@@ -497,6 +514,7 @@ describe("BusinessFlow — showroom chosen on the type step", () => {
   it("picking a non-showroom type advances normally", async () => {
     await toTypeStep();
     fireEvent.click(screen.getByRole("button", { name: new RegExp(en.onboarding.business.orgTypes.supplier) }));
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "distributor" } });
     await act(async () => { fireEvent.click(continueBtn()); });
     expect(saveBusiness).toHaveBeenCalledTimes(2);
     await waitFor(() => expect(screen.getByText(en.onboarding.business.location.title)).toBeInTheDocument());
@@ -505,8 +523,8 @@ describe("BusinessFlow — showroom chosen on the type step", () => {
   it("once step 1 holds the showroom details and a valid link, the type step advances", async () => {
     await toTypeStep();
     fireEvent.click(showroomChoice());
-    await act(async () => { fireEvent.click(continueBtn()); });
     fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "decor_showroom" } });
+    await act(async () => { fireEvent.click(continueBtn()); });
     fireEvent.change(screen.getByLabelText(label.phoneLabel), { target: { value: "01012345678" } });
     fireEvent.change(screen.getByLabelText("Instagram"), { target: { value: "@cairoceramics" } });
     await act(async () => { fireEvent.click(continueBtn()); });
@@ -520,13 +538,14 @@ describe("BusinessFlow — showroom chosen on the type step", () => {
   it("switching to another type after links were typed saves with blank links", async () => {
     await toTypeStep();
     fireEvent.click(showroomChoice());
-    await act(async () => { fireEvent.click(continueBtn()); });
     fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "decor_showroom" } });
+    await act(async () => { fireEvent.click(continueBtn()); });
     fireEvent.change(screen.getByLabelText(label.phoneLabel), { target: { value: "01012345678" } });
     fireEvent.change(screen.getByLabelText("Instagram"), { target: { value: "@cairoceramics" } });
     await act(async () => { fireEvent.click(continueBtn()); });
     expect(screen.getByText(en.onboarding.business.type.title)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: new RegExp(en.onboarding.business.orgTypes.supplier) }));
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "distributor" } });
     await act(async () => { fireEvent.click(continueBtn()); });
     const sent = saveBusiness.mock.calls.at(-1)![0] as Record<string, unknown>;
     expect(sent).toMatchObject({ orgType: "supplier", facebookUrl: "", instagramUrl: "", tiktokUrl: "", websiteUrl: "" });

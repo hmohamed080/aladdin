@@ -221,7 +221,7 @@ export function ResendButton({ cooldown }: { cooldown: number }) {
   const { pending } = useFormStatus();
   const waiting = cooldown > 0;
   return (
-    <Button type="submit" variant="ghost" size="sm" disabled={waiting || pending} aria-busy={pending}>
+    <Button type="submit" variant="ghost" size="sm" className="whitespace-nowrap" disabled={waiting || pending} aria-busy={pending}>
       {pending ? (
         <>
           <Spinner />

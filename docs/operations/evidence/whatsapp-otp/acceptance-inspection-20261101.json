@@ -1,0 +1,466 @@
+{
+  "generated_at": "2026-11-01T11:31:14.941Z",
+  "read_only": true,
+  "reports": [
+    {
+      "environment": "acceptance",
+      "project_ref_suffix": "bewi",
+      "auth": {
+        "mailer_autoconfirm": false,
+        "disable_signup": false,
+        "external_email_enabled": true,
+        "external_phone_enabled": false,
+        "sms_provider": "twilio",
+        "hook_send_sms_enabled": false,
+        "hook_before_user_created_enabled": false,
+        "hook_mfa_verification_attempt_enabled": false,
+        "security_captcha_enabled": true,
+        "security_captcha_provider": "turnstile",
+        "security_manual_linking_enabled": false,
+        "mfa_phone_enroll_enabled": false,
+        "mfa_phone_verify_enabled": false,
+        "mfa_totp_enroll_enabled": true,
+        "mfa_totp_verify_enabled": true,
+        "mfa_max_enrolled_factors": 10,
+        "mailer_secure_email_change_enabled": true,
+        "external_anonymous_users_enabled": false,
+        "external_google_enabled": true,
+        "external_facebook_enabled": true,
+        "rate_limit_email_sent": 30,
+        "rate_limit_sms_sent": 30,
+        "rate_limit_otp": 30,
+        "rate_limit_anonymous_users": 30,
+        "password_hibp_enabled": false,
+        "password_min_length": 6,
+        "password_required_characters": null,
+        "site_url": "https://aladdin-frontend-preview.bstalen",
+        "uri_allow_list": "https://aladdin-frontend-preview.bstalent9.workers.dev/auth/callback**,https://aladdin-frontend-preview.bstalent9.workers.dev/auth/forgot-password/reset"
+      },
+      "auth_interpretation": {
+        "email_confirmation_required": true,
+        "public_signup_open": true,
+        "captcha_protection_on": true,
+        "captcha_provider": "turnstile",
+        "phone_provider_enabled": false,
+        "phone_autoconfirm": false,
+        "sms_provider": "twilio",
+        "send_sms_hook_enabled": false,
+        "before_user_created_hook_enabled": false,
+        "phone_mfa_enabled": false,
+        "anonymous_sign_ins": false,
+        "leaked_password_protection_on": false,
+        "password_min_length": 6,
+        "redirect_allowlist": {
+          "site_url": "https://aladdin-frontend-preview.bstalen",
+          "entries": 2,
+          "stale_vercel": [],
+          "local": [],
+          "insecure": [],
+          "broad": [],
+          "duplicates": [],
+          "workers_dev": [
+            "https://aladdin-frontend-preview.bstalent9.workers.dev/auth/callback**",
+            "https://aladdin-frontend-preview.bstalent9.workers.dev/auth/forgot-password/reset"
+          ]
+        }
+      },
+      "database": {
+        "disputed_function_rights": [
+          {
+            "fn": "account_entry_allowed(text)",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          },
+          {
+            "fn": "account_password_confirm(text,text,text)",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          },
+          {
+            "fn": "admin_phone_cooldown_override(text,text)",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          },
+          {
+            "fn": "admin_phone_cooldown_status(text)",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          },
+          {
+            "fn": "admin_users_directory(text,text,text,text,text,text,integer,integer)",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          },
+          {
+            "fn": "branch_location_set(uuid,text,text,text)",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          },
+          {
+            "fn": "my_secondary_phone()",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          },
+          {
+            "fn": "organization_legal_name_set(uuid,text)",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          },
+          {
+            "fn": "secondary_phone_cancel()",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          },
+          {
+            "fn": "secondary_phone_change(text,uuid)",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          },
+          {
+            "fn": "secondary_phone_make_primary(uuid,text,text)",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          },
+          {
+            "fn": "secondary_phone_renew()",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          },
+          {
+            "fn": "secondary_phone_reserve(text,uuid)",
+            "service_role_exec": false,
+            "anon_exec": false,
+            "authenticated_exec": true
+          }
+        ],
+        "alias_census": [
+          {
+            "alias_users": 0,
+            "unconfirmed_alias_users": 0,
+            "unconfirmed_without_profile": 0
+          }
+        ],
+        "legacy_challenge_table": [
+          {
+            "table_name": "phone_verification_challenges",
+            "approx_rows": 0
+          }
+        ],
+        "authority_objects": [
+          {
+            "phone_authority_applied": false,
+            "signup_authority_applied": false,
+            "alias_guard_installed": false
+          }
+        ],
+        "default_function_privileges": [
+          {
+            "creator": "postgres",
+            "acl": "{postgres=X/postgres}"
+          },
+          {
+            "creator": "supabase_admin",
+            "acl": "{postgres=X/supabase_admin,anon=X/supabase_admin,authenticated=X/supabase_admin,service_role=X/supabase_admin}"
+          }
+        ],
+        "phone_flags": [
+          {
+            "profiles_with_phone": 4,
+            "profiles_verified": 0
+          }
+        ],
+        "authority_switches": null
+      },
+      "whatsapp_delivery_secrets": null,
+      "errors": [
+        "authority_switches: HTTP 400",
+        "worker secrets: not requested (no CLOUDFLARE_API_TOKEN / CF_ACCOUNT_ID / worker name)"
+      ],
+      "migration_diff": {
+        "applied_count": 197,
+        "repo_count": 199,
+        "latest_applied": "20261029090002",
+        "applied_not_in_repo": [],
+        "repo_not_applied": [
+          "20261030090001",
+          "20261030090002"
+        ],
+        "out_of_order_missing": [],
+        "plain_push_possible": true,
+        "r2_markers": {
+          "20261028090001": true,
+          "20261030090001": false,
+          "20261030090002": false,
+          "20261031090001": false
+        }
+      },
+      "permission_diff": {
+        "contract_version": "20261029090002",
+        "hosted_functions": 697,
+        "contract_functions": 697,
+        "differences": 108,
+        "listed": [
+          {
+            "fn": "public.add_sales_activity(uuid,sales_activity_type,text,uuid,uuid,timestamp with time zone,jsonb)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.admin_follow_up_log(text,uuid,admin_follow_up_type,text,timestamp with time zone,uuid)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.admin_organizations_list(text,text,organization_type,text,integer,integer)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.admin_role_create(text,text,integer,admin_scope_type,text[],text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.admin_staff_assign_role(uuid,uuid,admin_scope_type,uuid,text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.admin_users_list(text,text,persona_type,text,text,text,integer,integer)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app._apply_branch_location(verifications)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app._apply_co_owner(verifications)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app._apply_identity_change(verifications)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.account_code_for_org_type(organization_type)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.admin_org_status_tab(org_status)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.admin_resolve_scope(admin_scope_type,uuid)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.admin_user_status_tab(user_status,verification_status)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.admin_user_verification_state(boolean,verification_status)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.assert_can_edit_quotation_draft(quotations)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.assert_can_edit_rfq_draft(rfqs)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.branch_public_fields(branches)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.bv_status_label(verification_status)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.can_act_on_follow_up(follow_up_tasks)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.current_consent_version(consent_type)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.holds_account_type(uuid,onboarding_track,text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.is_platform(platform_role)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.offer_phase(offer_status,timestamp with time zone,timestamp with time zone,timestamp with time zone)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.organization_create_owned(text,organization_type,text,text,text,text,text,text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.organization_create_owned(text,organization_type,text,text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.own_product_validate(uuid,uuid,text,text,text,product_unit,product_unit,numeric,text,text,text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.purchase_request_transition(uuid,integer,purchase_request_status)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.secondary_phone_json(secondary_phone_reservations)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.validate_dashboard_kpi_card_order(dashboard_kpi_card_key[],text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app.video_upload_expired(media_videos)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.business_draft_save_v2(uuid,text,text,organization_type,text,text,text,text,text,text,text,text,text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.business_draft_save(uuid,text,text,organization_type,text,text,text,text,text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.business_save(text,text,organization_type,text,text,text,text,boolean)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.business_verification_queue(text[],organization_type,text,integer,integer)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.create_customer(uuid,text,customer_type,uuid,text,text,text,text,sales_source,uuid)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.create_follow_up(uuid,text,uuid,uuid,uuid,timestamp with time zone,sales_priority,text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.create_lead(uuid,text,uuid,uuid,sales_source,sales_priority,uuid,timestamp with time zone)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.create_product(uuid,text,product_category,product_unit,text,text,text,text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.dashboard_kpi_layout_set_personal(uuid,dashboard_kpi_card_key[],text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.dashboard_kpi_layout_set_team_default(uuid,dashboard_kpi_card_key[],text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.individual_save_professional(persona_type,text,smallint,text,text,text[],text[],text[],text,text[],boolean,text,text,smallint)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.onboarding_select_account_type(onboarding_track,text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.own_product_create(uuid,text,text,text,product_unit,jsonb,numeric,text,text,text,numeric)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.own_product_update(uuid,integer,text,text,text,product_unit,jsonb,numeric,text,text,text,numeric)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.pending_registration_save(uuid,text,activity_audience_kind,text,integer)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.publisher_product_create(uuid,text,text,text,product_unit,jsonb,numeric,text,text,text,numeric)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.record_consent(consent_type[],text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.request_account_upgrade(persona_type)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.set_lead_source_branch(uuid,integer,boolean,sales_source,boolean,uuid,boolean,uuid)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.transition_lead(uuid,integer,lead_stage,lead_status,text)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.update_customer(uuid,timestamp with time zone,text,text,text,text,text,sales_source,boolean,boolean,boolean,boolean)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.update_follow_up(uuid,integer,text,text,timestamp with time zone,sales_priority,boolean,boolean)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.update_lead_details(uuid,integer,text,sales_priority,timestamp with time zone,uuid,boolean)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "public.update_product(uuid,integer,text,product_category,product_unit,text,text,text,text,boolean,boolean,boolean)",
+            "issue": "not in the reviewed contract"
+          },
+          {
+            "fn": "app._apply_branch_location(public.verifications)",
+            "issue": "in the reviewed contract but missing on the hosted database"
+          },
+          {
+            "fn": "app._apply_co_owner(public.verifications)",
+            "issue": "in the reviewed contract but missing on the hosted database"
+          },
+          {
+            "fn": "app._apply_identity_change(public.verifications)",
+            "issue": "in the reviewed contract but missing on the hosted database"
+          },
+          {
+            "fn": "app.account_code_for_org_type(public.organization_type)",
+            "issue": "in the reviewed contract but missing on the hosted database"
+          },
+          {
+            "fn": "app.admin_org_status_tab(public.org_status)",
+            "issue": "in the reviewed contract but missing on the hosted database"
+          },
+          {
+            "fn": "app.admin_resolve_scope(public.admin_scope_type,uuid)",
+            "issue": "in the reviewed contract but missing on the hosted database"
+          }
+        ],
+        "truncated": true
+      },
+      "disputed_functions_summary": {
+        "found": 13,
+        "expected": 13,
+        "with_service_role_execute": 0,
+        "with_anon_execute": 0
+      }
+    }
+  ]
+}

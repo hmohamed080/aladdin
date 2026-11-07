@@ -19,6 +19,8 @@
  *         -- migration-policy: destructive-reviewed - <why this is safe, and which earlier release made it safe>
  *   - a version that is not newer than the newest migration already on the base branch FAILS unless the file carries
  *         -- migration-policy: out-of-order-reviewed - <why, e.g. reconciling history that is already applied>
+ *     or the file is pinned in supabase/migration-policy-reviewed.json by the sha256 of its LF-normalised text (for a file that is
+ *     already applied somewhere and therefore must stay byte-for-byte unchanged; editing it later breaks the pin and fails again)
  * and for every migration file MODIFIED, DELETED or RENAMED: always FAIL. An applied migration is immutable history.
  *
  * Usage:
@@ -26,7 +28,8 @@
  *
  * Exit codes: 0 ok (warnings allowed) · 1 policy failure · 2 usage error.
  */
-import { readFileSync, appendFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, appendFileSync, existsSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -112,7 +115,11 @@ export function versionOf(path) {
  * added file's text, `baseFiles` is every migration path on the base branch.
  * Returns { failures: string[], warnings: string[] }.
  */
-export function evaluatePr({ changes, readFile, baseFiles }) {
+export function contentHash(sql) {
+  return createHash("sha256").update(sql.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10))).digest("hex");
+}
+
+export function evaluatePr({ changes, readFile, baseFiles, reviewed = {} }) {
   const failures = [];
   const warnings = [];
   const baseVersions = baseFiles.map(versionOf).filter(Boolean);
@@ -144,8 +151,13 @@ export function evaluatePr({ changes, readFile, baseFiles }) {
 
     if (latestBase !== null && version < latestBase) {
       const marker = readMarker(sql, "out-of-order");
+      const pin = reviewed[path];
       if (marker && !marker.invalid) {
         warnings.push(`${path}: older than the newest migration on the base branch (${latestBase}); accepted via reviewed marker: ${marker}`);
+      } else if (pin && pin.sha256 === contentHash(sql) && typeof pin.reason === "string" && pin.reason.trim().length >= 15) {
+        warnings.push(`${path}: older than the newest migration on the base branch (${latestBase}); accepted via the pinned review in supabase/migration-policy-reviewed.json: ${pin.reason.trim()}`);
+      } else if (pin) {
+        failures.push(`${path}: pinned as reviewed out-of-order in supabase/migration-policy-reviewed.json, but the file no longer matches the pinned sha256 (or the reason is too short). Re-review it and update the pin.`);
       } else {
         failures.push(
           `${path}: version ${version} is older than the newest migration already on the base branch (${latestBase}). ` +
@@ -204,6 +216,9 @@ export function main(argv) {
     changes: parseChanges(readFileSync(args.changes, "utf8")),
     baseFiles: readFileSync(args.baseFiles, "utf8").split(/\r?\n/).filter(Boolean),
     readFile: (p) => readFileSync(join(root, p), "utf8"),
+    reviewed: existsSync(join(root, "supabase/migration-policy-reviewed.json"))
+      ? (JSON.parse(readFileSync(join(root, "supabase/migration-policy-reviewed.json"), "utf8")).out_of_order ?? {})
+      : {},
   });
 
   const lines = [];

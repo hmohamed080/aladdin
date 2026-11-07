@@ -1,5 +1,5 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
-import { IDENTITIES, registerWithPassword, signIn } from "./helpers/auth";
+import { IDENTITIES, answerBusinessContactIfAsked, pickBusinessActivity, registerWithPassword, signIn } from "./helpers/auth";
 
 /**
  * Business / organization onboarding. Drives the REAL owner path (no bypass) through the canonical `/auth/sign-up`:
@@ -63,6 +63,8 @@ test.describe("business onboarding", () => {
     // The business name alone is not enough: the legal / registered name is required too.
     await expect(page.getByRole("button", { name: /^continue$/i })).toBeDisabled();
     await page.locator("#blegal").fill("Nile Supply Trading Co LLC");
+    // A Supplier answers its own activity list (Distributor / Wholesaler).
+    await pickBusinessActivity(page);
     await page.getByRole("button", { name: /^continue$/i }).click();
 
     // The registered type is preset: there is no "what kind of business" step to confirm or change.
@@ -71,6 +73,7 @@ test.describe("business onboarding", () => {
     // Step 2 - location (optional).
     await expect(page.getByRole("heading", { name: /where are you based/i })).toBeVisible();
     await page.getByRole("button", { name: /^continue$/i }).click();
+    await answerBusinessContactIfAsked(page);
 
     // Step 3 - primary branch (optional).
     await expect(page.getByRole("heading", { name: /your primary branch/i })).toBeVisible();

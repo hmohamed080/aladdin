@@ -15,7 +15,8 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    # Stacked release PRs (base = an integration branch) run the same checks, including migration-policy.
+    branches: [main, "integration/**"]
   push:
     branches: [main]
   # Manual runs on stacked release branches (their PRs do not target main yet).

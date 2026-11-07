@@ -1,6 +1,6 @@
 # Cloudflare Workers runtime notes: media processing
 
-**Purpose.** What the Next.js server code needs to run under workerd (the OpenNext build for Cloudflare Workers, ADR-0021), as found by running the real Workers build under `wrangler dev`. This file covers image upload verification and variant generation, plus the other server modules that touch Node built-ins. Vercel stays the live host and the rollback, and its build is unchanged.
+**Purpose.** What the Next.js server code needs to run under workerd (the OpenNext build for Cloudflare Workers, ADR-0021), as found by running the real Workers build under `wrangler dev`. This file covers image upload verification and variant generation, plus the other server modules that touch Node built-ins. The plain `next build` (CI) is unchanged.
 
 ## Current decision
 
@@ -8,7 +8,7 @@ Image processing goes through one seam, `frontend/src/server/storage/image-proce
 
 | Runtime | Module | Engine |
 |---|---|---|
-| Node (Vercel, `next build`, scripts, Vitest) | `runtime.ts` → `sharp-processor.ts` | sharp, as before |
+| Node (`next build`, scripts, Vitest) | `runtime.ts` → `sharp-processor.ts` | sharp, as before |
 | Cloudflare Workers (`pnpm cf:build`) | `runtime.workers.ts` → `cloudflare-processor.ts` | Images binding `env.IMAGES` (wrangler.jsonc) |
 
 The engine is chosen when the app is **built**, not while it runs. `open-next.config.ts` sets `buildCommand: "ALADDIN_BUILD_TARGET=workers pnpm build"`. With that variable set, `next.config.ts` replaces `runtime.ts` with `runtime.workers.ts` (webpack `NormalModuleReplacementPlugin`, server compilers only) and gives webpack a separate cache (`*-workers`). So the Worker bundle contains no sharp at all, and the Node bundle contains no Cloudflare code. CI checks this in job `frontend-cloudflare`: the bundled `worker.js` and OpenNext's `handler.mjs` must not contain `sharp-linux`, `@img/sharp` or `node_modules/sharp/`, and `worker.js` must contain the `cloudflare-images` engine.

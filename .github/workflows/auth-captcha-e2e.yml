@@ -140,7 +140,7 @@ jobs:
           pnpm exec playwright test --project=chromium-desktop --reporter=list,html \
             e2e/auth-password-preview.spec.ts \
             e2e/profile-completion.spec.ts \
-            e2e/installer-phone-auth.spec.ts \
+            e2e/one-field-auth.spec.ts \
             e2e/recovery-replay.spec.ts \
             --grep-invert "renders no Turnstile widget|Complete your profile — seeded account" \
             2>&1 | tee "$ARTIFACTS/playwright.log"
