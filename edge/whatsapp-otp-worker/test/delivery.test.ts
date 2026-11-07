@@ -95,6 +95,23 @@ describe("a change made directly in D1 never turns delivery on, and is reported"
     });
   });
 
+  test("rolling the switch back to an OLDER audited ON version does not turn delivery on (only the newest audit row counts)", async () => {
+    await withD1(async (d1) => {
+      await configure(d1);
+      const env = envFor(d1);
+      const meta = mockMeta();
+      assert.equal((await adminCall(env, DELIVERY_PATH, deliveryBody())).status, 200); // v1 ON (audited)
+      assert.equal((await adminCall(env, DELIVERY_PATH, deliveryBody({ expected_version: 1, enabled: false, reason: "Closing the window after the rehearsal" }))).status, 200); // v2 OFF
+      // direct write: restore the v1 ON state, which still has its own (older) audit row
+      await d1.prepare("UPDATE otp_delivery_switch SET enabled = 1, version = 1 WHERE id = 1").run();
+      assert.equal((await handleRequest(await signedSend(goodBody()), env, meta.fetcher)).status, 503);
+      assert.equal(meta.calls.length, 0);
+      const usage = await json(await adminCall(env, USAGE_PATH, usageBody()));
+      assert.equal(usage.delivery_drift.version, 1);
+      assert.equal(usage.runtime.delivery_enabled, false);
+    });
+  });
+
   test("a consistent, audited switch reports no drift", async () => {
     await withD1(async (d1) => {
       await configure(d1);

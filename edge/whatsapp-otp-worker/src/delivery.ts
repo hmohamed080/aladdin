@@ -32,8 +32,8 @@ export async function readDeliverySwitch(db: Pick<Db, "prepare">): Promise<Deliv
 export async function deliverySwitchIsOn(db: Pick<Db, "prepare">): Promise<boolean> {
   try {
     const row = await db.prepare(
-      "SELECT s.enabled AS enabled FROM otp_delivery_switch s WHERE s.id = 1 AND s.enabled = 1 AND EXISTS " +
-      "(SELECT 1 FROM otp_delivery_audit a WHERE a.new_version = s.version AND a.new_enabled = s.enabled AND a.actor = s.updated_by)",
+      "SELECT s.enabled AS enabled FROM otp_delivery_switch s WHERE s.id = 1 AND s.enabled = 1 AND " +
+      "(SELECT a.new_version || ':' || a.new_enabled || ':' || a.actor FROM otp_delivery_audit a ORDER BY a.id DESC LIMIT 1) = s.version || ':' || s.enabled || ':' || s.updated_by",
     ).bind().first<{ enabled: number }>();
     return row?.enabled === 1;
   } catch { return false; }
@@ -46,8 +46,8 @@ export async function deliverySwitchIsOn(db: Pick<Db, "prepare">): Promise<boole
 export async function deliveryDrift(db: Pick<Db, "prepare">): Promise<{ version: number; at: number } | null> {
   try {
     const row = await db.prepare(
-      "SELECT s.version AS version, s.updated_at AS at FROM otp_delivery_switch s WHERE s.id = 1 AND NOT EXISTS " +
-      "(SELECT 1 FROM otp_delivery_audit a WHERE a.new_version = s.version AND a.new_enabled = s.enabled AND a.actor = s.updated_by)",
+      "SELECT s.version AS version, s.updated_at AS at FROM otp_delivery_switch s WHERE s.id = 1 AND " +
+      "(SELECT a.new_version || ':' || a.new_enabled || ':' || a.actor FROM otp_delivery_audit a ORDER BY a.id DESC LIMIT 1) IS NOT (s.version || ':' || s.enabled || ':' || s.updated_by)",
     ).bind().first<{ version: number; at: number }>();
     return row && isInt(row.version) && isInt(row.at) ? { version: row.version, at: row.at } : null;
   } catch { return null; }
