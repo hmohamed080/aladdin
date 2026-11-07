@@ -3,6 +3,7 @@ import { strict as assert } from "node:assert";
 import { readFileSync, readdirSync } from "node:fs";
 import { Miniflare } from "miniflare";
 import { claimEvent, handleRequest, purgeExpiredReplayClaims, type ReplayDb } from "../src/index.ts";
+import { NOTIFY_SECRET, setAttestation } from "./d1.ts";
 import { DELIVERY, baseEnv, goodBody, mockMeta, signedSend } from "./support.ts";
 
 const OTHER = "7c2e5d2d-1e4b-4d6f-8b88-3a7e4a1b0c22";
@@ -57,12 +58,13 @@ test("D1 real SQL engine: one challenge delivers once under concurrency, failure
     await configure(d1, 1000);
     await d1.prepare("INSERT INTO otp_delivery_switch (id, enabled, version, updated_at, updated_by) VALUES (1, 1, 1, 0, '00000000-0000-4000-8000-000000000001')").run(); // the Super Admin switch is ON
     await d1.prepare("INSERT INTO otp_delivery_audit (at, request_id, actor, old_enabled, new_enabled, new_version, reason) VALUES (0, '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-000000000001', NULL, 1, 1, 'fixture: audited switch change')").run(); // ...with the audit row the admin route always writes with it
+    await setAttestation(d1 as never, true, 1); // ...and the Aladdin database has attested that version 1 is authorized ON
     const db = d1 as unknown as ReplayDb;
     assert.equal((await claimEvent(db, `otp_${DELIVERY}`)).outcome, "new");
     assert.equal((await claimEvent(db, `otp_${DELIVERY}`)).outcome, "blocked");
 
     // concurrent identical signed deliveries, a fresh challenge
-    const meta = mockMeta(); const env = baseEnv({ IDEMPOTENCY_DB: db });
+    const meta = mockMeta(); const env = baseEnv({ IDEMPOTENCY_DB: db, OTP_NOTIFY_SIGNING_SECRET: { get: async () => NOTIFY_SECRET } });
     const body = goodBody({ delivery_id: OTHER });
     const results = await Promise.all(Array.from({ length: 8 }, async () => handleRequest(await signedSend(body), env, meta.fetcher)));
     assert.equal(meta.calls.length, 1, "exactly one Meta call for one challenge");

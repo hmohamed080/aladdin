@@ -7857,6 +7857,7 @@ export type Database = {
         Returns: string
       }
       admin_whatsapp_otp_delivery_reconcile: { Args: { p_applied: Json; p_drift?: Json }; Returns: Json }
+      admin_whatsapp_otp_delivery_authorized: { Args: never; Returns: Json }
       whatsapp_otp_notification_record: {
         Args: { p_event_key: string; p_kind: string; p_source_env: string; p_occurred_at: number; p_stats: Json }
         Returns: Json

@@ -183,7 +183,7 @@ describe("global rolling-24h send budget (settings row in D1)", () => {
   test("a missing settings row fails closed in every environment: nothing is sent and the token is never read", async () => {
     for (const environment of ["acceptance", "production"]) {
       const meta = mockMeta(); const reads = { n: 0 };
-      const res = await handleRequest(await signedSend(), baseEnv({ IDEMPOTENCY_DB: memoryReplayDb({ settings: null }), OTP_ENVIRONMENT: environment, tokenReads: reads }), meta.fetcher);
+      const res = await handleRequest(await signedSend(), baseEnv({ IDEMPOTENCY_DB: memoryReplayDb({ settings: null, attestationEnv: environment }), OTP_ENVIRONMENT: environment, tokenReads: reads }), meta.fetcher);
       assert.equal(res.status, 503, environment);
       assert.deepEqual(await res.json(), { error: "budget_unconfigured" });
       assert.equal(meta.calls.length, 0); assert.equal(reads.n, 0);
@@ -270,7 +270,7 @@ describe("preflight (signed, side-effect free) and leak checks", () => {
     const ok = await handleRequest(await signedSend('{"check":"preflight"}', { id: "preflight_1", path: "/v1/preflight" }), env, meta.fetcher);
     assert.equal(ok.status, 200);
     const text = await ok.text(); const out = JSON.parse(text);
-    assert.deepEqual({ ...out, sender_id_suffix: undefined }, { signing_secret_bound: true, admin_secret_bound: false, admin_grant_secret_bound: false, notify_configured: false, meta_token_bound: true, d1_reachable: true, delivery_permitted: false, delivery_switch: true, delivery_switch_version: 1, delivery_enabled: false, environment: "acceptance", recipient_mode: "allowlist", allowlist_entries: 1, settings_initialized: true, daily_send_limit: 100, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90, template: "aladdin_otp", languages: "ar", graph_version: "v25.0", sender_id_suffix: undefined, delivery_blockers: "environment_not_permitted,admin_secret_missing,grant_secret_missing,notify_not_configured" });
+    assert.deepEqual({ ...out, sender_id_suffix: undefined, delivery_attestation_age: undefined }, { signing_secret_bound: true, admin_secret_bound: false, admin_grant_secret_bound: false, notify_configured: false, meta_token_bound: true, d1_reachable: true, delivery_permitted: false, delivery_switch: true, delivery_switch_version: 1, delivery_attested: true, delivery_attestation_age: undefined, delivery_enabled: false, environment: "acceptance", recipient_mode: "allowlist", allowlist_entries: 1, settings_initialized: true, daily_send_limit: 100, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90, template: "aladdin_otp", languages: "ar", graph_version: "v25.0", sender_id_suffix: undefined, delivery_blockers: "environment_not_permitted,admin_secret_missing,grant_secret_missing,notify_not_configured" });
     assert.equal(out.sender_id_suffix, "5492");
     for (const secret of [FAKE_TOKEN, SECRET, PHONE, "1012345678", "1415528588305492"]) assert.ok(!text.includes(secret), "preflight must not contain " + secret.slice(0, 6));
     assert.equal(meta.calls.length, 0);

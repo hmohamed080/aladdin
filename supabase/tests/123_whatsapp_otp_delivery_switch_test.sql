@@ -10,7 +10,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(66);
+select plan(70);
 
 \set sa1   'b1000000-0000-4000-8000-000000000001'
 \set sa2   'b1000000-0000-4000-8000-000000000002'
@@ -226,6 +226,12 @@ select is((select count(*)::int from unnest(array['anon', 'authenticated', 'serv
             where has_function_privilege(r, 'app.whatsapp_otp_record_delivery_unmatched(integer,bigint)', 'execute')), 0,
   'F10 the internal recorder is not callable by any client role or the service role directly');
 
+select is(pg_temp.call_svc('public.admin_whatsapp_otp_delivery_authorized()'), '{"enabled": false, "version": 2}'::jsonb,
+  'F11 the authorized state is the latest APPLIED request (version 2, OFF), never a pending, failed or abandoned one');
+select is(pg_temp.call_as(:'sa1', 'public.admin_whatsapp_otp_delivery_authorized()') ->> 'sqlstate', '42501', 'F12 a signed-in Super Admin cannot read it either: service role only');
+select is(pg_temp.call_anon('public.admin_whatsapp_otp_delivery_authorized()') ->> 'sqlstate', '42501', 'F13 anon cannot');
+select is((select count(*)::int from app.whatsapp_otp_delivery_requests where status = 'applied'), 2, 'F14 ...and exactly the two applied requests exist, so a forged Worker audit row never becomes "authorized"');
+
 -- ===========================================================================
 -- E. Closed table, vocabulary, hardening, grants
 -- ===========================================================================
@@ -235,15 +241,15 @@ select ok((select bool_and(position('''' || a || '''::text' in d) > 0)
                   unnest(array['whatsapp_otp.delivery_requested', 'whatsapp_otp.delivery_changed', 'whatsapp_otp.delivery_change_failed']) a),
   'E2 the three audit actions are in the allow-list');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-            where n.nspname = 'public' and p.proname like 'admin_whatsapp_otp_delivery_%' and p.prosecdef and p.proconfig @> array['search_path=""']), 3,
-  'E3 all three functions are SECURITY DEFINER with an empty search_path');
+            where n.nspname = 'public' and p.proname like 'admin_whatsapp_otp_delivery_%' and p.prosecdef and p.proconfig @> array['search_path=""']), 4,
+  'E3 all four functions are SECURITY DEFINER with an empty search_path');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
             where n.nspname = 'public' and p.proname like 'admin_whatsapp_otp_delivery_%'
               and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('public', p.oid, 'execute'))), 0,
   'E4 no client role (anon, authenticated, PUBLIC) can execute any of them');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-            where n.nspname = 'public' and p.proname like 'admin_whatsapp_otp_delivery_%' and has_function_privilege('service_role', p.oid, 'execute')), 3,
-  'E5 the service role can execute all three');
+            where n.nspname = 'public' and p.proname like 'admin_whatsapp_otp_delivery_%' and has_function_privilege('service_role', p.oid, 'execute')), 4,
+  'E5 the service role can execute all four');
 select is((select count(*)::int from unnest(array['anon', 'authenticated', 'service_role']) r
             where has_table_privilege(r, 'app.whatsapp_otp_delivery_requests', 'select,insert,update,delete')), 0,
   'E6 no client role holds any privilege on the ledger');

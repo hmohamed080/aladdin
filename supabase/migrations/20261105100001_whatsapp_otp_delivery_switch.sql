@@ -292,6 +292,21 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- 5b. AUTHORIZED STATE (service role): what the Aladdin database has approved, for the Worker's periodic attestation. The latest APPLIED request
+-- is the authorized switch state; no applied request at all means OFF at version 0. The app calls reconcile first (it completes pending requests
+-- the Worker's audit tail proves applied), then this, then signs the answer. Read-only.
+-- ---------------------------------------------------------------------------
+create function public.admin_whatsapp_otp_delivery_authorized()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce(
+    (select jsonb_build_object('enabled', r.new_enabled, 'version', r.result_version)
+       from app.whatsapp_otp_delivery_requests r
+      where r.status = 'applied' and r.result_version is not null
+      order by r.result_version desc, r.finished_at desc limit 1),
+    jsonb_build_object('enabled', false, 'version', 0));
+$$;
+
+-- ---------------------------------------------------------------------------
 -- 6. Grants: service role only; nothing is executable by anon, authenticated or PUBLIC
 -- ---------------------------------------------------------------------------
 -- The internal recorder is reachable only from the reconcile function (same owner): nobody else, not even the service role.
@@ -299,10 +314,13 @@ revoke all on function app.whatsapp_otp_record_delivery_unmatched(integer, bigin
 revoke all on function public.admin_whatsapp_otp_delivery_begin(uuid, integer, boolean, boolean, text) from public, anon, authenticated, service_role;
 revoke all on function public.admin_whatsapp_otp_delivery_finish(uuid, uuid, text, integer, text) from public, anon, authenticated, service_role;
 revoke all on function public.admin_whatsapp_otp_delivery_reconcile(jsonb, jsonb) from public, anon, authenticated, service_role;
+revoke all on function public.admin_whatsapp_otp_delivery_authorized() from public, anon, authenticated, service_role;
 grant execute on function public.admin_whatsapp_otp_delivery_begin(uuid, integer, boolean, boolean, text) to service_role;
 grant execute on function public.admin_whatsapp_otp_delivery_finish(uuid, uuid, text, integer, text) to service_role;
 grant execute on function public.admin_whatsapp_otp_delivery_reconcile(jsonb, jsonb) to service_role;
+grant execute on function public.admin_whatsapp_otp_delivery_authorized() to service_role;
 
 comment on function public.admin_whatsapp_otp_delivery_begin(uuid, integer, boolean, boolean, text) is 'Service role only. Checks the ACTOR''s effective whatsapp_otp.manage, records the request and its audit event, and signs a one-request grant ("v1d") for the Worker. Never turns delivery on by itself.';
 comment on function public.admin_whatsapp_otp_delivery_finish(uuid, uuid, text, integer, text) is 'Service role only, after the Worker''s signed answer. Completes the actor''s own pending request and writes the audit event with actor, old value, new value, reason and version. Idempotent.';
 comment on function public.admin_whatsapp_otp_delivery_reconcile(jsonb, jsonb) is 'Service role only. Completes requests that the Worker''s authoritative D1 audit shows as applied and closes stale ones as not applied.';
+comment on function public.admin_whatsapp_otp_delivery_authorized() is 'Service role only. The delivery switch state the Aladdin database has approved (latest applied request; none = OFF, version 0). Read-only; used for the Worker''s signed attestation.';

@@ -113,6 +113,17 @@ export async function setDeliverySwitch(d1: { prepare(sql: string): { bind(...v:
   await d1.prepare("INSERT OR REPLACE INTO otp_delivery_switch (id, enabled, version, updated_at, updated_by) VALUES (1, ?1, ?2, 0, ?3)").bind(enabled ? 1 : 0, version, ACTOR).run();
   await d1.prepare("INSERT INTO otp_delivery_audit (at, request_id, actor, old_enabled, new_enabled, new_version, reason) VALUES (0, ?1, ?2, NULL, ?3, ?4, 'fixture: audited switch change')")
     .bind(crypto.randomUUID(), ACTOR, enabled ? 1 : 0, version).run();
+  await setAttestation(d1, enabled, version);
+}
+
+/** The app's signed answer, exactly as attest.ts verifies it (environment "acceptance" is what envFor/baseEnv use). */
+export async function setAttestation(d1: { prepare(sql: string): { bind(...v: (string | number)[]): { run(): Promise<unknown> } } }, enabled: boolean, version: number, opts: { issuedAt?: number; env?: string; secret?: string } = {}) {
+  const issuedAt = opts.issuedAt ?? Math.floor(Date.now() / 1000);
+  const nonce = "ab".repeat(16);
+  const { attestationCanonical } = await import("../src/attest.ts");
+  const { signPayload } = await import("../src/signing.ts");
+  const mac = (await signPayload(opts.secret ?? NOTIFY_SECRET, "attest", issuedAt, attestationCanonical({ env: opts.env ?? "acceptance", enabled, version, issuedAt, nonce })))!;
+  await d1.prepare("INSERT OR REPLACE INTO otp_delivery_attestation (id, enabled, version, issued_at, nonce, mac) VALUES (1, ?1, ?2, ?3, ?4, ?5)").bind(enabled ? 1 : 0, version, issuedAt, nonce, mac).run();
 }
 
 /** Fixture: a direct write to the switch table that bypassed the audit (what a break-glass or hostile D1 write looks like). */

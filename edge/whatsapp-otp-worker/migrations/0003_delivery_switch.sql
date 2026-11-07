@@ -23,3 +23,16 @@ CREATE TABLE IF NOT EXISTS otp_delivery_audit (
   new_version INTEGER NOT NULL CHECK (new_version >= 1),
   reason TEXT NOT NULL CHECK (length(reason) BETWEEN 10 AND 500)
 );
+
+-- The signed attestation of the Aladdin database: which delivery state is AUTHORIZED, as of when. Written only by the scheduled attestation
+-- (attest.ts) after it verified the app's HMAC. The send path counts the switch as ON only when this row says ON at the switch's version, is
+-- correctly signed (the secret is in the Secrets Store, never in D1) and is younger than the TTL. A row here that was not produced by the app
+-- cannot carry a valid signature, so forging the switch and its audit row is not enough to send.
+CREATE TABLE IF NOT EXISTS otp_delivery_attestation (
+  id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
+  enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+  version INTEGER NOT NULL CHECK (version >= 0),
+  issued_at INTEGER NOT NULL,
+  nonce TEXT NOT NULL CHECK (length(nonce) = 32),
+  mac TEXT NOT NULL CHECK (length(mac) BETWEEN 40 AND 128)
+);

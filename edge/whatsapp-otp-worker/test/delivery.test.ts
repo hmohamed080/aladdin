@@ -2,7 +2,7 @@ import { describe, test } from "node:test";
 import { strict as assert } from "node:assert";
 import { handleRequest } from "../src/index.ts";
 import { goodBody, mockMeta, signedSend } from "./support.ts";
-import { ACTOR, ADMIN_BYTES, DELIVERY_PATH, OTHER_ACTOR, USAGE_PATH, adminCall, configure, deliveryBody, deliveryGrantFor, envFor, setDeliverySwitch, setDeliverySwitchUnaudited, usageBody, withD1 } from "./d1.ts";
+import { ACTOR, ADMIN_BYTES, DELIVERY_PATH, OTHER_ACTOR, USAGE_PATH, adminCall, configure, deliveryBody, deliveryGrantFor, envFor, setAttestation, setDeliverySwitch, setDeliverySwitchUnaudited, usageBody, withD1 } from "./d1.ts";
 
 const json = async (r: Response) => (await r.json()) as Record<string, any>;
 const flagRow = (db: any) => db.prepare("SELECT enabled, version, updated_by FROM otp_delivery_switch WHERE id = 1").bind().first();
@@ -79,6 +79,7 @@ describe("a change made directly in D1 never turns delivery on, and is reported"
       const env = envFor(d1);
       const meta = mockMeta();
       assert.equal((await adminCall(env, DELIVERY_PATH, deliveryBody())).status, 200);
+      await setAttestation(d1, true, 1); // the next scheduled attestation: the Aladdin database authorizes version 1 ON
       assert.equal((await handleRequest(await signedSend(goodBody()), env, meta.fetcher)).status, 200);
       // 1. a legitimate OFF through the route, then a direct "enabled = 1" that keeps the version: the audit says OFF, so it stays OFF
       assert.equal((await adminCall(env, DELIVERY_PATH, deliveryBody({ expected_version: 1, enabled: false, reason: "Closing the window after the rehearsal" }))).status, 200);
@@ -242,8 +243,13 @@ describe("POST /v1/admin/delivery: the grant-protected, audited toggle", () => {
       body = await json(await adminCall(ready, USAGE_PATH, usageBody()));
       assert.equal(body.delivery.enabled, true);
       assert.equal(body.delivery.version, 1);
-      assert.equal(body.runtime.delivery_enabled, true);
+      assert.equal(body.runtime.delivery_enabled, false, "ON in D1 is not effective until the Aladdin database has attested it");
+      assert.equal(body.runtime.delivery_attested, false);
       assert.equal(body.runtime.delivery_blockers, "");
+      await setAttestation(d1, true, 1);
+      body = await json(await adminCall(ready, USAGE_PATH, usageBody()));
+      assert.equal(body.runtime.delivery_enabled, true);
+      assert.equal(body.runtime.delivery_attested, true);
       assert.equal(body.delivery_audit.length, 1);
       assert.deepEqual({ ...body.delivery_audit[0], at: 0, request_id: "x" }, { at: 0, request_id: "x", actor: ACTOR, old: null, new: true, version: 1, reason: "Acceptance rehearsal window approved" });
     });

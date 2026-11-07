@@ -1,6 +1,6 @@
 {
  "version": "20261105100001",
- "source": "20261103090001 plus the three service-role-only functions of 20261105100001 (WhatsApp OTP delivery switch: begin, finish, reconcile). The three entries are derived from the identical-shape entries of admin_whatsapp_otp_settings_begin/finish/reconcile (definer, empty search_path, postgres + service_role grants only); every pre-existing entry is unchanged. NOT yet compared against a live replay inventory: the migration-permission-gate must confirm it. Then amended: reconcile gained a p_drift argument and app.whatsapp_otp_record_delivery_unmatched was added, cloned from app.whatsapp_otp_record_unmatched (same shape).",
+ "source": "20261103090001 plus the three service-role-only functions of 20261105100001 (WhatsApp OTP delivery switch: begin, finish, reconcile). The three entries are derived from the identical-shape entries of admin_whatsapp_otp_settings_begin/finish/reconcile (definer, empty search_path, postgres + service_role grants only); every pre-existing entry is unchanged. NOT yet compared against a live replay inventory: the migration-permission-gate must confirm it. Then amended: reconcile gained a p_drift argument and app.whatsapp_otp_record_delivery_unmatched was added, cloned from app.whatsapp_otp_record_unmatched (same shape). public.admin_whatsapp_otp_delivery_authorized() was added (same shape as reconcile).",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.media_storage_resolve(text,text,text)",
@@ -26119,6 +26119,43 @@
     "dashboard_user": false,
     "supabase_auth_admin": false,
     "supabase_storage_admin": false
+   }
+  },
+  {
+   "kind": "f",
+   "owner": "postgres",
+   "config": [
+    "search_path=\"\""
+   ],
+   "grants": [
+    {
+     "role": "postgres",
+     "grantable": false
+    },
+    {
+     "role": "service_role",
+     "grantable": false
+    }
+   ],
+   "definer": true,
+   "effective": {
+    "anon": false,
+    "service_role": true,
+    "authenticated": false,
+    "authenticator": false,
+    "dashboard_user": false,
+    "supabase_auth_admin": false,
+    "supabase_storage_admin": false
+   },
+   "signature": "public.admin_whatsapp_otp_delivery_authorized()",
+   "schemaUsage": {
+    "anon": true,
+    "service_role": true,
+    "authenticated": true,
+    "authenticator": true,
+    "dashboard_user": true,
+    "supabase_auth_admin": true,
+    "supabase_storage_admin": true
    }
   }
  ]

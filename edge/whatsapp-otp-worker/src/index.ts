@@ -22,7 +22,8 @@
 
 import { handleAdminRequest, isAdminPath } from "./admin.ts";
 import type { Db } from "./db.ts";
-import { deliveryBlockers, deliverySwitchIsOn, readDeliverySwitch } from "./delivery.ts";
+import { attestationFacts, deliveryEffectivelyOn } from "./attest.ts";
+import { deliveryBlockers, readDeliverySwitch } from "./delivery.ts";
 import { runMaintenance } from "./maintenance.ts";
 import { type OtpSettings, readSettings } from "./settings.ts";
 import { verifySignature } from "./signing.ts";
@@ -366,7 +367,9 @@ async function preflightReport(env: Env): Promise<Record<string, string | number
   try { sw = env.IDEMPOTENCY_DB ? await readDeliverySwitch(env.IDEMPOTENCY_DB as unknown as Db) : null; } catch { sw = null; }
   const permitted = env.WHATSAPP_DELIVERY_ENABLED === "true";
   // The EFFECTIVE switch: ON and accounted for by its audit row (the same check the send path makes), never the raw stored flag.
-  const switchOn = env.IDEMPOTENCY_DB ? await deliverySwitchIsOn(env.IDEMPOTENCY_DB as unknown as Db) : false;
+  const nowSec = Math.floor(Date.now() / 1000);
+  const switchOn = env.IDEMPOTENCY_DB ? await deliveryEffectivelyOn(env as never, env.IDEMPOTENCY_DB as unknown as Db, nowSec) : false;
+  const attested = await attestationFacts(env as never, env.IDEMPOTENCY_DB as unknown as Db | undefined, nowSec);
   const facts: Record<string, string | number | boolean> = {
     signing_secret_bound: true,
     admin_secret_bound: adminBound,
@@ -377,6 +380,8 @@ async function preflightReport(env: Env): Promise<Record<string, string | number
     delivery_permitted: permitted,
     delivery_switch: switchOn,
     delivery_switch_version: sw?.version ?? 0,
+    delivery_attested: attested.delivery_attested,
+    delivery_attestation_age: attested.delivery_attestation_age,
     delivery_enabled: permitted && switchOn, // effective: both the permit and the audited Super Admin switch
     environment: env.OTP_ENVIRONMENT ?? "unset",
     recipient_mode: env.OTP_RECIPIENT_MODE === "open" && env.OTP_ENVIRONMENT === "production" ? "open" : "allowlist",
@@ -430,7 +435,7 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
   if (!db) return answer(503, { error: "idempotency_unavailable" });
   // The Super Admin switch, read from D1 on EVERY send (no cache, so an OFF takes effect on the next request). Missing, OFF and unreadable
   // are indistinguishable from outside: nothing is sent and neither the token nor Meta is touched.
-  if (!(await deliverySwitchIsOn(db as unknown as Db))) return answer(503, { error: "delivery_disabled" });
+  if (!(await deliveryEffectivelyOn(env as never, db as unknown as Db, Math.floor(Date.now() / 1000)))) return answer(503, { error: "delivery_disabled" });
   // Fail closed: the limits are read from D1 and validated BEFORE the token is read or Meta is called. Missing, invalid or unreadable = nothing is sent.
   // (The delivery switch above is independent of this: turning delivery off never needs the budget.)
   let settings: OtpSettings | null = null;
