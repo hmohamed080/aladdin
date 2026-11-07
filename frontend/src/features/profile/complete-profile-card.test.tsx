@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
@@ -58,9 +58,11 @@ describe("CompleteProfileCard", () => {
 
   it("points every checklist item at a route that actually exists", () => {
     const appDir = path.resolve(__dirname, "../../app");
+    // A route group such as `(workspace)` adds no URL segment, so a URL can live directly under `app/` or under a group.
+    const roots = [appDir, ...readdirSync(appDir, { withFileTypes: true }).filter((e) => e.isDirectory() && /^\(.+\)$/.test(e.name)).map((e) => path.join(appDir, e.name))];
     for (const item of PROFILE_COMPLETION_ITEMS) {
       const route = ITEM_HREF[item].split("#")[0] ?? "";
-      expect(existsSync(path.join(appDir, route, "page.tsx")), `${item} -> ${route}`).toBe(true);
+      expect(roots.some((root) => existsSync(path.join(root, route, "page.tsx"))), `${item} -> ${route}`).toBe(true);
     }
   });
 });

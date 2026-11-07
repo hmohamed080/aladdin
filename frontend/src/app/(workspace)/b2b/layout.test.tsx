@@ -58,4 +58,22 @@ describe("/b2b layout - callers without an active workspace", () => {
     render(await B2BLayout({ children: <p>page</p> }));
     expect(screen.getByTestId("shell")).toBeInTheDocument();
   });
+
+  // The Showroom frame is drawn by the (workspace) layout above this one so it survives moves between /showroom and /b2b.
+  // Drawing the workspace shell (or a second Showroom frame) here would put two shells on the page for a dealer.
+  it("a showroom dealer passes through: no workspace shell here, the (workspace) layout frames it", async () => {
+    state.workspace = { active: { ...active, orgType: "showroom_dealer" }, entries: [] };
+    render(await B2BLayout({ children: <p>page</p> }));
+    expect(screen.queryByTestId("shell")).not.toBeInTheDocument();
+    expect(screen.getByText("page")).toBeInTheDocument();
+  });
+
+  it("every other organization type still gets the workspace shell, unchanged", async () => {
+    for (const orgType of ["supplier", "manufacturer", "importer", "design_office", null]) {
+      state.workspace = { active: { ...active, orgType }, entries: [] };
+      const { unmount } = render(await B2BLayout({ children: <p>page</p> }));
+      expect(screen.getByTestId("shell")).toBeInTheDocument();
+      unmount();
+    }
+  });
 });
