@@ -245,7 +245,7 @@ There is **no automated paging** today: the events are searchable but nobody is 
 
 **Rollback summary:** P-2 is additive: forward-fix with a new migration, or restore from the P-0b snapshot (hours, loses writes since the snapshot); P-1 delete one row; P-3 leave empty tables; P-4 nothing live changes (ignore the undeployed version); P-6 delete the new Worker (before the frontend binds to it); frontend: uploaded versions serve 0% until promoted, and `wrangler rollback --env production` returns to `a3b08a22`.
 
-**Remaining blockers (checked 2026-11-07):** (1) `CLOUDFLARE_PRODUCTION_ENABLED` is `false` (owner switch, step B0) and the `cloudflare-production` environment has no required reviewer; (2) the Acceptance preview runs an older build, so L1/L2 need step A1 first; (3) the hosted login gate L1 to L5 and the P-7a runtime probe before any promotion; (4) P-8 limits initialisation and P-9 alert-connection and attestation checks after promotion; (5) alert recipients and A10, which block only live activation. Resolved: `main` holds the integrated build (`5861d879`), P-6 is done and verified.
+**Remaining blockers (checked 2026-11-07):** (1) `CLOUDFLARE_PRODUCTION_ENABLED` is `false` (owner switch, step B0; kept closed on purpose; the owner is now the required reviewer of the environment); (2) the Acceptance preview runs an older build, so L1/L2 need step A1 first; (3) the hosted login gate L1 to L5 and the P-7a runtime probe before any promotion; (4) P-8 limits initialisation and P-9 alert-connection and attestation checks after promotion; (5) alert recipients and A10, which block only live activation. Resolved: `main` holds the integrated build (`5861d879`), P-6 is done and verified.
 
 ## 8. A10 and activation (not part of this checklist)
 
