@@ -17,7 +17,7 @@ import type { Database } from "@/types/database.types";
  */
 export async function entryLandingPath(supabase: SupabaseClient<Database>, rawNext: unknown): Promise<string> {
   const next = sanitizeNext(rawNext);
-  if (next.startsWith("/onboarding") || next.startsWith("/auth/invite/")) return next;
+  if (next.startsWith("/onboarding") || next.startsWith("/auth/invite/") || next.startsWith("/auth/staff-invitation")) return next;
   const { data: state } = await supabase.rpc("my_registration_state");
   if (!hasAppAccess(state as RegistrationState)) return "/onboarding";
   const landing = await resolveActiveLanding(supabase);

@@ -1,0 +1,175 @@
+# Daily backups. Lives in the separate private repo `aladdin-backups` (copied there by ops/backups/build-repo.sh).
+# Read-only on the databases; writes only new, locked objects to the backup bucket.
+# Which projects a run covers is decided by backup/plan.sh (tested offline by backup/plan-test.sh):
+#   - Production only when the repository variable PRODUCTION_BACKUP_ENABLED is exactly "true" (the owner's
+#     activation GO); a manual Production run also needs the typed confirmation "back up production".
+#   - Acceptance by ACCEPTANCE_BACKUP_SCHEDULE: off (default), daily (the trial) or weekly (Sundays, Cairo).
+name: Daily backup
+run-name: backup (${{ inputs.label || 'scheduled' }}) ${{ inputs.request_id }}
+on:
+  schedule:
+    # Poll runtime Cairo schedule; inactive builds remove this trigger.
+    - cron: "17,47 * * * *"
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "Which project to back up"
+        type: choice
+        options: [acceptance, production]
+        default: acceptance
+      request_id:
+        type: string
+        required: false
+        default: ""
+      confirm:
+        description: 'Production only: type "back up production"'
+        type: string
+        required: false
+        default: ""
+permissions:
+  contents: read
+concurrency:
+  group: daily-backup
+  cancel-in-progress: false
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      labels: ${{ steps.plan.outputs.labels }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_LABEL: ${{ inputs.label }}
+          INPUT_CONFIRM: ${{ inputs.confirm }}
+          PRODUCTION_BACKUP_ENABLED: ${{ vars.PRODUCTION_BACKUP_ENABLED }}
+          ACCEPTANCE_BACKUP_SCHEDULE: ${{ vars.ACCEPTANCE_BACKUP_SCHEDULE }}
+        run: |
+          if [ "$EVENT" = schedule ]; then
+            labels='["acceptance","production"]'
+          else
+            labels="$(bash backup/plan.sh backup)"
+          fi
+          echo "labels=$labels" >> "$GITHUB_OUTPUT"
+          echo "Projects in this run: $labels" >> "$GITHUB_STEP_SUMMARY"
+
+  # The service-role key lives ONLY here, in its own per-project environment `backup-control-<label>`: this job
+  # reads the runtime schedule and claims the run, and touches no backup data. The data job below never sees it.
+  control:
+    name: control (${{ matrix.label }})
+    needs: plan
+    if: needs.plan.outputs.labels != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        label: ${{ fromJSON(needs.plan.outputs.labels) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: backup-control-${{ matrix.label }}
+    # Matrix legs share these outputs; each leg fills only its own project's keys (empty values never overwrite).
+    outputs:
+      run_acceptance: ${{ matrix.label == 'acceptance' && steps.control.outputs.run || '' }}
+      run_production: ${{ matrix.label == 'production' && steps.control.outputs.run || '' }}
+      slot_acceptance: ${{ matrix.label == 'acceptance' && steps.control.outputs.slot_date || '' }}
+      slot_production: ${{ matrix.label == 'production' && steps.control.outputs.slot_date || '' }}
+    env:
+      EVENT: ${{ github.event_name }}
+      BACKUP_KIND: backup
+      TARGET_RUN_ID: ${{ github.run_id }}
+      REQUEST_ID: ${{ inputs.request_id }}
+      BACKUP_LABEL: ${{ matrix.label }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read runtime schedule
+        id: control
+        run: python3 backup/runtime-schedule.py
+      - name: Claim run
+        if: steps.control.outputs.run == 'true'
+        run: python3 backup/report-run.py
+
+  # No secrets here: only turns the control job's per-label answers into the list of labels that may run
+  # (a job-level `if` cannot read the matrix, so the data job's matrix is built from this list instead).
+  gate:
+    name: gate
+    needs: [plan, control]
+    if: needs.plan.outputs.labels != '[]' && needs.control.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      labels: ${{ steps.pick.outputs.labels }}
+    env:
+      PLANNED: ${{ needs.plan.outputs.labels }}
+      RUN_ACCEPTANCE: ${{ needs.control.outputs.run_acceptance }}
+      RUN_PRODUCTION: ${{ needs.control.outputs.run_production }}
+    steps:
+      - name: Labels allowed to run
+        id: pick
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          planned = json.loads(os.environ['PLANNED'])
+          ok = [l for l in planned if os.environ.get('RUN_' + l.upper()) == 'true']
+          print('labels=' + json.dumps(ok))
+          PY
+
+  backup:
+    name: backup (${{ matrix.label }})
+    needs: [plan, control, gate]
+    if: needs.gate.result == 'success' && needs.gate.outputs.labels != '[]' && needs.control.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        label: ${{ fromJSON(needs.gate.outputs.labels) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: backup-${{ matrix.label }}
+    env:
+      EVENT: ${{ github.event_name }}
+      BACKUP_KIND: backup
+      TARGET_RUN_ID: ${{ github.run_id }}
+      REQUEST_ID: ${{ inputs.request_id }}
+      BACKUP_LABEL: ${{ matrix.label }}
+      BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
+      R2_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_WRITE_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_WRITE_SECRET }}
+      AGE_RECIPIENTS: ${{ vars.AGE_RECIPIENTS }}
+      BACKUP_DB_URL: ${{ secrets.BACKUP_DB_URL }}
+      PRODUCTION_BACKUP_ENABLED: ${{ vars.PRODUCTION_BACKUP_ENABLED }}
+      # Legacy Supabase-Storage copy: OFF unless a documented, time-boxed recovery need switches it on (variable).
+      LEGACY_MEDIA_BACKUP: ${{ vars.LEGACY_MEDIA_BACKUP }}
+      # Independent copy of the R2-hosted originals (separate bucket, read-only source token, 90-day generations).
+      R2_MEDIA_BACKUP: ${{ vars.R2_MEDIA_BACKUP }}
+      R2_SOURCE_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      R2_SOURCE_BUCKET: ${{ vars.R2_MEDIA_SOURCE_BUCKET }}
+      R2_SOURCE_ACCESS_KEY_ID: ${{ secrets.R2_MEDIA_READ_KEY_ID }}
+      R2_SOURCE_SECRET_ACCESS_KEY: ${{ secrets.R2_MEDIA_READ_SECRET }}
+      BACKUP_SLOT_DATE: ${{ needs.control.outputs[format('slot_{0}', matrix.label)] }}
+      SKIP_IF_TAKEN: ${{ github.event_name == 'schedule' && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hand-off folder between the two backup steps
+        run: echo "BACKUP_STATE_DIR=$RUNNER_TEMP/backup-state" >> "$GITHUB_ENV"
+      - name: Install age and the Postgres 17 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq age postgresql-client-17 >/dev/null
+      - name: Database backup
+        id: database
+        run: |
+          bash backup/db-backup.sh
+          . "$BACKUP_STATE_DIR/db.env"
+          echo "skipped=$SKIPPED" >> "$GITHUB_OUTPUT"
+      - name: Legacy media backup (files in Supabase Storage; opt-in, being retired)
+        run: bash backup/media-backup.sh
+      - name: R2 media backup (originals hosted in R2, independent bucket)
+        run: bash backup/r2-media-backup.sh
+      - name: Verify complete coverage
+        if: steps.database.outputs.skipped != '1'
+        run: bash backup/verify-complete.sh

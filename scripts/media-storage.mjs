@@ -9,10 +9,10 @@ import { verifyImageWithSharp } from "../frontend/src/server/storage/image-proce
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-export const NAMESPACES = ["avatar", "certificate", "portfolio", "product", "organization"];
+export const NAMESPACES = ["avatar", "certificate", "portfolio", "product", "organization", "request", "verification"];
 const BUCKETS = { avatar: "avatars", portfolio: "professional-portfolio", certificate: "professional-certificates",
-  product: "product-images", organization: "organization-images" };
-const STAGING_PROJECT = "kkpkgjrweysgvhvkhzun";
+  product: "product-images", organization: "organization-images", request: "purchase-request-images", verification: "business-verification-documents" };
+const ACCEPTANCE_PROJECT = "nxossqhdfltcqdwvbewi";
 /** Supabase response bytes per copied object besides the object itself (inventory row, metadata
  * lookup, signed URL, switch RPC, headers). Deliberately generous so the egress estimate errs high. */
 export const OVERHEAD_BYTES_PER_OBJECT = 4096;
@@ -31,7 +31,7 @@ export class JournalWriteFailed extends OperatorError {
 
 // ---------- arguments ----------
 
-const COMMANDS = ["plan", "migrate", "rollback", "rehash", "cleanup"];
+const COMMANDS = ["plan", "migrate", "rollback", "rehash", "delta", "cleanup"];
 const VALUE_OPTIONS = ["--project", "--namespace", "--batch-size", "--max-batches", "--max-bytes",
   "--remaining-egress-bytes", "--egress-safety-fraction", "--journal", "--key", "--limit"];
 const FLAG_OPTIONS = ["--execute", "--from-ledger", "--retry-rolled-back", "--json", "--help"];
@@ -86,7 +86,7 @@ export function parseArgs(argv) {
     if (!namespaces) throw new OperatorError("migrate --execute requires an explicit --namespace list (cheap namespaces first)");
     if (!options.maxBytes) throw new OperatorError("migrate --execute requires a hard --max-bytes budget");
   }
-  if ((options.execute && ["migrate", "rollback"].includes(command)) || command === "rehash") {
+  if ((options.execute && ["migrate", "rollback"].includes(command)) || command === "rehash" || command === "delta") {
     if (!options.journal) throw new OperatorError(`${command} requires --journal <path> (append-only JSON-lines run journal)`);
   }
   if (command === "rollback" && !options.fromLedger && !options.journal) throw new OperatorError("rollback needs --journal, or --from-ledger with --namespace");
@@ -241,6 +241,52 @@ export async function buildPlan(io, journalState, { namespaces, batchSize, maxBy
   return { perNamespace, total, runsAtMaxBytes: runs, objectsLargerThanMaxBytes: tooLarge };
 }
 
+/**
+ * Read-only DELTA between the migration journal and the live inventory. It answers "what changed since the snapshot":
+ *   newObjects        - uploaded to Supabase and never copied (the next `migrate` run picks them up)
+ *   replacedAfterCopy - already copied and switched, but the Supabase source has since changed size or ETag. The R2 copy
+ *                       is NEVER overwritten (immutable); these are listed for an explicit, reviewed re-adoption.
+ *   unchanged         - copied, switched and the source still matches the journal
+ *   r2Native          - written straight to R2 (no Supabase source to compare)
+ *   notInJournal      - on R2 but absent from this journal: cannot be compared, so it is reported, never assumed fine
+ * It writes nothing: no download, no put, no switch, no journal entry.
+ */
+export async function buildDelta(io, journalState, { namespaces, retryRolledBack = false, sampleLimit = 50 }) {
+  const zero = () => ({ ready: 0, newObjects: 0, replacedAfterCopy: 0, unchanged: 0, r2Native: 0, notInJournal: 0, missingSource: 0, rolledBack: 0, unknownSize: 0 });
+  const perNamespace = Object.fromEntries(namespaces.map((ns) => [ns, zero()]));
+  const replaced = [];
+  for await (const row of inventoryRows(io, namespaces)) {
+    const ns = perNamespace[row.namespace];
+    ns.ready++;
+    const state = journalState.get(`${row.namespace}/${row.object_key}`);
+    if (row.provider === "r2") {
+      if (!row.source_exists && !state?.switched) { ns.r2Native++; continue; }
+      if (!state?.switched) { ns.notInJournal++; continue; }
+      if (!row.source_exists) { ns.missingSource++; continue; }
+      const meta = await sourceMetadata(io, row);
+      if (!meta) { ns.unknownSize++; continue; }
+      const changed = meta.size !== state.size || Boolean(state.etag && meta.etag && state.etag !== meta.etag);
+      if (changed) {
+        ns.replacedAfterCopy++;
+        if (replaced.length < sampleLimit) replaced.push({ namespace: row.namespace, key: row.object_key, journalSize: state.size, sourceSize: meta.size });
+      } else ns.unchanged++;
+      continue;
+    }
+    const kind = classify(row, journalState, retryRolledBack);
+    if (kind === "candidate") ns.newObjects++;
+    else if (kind === "missingSource") ns.missingSource++;
+    else if (kind === "rolledBack") ns.rolledBack++;
+    else ns.unchanged++;
+  }
+  const total = zero();
+  for (const counts of Object.values(perNamespace)) for (const k of Object.keys(total)) total[k] += counts[k];
+  return {
+    perNamespace, total, replaced,
+    // The cutover gate: nothing is waiting to be copied and nothing was replaced after its copy.
+    cutoverReady: total.newObjects === 0 && total.replacedAfterCopy === 0 && total.notInJournal === 0 && total.unknownSize === 0,
+  };
+}
+
 /** Picks this run's objects from metadata sizes, stopping before the hard byte budget would be exceeded. */
 export async function selectRun(io, journalState, { namespaces, maxBytes, batchSize, maxBatches, retryRolledBack = false }) {
   const maxObjects = maxBatches ? maxBatches * batchSize : Infinity;
@@ -286,6 +332,10 @@ export async function migrateRows(selected, io, journal, { maxBytes, batchSize, 
       let stage = "readback";
       const switchTo = async (verified) => {
         stage = "switch";
+        const latest = await sourceMetadata(io, row);
+        if (!latest || latest.size !== size || (etag && latest.etag !== etag)) {
+          throw new OperatorError("Source changed during migration; adoption refused");
+        }
         await io.switchReference(row, verified);
         record("switch", { ok: true, sha256: verified.sha256, size: verified.size });
         result.switched++;
@@ -441,7 +491,7 @@ function supabaseIo(supabase) {
 
 function r2Io(env) {
   if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_PRIVATE_BUCKET) throw new OperatorError("R2 settings are required for this command");
-  const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+  const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
   const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
   const s3 = new S3Client({ region: "auto", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED", responseChecksumValidation: "WHEN_REQUIRED", endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY },
@@ -449,6 +499,10 @@ function r2Io(env) {
   const key = (row) => `${row.namespace}/${row.object_key}`;
   return {
     s3, DeleteObjectCommand, bucket: env.R2_PRIVATE_BUCKET, key,
+    exists: async (objectKey) => {
+      try { await s3.send(new HeadObjectCommand({ Bucket: env.R2_PRIVATE_BUCKET, Key: objectKey })); return true; }
+      catch (error) { if (error?.$metadata?.httpStatusCode === 404 || error?.name === "NotFound") return false; throw error; }
+    },
     putDestination: async (row, bytes) => {
       try {
         await s3.send(new PutObjectCommand({ Bucket: env.R2_PRIVATE_BUCKET, Key: key(row), Body: bytes,
@@ -483,6 +537,9 @@ const HELP = `Supabase -> R2 media migration. Dry-run unless --execute. Never de
            media_migration_rollback per entry. Supabase sources and R2 copies are both kept.
   rehash   --project <ref|local> --journal f [--namespace a,b | --key ns/key]
            Re-reads R2 copies and confirms sha256 + size against the journal. Read-only.
+  delta    --project <ref|local> --journal f [--namespace a,b] [--json]
+           Read-only. New uploads not yet copied, and sources replaced AFTER their copy (never auto-overwritten).
+           cutoverReady is true only when nothing is waiting and nothing changed. Run it again right before cutover.
   cleanup  --project <ref|local> [--limit 25] [--execute]
            Deletes ONLY retired R2 objects. Legacy Supabase objects are never removed.
 
@@ -518,7 +575,7 @@ export async function main(argv = process.argv.slice(2)) {
   const local = ["localhost", "127.0.0.1"].includes(url.hostname);
   const project = local ? "local" : url.hostname.split(".")[0];
   if (options.project !== project) throw new OperatorError("Requested project does not match configured environment");
-  if (options.execute && !local && project !== STAGING_PROJECT) throw new OperatorError("Production execution requires separate verified approval");
+  if (options.execute && !local && project !== ACCEPTANCE_PROJECT && env.MEDIA_MIGRATION_APPROVED_PROJECT !== project) throw new OperatorError("Production execution requires separate verified approval");
   const { createClient } = require("@supabase/supabase-js");
   const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const db = supabaseIo(supabase);
@@ -534,6 +591,12 @@ export async function main(argv = process.argv.slice(2)) {
     if (error) throw new OperatorError("Source inventory failed");
     if (options.json) console.log(JSON.stringify({ project, namespaces, ...plan, sourceInventory: inventory }));
     else printPlan(project, options, plan, inventory);
+    return;
+  }
+
+  if (options.command === "delta") {
+    const delta = await buildDelta(db, readJournalState(options.journal), { namespaces, retryRolledBack });
+    console.log(JSON.stringify({ project, namespaces, readOnly: true, ...delta }));
     return;
   }
 
@@ -581,22 +644,52 @@ async function cleanup(supabase, env, project, options) {
   const { data: rows, error } = await supabase.rpc("media_cleanup_candidates", { p_limit: options.limit });
   if (error) throw new OperatorError("Cleanup query failed; confirm the provider migration is installed in the selected environment");
   if (!options.execute) {
-    console.log(JSON.stringify({ dryRun: true, project, candidates: rows.length,
-      providers: rows.reduce((counts, row) => ({ ...counts, [row.provider]: (counts[row.provider] ?? 0) + 1 }), {}) }));
+    console.log(JSON.stringify({ dryRun: true, project, ...reconciliation(rows) }));
     return;
   }
-  const r2 = r2Io(env);
-  let retired = 0;
+  const result = await runCleanup(supabase, r2Io(env), rows);
+  console.log(JSON.stringify({ project, ...result }));
+  if (result.failed) process.exitCode = 1;
+}
+
+/** What is waiting for cleanup, by provider and namespace. Counts only: never keys, owners or object names. */
+export function reconciliation(rows) {
+  const count = (pick) => rows.reduce((acc, row) => ({ ...acc, [pick(row)]: (acc[pick(row)] ?? 0) + 1 }), {});
+  return { candidates: rows.length, providers: count((row) => row.provider), namespaces: count((row) => row.namespace) };
+}
+
+const VARIANT_NAMES = ["thumb", "card", "full"];
+/** Every physical object a record can own: the original, its pending upload copy and its variants. */
+export function objectsToDelete(object) {
+  const variants = VARIANT_NAMES.map((variant) => /^[uo]\//.test(object)
+    ? object.replace(/\/original\.[a-z0-9]+$/, `/v/${variant}.webp`) : `v/${object}/${variant}.webp`);
+  return [object, `pending/${object}`, ...variants];
+}
+
+/**
+ * Retire, delete the bytes, CONFIRM they are gone, then record completion. One row's failure never stops the
+ * others and is retried by the next run: retire is idempotent, deleting an absent object is a no-op, and a row is
+ * completed only after a read-back finds the original absent. A legacy Supabase object is never touched.
+ */
+export async function runCleanup(supabase, r2, rows) {
+  let retired = 0, failed = 0;
+  const preservedLegacy = rows.filter((row) => row.provider === "supabase").length;
   for (const row of rows) {
-    if (row.provider !== "r2") continue; // Legacy source objects are never removed by this tool.
-    const { error: retireError } = await supabase.rpc("media_cleanup_retire", { p_namespace: row.namespace, p_key: row.object_key, p_owner: row.owner_user_id });
-    if (retireError) continue;
-    for (const objectKey of [r2.key(row), `pending/${r2.key(row)}`]) await r2.s3.send(new r2.DeleteObjectCommand({ Bucket: r2.bucket, Key: objectKey }));
-    const { error: completeError } = await supabase.rpc("media_cleanup_complete", { p_namespace: row.namespace, p_key: row.object_key, p_owner: row.owner_user_id });
-    if (completeError) throw new OperatorError("Cleanup completion failed; retry safely");
-    retired++;
+    if (row.provider !== "r2") continue;
+    try {
+      // The database names the physical key: ids-only (u/…, o/…) for uploads since 2026-10-29, else the legacy key.
+      const { data: object, error: objectError } = await supabase.rpc("media_storage_object", { p_namespace: row.namespace, p_key: row.object_key });
+      if (objectError || typeof object !== "string" || !object) { failed++; continue; }
+      const { error: retireError } = await supabase.rpc("media_cleanup_retire", { p_namespace: row.namespace, p_key: row.object_key, p_owner: row.owner_user_id });
+      if (retireError) { failed++; continue; }
+      for (const objectKey of objectsToDelete(object)) await r2.s3.send(new r2.DeleteObjectCommand({ Bucket: r2.bucket, Key: objectKey }));
+      if (r2.exists && await r2.exists(object)) { failed++; continue; } // not gone: leave the row for the next run
+      const { error: completeError } = await supabase.rpc("media_cleanup_complete", { p_namespace: row.namespace, p_key: row.object_key, p_owner: row.owner_user_id });
+      if (completeError) { failed++; continue; }
+      retired++;
+    } catch { failed++; }
   }
-  console.log(JSON.stringify({ project, retired, preservedLegacy: rows.filter((row) => row.provider === "supabase").length }));
+  return { retired, failed, preservedLegacy };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

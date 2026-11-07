@@ -1,5 +1,5 @@
 {
- "reason": "Renamed by PR #100 so they apply after main's 20261020090001; reintroducing one would run it twice under two versions. 20261105100001 was renamed to 20261107090003 (WhatsApp OTP delivery switch) before it was applied anywhere, so it sorts after main's 20261107090002.",
+ "reason": "Renamed so they apply after versions already applied on Acceptance or main (PR #100: after 20261020090001; PR #118: 20261029120001 sorted before the Acceptance-applied 20261030090001/2). 20261105100001 was renamed to 20261107090003 (WhatsApp OTP delivery switch) before it was applied anywhere, so it sorts after main's 20261107090002. Reintroducing one would run it twice under two versions.",
  "versions": {
   "20261017160000": "20261021090001",
   "20261017160001": "20261021090002",
@@ -16,6 +16,8 @@
   "20261019140000": "20261021090013",
   "20261019163000": "20261021090014",
   "20261019170000": "20261021090015",
+  "20261029120001": "20261107090004",
+  "20261103090002": "20261107090005",
   "20261105100001": "20261107090003"
  }
 }
