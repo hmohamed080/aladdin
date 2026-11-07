@@ -7,6 +7,7 @@ import { ArrowUpRightIcon, GlobeIcon, MenuIcon, XIcon } from "@/components/ui/ic
 import { LanguageSwitch } from "@/components/layout/switchers";
 import { useI18n } from "@/lib/i18n/context";
 import styles from "./landing-header.module.css";
+import { BRAND } from "@/lib/assets/registry";
 
 const content = {
   ar: {
@@ -48,7 +49,7 @@ export function LandingHeader() {
             ~256 px file instead of the 1920 px one. No `priority` and no eager load
             (React preloads an eager <img>): the hero image, not the logo, is the
             LCP element and must not share the early bandwidth with it. */}
-        <Image src="/preview/landing/aladdin-logo.png" alt="" width={684} height={643} sizes="80px" />
+        <Image src={BRAND.logo} alt="" width={684} height={643} sizes="80px" />
       </a>
       <Button ref={menu} className={styles.menu} variant="ghost" aria-label={t.menu} aria-expanded={open} aria-controls="preview-navigation" onClick={() => setOpen(!open)}>
         {open ? <XIcon size={20} /> : <MenuIcon size={20} />}<span>{t.menu}</span>

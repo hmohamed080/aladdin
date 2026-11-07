@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useI18n } from "@/lib/i18n/context";
 import { ClockIcon, HandshakeIcon, ShieldIcon } from "@/components/ui/icons";
 import styles from "./landing-value.module.css";
+import { LANDING } from "@/lib/assets/registry";
 
 /**
  * `section-3.png` is a plain decorative background now (marble/plant
@@ -43,7 +44,7 @@ export function LandingValue() {
     <section id="value" className={styles.section} data-landing-preview-part="ValueBand">
       <div className={styles.frame}>
         <Image
-          src="/preview/landing/sections/value-band.png"
+          src={LANDING.valueBand}
           alt=""
           fill
           sizes="100vw"

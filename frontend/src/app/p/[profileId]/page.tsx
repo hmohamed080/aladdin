@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { MediaCover } from "@/components/media/media-fallbacks";
 import { loadPublicProfile } from "@/server/queries/professional-profile";
 import { loadPublicPortfolio } from "@/server/queries/portfolio";
 import { loadPublicReviews } from "@/server/queries/reviews";
@@ -89,8 +90,7 @@ export default async function PublicProfilePage({
     <main className={cn(contentColumnClass, "flex flex-col gap-xl py-xl")} id="main">
       {typeof coverKey === "string" ? (
         <div className="relative aspect-[6/1] w-full overflow-hidden rounded-md border border-strong bg-surface-2" data-testid="public-profile-cover">
-          {/* eslint-disable-next-line @next/next/no-img-element -- streamed through /p/cover, which re-proves publication */}
-          <img src={`/p/cover/${profileId}`} alt="" className="h-full w-full object-cover" />
+          <MediaCover src={`/p/cover/${profileId}`} />
         </div>
       ) : null}
       <PublicProfileView profile={profile} t={t} locale={locale} />

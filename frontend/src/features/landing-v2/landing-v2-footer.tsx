@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { ArrowUpRightIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
 import styles from "./landing-v2-footer.module.css";
+import { BRAND, LANDING } from "@/lib/assets/registry";
 
 const content = {
   ar: {
@@ -83,7 +84,7 @@ export function LandingV2Footer() {
   return (
     <footer className={styles.footer} dir={dir} data-landing-v2-part="Footer">
       <div className={styles.texture} aria-hidden="true">
-        <Image src="/landing-v2/sections/footer-texture.png" alt="" fill sizes="100vw" className={styles.textureImg} />
+        <Image src={LANDING.footerTexture} alt="" fill sizes="100vw" className={styles.textureImg} />
       </div>
 
       {/* `.top`'s own CSS pins `direction: ltr` so the three blocks below
@@ -95,7 +96,7 @@ export function LandingV2Footer() {
           fixed. */}
       <div className={styles.top}>
         <div className={styles.brandBlock} dir={dir}>
-          <Image src="/brand/aladdin-logo.png" alt="Aladdin" width={684} height={643} className={styles.logo} />
+          <Image src={BRAND.logo} alt="Aladdin" width={684} height={643} className={styles.logo} />
           <p className={styles.tagline}>{copy.tagline}</p>
         </div>
 

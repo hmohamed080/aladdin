@@ -11,6 +11,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { cropImageToBlob } from "@/lib/media/crop-image";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { AVATAR_MAX_BYTES } from "@/lib/storage/avatar-assets";
+import { MediaAvatar } from "@/components/media/media-fallbacks";
 import {
   confirmAvatarUploadAction,
   confirmCoverUploadAction,
@@ -112,7 +113,6 @@ export function InstallerProfileHero({
     else router.refresh();
   };
 
-  const initial = Array.from(displayName.trim())[0]?.toLocaleUpperCase() ?? "?";
 
   return (
     <header className="relative isolate overflow-hidden rounded-md border border-strong bg-surface shadow-card tablet:min-h-60" data-testid="profile-hero">
@@ -133,12 +133,7 @@ export function InstallerProfileHero({
         </div>
         <div className="relative order-1 shrink-0 tablet:me-sm">
           <span className="relative grid h-24 w-24 place-items-center overflow-hidden rounded-pill border-4 border-canvas bg-surface-2 text-headline font-bold text-fg shadow-raised tablet:h-28 tablet:w-28">
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not a static asset
-              <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
-            ) : (
-              initial
-            )}
+            <MediaAvatar src={avatarUrl} name={displayName} alt={displayName} />
           </span>
           <button type="button" onClick={() => avatarInput.current?.click()} aria-label={ar ? "تغيير صورة الملف" : "Change profile photo"} className="absolute -bottom-1 -start-1 grid h-10 w-10 place-items-center rounded-pill border-2 border-canvas bg-accent-solid text-on-accent shadow-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" data-testid="profile-avatar-change"><CameraIcon size={18} /></button>
           {avatarUrl ? (

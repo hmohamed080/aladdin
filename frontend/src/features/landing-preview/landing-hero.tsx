@@ -9,6 +9,7 @@ import headerStyles from "./landing-header.module.css";
 import { useI18n } from "@/lib/i18n/context";
 import styles from "./landing-hero.module.css";
 import widthStyles from "./landing-hero-width.module.css";
+import { LANDING } from "@/lib/assets/registry";
 
 const content = {
   ar: {
@@ -104,7 +105,7 @@ export function LandingHero() {
               or regenerated. Original `background-2.png` (1672×941) is
               untouched on disk for instant rollback. */}
           <Image
-            src="/preview/landing/hero/background-2-new-trimmed.png"
+            src={LANDING.heroBackground}
             alt=""
             width={1728}
             height={735}
