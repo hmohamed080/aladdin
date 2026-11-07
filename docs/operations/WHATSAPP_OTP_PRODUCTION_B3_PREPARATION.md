@@ -191,6 +191,8 @@ Principles: Acceptance only; no Production resource is written (read-only Produc
 
 Stop after A10 and report. Production infrastructure preparation (P-0 to P-9, sending OFF) does not wait for A10; only live activation does:
 
+**The exact, current P-0 to P-9 rollout and rollback checklist, the complete pending-migration list (11), the blockers and the monitoring plan are in [WHATSAPP_OTP_PRODUCTION_ROLLOUT_CHECKLIST.md](WHATSAPP_OTP_PRODUCTION_ROLLOUT_CHECKLIST.md); it supersedes the prose below where they differ.**
+
 **P-0** repeat the preflight for Production; **P-1** owner creates the Production grant key (C-6) and inserts it in the Production database after **P-2** the Supabase migration; **P-3** Production D1 backup and baseline (section 3); **P-4** owner sets the Production frontend values (section 7, no public Worker); **P-5** guard + dry-run; **P-6** deploy the private Production Worker with delivery OFF; **P-7** deploy the Production frontend (only now, because of the binding gate); **P-8** Super Admin initialises 150 / 5,000 / 70 / 90 and verifies audit and history; **P-9** G-NOTIFY on Production and Security Events review; **P-10** G-META evidence; then the separately approved cutover (a reviewed change of `wrangler.production.jsonc` and its guard to enable delivery, a controlled single send first).
 
 ## 11. A3 helper: secure one-time provisioning of the Acceptance grant key
