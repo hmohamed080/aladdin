@@ -248,6 +248,8 @@ begin
        and new_enabled = (e ->> 'new')::boolean
     returning * into v_row;
     if found then
+      -- Attribute the event to the ACTOR of the approved request (as finish does), never to nobody: the audit must say who.
+      perform set_config('request.jwt.claims', json_build_object('sub', v_row.actor_id, 'role', 'authenticated')::text, true);
       perform app.record_audit_event('whatsapp_otp.delivery_changed', 'whatsapp_otp_delivery', v_row.id, null,
         jsonb_build_object('request_id', v_row.id, 'actor_id', v_row.actor_id, 'old', v_row.old_enabled, 'new', v_row.new_enabled,
                            'reason', v_row.reason, 'version', v_row.result_version, 'reconciled', true));
@@ -269,6 +271,7 @@ begin
      where status = 'pending' and created_at < clock_timestamp() - interval '15 minutes'
     returning *
   loop
+    perform set_config('request.jwt.claims', json_build_object('sub', v_row.actor_id, 'role', 'authenticated')::text, true);
     perform app.record_audit_event('whatsapp_otp.delivery_change_failed', 'whatsapp_otp_delivery', v_row.id, null,
       jsonb_build_object('request_id', v_row.id, 'actor_id', v_row.actor_id, 'code', 'not_applied', 'reconciled', true));
     v_abandoned := v_abandoned + 1;
