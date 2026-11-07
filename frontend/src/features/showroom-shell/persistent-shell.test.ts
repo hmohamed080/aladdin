@@ -34,9 +34,10 @@ describe("Showroom navigation shares one persistent layout", () => {
     expect(existsSync(join(APP, "showroom", "(app)"))).toBe(false);
   });
 
-  it("the public Showroom sign-in/up pages stay outside the workspace shell", () => {
+  it("the retired Showroom sign-in/up pages stay gone (ADR-0025 redirects them to /auth/*) and never join the workspace shell", () => {
     const outside = readdirSync(join(APP, "showroom"));
-    expect(outside).toEqual(expect.arrayContaining(["sign-in", "sign-up"]));
+    expect(outside).not.toContain("sign-in");
+    expect(outside).not.toContain("sign-up");
     expect(outside).not.toContain("home");
   });
 
