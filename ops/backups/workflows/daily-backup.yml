@@ -90,14 +90,39 @@ jobs:
       - name: Claim run
         run: python3 backup/report-run.py
 
+  # No secrets here: only turns the control job's per-label answers into the list of labels that may run
+  # (a job-level `if` cannot read the matrix, so the data job's matrix is built from this list instead).
+  gate:
+    name: gate
+    needs: [plan, control]
+    if: needs.plan.outputs.labels != '[]' && needs.control.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      labels: ${{ steps.pick.outputs.labels }}
+    env:
+      PLANNED: ${{ needs.plan.outputs.labels }}
+      RUN_ACCEPTANCE: ${{ needs.control.outputs.run_acceptance }}
+      RUN_PRODUCTION: ${{ needs.control.outputs.run_production }}
+    steps:
+      - name: Labels allowed to run
+        id: pick
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          planned = json.loads(os.environ['PLANNED'])
+          ok = [l for l in planned if os.environ.get('RUN_' + l.upper()) == 'true']
+          print('labels=' + json.dumps(ok))
+          PY
+
   backup:
     name: backup (${{ matrix.label }})
-    needs: [plan, control]
-    if: needs.plan.outputs.labels != '[]' && needs.control.result == 'success' && needs.control.outputs[format('run_{0}', matrix.label)] == 'true'
+    needs: [plan, control, gate]
+    if: needs.gate.result == 'success' && needs.gate.outputs.labels != '[]' && needs.control.result == 'success'
     strategy:
       fail-fast: false
       matrix:
-        label: ${{ fromJSON(needs.plan.outputs.labels) }}
+        label: ${{ fromJSON(needs.gate.outputs.labels) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     environment: backup-${{ matrix.label }}
