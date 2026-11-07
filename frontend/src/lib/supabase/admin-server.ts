@@ -98,6 +98,26 @@ export function whatsappOtpSettingsFinish(a: { actor: string; request: string; s
   );
 }
 
+export function whatsappOtpDeliveryBegin(a: { actor: string; expectedVersion: number; old: boolean | null; next: boolean; reason: string }) {
+  return whatsappOtpRpc<{ request_id: string; actor_id: string; reason: string; grant: string; grant_expires: number }>((c) =>
+    c.rpc("admin_whatsapp_otp_delivery_begin", { p_actor: a.actor, p_expected_version: a.expectedVersion, p_old: a.old, p_new: a.next, p_reason: a.reason }),
+  );
+}
+
+export function whatsappOtpDeliveryFinish(a: { actor: string; request: string; status: "applied" | "failed"; version?: number; code?: string }) {
+  return whatsappOtpRpc<string>((c) =>
+    c.rpc("admin_whatsapp_otp_delivery_finish", { p_actor: a.actor, p_request: a.request, p_status: a.status, p_version: a.version, p_code: a.code }),
+  );
+}
+
+export function whatsappOtpDeliveryReconcile(applied: Json, drift: Json = null) {
+  return whatsappOtpRpc<{ applied: number; abandoned: number; unmatched: number }>((c) => c.rpc("admin_whatsapp_otp_delivery_reconcile", drift ? { p_applied: applied, p_drift: drift } : { p_applied: applied }));
+}
+
+export function whatsappOtpDeliveryAuthorized() {
+  return whatsappOtpRpc<{ enabled: boolean; version: number }>((c) => c.rpc("admin_whatsapp_otp_delivery_authorized"));
+}
+
 export function whatsappOtpSettingsReconcile(applied: Json) {
   return whatsappOtpRpc<{ applied: number; abandoned: number; unmatched: number }>((c) => c.rpc("admin_whatsapp_otp_settings_reconcile", { p_applied: applied }));
 }

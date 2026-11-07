@@ -7,6 +7,7 @@
  * URL; the app turns it into notifications through the existing notification system.
  */
 import type { Db } from "./db.ts";
+import { runAttestation } from "./attest.ts";
 import { DAY_SECONDS, HOUR_SECONDS, LEVEL_NAMES, budgetLevel, readSettings, windowCounts } from "./settings.ts";
 import { type NotifyTransportEnv, notifyTransportAvailable, postSignedNotify } from "./notify-transport.ts";
 
@@ -143,7 +144,7 @@ export async function purgeHelperTables(db: Db, nowSeconds: number): Promise<voi
   await db.prepare("DELETE FROM otp_notification_outbox WHERE event_key IN (SELECT event_key FROM otp_notification_outbox WHERE delivered_at IS NOT NULL AND delivered_at < ?1 LIMIT 250)").bind(nowSeconds - 30 * DAY_SECONDS).run();
 }
 
-export type MaintenanceSummary = { purged: boolean; evaluated: boolean; delivered: number; failed: number; errors: string[] };
+export type MaintenanceSummary = { purged: boolean; evaluated: boolean; delivered: number; failed: number; attested?: boolean; errors: string[] };
 
 /** One scheduled run. Each step is wrapped separately, so a failure in one never prevents the others and never throws. */
 export async function runMaintenance(
@@ -159,6 +160,8 @@ export async function runMaintenance(
   try { await purgeJournal(db, nowSeconds); await purgeHelperTables(db, nowSeconds); summary.purged = true; } catch { summary.errors.push("purge"); }
   try { await evaluateAlerts(db, nowSeconds); summary.evaluated = true; } catch { summary.errors.push("evaluate"); }
   try { const r = await deliverOutbox(env, db, fetcher, nowSeconds); summary.delivered = r.delivered; summary.failed = r.failed; } catch { summary.errors.push("deliver"); }
+  // Independent reconciliation against the Aladdin database (signed attestation the send path requires; see attest.ts). Never throws.
+  try { summary.attested = (await runAttestation(env, db, fetcher, nowSeconds)).attested; } catch { summary.errors.push("attest"); }
   if (summary.errors.length) console.warn(JSON.stringify({ event: "whatsapp_otp_maintenance_errors", steps: summary.errors }));
   return summary;
 }

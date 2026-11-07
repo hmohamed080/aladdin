@@ -35,7 +35,7 @@ export type SettingsRow = { daily_limit: number; hard_ceiling: number; warn_perc
 export const DEFAULT_SETTINGS: SettingsRow = { daily_limit: 100, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90, version: 1, updated_at: 0, updated_by: "00000000-0000-4000-8000-000000000001" };
 
 /** A fake D1 for the SEND path: the replay claim, the outcome update and the settings row. Admin and maintenance tests use real SQL (Miniflare). */
-export function memoryReplayDb(opts: { settings?: SettingsRow | null } = {}): ReplayDb & { rows: Map<string, string>; seed(hash: string, createdAt: number): void; settings: SettingsRow | null } {
+export function memoryReplayDb(opts: { settings?: SettingsRow | null; deliverySwitch?: boolean | null | "unreadable"; attestation?: false; attestationEnv?: string } = {}): ReplayDb & { rows: Map<string, string>; seed(hash: string, createdAt: number): void; settings: SettingsRow | null } {
   const rows = new Map<string, string>();
   const created = new Map<string, number>();
   const settings = opts.settings === undefined ? { ...DEFAULT_SETTINGS } : opts.settings;
@@ -72,6 +72,22 @@ export function memoryReplayDb(opts: { settings?: SettingsRow | null } = {}): Re
               throw new Error("Unexpected SQL");
             },
             async first<T>() {
+              if (sql.includes("FROM otp_delivery_switch")) {
+                // The Super Admin switch. Default ON so send-path tests stay about the send path; null = no row; "unreadable" = D1 error.
+                const flag = opts.deliverySwitch === undefined ? true : opts.deliverySwitch;
+                if (flag === "unreadable") throw new Error("D1 unavailable");
+                return (flag === null ? null : { enabled: flag ? 1 : 0, version: 1, updated_at: 0, updated_by: DEFAULT_SETTINGS.updated_by }) as T | null;
+              }
+              if (sql.includes("FROM otp_delivery_attestation")) {
+                // The Aladdin database's signed attestation of version 1. Default valid so send-path tests stay about the send path; false = none.
+                if (opts.attestation === false) return null;
+                const { attestationCanonical } = await import("../src/attest.ts");
+                const { signPayload } = await import("../src/signing.ts");
+                const issuedAt = Math.floor(Date.now() / 1000);
+                const nonce = "ab".repeat(16);
+                const mac = await signPayload(SUPPORT_NOTIFY_SECRET, "attest", issuedAt, attestationCanonical({ env: opts.attestationEnv ?? "acceptance", enabled: true, version: 1, issuedAt, nonce }));
+                return { enabled: 1, version: 1, issued_at: issuedAt, nonce, mac } as T;
+              }
               if (sql.includes("FROM otp_settings WHERE id = 1")) return (settings ? { ...settings } : null) as T | null;
               if (sql.startsWith("SELECT 1")) return { ok: 1 } as T;
               const id = String(values[0]);
@@ -83,6 +99,9 @@ export function memoryReplayDb(opts: { settings?: SettingsRow | null } = {}): Re
     },
   };
 }
+
+/** The notify secret of the test environment (same bytes as NOTIFY_SECRET in d1.ts). */
+export const SUPPORT_NOTIFY_SECRET = "whsec_" + btoa(String.fromCharCode(...new Uint8Array(32).fill(55)));
 
 export type MetaCall = { url: string; headers: Record<string, string>; body: { messaging_product: string; to: string; type: string; template: { name: string; language: { code: string }; components: unknown[] } } };
 export function mockMeta(success = true) {
@@ -106,9 +125,10 @@ export function baseEnv(over: Partial<Env> & { tokenReads?: { n: number } } = {}
     WHATSAPP_GRAPH_API_VERSION: "v25.0",
     WHATSAPP_DELIVERY_ENABLED: "true",
     OTP_ENVIRONMENT: "acceptance",
+    OTP_NOTIFY_SIGNING_SECRET: { get: async () => SUPPORT_NOTIFY_SECRET },
     OTP_RECIPIENT_MODE: "allowlist",
     OTP_ALLOWED_RECIPIENTS: PHONE,
-    IDEMPOTENCY_DB: memoryReplayDb(),
+    IDEMPOTENCY_DB: memoryReplayDb({ attestationEnv: rest.OTP_ENVIRONMENT ?? "acceptance" }),
     ...rest,
   };
 }

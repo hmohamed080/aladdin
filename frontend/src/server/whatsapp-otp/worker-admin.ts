@@ -14,6 +14,10 @@ export type WorkerSettingsView = WorkerSettings & { version: number; updated_at:
 export type FailureWindow = { attempts: number; accepted: number; failed: number; failure_percent: number | null };
 export type AuditEntry = { at: number; request_id: string; actor: string; kind: string; version: number; reason: string; old: WorkerSettings | null; new: WorkerSettings };
 
+/** The persisted Super Admin delivery switch as the Worker reports it. `version` 0 = never set (no row = OFF). */
+export type DeliveryState = { enabled: boolean; version: number; updated_at: number | null; updated_by: string | null };
+export type DeliveryAuditEntry = { at: number; request_id: string; actor: string; old: boolean | null; new: boolean; version: number; reason: string };
+
 export type WorkerUsage = {
   now: number;
   configured: boolean;
@@ -29,6 +33,11 @@ export type WorkerUsage = {
   failure: { last_hour: FailureWindow; last_24h: FailureWindow; last_7d: FailureWindow; last_failure_at: number | null };
   notifications: { pending: number; oldest_pending_at: number | null };
   audit: AuditEntry[];
+  /** Absent on a Worker that predates the switch: treated as OFF and not switchable. */
+  delivery?: DeliveryState;
+  delivery_audit?: DeliveryAuditEntry[];
+  /** The switch row is not accounted for by any audit row (a direct D1 write); null when consistent. */
+  delivery_drift?: { version: number; at: number } | null;
   /** Non-secret facts about the Worker itself (which switches and bindings exist). Absent on an older Worker. */
   runtime?: Record<string, string | number | boolean>;
 };
@@ -53,9 +62,20 @@ export type SettingsPayload = {
   grant_expires: number;
 };
 
+export type DeliveryPayload = {
+  request_id: string;
+  actor_id: string;
+  expected_version: number;
+  enabled: boolean;
+  reason: string;
+  /** The database-issued authorization for exactly this request ("v1d" grant). The app server cannot mint one. */
+  grant: string;
+  grant_expires: number;
+};
+
 export type ApplyOutcome =
   | { kind: "applied"; version: number }
-  | { kind: "refused"; code: string; currentVersion?: number }
+  | { kind: "refused"; code: string; currentVersion?: number; missing?: string }
   | { kind: "ambiguous" };
 
 /** The Worker admin base is the ORIGIN of the configured send URL: the same Worker, a different (separately signed) path. */
@@ -115,22 +135,30 @@ export async function fetchUsage(config: WorkerAdminConfig): Promise<UsageResult
   }
 }
 
-export async function applySettings(config: WorkerAdminConfig, payload: SettingsPayload): Promise<ApplyOutcome> {
+async function applyChange(config: WorkerAdminConfig, path: string, payload: { request_id: string }): Promise<ApplyOutcome> {
   if (!adminBase(config.workerUrl) || !config.adminSecret) return { kind: "refused", code: "admin_unconfigured" };
   try {
-    const res = await post(config, "/v1/admin/settings", payload.request_id, JSON.stringify(payload));
+    const res = await post(config, path, payload.request_id, JSON.stringify(payload));
     if (!res) return { kind: "refused", code: "admin_unconfigured" };
-    const body = (await res.json().catch(() => ({}))) as { status?: string; version?: number; error?: string; current_version?: number };
+    const body = (await res.json().catch(() => ({}))) as { status?: string; version?: number; error?: string; current_version?: number; missing?: string };
     if (res.ok && body.status === "applied" && isNum(body.version)) return { kind: "applied", version: body.version };
     // A 4xx is the Worker's definite answer (nothing changed). 5xx and anything unreadable might have been applied: ambiguous.
     if (res.status >= 400 && res.status < 500 && typeof body.error === "string" && /^[a-z_]{1,48}$/.test(body.error)) {
-      return { kind: "refused", code: body.error, currentVersion: isNum(body.current_version) ? body.current_version : undefined };
+      return {
+        kind: "refused",
+        code: body.error,
+        currentVersion: isNum(body.current_version) ? body.current_version : undefined,
+        missing: typeof body.missing === "string" && /^[a-z0-9_,]{1,300}$/.test(body.missing) ? body.missing : undefined,
+      };
     }
     return { kind: "ambiguous" };
   } catch {
     return { kind: "ambiguous" };
   }
 }
+
+export const applySettings = (config: WorkerAdminConfig, payload: SettingsPayload): Promise<ApplyOutcome> => applyChange(config, "/v1/admin/settings", payload);
+export const applyDelivery = (config: WorkerAdminConfig, payload: DeliveryPayload): Promise<ApplyOutcome> => applyChange(config, "/v1/admin/delivery", payload);
 
 export const NOTIFY_CHECK_RESULTS = ["reachable", "secret_mismatch", "blocked_by_cloudflare", "refused", "app_unconfigured", "unexpected", "unreachable", "not_configured"] as const;
 export type NotifyCheckResult = (typeof NOTIFY_CHECK_RESULTS)[number];

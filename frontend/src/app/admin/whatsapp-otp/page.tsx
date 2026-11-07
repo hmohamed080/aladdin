@@ -4,9 +4,10 @@ import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatDateTime, formatNumber } from "@/lib/ui/format";
 import { readPhoneVerificationEnv } from "@/lib/env/phone-verification";
-import { whatsappOtpSettingsReconcile } from "@/lib/supabase/admin-server";
+import { whatsappOtpDeliveryReconcile, whatsappOtpSettingsReconcile } from "@/lib/supabase/admin-server";
 import { can } from "@/lib/permissions/admin";
 import { requireAdminRoute } from "@/server/authorization/admin";
+import { appliedDeliveryRows, deliveryBlockers } from "@/server/whatsapp-otp/delivery-change";
 import { appliedRows } from "@/server/whatsapp-otp/settings-change";
 import { fetchUsage, type FailureWindow } from "@/server/whatsapp-otp/worker-admin";
 import { resolveWorkerTransport } from "@/server/whatsapp-otp/worker-binding";
@@ -14,6 +15,7 @@ import { AdminHeader, StatTile } from "@/features/admin/parts";
 import { Badge, Card, SectionTitle, StatePanel } from "@/components/ui/primitives";
 import { WhatsappOtpSettingsForm } from "@/features/admin-ops/whatsapp-otp-settings-form";
 import { WhatsappOtpNotifyCheck } from "@/features/admin-ops/whatsapp-otp-notify-check";
+import { WhatsappOtpDeliverySwitch } from "@/features/admin-ops/whatsapp-otp-delivery-switch";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +52,7 @@ export default async function WhatsappOtpPage() {
 
   // Settle any change the Worker applied but Supabase never completed, from the Worker's own authoritative record. Best effort.
   await whatsappOtpSettingsReconcile(appliedRows(usage)).catch(() => undefined);
+  await whatsappOtpDeliveryReconcile(appliedDeliveryRows(usage), usage.delivery_drift ?? null).catch(() => undefined);
 
   // Display names for the history (RLS decides what an administrator may read; the id prefix is the fallback).
   const actorIds = [...new Set(usage.audit.map((a) => a.actor))];
@@ -64,6 +67,15 @@ export default async function WhatsappOtpPage() {
   const runtime = usage.runtime;
   const bindingsReady = runtime ? ["signing_secret_bound", "admin_secret_bound", "admin_grant_secret_bound", "notify_configured", "meta_token_bound", "d1_reachable"].every((k) => runtime[k] === true) : false;
   const canManage = can(access, "whatsapp_otp.manage");
+  // The switch is the Worker's persisted flag (never browser state). A Worker without it reports no state and cannot be switched from here.
+  const delivery = usage.delivery;
+  const deliveryOn = runtime ? runtime.delivery_enabled === true : false;
+  const blockers = deliveryBlockers(usage);
+  // One line of helper text for everyone: what ON/OFF means now, or (Super Admin, switch off) what still blocks turning it on.
+  const deliveryHelp =
+    canManage && delivery && !delivery.enabled && blockers.length > 0
+      ? t("whatsappOtp.delivery.blockedHelp", { items: blockers.map((b) => t(`whatsappOtp.delivery.blockers.${b}`)).join(" · ") })
+      : t(deliveryOn ? "whatsappOtp.delivery.onHelp" : delivery?.enabled ? "whatsappOtp.delivery.offByEnvironmentHelp" : "whatsappOtp.delivery.offHelp");
   const canCeiling = can(access, "whatsapp_otp.ceiling_manage");
   const n = (v: number) => formatNumber(v, locale);
   const window = (label: string, w: FailureWindow) => (
@@ -110,7 +122,14 @@ export default async function WhatsappOtpPage() {
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-label text-fg-muted">{t("whatsappOtp.runtime.delivery")}</span>
-              <Badge tone={runtime.delivery_enabled === true ? "success" : "warning"}>{t(runtime.delivery_enabled === true ? "whatsappOtp.runtime.deliveryOn" : "whatsappOtp.runtime.deliveryOff")}</Badge>
+              {canManage && delivery ? (
+                <div className="flex items-center gap-sm">
+                  <WhatsappOtpDeliverySwitch enabled={delivery.enabled} version={delivery.version} blockers={blockers} />
+                  <Badge tone={deliveryOn ? "success" : "warning"}>{t(deliveryOn ? "whatsappOtp.runtime.deliveryOn" : "whatsappOtp.runtime.deliveryOff")}</Badge>
+                </div>
+              ) : (
+                <Badge tone={deliveryOn ? "success" : "warning"}>{t(deliveryOn ? "whatsappOtp.runtime.deliveryOn" : "whatsappOtp.runtime.deliveryOff")}</Badge>
+              )}
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-label text-fg-muted">{t("whatsappOtp.runtime.recipients")}</span>
@@ -121,6 +140,7 @@ export default async function WhatsappOtpPage() {
               <Badge tone={bindingsReady ? "success" : "danger"}>{t(bindingsReady ? "whatsappOtp.runtime.ready" : "whatsappOtp.runtime.missing")}</Badge>
             </div>
           </div>
+          <p id="otp-delivery-help" className="mt-md text-label text-fg-muted" data-testid="whatsapp-otp-delivery-help">{deliveryHelp}</p>
           {canManage ? <WhatsappOtpNotifyCheck /> : null}
         </Card>
       ) : null}

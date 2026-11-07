@@ -2,7 +2,7 @@ import { describe, test } from "node:test";
 import { strict as assert } from "node:assert";
 import { handleRequest } from "../src/index.ts";
 import { DELIVERY, SECRET, goodBody, mockMeta, signedSend } from "./support.ts";
-import { ACTOR, OTHER_ACTOR, SETTINGS_PATH, USAGE_PATH, adminCall, configure, envFor, seedJournal, settingsBody, usageBody, withD1 } from "./d1.ts";
+import { ACTOR, OTHER_ACTOR, SETTINGS_PATH, USAGE_PATH, adminCall, configure, envFor, seedJournal, setDeliverySwitch, settingsBody, usageBody, withD1 } from "./d1.ts";
 
 const json = async (r: Response) => (await r.json()) as Record<string, any>;
 const now = () => Math.floor(Date.now() / 1000);
@@ -230,6 +230,7 @@ describe("Hard Ceiling and Daily Send Limit rules", () => {
 describe("the settings take effect immediately, with no redeploy, and never weaken enforcement", () => {
   test("a dashboard change applies to the very next send; delivery stays an independent switch", async () => {
     await withD1(async (d1) => {
+      await setDeliverySwitch(d1, true);
       const env = envFor(d1); const meta = mockMeta();
       const send = async (n: number) => (await handleRequest(await signedSend(goodBody({ delivery_id: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}` })), env, meta.fetcher)).status;
       assert.equal(await send(1), 503, "no settings row: nothing is sent");

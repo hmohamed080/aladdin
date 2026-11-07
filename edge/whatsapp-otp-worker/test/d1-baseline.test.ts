@@ -7,7 +7,7 @@ const expected = expectedFromMigrations();
 const obj = (...names: string[]) => names.map((name) => ({ type: "table", name }));
 
 test("the expected tables come from the repository's own migrations (never drift)", () => {
-  for (const t of ["whatsapp_hook_events", "otp_settings", "otp_settings_audit", "otp_admin_requests", "otp_alert_state", "otp_notification_outbox"]) assert.ok(expected.tables.includes(t), t);
+  for (const t of ["whatsapp_hook_events", "otp_settings", "otp_settings_audit", "otp_admin_requests", "otp_alert_state", "otp_notification_outbox", "otp_delivery_switch", "otp_delivery_audit"]) assert.ok(expected.tables.includes(t), t);
 });
 
 test("an empty database, the hand-created Production state, a tracked-but-behind and a current database are each classified with the right next step", () => {

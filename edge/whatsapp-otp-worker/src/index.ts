@@ -14,7 +14,7 @@
  *
  * Order of checks (each cheaper than the next; Meta is called only after ALL pass):
  *   method/path -> content type -> size -> signing secret bound -> signature+clock window -> body schema -> id binds to delivery_id ->
- *   delivery switch -> recipient policy -> D1 reachable -> atomic claim (INSERT OR IGNORE on the hash of the id) -> Meta, no retry.
+ *   delivery permit -> recipient policy -> D1 reachable -> Super Admin switch (D1) -> atomic claim (INSERT OR IGNORE on the hash of the id) -> Meta, no retry.
  * Idempotency identity = the challenge (delivery_id): the same signed delivery can never produce a second Meta message, and a failed or
  * ambiguous attempt is never retried here (a resend is a NEW challenge decided by the authority's cooldowns).
  * Nothing logs a code, a number, a header or a body.
@@ -22,6 +22,8 @@
 
 import { handleAdminRequest, isAdminPath } from "./admin.ts";
 import type { Db } from "./db.ts";
+import { attestationFacts, deliveryEffectivelyOn } from "./attest.ts";
+import { deliveryBlockers, readDeliverySwitch } from "./delivery.ts";
 import { runMaintenance } from "./maintenance.ts";
 import { type OtpSettings, readSettings } from "./settings.ts";
 import { verifySignature } from "./signing.ts";
@@ -50,7 +52,11 @@ export interface Env {
   /** Comma list of template languages Meta has APPROVED for the template (default "ar"). A locale outside it is sent in "ar". */
   WHATSAPP_OTP_LANGUAGES?: string;
   WHATSAPP_GRAPH_API_VERSION: string;
-  /** Master switch. Anything but the literal "true" means nothing is sent. */
+  /**
+   * The ENVIRONMENT PERMIT: whether this deployment may ever deliver. Anything but the literal "true" means nothing is sent and the Super
+   * Admin switch cannot be turned ON. It is necessary, not sufficient: the runtime ON/OFF switch (D1 otp_delivery_switch, changed only by the
+   * grant-protected admin route) must ALSO be on. No row = OFF.
+   */
   WHATSAPP_DELIVERY_ENABLED: string;
   /** "acceptance" | "production" | "local". Only "production" may use recipient mode "open"; only "local" may redirect the Graph URL. */
   OTP_ENVIRONMENT?: string;
@@ -357,14 +363,26 @@ async function preflightReport(env: Env): Promise<Record<string, string | number
   try { grantBound = Boolean(await env.OTP_ADMIN_GRANT_SECRET?.get()); } catch { grantBound = false; }
   let notifyConfigured = false;
   try { notifyConfigured = Boolean(env.OTP_NOTIFY_URL) && Boolean(await env.OTP_NOTIFY_SIGNING_SECRET?.get()); } catch { notifyConfigured = false; }
-  return {
+  let sw: Awaited<ReturnType<typeof readDeliverySwitch>> = null;
+  try { sw = env.IDEMPOTENCY_DB ? await readDeliverySwitch(env.IDEMPOTENCY_DB as unknown as Db) : null; } catch { sw = null; }
+  const permitted = env.WHATSAPP_DELIVERY_ENABLED === "true";
+  // The EFFECTIVE switch: ON and accounted for by its audit row (the same check the send path makes), never the raw stored flag.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const switchOn = env.IDEMPOTENCY_DB ? await deliveryEffectivelyOn(env as never, env.IDEMPOTENCY_DB as unknown as Db, nowSec) : false;
+  const attested = await attestationFacts(env as never, env.IDEMPOTENCY_DB as unknown as Db | undefined, nowSec);
+  const facts: Record<string, string | number | boolean> = {
     signing_secret_bound: true,
     admin_secret_bound: adminBound,
     admin_grant_secret_bound: grantBound,
     notify_configured: notifyConfigured,
     meta_token_bound: tokenBound,
     d1_reachable: d1,
-    delivery_enabled: env.WHATSAPP_DELIVERY_ENABLED === "true",
+    delivery_permitted: permitted,
+    delivery_switch: switchOn,
+    delivery_switch_version: sw?.version ?? 0,
+    delivery_attested: attested.delivery_attested,
+    delivery_attestation_age: attested.delivery_attestation_age,
+    delivery_enabled: permitted && switchOn, // effective: both the permit and the audited Super Admin switch
     environment: env.OTP_ENVIRONMENT ?? "unset",
     recipient_mode: env.OTP_RECIPIENT_MODE === "open" && env.OTP_ENVIRONMENT === "production" ? "open" : "allowlist",
     allowlist_entries: allowedRecipients(env).length,
@@ -378,6 +396,8 @@ async function preflightReport(env: Env): Promise<Record<string, string | number
     graph_version: env.WHATSAPP_GRAPH_API_VERSION,
     sender_id_suffix: String(env.WHATSAPP_PHONE_NUMBER_ID ?? "").slice(-4),
   };
+  facts.delivery_blockers = deliveryBlockers(facts).join(",");
+  return facts;
 }
 
 /** Signed, side-effect-free runtime check: reports whether each binding is PRESENT and the switches' state. Never a value. */
@@ -413,6 +433,9 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
   if (!recipientAllowed(req.to, env)) return answer(403);
   const db = env.IDEMPOTENCY_DB;
   if (!db) return answer(503, { error: "idempotency_unavailable" });
+  // The Super Admin switch, read from D1 on EVERY send (no cache, so an OFF takes effect on the next request). Missing, OFF and unreadable
+  // are indistinguishable from outside: nothing is sent and neither the token nor Meta is touched.
+  if (!(await deliveryEffectivelyOn(env as never, db as unknown as Db, Math.floor(Date.now() / 1000)))) return answer(503, { error: "delivery_disabled" });
   // Fail closed: the limits are read from D1 and validated BEFORE the token is read or Meta is called. Missing, invalid or unreadable = nothing is sent.
   // (The delivery switch above is independent of this: turning delivery off never needs the budget.)
   let settings: OtpSettings | null = null;

@@ -75,6 +75,7 @@ export const KNOWN_NOTIFICATION_EVENTS = [
   "whatsapp_otp.budget_exhausted",
   "whatsapp_otp.failure_rate",
   "whatsapp_otp.audit_unmatched",
+  "whatsapp_otp.delivery_unmatched",
 ] as const;
 
 export type KnownNotificationEvent = (typeof KNOWN_NOTIFICATION_EVENTS)[number];

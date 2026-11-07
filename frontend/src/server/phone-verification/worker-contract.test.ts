@@ -5,10 +5,13 @@ import { createPhoneSignupService } from "./signup-service";
 import { parseKeyring } from "./otp";
 // The Worker is a separate package; importing its handler lets this test run the app's REAL signing code against the Worker's REAL verifier.
 import { handleRequest, type Env, type ReplayDb } from "../../../../edge/whatsapp-otp-worker/src/index";
+import { attestationCanonical as workerCanonical } from "../../../../edge/whatsapp-otp-worker/src/attest";
+import { signBody } from "../whatsapp-otp/signing";
 
 const PHONE = "+201012345678";
 const secretBytes = randomBytes(32);
 const SECRET = `whsec_${secretBytes.toString("base64")}`;
+const NOTIFY_SECRET = `whsec_${randomBytes(32).toString("base64")}`;
 
 function memoryDb(): ReplayDb {
   const rows = new Map<string, string>();
@@ -24,6 +27,13 @@ function memoryDb(): ReplayDb {
             },
             async first<T>() {
               // The Worker reads its settings row from D1 before every delivery: a fixture row, never production configuration.
+              if (sql.includes("FROM otp_delivery_switch")) return { enabled: 1, version: 1, updated_at: 0, updated_by: "00000000-0000-4000-8000-000000000001" } as T; // the Super Admin switch is ON
+              if (sql.includes("FROM otp_delivery_attestation")) {
+                // The Aladdin database's attestation of version 1 ON, signed with the app-side signer (the same bytes the real route produces).
+                const issuedAt = Math.floor(Date.now() / 1000), nonce = "ab".repeat(16);
+                const mac = signBody(NOTIFY_SECRET, "attest", issuedAt, workerCanonical({ env: "acceptance", enabled: true, version: 1, issuedAt, nonce }));
+                return { enabled: 1, version: 1, issued_at: issuedAt, nonce, mac } as T;
+              }
               if (sql.includes("FROM otp_settings WHERE id = 1")) return { daily_limit: 100, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90, version: 1, updated_at: 0, updated_by: "00000000-0000-4000-8000-000000000001" } as T;
               return (rows.has(String(v[0])) ? { state: rows.get(String(v[0])) } : null) as T | null;
             },
@@ -50,6 +60,7 @@ function rig(over: Partial<Env> = {}) {
     WHATSAPP_GRAPH_API_VERSION: "v25.0",
     WHATSAPP_DELIVERY_ENABLED: "true",
     OTP_ENVIRONMENT: "acceptance",
+    OTP_NOTIFY_SIGNING_SECRET: { get: async () => NOTIFY_SECRET },
     OTP_RECIPIENT_MODE: "allowlist",
     OTP_ALLOWED_RECIPIENTS: PHONE,
     IDEMPOTENCY_DB: memoryDb(),
@@ -104,5 +115,58 @@ describe("application transport <-> delivery Worker contract (real signer, real 
     await Promise.all(tasks);
     expect(metaCalls.length).toBe(1);
     expect(challenge).toMatch(/^[0-9a-f-]{36}$/);
+  });
+});
+
+describe("periodic attestation: the Worker's real client against the app's real endpoint", () => {
+  it("both directions verify: the app's signed answer is stored by the Worker, and a mismatch is reported to reconcile and attested as authorized", async () => {
+    const { handleAttest } = await import("../whatsapp-otp/attest");
+    const { runAttestation } = await import("../../../../edge/whatsapp-otp-worker/src/attest");
+    const stored: unknown[][] = [];
+    const sw = { enabled: 1, version: 9, updated_at: 1_799_999_000, updated_by: "00000000-0000-4000-8000-000000000001" };
+    const db = {
+      prepare(sql: string) {
+        return {
+          bind(...v: unknown[]) {
+            return {
+              async first() { return sql.includes("FROM otp_delivery_switch") ? (sql.includes("NOT EXISTS") || sql.includes("IS NOT") ? null : sw) : null; },
+              async all() { return { results: [] }; },
+              async run() { if (sql.includes("otp_delivery_attestation")) stored.push(v); return { success: true, meta: { changes: 1 } }; },
+            };
+          },
+        };
+      },
+    };
+    const reconcileCalls: unknown[][] = [];
+    const binding = {
+      fetch: (url: string, init?: RequestInit) =>
+        handleAttest(new Request(url, init), {
+          secret: NOTIFY_SECRET,
+          expectedSourceEnv: "acceptance",
+          reconcile: async (rows, drift) => { reconcileCalls.push([rows, drift]); return true; },
+          authorized: async () => ({ enabled: false, version: 2 }), // the database authorized OFF at version 2; D1 claims ON at version 9
+        }),
+    };
+    const env = { OTP_NOTIFY_URL: "https://app.example/api/internal/whatsapp-otp/notify", OTP_NOTIFY_SIGNING_SECRET: { get: async () => NOTIFY_SECRET }, OTP_ENVIRONMENT: "acceptance", APP_NOTIFY: binding };
+    const out = await runAttestation(env as never, db as never, fetch, Math.floor(Date.now() / 1000));
+    expect(out).toEqual({ attested: true });
+    // the Worker stored what the DATABASE authorized (OFF, version 2), not what D1 claimed (ON, version 9)
+    expect(stored).toHaveLength(1);
+    expect(stored[0]![0]).toBe(0);
+    expect(stored[0]![1]).toBe(2);
+    // and the app raised the unmatched alert for the forged state
+    expect(reconcileCalls.at(-1)).toEqual([[], { version: 9, at: 1_799_999_000 }]);
+  });
+
+  it("a wrong secret on either side stores nothing", async () => {
+    const { handleAttest } = await import("../whatsapp-otp/attest");
+    const { runAttestation } = await import("../../../../edge/whatsapp-otp-worker/src/attest");
+    const stored: unknown[] = [];
+    const db = { prepare: (sql: string) => ({ bind: (...v: unknown[]) => ({ first: async () => null, all: async () => ({ results: [] }), run: async () => { if (sql.includes("otp_delivery_attestation")) stored.push(v); return { success: true, meta: { changes: 1 } }; } }) }) };
+    const other = `whsec_${randomBytes(32).toString("base64")}`;
+    const binding = { fetch: (url: string, init?: RequestInit) => handleAttest(new Request(url, init), { secret: other, expectedSourceEnv: "acceptance", reconcile: async () => true, authorized: async () => ({ enabled: true, version: 1 }) }) };
+    const env = { OTP_NOTIFY_URL: "https://app.example/api/internal/whatsapp-otp/notify", OTP_NOTIFY_SIGNING_SECRET: { get: async () => NOTIFY_SECRET }, OTP_ENVIRONMENT: "acceptance", APP_NOTIFY: binding };
+    expect((await runAttestation(env as never, db as never, fetch, Math.floor(Date.now() / 1000))).attested).toBe(false);
+    expect(stored).toHaveLength(0);
   });
 });

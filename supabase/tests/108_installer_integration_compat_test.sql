@@ -246,7 +246,9 @@ select is((select count(*)::int from live_actions l where not exists (select 1 f
             -- 20261103090001 (admin-controlled WhatsApp OTP limits) adds exactly these three.
             and l.a not in ('whatsapp_otp.settings_requested', 'whatsapp_otp.settings_changed', 'whatsapp_otp.settings_change_failed')
             -- 20261105090001 (Admin Staff invitations) adds exactly these three.
-            and l.a not in ('admin_staff.invited', 'admin_staff.invitation_revoked', 'admin_staff.invitation_accepted')), 0,
+            and l.a not in ('admin_staff.invited', 'admin_staff.invitation_revoked', 'admin_staff.invitation_accepted')
+            -- 20261105100001 (the delivery ON/OFF switch) adds exactly these three.
+            and l.a not in ('whatsapp_otp.delivery_requested', 'whatsapp_otp.delivery_changed', 'whatsapp_otp.delivery_change_failed')), 0,
   'nothing else was added: only feature actions on top of main (a later migration that adds more must extend this fixture)');
 select is((select count(*)::int from live_actions l where l.a in ('phone_verification.started', 'phone_verification.completed')), 2,
   'Phase B1 added exactly its two phone verification audit actions');

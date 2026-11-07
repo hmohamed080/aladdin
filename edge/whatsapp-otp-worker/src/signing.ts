@@ -61,6 +61,11 @@ export async function grantCanonical(f: GrantFields, rawReason: string): Promise
   return ["v1", f.requestId, f.actorId, f.expectedVersion, f.dailyLimit, f.hardCeiling, f.warnPercent, f.criticalPercent, f.ceilingAuthorized ? 1 : 0, f.grantExpires, await sha256Hex(rawReason)].join("|");
 }
 
+/** "v1d|request|actor|version|enabled|expires|sha256(reason)". Mirrors admin_whatsapp_otp_delivery_begin; the distinct prefix means a settings grant never verifies here. */
+export async function deliveryGrantCanonical(f: { requestId: string; actorId: string; expectedVersion: number; enabled: boolean; grantExpires: number }, rawReason: string): Promise<string> {
+  return ["v1d", f.requestId, f.actorId, f.expectedVersion, f.enabled ? 1 : 0, f.grantExpires, await sha256Hex(rawReason)].join("|");
+}
+
 /**
  * Constant-time check of a grant (base64 HMAC-SHA256) with the grant key. The key lives in the Aladdin database and in this Worker's Secrets
  * Store, NEVER in the app server, so the admin signing secret alone can authenticate a request but can no longer authorize a change.
