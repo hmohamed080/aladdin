@@ -53,15 +53,12 @@ jobs:
       BACKUP_KIND: restore_test
       TARGET_RUN_ID: ${{ github.run_id }}
       REQUEST_ID: ${{ inputs.request_id }}
-      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       BACKUP_LABEL: ${{ inputs.label || 'production' }}
       BACKUP_KEY: ${{ inputs.backup_key }}
       BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
       R2_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_READ_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_READ_SECRET }}
-      AGE_IDENTITY: ${{ secrets.AGE_RESTORE_TEST_IDENTITY }}
       LEGACY_MEDIA_BACKUP: ${{ vars.LEGACY_MEDIA_BACKUP }}
       R2_MEDIA_BACKUP: ${{ vars.R2_MEDIA_BACKUP }}
       REPO_ROOT: ${{ github.workspace }}
@@ -70,14 +67,22 @@ jobs:
       - name: Read runtime schedule
         id: control
         run: python3 backup/runtime-schedule.py
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       - name: Work folder on the runner
         run: echo "OUT=$RUNNER_TEMP/restore-test" >> "$GITHUB_ENV"
       - name: Claim run
         if: steps.control.outputs.run == 'true'
         run: python3 backup/report-run.py
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq age >/dev/null
       - name: Restore and verify
         if: steps.control.outputs.run == 'true'
+        env:
+          AGE_IDENTITY: ${{ secrets.AGE_RESTORE_TEST_IDENTITY }}
         run: |
           umask 077; printf '%s\n' "$AGE_IDENTITY" > "$RUNNER_TEMP/restore.key"
           [ -n "$BACKUP_KEY" ] || unset BACKUP_KEY
