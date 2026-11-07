@@ -54,6 +54,8 @@
     "production": {
       "name": "aladdin-frontend-production",
       "workers_dev": false,
+      // No preview URLs either: wrangler otherwise reports its default (true) as the local value.
+      "preview_urls": false,
       "services": [
         { "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend-production" },
         { "binding": "BACKEND", "service": "aladdin-backend-production" }
