@@ -12048,16 +12048,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
@@ -12089,16 +12085,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
@@ -12981,16 +12973,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
@@ -13022,16 +13010,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
@@ -13729,16 +13713,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
@@ -14399,16 +14379,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
@@ -19684,16 +19660,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
@@ -21246,16 +21218,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
@@ -24764,16 +24732,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
@@ -24805,16 +24769,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
@@ -24846,16 +24806,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
@@ -24887,16 +24843,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
@@ -24928,16 +24880,12 @@
     {
      "role": "postgres",
      "grantable": false
-    },
-    {
-     "role": "service_role",
-     "grantable": false
     }
    ],
    "definer": true,
    "effective": {
     "anon": false,
-    "service_role": true,
+    "service_role": false,
     "authenticated": true,
     "authenticator": false,
     "dashboard_user": false,
