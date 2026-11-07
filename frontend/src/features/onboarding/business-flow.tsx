@@ -141,15 +141,12 @@ export function BusinessFlow({
   const [phoneInvalid, setPhoneInvalid] = useState(false);
   const savedPhone = splitE164(state.contactPhone);
   // BOTH names are required to leave the identity step: the business (trading) name and the legal / registered name.
-  // The business activity is asked with the identity when the type is already known, else with the type.
+  // The business activity is asked with the identity when the type is already known, else with the type (stack: account basics / ADR-0026).
   const activities = businessActivitiesOf(state.orgType);
-  const identityFieldsDone = (s: BState) => s.displayName.trim().length >= 2 && s.legalName.trim().length >= 2 && s.description.trim().length <= 250 && (!showroom || (!phoneInvalid && !showroomIdentityError(s)));
+  const identityFieldsDone = (s: BState) => s.displayName.trim().length >= 2 && s.legalName.trim().length >= 2 && s.description.trim().length <= 250 && (!showroom || (!phoneInvalid && !showroomIdentityError(s))) && (!typePreselected || !businessActivityError(s.orgType, s.activityType));
   // A showroom also needs at least one valid link and no invalid one. Next stays pressable for the links so a
   // press can say what is missing; it never advances past them (see persistAdvance).
-  const identityDone = (s: BState) =>
-    identityFieldsDone(s) &&
-    (!typePreselected || !businessActivityError(s.orgType, s.activityType)) &&
-    (!showroom || !socialLinksError(s.links));
+  const identityDone = (s: BState) => identityFieldsDone(s) && (!showroom || !socialLinksError(s.links));
   // Every new business needs a governorate, a city (or custom city) and a detailed address.
   const locationDone = (s: BState) =>
     !!s.governorate && businessAddressSchema.safeParse(s.detailedAddress).success &&

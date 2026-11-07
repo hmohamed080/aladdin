@@ -483,6 +483,7 @@ describe("BusinessFlow — showroom links (step 1)", () => {
     expect(screen.queryByRole("button", { name: /^Instagram/ })).toBeNull();
     expect(follows(screen.getByLabelText(label.legalNameLabel), screen.getByLabelText(starts(label.descriptionLabel)))).toBe(true);
     fillNames();
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "distributor" } }); // a preset type asks its own activity with the identity
     await act(async () => { fireEvent.click(continueBtn()); });
     expect(saveBusiness).toHaveBeenCalledTimes(1);
   });
@@ -513,7 +514,7 @@ describe("BusinessFlow — showroom chosen on the type step", () => {
   it("picking a non-showroom type advances normally", async () => {
     await toTypeStep();
     fireEvent.click(screen.getByRole("button", { name: new RegExp(en.onboarding.business.orgTypes.supplier) }));
-    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "wholesaler" } });
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "distributor" } });
     await act(async () => { fireEvent.click(continueBtn()); });
     expect(saveBusiness).toHaveBeenCalledTimes(2);
     await waitFor(() => expect(screen.getByText(en.onboarding.business.location.title)).toBeInTheDocument());
@@ -544,7 +545,7 @@ describe("BusinessFlow — showroom chosen on the type step", () => {
     await act(async () => { fireEvent.click(continueBtn()); });
     expect(screen.getByText(en.onboarding.business.type.title)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: new RegExp(en.onboarding.business.orgTypes.supplier) }));
-    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "wholesaler" } });
+    fireEvent.change(screen.getByLabelText(label.activityLabel), { target: { value: "distributor" } });
     await act(async () => { fireEvent.click(continueBtn()); });
     const sent = saveBusiness.mock.calls.at(-1)![0] as Record<string, unknown>;
     expect(sent).toMatchObject({ orgType: "supplier", facebookUrl: "", instagramUrl: "", tiktokUrl: "", websiteUrl: "" });

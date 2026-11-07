@@ -36,6 +36,11 @@
     { "binding": "OTP_NOTIFY_SIGNING_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_NOTIFY_SIGNING_SECRET_PRODUCTION" },
     { "binding": "OTP_ADMIN_GRANT_SECRET", "store_id": "acfaa67f391e499db6fde398022f50ce", "secret_name": "OTP_ADMIN_GRANT_SECRET_PRODUCTION" }
   ],
+  // PRIVATE route to the Production app for the alert callback AND the periodic delivery attestation (src/attest.ts). Without this binding
+  // nothing can ever be attested, so delivery could never be turned ON (it fails closed), and no alert would be delivered.
+  "services": [
+    { "binding": "APP_NOTIFY", "service": "aladdin-frontend-production" }
+  ],
   "d1_databases": [
     {
       "binding": "IDEMPOTENCY_DB",

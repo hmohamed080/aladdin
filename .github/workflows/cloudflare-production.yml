@@ -6,8 +6,15 @@
 #
 #   stage = check     builds and bundles both Workers (dry run). Uploads nothing. The default.
 #   stage = backend   deploys `aladdin-backend-production` (FastAPI in a Container). Run first.
+#   stage = frontend-upload  UPLOAD-ONLY: builds and uploads the frontend as a NEW VERSION that is NOT deployed (serves 0% of traffic;
+#                     users are unaffected). Test it on the live hostname with the request header
+#                       Cloudflare-Workers-Version-Overrides: aladdin-frontend-production="<version id>"
+#                     (only requests that carry it reach the new version), then promote it by hand with
+#                       wrangler versions deploy <version id>@100% --env production
+#                     which is the user-facing activation and needs its own approval. Never promotes by itself.
 #   stage = frontend  deploys `aladdin-frontend-production`. Refuses to run unless the backend Worker already
-#                     exists, because the frontend's BACKEND service binding points at it.
+#                     exists, because the frontend's BACKEND service binding points at it. It also refuses unless the WhatsApp OTP
+#                     Worker exists (the OTP_WORKER service binding). Goes live immediately: prefer frontend-upload first.
 #
 # SAFE BY DEFAULT: nothing is uploaded unless the GitHub Environment `cloudflare-production` has the variable
 # CLOUDFLARE_PRODUCTION_ENABLED set to exactly "true". Without it every stage builds and bundles only.
@@ -35,9 +42,9 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "check = build and bundle only; backend first, then frontend"
+        description: "check = build and bundle only; backend first; frontend-upload = new version, no traffic; frontend = deploy and go live"
         type: choice
-        options: [check, backend, frontend]
+        options: [check, backend, frontend-upload, frontend]
         default: check
 
 concurrency:
@@ -104,7 +111,7 @@ jobs:
 
       # Frontend: OpenNext build with the live public values, then the Worker, no public address.
       - name: Backend Worker must exist before the frontend
-        if: inputs.stage == 'frontend' && env.UPLOAD == 'true'
+        if: (inputs.stage == 'frontend' || inputs.stage == 'frontend-upload') && env.UPLOAD == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -112,6 +119,15 @@ jobs:
           status=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/aladdin-backend-production/settings")
           [ "$status" = "200" ] || { echo "aladdin-backend-production is not deployed (HTTP $status): run stage=backend first"; exit 1; }
+      - name: WhatsApp OTP Worker must exist before the frontend (service binding OTP_WORKER)
+        if: (inputs.stage == 'frontend' || inputs.stage == 'frontend-upload') && env.UPLOAD == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/aladdin-whatsapp-otp-production/settings")
+          [ "$status" = "200" ] || { echo "aladdin-whatsapp-otp-production is not deployed (HTTP $status): deploy the private OTP Worker (P-6) first"; exit 1; }
       - name: Build the frontend for Workers
         if: inputs.stage != 'backend'
         run: pnpm --filter frontend cf:build
@@ -119,6 +135,22 @@ jobs:
         if: inputs.stage != 'backend'
         working-directory: frontend
         run: pnpm exec wrangler deploy --env production --dry-run --outdir "$RUNNER_TEMP/frontend"
+      - name: Upload aladdin-frontend-production as an UNDEPLOYED version (0% of traffic)
+        if: inputs.stage == 'frontend-upload' && env.UPLOAD == 'true'
+        working-directory: frontend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          pnpm exec wrangler versions upload --env production --message "upload-only ${GITHUB_SHA::12}" \
+            --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$NEXT_PUBLIC_SUPABASE_ANON_KEY" | tee "$RUNNER_TEMP/upload.txt"
+          {
+            echo "### Frontend version uploaded, NOT deployed (0% of traffic)"
+            grep -i "version id" "$RUNNER_TEMP/upload.txt" || true
+            echo "Test with the header Cloudflare-Workers-Version-Overrides: aladdin-frontend-production=\"<version id>\"; promote with wrangler versions deploy <version id>@100% --env production (separate approval)."
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Deploy aladdin-frontend-production
         if: inputs.stage == 'frontend' && env.UPLOAD == 'true'
         working-directory: frontend

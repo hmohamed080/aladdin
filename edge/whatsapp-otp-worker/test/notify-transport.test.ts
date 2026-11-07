@@ -156,7 +156,7 @@ describe("real alert delivery uses the SAME private transport", () => {
       assert.deepEqual(await deliverOutbox(envFor(d1, { APP_NOTIFY: down } as any), db, forbiddenFetch, t), { delivered: 0, failed: 1 });
       assert.equal((await rows(db))[0]!.attempts, 1);
       await d1.prepare("UPDATE otp_notification_outbox SET attempts = 0, next_attempt_at = 0").run();
-      assert.deepEqual(await deliverOutbox(envFor(d1, {}), db, forbiddenFetch, t + 10), { delivered: 0, failed: 0, skipped: "notify_transport_unavailable" });
+      assert.deepEqual(await deliverOutbox(envFor(d1, { APP_NOTIFY: undefined }), db, forbiddenFetch, t + 10), { delivered: 0, failed: 0, skipped: "notify_transport_unavailable" });
       assert.equal((await rows(db))[0]!.attempts, 0, "waits in the outbox for the binding to be fixed");
       const ok = binding(() => new Response("{}", { status: 200 }));
       assert.deepEqual(await deliverOutbox(envFor(d1, { APP_NOTIFY: ok.b } as any), db, forbiddenFetch, t + 20), { delivered: 1, failed: 0 }, "delivered once the binding exists");

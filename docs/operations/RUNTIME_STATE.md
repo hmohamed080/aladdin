@@ -8,6 +8,7 @@
 ## Persistent Showroom shell (draft PR, not merged) — 2026-11-05
 - Branch `fix/persistent-workspace-shell-20261105` from `main` `f823d88c`. Frontend routing only: `/b2b/*` and `/showroom/*` now live under the `(workspace)` route group so the Showroom shell stays mounted when a link crosses between them ([ADR-0025](../decisions/ADR-0025-persistent-showroom-shell.md)). No URL, migration, permission, hosted or deploy change.
 - Verified locally: typecheck, lint, production build, focused and full Vitest (see the work log for the 5 failures and why each is or is not this change). Not verified in a browser; the new Playwright spec is unrun.
+
 ## WhatsApp OTP admin-controlled limits (stacked PR on #127, code only) — 2026-11-02
 
 - Branch `feat/whatsapp-otp-admin-settings-20261103` (worktree `D:/projects/aladdin-b1-recon`) adds Super Admin control of the Daily Send Limit, the Hard Ceiling and the 70 % / 90 % alert thresholds from `/admin/whatsapp-otp`: Worker D1 migration `0002`, signed `/v1/admin/*` routes, a cron-driven alert outbox, Supabase migration `20261103090001` and the app page, action and `/api/internal/whatsapp-otp/notify` callback.

@@ -36,4 +36,13 @@ chmod 400 "$OUTF" "$OUTF.sha256" 2>/dev/null || true
 echo "Encrypted backup: $OUTF ($(wc -c < "$OUTF" | tr -d ' ') bytes)"
 echo "Checksum file:    $OUTF.sha256 ($(cut -d' ' -f1 "$OUTF.sha256"))"
 echo "Recovery check: decrypted again, archive hash and all backup checksums match."
+# Proof for production-p2-push.sh: written only now, after the decrypt-and-compare above passed. It pins the encrypted
+# file's hash (any later change to the file invalidates it) and, for a recovery snapshot, which snapshot it belongs to.
+{
+  echo "verified_utc=$(date -u +%FT%TZ)"
+  echo "encrypted_sha256=$(cut -d' ' -f1 "$OUTF.sha256")"
+  echo "archive_sha256=$TARSUM"
+  if [ -f "$DIR/snapshot-meta.txt" ]; then sed 's/^/snapshot_/' "$DIR/snapshot-meta.txt"; fi
+} > "$OUTF.verified"
+chmod 400 "$OUTF.verified" 2>/dev/null || true
 echo "Recover later with: gpg --decrypt -o backup.tar \"$(basename "$OUTF")\" && tar -xf backup.tar"

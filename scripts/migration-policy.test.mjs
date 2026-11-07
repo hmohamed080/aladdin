@@ -168,3 +168,17 @@ test("CLI end to end: exit 0 for a safe PR, 1 for a destructive one, 2 for bad u
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a pinned out-of-order review passes only while the file still matches its sha256", async () => {
+  const { contentHash } = await import("./migration-policy.mjs");
+  const sql = "select 1;\r\n";
+  const path = "supabase/migrations/20261008090001_change.sql";
+  const pin = (sha256, reason = "applied on Acceptance already; production uses --include-all") => ({ [path]: { sha256, reason } });
+  const call = (text, reviewed) =>
+    evaluatePr({ changes: [{ status: "A", path }], baseFiles: ["supabase/migrations/20261009090001_x.sql"], readFile: () => text, reviewed });
+  assert.equal(call(sql, pin(contentHash(sql))).failures.length, 0, "matching pin is accepted (CRLF is normalised)");
+  assert.equal(call("select 1;\n", pin(contentHash(sql))).failures.length, 0, "LF and CRLF hash the same");
+  assert.equal(call("select 2;\n", pin(contentHash(sql))).failures.length, 1, "an edited file no longer matches the pin");
+  assert.equal(call(sql, pin(contentHash(sql), "short")).failures.length, 1, "a pin needs a real reason");
+  assert.equal(call(sql, {}).failures.length, 1, "no pin and no marker still fails");
+});

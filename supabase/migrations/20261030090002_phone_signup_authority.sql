@@ -1,4 +1,3 @@
--- migration-policy: out-of-order-reviewed - stacked ahead of 20261107090002, which Production already has; the version stays so Acceptance history and the branches citing it stay aligned. Production receives it only through an owner-approved dry-run and db push (include-all), never by repair
 -- ===========================================================================
 -- Phone verification authority, part 2 (R1): signup_proof + the phone-alias creation guard.
 --

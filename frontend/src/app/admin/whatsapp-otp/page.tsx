@@ -71,6 +71,9 @@ export default async function WhatsappOtpPage() {
   const delivery = usage.delivery;
   const deliveryOn = runtime ? runtime.delivery_enabled === true : false;
   const blockers = deliveryBlockers(usage);
+  // The Aladdin database confirms the switch every minute; no valid confirmation for 3 minutes means the periodic check is failing.
+  const attestationAge = typeof runtime?.delivery_attestation_age === "number" ? runtime.delivery_attestation_age : -1;
+  const attestationOverdue = attestationAge === -1 || attestationAge > 180;
   // One line of helper text for everyone: what ON/OFF means now, or (Super Admin, switch off) what still blocks turning it on.
   const deliveryHelp =
     canManage && delivery && !delivery.enabled && blockers.length > 0
@@ -80,7 +83,9 @@ export default async function WhatsappOtpPage() {
             ? "whatsappOtp.delivery.onHelp"
             : delivery?.enabled
               ? runtime?.delivery_permitted === true
-                ? "whatsappOtp.delivery.awaitingConfirmationHelp" // permitted and switched on: waiting for the Aladdin database's signed confirmation
+                ? attestationOverdue
+                  ? "whatsappOtp.delivery.attestationOverdueHelp"
+                  : "whatsappOtp.delivery.awaitingConfirmationHelp" // permitted and switched on: waiting for the Aladdin database's signed confirmation
                 : "whatsappOtp.delivery.offByEnvironmentHelp"
               : "whatsappOtp.delivery.offHelp",
         );

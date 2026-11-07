@@ -31,6 +31,13 @@ export const ACCEPTANCE_PG_PREFIX = "17.11";
 /** SHA-256 of the pinned Supabase Root 2021 CA (public certificate, compare with the dashboard: Database > Settings > SSL). */
 export const PINNED_CA_SHA256 = "807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa";
 export const CONFIRMATION_PHRASE = "PROVISION ACCEPTANCE";
+/** Production runs Supabase Postgres 17.6.x (project list: 17.6.1.155). Pinned like Acceptance's, so a wrong project fails before any write. */
+export const PRODUCTION_PG_PREFIX = "17.6";
+export const PRODUCTION_CONFIRMATION_PHRASE = "PROVISION PRODUCTION";
+/** Production history already holds 193 rows before the OTP migrations; fewer means this is not the Production database. */
+export const PRODUCTION_MIN_HISTORY_ROWS = 194;
+/** The release-record reference of the owner's written approval, e.g. PROD-GRANT-20261107-OWNER1 (a Production write is refused without it). */
+export const APPROVAL_REFERENCE = /^PROD-GRANT-\d{8}-[A-Z0-9]{3,16}$/;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const POOLER_HOST = /^aws-\d+-[a-z]+-[a-z]+-\d+\.pooler\.supabase\.com$/;
@@ -59,13 +66,13 @@ export const fingerprint = (bytes) => createHash("sha256").update(bytes).digest(
  * The ONLY accepted targets are the Acceptance session/transaction pooler (user postgres.<ref>) or the Acceptance direct host. Anything that
  * mentions the Production reference, in any part and in any encoding, is refused. Returns { config } or { error }. Never echoes the input.
  */
-export function parseTarget(uri) {
+function parseTargetFor(uri, { ref, otherRef, otherRefError, notError }) {
   const raw = String(uri ?? "").trim();
   if (!raw) return { error: "empty" };
   const lowered = raw.toLowerCase();
   let decoded = lowered;
   try { decoded = decodeURIComponent(lowered); } catch { return { error: "malformed" }; }
-  if (lowered.includes(PRODUCTION_REF) || decoded.includes(PRODUCTION_REF)) return { error: "production_refused" };
+  if (lowered.includes(otherRef) || decoded.includes(otherRef)) return { error: otherRefError };
   let u;
   try { u = new URL(raw); } catch { return { error: "malformed" }; }
   if (u.protocol !== "postgres:" && u.protocol !== "postgresql:") return { error: "not_postgres" };
@@ -73,13 +80,22 @@ export function parseTarget(uri) {
   const host = u.hostname.toLowerCase();
   const password = decodeURIComponent(u.password);
   if (!password) return { error: "no_password" };
-  const pooler = POOLER_HOST.test(host) && user === `postgres.${ACCEPTANCE_REF}` && (u.port === "" || u.port === "5432" || u.port === "6543");
-  const direct = host === `db.${ACCEPTANCE_REF}.supabase.co` && user === "postgres" && (u.port === "" || u.port === "5432");
-  if (!pooler && !direct) return { error: "not_acceptance" };
+  const pooler = POOLER_HOST.test(host) && user === `postgres.${ref}` && (u.port === "" || u.port === "5432" || u.port === "6543");
+  const direct = host === `db.${ref}.supabase.co` && user === "postgres" && (u.port === "" || u.port === "5432");
+  if (!pooler && !direct) return { error: notError };
   const database = decodeURIComponent(u.pathname.replace(/^\//, "")) || "postgres";
-  if (database !== "postgres") return { error: "not_acceptance" };
-  // Any other project reference-looking token in the user or host is suspicious; the checks above already require exact Acceptance values.
+  if (database !== "postgres") return { error: notError };
+  // Any other project reference-looking token in the user or host is suspicious; the checks above already require exact values for THIS target.
   return { config: { host, port: Number(u.port || 5432), user, password, database, kind: pooler ? "pooler" : "direct" } };
+}
+
+export function parseTarget(uri) {
+  return parseTargetFor(uri, { ref: ACCEPTANCE_REF, otherRef: PRODUCTION_REF, otherRefError: "production_refused", notError: "not_acceptance" });
+}
+
+/** The Production target: the exact Production pooler/direct host; anything that mentions the ACCEPTANCE reference is refused (a mix-up guard). */
+export function parseProductionTarget(uri) {
+  return parseTargetFor(uri, { ref: PRODUCTION_REF, otherRef: ACCEPTANCE_REF, otherRefError: "acceptance_refused", notError: "not_production" });
 }
 
 export function verifyPinnedCa(pem) {
@@ -153,6 +169,38 @@ export function makeOut(write, secrets) {
 // ---------------------------------------------------------------------------------------------------------------------------------
 // The run (every collaborator injected so each refusal is testable without a network)
 // ---------------------------------------------------------------------------------------------------------------------------------
+export const ACCEPTANCE_PROFILE = {
+  name: "Acceptance",
+  parseTarget,
+  refusedMessage: (code) => (code === "production_refused" ? "REFUSED: that connection string mentions the Production project" : `REFUSED: not a valid Acceptance connection string (${code})`),
+  uriPrompt: "Acceptance database URI (Supabase Dashboard > Connect > Session pooler, password filled in) [hidden]: ",
+  keyPrompt: "Acceptance OTP_ADMIN_GRANT_SECRET value from your password manager [hidden]: ",
+  pgPrefix: ACCEPTANCE_PG_PREFIX,
+  phrase: CONFIRMATION_PHRASE,
+  requireApproval: false,
+  minHistoryRows: 0,
+};
+
+/**
+ * PRODUCTION. Stricter than Acceptance, never the default: it is reachable only through provision-grant-key-production.mjs.
+ *  - a dry run is always allowed (read-only); a WRITE needs --approval=PROD-GRANT-YYYYMMDD-XXXX (the owner's written release-record reference),
+ *    checked BEFORE any prompt, and the reference is echoed in the output so it lands in the release record;
+ *  - a different typed phrase, the Production ref in the target, the Acceptance ref refused, Postgres 17.6 pinned, and a history of at least
+ *    194 rows (Production has 193 before the OTP migrations);
+ *  - never in CI (the CI variable refuses), and never without an interactive terminal (hidden prompts).
+ */
+export const PRODUCTION_PROFILE = {
+  name: "Production",
+  parseTarget: parseProductionTarget,
+  refusedMessage: (code) => (code === "acceptance_refused" ? "REFUSED: that connection string mentions the Acceptance project" : `REFUSED: not a valid Production connection string (${code})`),
+  uriPrompt: "PRODUCTION database URI (Supabase Dashboard > Connect > Session pooler, password filled in) [hidden]: ",
+  keyPrompt: "PRODUCTION OTP_ADMIN_GRANT_SECRET_PRODUCTION value from your password manager [hidden]: ",
+  pgPrefix: PRODUCTION_PG_PREFIX,
+  phrase: PRODUCTION_CONFIRMATION_PHRASE,
+  requireApproval: true,
+  minHistoryRows: PRODUCTION_MIN_HISTORY_ROWS,
+};
+
 class Refuse extends Error {}
 const refuse = (m) => { throw new Refuse(m); };
 
@@ -160,28 +208,36 @@ export async function run(deps) {
   const secrets = [];
   const out = makeOut(deps.write ?? ((s) => process.stdout.write(s)), secrets);
   const args = deps.argv ?? [];
+  const profile = deps.profile ?? ACCEPTANCE_PROFILE;
   const known = new Set(["--write", "--help"]);
-  const unknown = args.filter((a) => !known.has(a));
+  const approvalArgs = profile.requireApproval ? args.filter((a) => a.startsWith("--approval=")) : [];
+  const unknown = args.filter((a) => !known.has(a) && !approvalArgs.includes(a));
   if (unknown.length > 0 || args.includes("--help")) {
-    out("usage: node provision-grant-key.mjs [--write]\n  (no argument) dry run: all checks, no write\n  --write       provision the Acceptance grant key after a typed confirmation\nThe key and the database URI are entered at hidden prompts only; they are never accepted as arguments.");
+    out(`usage: node ${profile.requireApproval ? "provision-grant-key-production.mjs [--write --approval=PROD-GRANT-YYYYMMDD-XXXX]" : "provision-grant-key.mjs [--write]"}\n  (no argument) dry run: all checks, no write\n  --write       provision the ${profile.name} grant key after a typed confirmation${profile.requireApproval ? " and a release-record approval reference" : ""}\nThe key and the database URI are entered at hidden prompts only; they are never accepted as arguments.`);
     return unknown.length > 0 ? 2 : 0;
   }
   const write = args.includes("--write");
+  const approval = (approvalArgs[0] ?? "").slice("--approval=".length);
   let bytes = null;
   let sql = null;
   try {
-    out(`Acceptance grant-key provisioning (${write ? "WRITE mode" : "dry run, no write"}). Target: Acceptance project only.`);
+    // PRODUCTION WRITE GATES, checked before any prompt or network use: not in CI, and only with the owner's written approval reference.
+    if (profile.requireApproval && write) {
+      if (deps.ci) refuse("REFUSED: a Production write never runs in CI");
+      if (!APPROVAL_REFERENCE.test(approval)) refuse("REFUSED: a Production write needs --approval=PROD-GRANT-YYYYMMDD-XXXX (the reference of the owner's written approval in the release record); a dry run needs none");
+    }
+    out(`${profile.name} grant-key provisioning (${write ? "WRITE mode" : "dry run, no write"}). Target: ${profile.name} project only.${profile.requireApproval && write ? ` Approval reference: ${approval}.` : ""}`);
     if (!verifyPinnedCa(deps.ca)) refuse("the pinned Supabase CA file does not match its expected fingerprint");
 
     // 1. The target, typed at a hidden prompt, validated before any network use
-    const uri = await deps.hidden("Acceptance database URI (Supabase Dashboard > Connect > Session pooler, password filled in) [hidden]: ");
+    const uri = await deps.hidden(profile.uriPrompt);
     secrets.push(uri);
-    const target = parseTarget(uri);
-    if (target.error) refuse(target.error === "production_refused" ? "REFUSED: that connection string mentions the Production project" : `REFUSED: not a valid Acceptance connection string (${target.error})`);
+    const target = profile.parseTarget(uri);
+    if (target.error) refuse(profile.refusedMessage(target.error));
     secrets.push(target.config.password);
 
     // 2. The key, typed at a hidden prompt
-    const keyText = await deps.hidden("Acceptance OTP_ADMIN_GRANT_SECRET value from your password manager [hidden]: ");
+    const keyText = await deps.hidden(profile.keyPrompt);
     secrets.push(keyText, String(keyText).trim());
     const checked = validateGrantKey(keyText);
     if (checked.error) refuse(`REFUSED: the key is not valid (${checked.error}); nothing was sent`);
@@ -201,9 +257,10 @@ export async function run(deps) {
     // 4. Independent target verification and state, all read-only in ONE transaction
     const before = await sql.begin("read only", async (tx) => {
       const [ident] = await tx.unsafe(Q_IDENTITY);
-      if (!String(ident?.server_version ?? "").startsWith(deps.pgPrefix ?? ACCEPTANCE_PG_PREFIX)) refuse("REFUSED: the server version does not match Acceptance");
+      if (!String(ident?.server_version ?? "").startsWith(deps.pgPrefix ?? profile.pgPrefix)) refuse(`REFUSED: the server version does not match ${profile.name}`);
       const [hist] = await tx.unsafe(Q_HISTORY);
       if (!hist || String(hist.latest) < REQUIRED_MIGRATION) refuse(`REFUSED: migration ${REQUIRED_MIGRATION} is not applied on this database`);
+      if (hist.n < profile.minHistoryRows) refuse(`REFUSED: this migration history (${hist.n} rows) is too short to be the ${profile.name} database`);
       const [tbl] = await tx.unsafe(Q_TABLE);
       if (!tbl?.present) refuse("REFUSED: app.whatsapp_otp_grant_key does not exist on this database");
       if (!tbl.rls) refuse("REFUSED: row-level security is not enabled on the grant-key table");
@@ -212,7 +269,7 @@ export async function run(deps) {
       const [sig] = await tx.unsafe(Q_SIGNATURE);
       return { hist, sig };
     });
-    out(`Target verified: Acceptance (pooler user, pinned TLS, PostgreSQL ${deps.pgPrefix ?? ACCEPTANCE_PG_PREFIX}), migration history ${before.hist.n} rows, latest ${before.hist.latest}, grant-key table present with RLS and 0 rows.`);
+    out(`Target verified: ${profile.name} (${target.config.kind} user, pinned TLS, PostgreSQL ${deps.pgPrefix ?? profile.pgPrefix}), migration history ${before.hist.n} rows, latest ${before.hist.latest}, grant-key table present with RLS and 0 rows.`);
 
     if (!write) {
       out("DRY RUN complete: nothing was written. Run again with --write to provision.");
@@ -220,8 +277,8 @@ export async function run(deps) {
     }
 
     // 5. Typed confirmation
-    const typed = String((await deps.line(`Type ${CONFIRMATION_PHRASE} to write one row (anything else cancels): `)) ?? "").trim();
-    if (typed !== CONFIRMATION_PHRASE) refuse("cancelled: the confirmation phrase did not match; nothing was written");
+    const typed = String((await deps.line(`Type ${profile.phrase} to write one row (anything else cancels): `)) ?? "").trim();
+    if (typed !== profile.phrase) refuse("cancelled: the confirmation phrase did not match; nothing was written");
 
     // 6. The write: ONE transaction, a constant statement, the key as a bound bytea parameter, verified before COMMIT
     await sql.begin(async (tx) => {
@@ -250,7 +307,7 @@ export async function run(deps) {
       out("WARNING: a post-write check failed. Do not continue; report this output (it contains no secret).");
       return 1;
     }
-    out("Done. The key was not read back. Next: close this terminal; the grant key is now configured for Acceptance.");
+    out(`Done. The key was not read back. Next: close this terminal; the grant key is now configured for ${profile.name}.${profile.requireApproval ? ` Record in the release record: approval ${approval}, fingerprint ${shown}, ${new Date().toISOString()}.` : ""}`);
     return 0;
   } catch (e) {
     out(e instanceof Refuse ? e.message : `failed safely (${String(e && e.code ? e.code : e && e.name ? e.name : "error").slice(0, 40)}); no key was printed`);
@@ -287,7 +344,7 @@ export function loadDriver() {
   return require(entry);
 }
 
-async function realConnect(config, ca) {
+export async function realConnect(config, ca) {
   const postgres = loadDriver();
   const sql = postgres({
     host: config.host,

@@ -116,3 +116,12 @@ test("the Acceptance guard still refuses the Production config, and the two conf
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("the private APP_NOTIFY service binding to the Production app is required, and only that one (alerts and the delivery attestation depend on it)", () => {
+  assert.deepEqual(baseline.services, [{ binding: "APP_NOTIFY", service: "aladdin-frontend-production" }]);
+  blocked("no service binding", (c) => { delete c.services; });
+  blocked("empty service bindings", (c) => { c.services = []; });
+  blocked("binding to the preview app", (c) => { c.services = [{ binding: "APP_NOTIFY", service: "aladdin-frontend-preview" }]; });
+  blocked("wrong binding name", (c) => { c.services = [{ binding: "APP", service: "aladdin-frontend-production" }]; });
+  blocked("an extra binding", (c) => { c.services = [...c.services, { binding: "OTHER", service: "aladdin-backend-production" }]; });
+});

@@ -65,7 +65,12 @@ async function fillIdentity(page: Page, name: string): Promise<void> {
   await page.locator("#blegal").fill(`${name} Legal LLC`);
   // Each business type answers its own activity list; a Showroom also gives its business phone.
   await pickBusinessActivity(page);
-  if (await page.locator("#bphone").count()) await page.locator("#bphone").fill(`10${String(Date.now()).slice(-8)}`);
+  if (await page.locator("#bphone").count()) {
+    await page.locator("#bphone").fill(`10${String(Date.now()).slice(-8)}`);
+    // A showroom needs at least one valid link to finish the identity step (showroom social links, #139).
+    await page.locator('button[aria-controls="blinks-instagram-panel"]').click();
+    await page.locator("#blinks-instagram").fill("@shop");
+  }
   await page.getByRole("button", { name: /^continue$/i }).click();
   await expect(page.getByRole("heading", { name: /where are you based/i })).toBeVisible();
 }

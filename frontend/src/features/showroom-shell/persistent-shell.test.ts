@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SHOWROOM_GROUPS } from "./navigation";
@@ -34,11 +34,14 @@ describe("Showroom navigation shares one persistent layout", () => {
     expect(existsSync(join(APP, "showroom", "(app)"))).toBe(false);
   });
 
-  it("the retired Showroom sign-in/up pages stay gone (ADR-0025 redirects them to /auth/*) and never join the workspace shell", () => {
+  it("no Showroom sign-in/up page lives inside the workspace shell: they were retired (ADR-0025) and are permanent redirects to /auth/*", () => {
     const outside = readdirSync(join(APP, "showroom"));
-    expect(outside).not.toContain("sign-in");
-    expect(outside).not.toContain("sign-up");
     expect(outside).not.toContain("home");
+    // The public entry pages are gone as route segments; the old URLs are redirects served by next.config, never rendered in the shell.
+    const config = readFileSync(join(APP, "..", "..", "next.config.ts"), "utf8");
+    expect(config).toContain('source: "/showroom/sign-in", destination: "/auth/sign-in", permanent: true');
+    expect(config).toContain('source: "/showroom/sign-up"');
+    expect(existsSync(join(GROUP, "showroom", "sign-in"))).toBe(false);
   });
 
   it("every sidebar destination is served from the shared group", () => {
