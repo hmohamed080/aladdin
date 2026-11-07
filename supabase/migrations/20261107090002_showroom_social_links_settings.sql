@@ -2,7 +2,7 @@
 --
 -- Purpose:
 --   * public.organization_social_links_set: a showroom manager (org.manage) replaces the four links of the
---     organization from Settings. Validated by app.social_link_valid (20261105090001), audited as
+--     organization from Settings. Validated by app.social_link_valid (20261107090001), audited as
 --     organization.social_links_changed with the link COUNT only (links never go into logs), and not blocked by
 --     the verified-identity lock: links are business information, not identity.
 --   * app.profile_completion: one more item, 'organization_links', for a caller who manages a showroom, missing

@@ -46,8 +46,8 @@
 | `frontend/src/features/organization/organization-social-links-field.tsx` (new) + `features/showroom-shell/settings/settings.tsx` | Settings edit |
 | `frontend/src/features/profile/complete-profile-card.tsx`, `server/queries/profile-identity.ts` | `organization_links` item |
 | `frontend/src/app/admin/business-verification/[id]/page.tsx`, `server/queries/business-verification.ts` | Admin sees links, marked unverified |
-| `supabase/migrations/20261105090001_showroom_social_links.sql`, `20261105090002_showroom_social_links_settings.sql` (new) | Schema + RPCs |
-| `supabase/permissions/20261105090001.json`, `20261105090002.json` (new) | Reviewed function contracts |
+| `supabase/migrations/20261107090001_showroom_social_links.sql`, `20261107090002_showroom_social_links_settings.sql` (new) | Schema + RPCs |
+| `supabase/permissions/20261107090001.json`, `20261107090002.json` (new) | Reviewed function contracts |
 | `supabase/tests/116_showroom_social_links_test.sql`, `117_showroom_social_links_settings_test.sql` (new) | pgTAP |
 | `frontend/e2e/showroom-social-links.spec.ts` (new) | Journey |
 
@@ -87,7 +87,7 @@
 ### Task 2: Columns, DB validator, `_v3` save/submit RPCs
 
 **Files:**
-- Create: `supabase/migrations/20261105090001_showroom_social_links.sql`, `supabase/permissions/20261105090001.json`, `supabase/tests/116_showroom_social_links_test.sql`
+- Create: `supabase/migrations/20261107090001_showroom_social_links.sql`, `supabase/permissions/20261107090001.json`, `supabase/tests/116_showroom_social_links_test.sql`
 - Modify: `frontend/src/types/database.types.ts` (tables `business_creation_drafts`, `organizations`; Functions `business_draft_save_v3`, `business_draft_submit_v3`)
 
 **Interfaces:**
@@ -105,7 +105,7 @@
 
 - [ ] **Step 3: Write the migration** per the Interfaces block. Header comment: purpose, expand-only, `_v2` untouched.
 
-- [ ] **Step 4: Add `supabase/permissions/20261105090001.json`** = the latest contract (`20261026090001.json`) with `version` set to `20261105090001` plus entries for `public.business_draft_save_v3(...)`, `public.business_draft_submit_v3(uuid)` (copy the `_v2` entries' shape: authenticated yes, anon no) and `app.social_link_valid(text,text)` (copy the shape of another internal `app.` function with no API-role execute). Run `node scripts/migration-permission-gate.mjs <container> postgres check` against the local DB (or the repo's documented gate command) and fix until it passes.
+- [ ] **Step 4: Add `supabase/permissions/20261107090001.json`** = the latest contract (`20261026090001.json`) with `version` set to `20261107090001` plus entries for `public.business_draft_save_v3(...)`, `public.business_draft_submit_v3(uuid)` (copy the `_v2` entries' shape: authenticated yes, anon no) and `app.social_link_valid(text,text)` (copy the shape of another internal `app.` function with no API-role execute). Run `node scripts/migration-permission-gate.mjs <container> postgres check` against the local DB (or the repo's documented gate command) and fix until it passes.
 
 - [ ] **Step 5: Run** the pgTAP suite again → PASS; run `npx -y pnpm@9.15.9 supabase db lint`.
 
@@ -118,7 +118,7 @@
 ### Task 3: Settings RPC, audit action, profile completion, admin detail
 
 **Files:**
-- Create: `supabase/migrations/20261105090002_showroom_social_links_settings.sql`, `supabase/permissions/20261105090002.json`, `supabase/tests/117_showroom_social_links_settings_test.sql`
+- Create: `supabase/migrations/20261107090002_showroom_social_links_settings.sql`, `supabase/permissions/20261107090002.json`, `supabase/tests/117_showroom_social_links_settings_test.sql`
 
 **Interfaces:**
 - Produces:
@@ -131,7 +131,7 @@
 
 - [ ] **Step 2: Run** `npx -y pnpm@9.15.9 supabase test db` → FAIL.
 
-- [ ] **Step 3: Write the migration**; **Step 4: add `20261105090002.json`** (= `20261105090001.json` with `version` bumped plus `public.organization_social_links_set(uuid,text,text,text,text)`; contract entries for the two re-created functions are unchanged) and run the permission gate; **Step 5: run** pgTAP → PASS and `supabase db lint`.
+- [ ] **Step 3: Write the migration**; **Step 4: add `20261107090002.json`** (= `20261107090001.json` with `version` bumped plus `public.organization_social_links_set(uuid,text,text,text,text)`; contract entries for the two re-created functions are unchanged) and run the permission gate; **Step 5: run** pgTAP → PASS and `supabase db lint`.
 
 - [ ] **Step 6: Update `database.types.ts`** (`organization_social_links_set`).
 

@@ -104,7 +104,7 @@ Column names, the exact audit action name, the precise copy, the settings screen
 ## Implementation record and deviations from this design
 Implemented as designed except for the points below, each decided during the build.
 
-- **Migrations:** `20261105090001_showroom_social_links.sql` (columns on drafts and organizations, the validator, `business_draft_save_v3` / `business_draft_submit_v3`) and `20261105090002_showroom_social_links_settings.sql` (`organization_social_links_set`, audit action, profile-completion item, admin detail). The v2 RPCs are untouched.
+- **Migrations:** `20261107090001_showroom_social_links.sql` (columns on drafts and organizations, the validator, `business_draft_save_v3` / `business_draft_submit_v3`) and `20261107090002_showroom_social_links_settings.sql` (`organization_social_links_set`, audit action, profile-completion item, admin detail). The v2 RPCs are untouched.
 - **Validator grant:** `app.social_link_valid` is executable by `authenticated` only. The design said no API-role execute, but CHECK constraints are evaluated as the writing role, so an owner updating an organization row needs it. `anon` and `service_role` have no grant.
 - **Save replaces all four links:** the v3 save and the settings RPC replace every link, and an omitted link is cleared. Every client save therefore sends all four values.
 - **Last link cannot be cleared from Settings:** a showroom cannot save with zero links, and the required message appears when the manager clears the last one.

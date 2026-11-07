@@ -1,5 +1,5 @@
 {
- "version": "20261105090002",
+ "version": "20261107090001",
  "source": "local supabase/postgres:17 replay of every migration through this version (feat/showroom-social-links-20261105, isolated stack aladdin_sociallinks)",
  "publicRPCs": [
   "public.invitation_lookup(text)",
@@ -20228,43 +20228,6 @@
     "supabase_storage_admin": false
    },
    "signature": "public.organization_media_resolve(text,text,text,uuid)",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": true,
-    "authenticated": true,
-    "authenticator": true,
-    "dashboard_user": true,
-    "supabase_auth_admin": true,
-    "supabase_storage_admin": true
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
-     "role": "authenticated",
-     "grantable": false
-    },
-    {
-     "role": "postgres",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": false,
-    "authenticated": true,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
-   "signature": "public.organization_social_links_set(uuid,text,text,text,text)",
    "schemaUsage": {
     "anon": true,
     "service_role": true,

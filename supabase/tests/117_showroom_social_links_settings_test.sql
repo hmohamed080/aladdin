@@ -1,4 +1,4 @@
--- Showroom social links, Settings (docs/frontend/showroom-social-links-onboarding.md, 20261105090002):
+-- Showroom social links, Settings (docs/frontend/showroom-social-links-onboarding.md, 20261107090002):
 -- public.organization_social_links_set, the organization.social_links_changed audit action, the
 -- 'organization_links' profile-completion item and the four links in business_verification_detail.
 --
