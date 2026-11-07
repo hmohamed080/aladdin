@@ -109,7 +109,7 @@ done; done
 check "restore: an unknown event is refused" "$(rest EVENT=push)" ERROR
 # The workflow must use that decision, and nothing else, to start the restore job; isolation settings stay as they were.
 W="$HERE/workflows/restore-test.yml"
-check "restore workflow: the job waits for the plan" "$(grep -c "needs.plan.outputs.run == 'true'" "$W")" 1
+check "restore workflow: the control job and the restore job both wait for the plan" "$(grep -c "needs.plan.outputs.run == 'true'" "$W")" 2
 check "restore workflow: no inline vars.PRODUCTION_BACKUP_ENABLED shortcut" "$(grep -c "if:.*vars.PRODUCTION_BACKUP_ENABLED" "$W")" 0
 # shellcheck disable=SC2016
 check "restore workflow: still its own per-project environment" "$(grep -c 'environment: restore-test-\${{ inputs.label' "$W")" 1

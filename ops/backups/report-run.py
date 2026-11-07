@@ -35,7 +35,11 @@ def main():
         name = ('backup' if kind == 'backup' else 'restore') + f' ({label})'
         job = next((j for j in jobs if j['name'] == name),None)
         if not job or job['conclusion'] == 'skipped': return
-        claim = next((s for s in job.get('steps',[]) if s['name'] == 'Claim run'),None)
+        # The claim lives in the control job (the only job that holds the service-role key); a restore's data
+        # job has its own control job, a backup's control job is `control (label)`.
+        control = next((j for j in jobs if j['name'] == (f'restore-control ({label})' if kind != 'backup' else f'control ({label})')),None)
+        if not control: return
+        claim = next((s for s in control.get('steps',[]) if s['name'] == 'Claim run'),None)
         if not claim or claim['conclusion'] != 'success': return # no request was claimed
         coverage = next((s for s in job.get('steps',[]) if s['name'] == 'Verify complete coverage'),None)
         conclusion = run['conclusion']

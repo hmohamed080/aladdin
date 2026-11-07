@@ -15,7 +15,8 @@ jobs:
       matrix:
         label: [acceptance, production]
     runs-on: ubuntu-24.04
-    environment: backup-${{ matrix.label }}
+    # Same dedicated control environment as the claim: it holds the service-role key and nothing else.
+    environment: backup-control-${{ matrix.label }}
     steps:
       - uses: actions/checkout@v4
         with:

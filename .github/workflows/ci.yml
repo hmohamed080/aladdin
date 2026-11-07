@@ -180,6 +180,8 @@ jobs:
         run: bash ops/backups/retention-test.sh
       - name: Wrong-target guards stop before any tool runs (shimmed, offline)
         run: bash ops/backups/target-guard-test.sh
+      - name: Credential isolation (service-role key never next to the age restore identity)
+        run: python3 ops/backups/workflow-isolation-test.py
       - name: Restore stack pin and strict Auth/Storage guard
         run: bash ops/backups/restore-pin-test.sh
       - name: The built backup repo holds the whole kit

@@ -55,10 +55,45 @@ jobs:
           echo "labels=$labels" >> "$GITHUB_OUTPUT"
           echo "Projects in this run: $labels" >> "$GITHUB_STEP_SUMMARY"
 
-  backup:
-    name: backup (${{ matrix.label }})
+  # The service-role key lives ONLY here, in its own per-project environment `backup-control-<label>`: this job
+  # reads the runtime schedule and claims the run, and touches no backup data. The data job below never sees it.
+  control:
+    name: control (${{ matrix.label }})
     needs: plan
     if: needs.plan.outputs.labels != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        label: ${{ fromJSON(needs.plan.outputs.labels) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: backup-control-${{ matrix.label }}
+    # Matrix legs share these outputs; each leg fills only its own project's keys (empty values never overwrite).
+    outputs:
+      run_acceptance: ${{ matrix.label == 'acceptance' && steps.control.outputs.run || '' }}
+      run_production: ${{ matrix.label == 'production' && steps.control.outputs.run || '' }}
+      slot_acceptance: ${{ matrix.label == 'acceptance' && steps.control.outputs.slot_date || '' }}
+      slot_production: ${{ matrix.label == 'production' && steps.control.outputs.slot_date || '' }}
+    env:
+      EVENT: ${{ github.event_name }}
+      BACKUP_KIND: backup
+      TARGET_RUN_ID: ${{ github.run_id }}
+      REQUEST_ID: ${{ inputs.request_id }}
+      BACKUP_LABEL: ${{ matrix.label }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read runtime schedule
+        id: control
+        run: python3 backup/runtime-schedule.py
+      - name: Claim run
+        run: python3 backup/report-run.py
+
+  backup:
+    name: backup (${{ matrix.label }})
+    needs: [plan, control]
+    if: needs.plan.outputs.labels != '[]' && needs.control.result == 'success' && needs.control.outputs[format('run_{0}', matrix.label)] == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -87,26 +122,13 @@ jobs:
       R2_SOURCE_BUCKET: ${{ vars.R2_MEDIA_SOURCE_BUCKET }}
       R2_SOURCE_ACCESS_KEY_ID: ${{ secrets.R2_MEDIA_READ_KEY_ID }}
       R2_SOURCE_SECRET_ACCESS_KEY: ${{ secrets.R2_MEDIA_READ_SECRET }}
+      BACKUP_SLOT_DATE: ${{ needs.control.outputs[format('slot_{0}', matrix.label)] }}
       SKIP_IF_TAKEN: ${{ github.event_name == 'schedule' && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
-      - name: Read runtime schedule
-        id: control
-        run: python3 backup/runtime-schedule.py
-        env:
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       - name: Hand-off folder between the two backup steps
-        if: steps.control.outputs.run == 'true'
         run: echo "BACKUP_STATE_DIR=$RUNNER_TEMP/backup-state" >> "$GITHUB_ENV"
-      - name: Claim run
-        if: steps.control.outputs.run == 'true'
-        run: python3 backup/report-run.py
-        env:
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       - name: Install age and the Postgres 17 client
-        if: steps.control.outputs.run == 'true'
         run: |
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
@@ -114,17 +136,14 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq age postgresql-client-17 >/dev/null
       - name: Database backup
         id: database
-        if: steps.control.outputs.run == 'true'
         run: |
           bash backup/db-backup.sh
           . "$BACKUP_STATE_DIR/db.env"
           echo "skipped=$SKIPPED" >> "$GITHUB_OUTPUT"
       - name: Legacy media backup (files in Supabase Storage; opt-in, being retired)
-        if: steps.control.outputs.run == 'true'
         run: bash backup/media-backup.sh
       - name: R2 media backup (originals hosted in R2, independent bucket)
-        if: steps.control.outputs.run == 'true'
         run: bash backup/r2-media-backup.sh
       - name: Verify complete coverage
-        if: steps.control.outputs.run == 'true' && steps.database.outputs.skipped != '1'
+        if: steps.database.outputs.skipped != '1'
         run: bash backup/verify-complete.sh

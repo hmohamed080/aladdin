@@ -1,5 +1,6 @@
 # Monthly restore test into a throwaway local Supabase stack on the runner. Touches no hosted project.
-# The restore-test private key lives only in the per-project `restore-test-<label>` environment, never next to the write token.
+# The restore-test private key lives only in the per-project `restore-test-<label>` environment, never next to the write token
+# and never in a job that holds the Supabase service-role key (that lives only in `backup-control-<label>`).
 name: Monthly restore test
 run-name: restore (${{ inputs.label || 'production' }}) ${{ inputs.request_id }}
 on:
@@ -40,11 +41,38 @@ jobs:
           echo "run=$run" >> "$GITHUB_OUTPUT"
           if [ "$run" != true ]; then echo "NO RESTORE TEST RAN: the scheduled Production restore needs PRODUCTION_BACKUP_ENABLED=true and PRODUCTION_RESTORE_SCHEDULE_ENABLED=true." | tee -a "$GITHUB_STEP_SUMMARY"; fi
 
+  # The service-role key lives ONLY here. This job reads the runtime schedule and claims the run; it holds no
+  # R2 token and no age identity. The restore job below never sees the service-role key.
+  restore-control:
+    name: restore-control (${{ inputs.label || 'production' }})
+    needs: plan
+    if: needs.plan.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: backup-control-${{ inputs.label || 'production' }}
+    outputs:
+      run: ${{ steps.control.outputs.run }}
+    env:
+      EVENT: ${{ github.event_name }}
+      BACKUP_KIND: restore_test
+      TARGET_RUN_ID: ${{ github.run_id }}
+      REQUEST_ID: ${{ inputs.request_id }}
+      BACKUP_LABEL: ${{ inputs.label || 'production' }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read runtime schedule
+        id: control
+        run: python3 backup/runtime-schedule.py
+      - name: Claim run
+        run: python3 backup/report-run.py
+
   restore:
     name: restore (${{ inputs.label || 'production' }})
-    needs: plan
+    needs: [plan, restore-control]
     # A manual run restores what it is asked to. A scheduled run restores Production only when plan.sh says so (both switches).
-    if: needs.plan.outputs.run == 'true'
+    if: needs.plan.outputs.run == 'true' && needs.restore-control.result == 'success' && needs.restore-control.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     environment: restore-test-${{ inputs.label || 'production' }}
@@ -64,32 +92,21 @@ jobs:
       REPO_ROOT: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
-      - name: Read runtime schedule
-        id: control
-        run: python3 backup/runtime-schedule.py
-        env:
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       - name: Work folder on the runner
         run: echo "OUT=$RUNNER_TEMP/restore-test" >> "$GITHUB_ENV"
-      - name: Claim run
-        if: steps.control.outputs.run == 'true'
-        run: python3 backup/report-run.py
-        env:
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq age >/dev/null
       - name: Restore and verify
-        if: steps.control.outputs.run == 'true'
         env:
           AGE_IDENTITY: ${{ secrets.AGE_RESTORE_TEST_IDENTITY }}
         run: |
           umask 077; printf '%s\n' "$AGE_IDENTITY" > "$RUNNER_TEMP/restore.key"
           [ -n "$BACKUP_KEY" ] || unset BACKUP_KEY
           AGE_IDENTITY_FILE="$RUNNER_TEMP/restore.key" bash backup/restore-test.sh
+      - name: Remove the restore key from the runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/restore.key"
       - name: Report (counts and hashes only)
         if: always()
         run: cat "$OUT/REPORT.txt" >> "$GITHUB_STEP_SUMMARY" || true
       - name: Verify complete coverage
-        if: steps.control.outputs.run == 'true'
         run: bash backup/verify-complete.sh

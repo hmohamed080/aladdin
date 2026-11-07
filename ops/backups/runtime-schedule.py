@@ -63,11 +63,11 @@ def main():
         settings = json.load(response)
     now = dt.datetime.now(UTC)
     run = decision(settings, label, os.environ['EVENT'], now, os.environ.get('BACKUP_KIND','backup'))
-    if run and os.environ['EVENT'] == 'schedule' and os.environ.get('BACKUP_KIND','backup') == 'backup':
-        with open(os.environ['GITHUB_ENV'], 'a') as output:
-            output.write('BACKUP_SLOT_DATE=' + due_slot(settings, now).isoformat() + '\n')
     with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
         output.write('run=' + str(run).lower() + '\n')
+        # The data job reads the slot from this job's output; it never holds the credential that produced it.
+        if run and os.environ['EVENT'] == 'schedule' and os.environ.get('BACKUP_KIND','backup') == 'backup':
+            output.write('slot_date=' + due_slot(settings, now).isoformat() + '\n')
 
 if __name__ == '__main__':
     try:
