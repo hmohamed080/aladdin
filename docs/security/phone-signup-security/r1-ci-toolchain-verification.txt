@@ -1,0 +1,6 @@
+db reset (195 migrations from scratch on CLI 2.110.0 / Postgres 17.6.1.143) -> ok
+permission contract (strict, no accepted drift) -> ok
+db lint (public, app): no error, none in the phone authority objects -> ok
+pgTAP FULL repository (145 files) Files=145, Tests=6551, 63 wallclock secs ( 1.78 usr  0.64 sys +  3.22 cusr  3.01 csys =  8.65 CPU) Result: PASS  -> ok
+installer phone-change concurrency (existing) -> ok
+RESULT [reset contract lint pgtap concurrency]: PASS

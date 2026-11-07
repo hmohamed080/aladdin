@@ -2,7 +2,7 @@
 #
 # Target: https://aladdin-frontend-preview.bstalent9.workers.dev only (acceptance Supabase nxossqhdfltcqdwvbewi). It signs in
 # as the three Acceptance test accounts (owner test1@example.com, acc6-sales-manager, acc6-sales-rep), opens pages and
-# reads what renders. It creates, edits and deletes nothing, deploys nothing, and never touches Production, Vercel, DNS or
+# reads what renders. It creates, edits and deletes nothing, deploys nothing, and never touches Production, DNS or
 # the database directly. See frontend/playwright.acceptance.config.ts and frontend/e2e-acceptance/.
 #
 # GitHub Environment `acceptance-e2e` (separate from `cloudflare-preview`, so this job never sees a deploy token):

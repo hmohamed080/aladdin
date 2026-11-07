@@ -33,6 +33,7 @@ const items: Item[] = [
   // The Verified badge: its own queue, separate from approving an organization's application.
   { href: "/admin/business-verification", key: "businessVerification.admin.title", exact: false, Icon: BadgeCheckIcon },
   { href: "/admin/phone-cooldowns", key: "phoneCooldown.title", exact: false, Icon: PhoneIcon },
+  { href: "/admin/whatsapp-otp", key: "whatsappOtp.title", exact: false, Icon: PhoneIcon },
   { href: "/admin/points", key: "admin.preview.nav.points", exact: false, Icon: MoneyIcon },
   { href: "/admin/staff", key: "admin.preview.nav.staff", exact: false, Icon: UserIcon },
   { href: "/admin/analytics", key: "admin.preview.nav.analytics", exact: false, Icon: BarChartIcon },

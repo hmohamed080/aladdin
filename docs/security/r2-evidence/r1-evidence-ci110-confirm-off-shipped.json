@@ -1,0 +1,320 @@
+{
+ "summary": {
+  "suite": "phone-signup-authority",
+  "mode": "confirm-off",
+  "posture": "shipped",
+  "email_confirmations": false,
+  "gotrue_image": "public.ecr.aws/supabase/gotrue:v2.193.0",
+  "cli": "2.110.0",
+  "PASS": 23,
+  "FAIL": 0,
+  "XFAIL": 18,
+  "XPASS": 0,
+  "EVAL": 2,
+  "N/A": 0,
+  "total": 43
+ },
+ "results": [
+  {
+   "id": "SEC-ENV-1",
+   "area": "guard",
+   "title": "Target is loopback API + explicitly named non-shared DB container",
+   "status": "PASS",
+   "evidence": "supabase_db_aladdin_r2sec"
+  },
+  {
+   "id": "SEC-ENV-2",
+   "area": "guard",
+   "title": "No SMS provider / Send-SMS hook / Phone MFA / anonymous sign-in is enabled: nothing on this stack can deliver a message",
+   "status": "PASS",
+   "evidence": ""
+  },
+  {
+   "id": "SEC-ENV-3",
+   "area": "guard",
+   "title": "Toolchain under test",
+   "status": "EVAL",
+   "evidence": "posture=shipped email_confirmations=false gotrue=public.ecr.aws/supabase/gotrue:v2.193.0 cli=2.110.0"
+  },
+  {
+   "id": "SEC-POS-0",
+   "area": "posture",
+   "title": "Migration defaults: enabled=false, signup_enabled=false, alias_guard_mode=off",
+   "status": "PASS",
+   "evidence": "false,false,off"
+  },
+  {
+   "id": "SEC-FX-1",
+   "area": "fixtures",
+   "title": "Legacy Installer (alias), Showroom (alias + organization) and e-mail accounts built through the real Admin-API + RPC path",
+   "status": "PASS",
+   "evidence": "LegacyInstaller:422eb51d LegacyShowroom:f45330a6 EmailSignup:7c64c097"
+  },
+  {
+   "id": "SEC-POS-1",
+   "area": "posture",
+   "title": "Posture shipped is active",
+   "status": "PASS",
+   "evidence": "false,false,off"
+  },
+  {
+   "id": "SEC-S1",
+   "area": "posture",
+   "title": "Shipped: the signup entry points answer 'unavailable' and write nothing",
+   "status": "PASS",
+   "evidence": "{\"status\":\"unavailable\"}"
+  },
+  {
+   "id": "SEC-A1",
+   "area": "bypass",
+   "title": "An anonymous caller CANNOT create an Auth user on the internal phone alias through GoTrue /signup [guard DORMANT]",
+   "status": "XFAIL",
+   "evidence": "status=ok auth_rows=1 confirmed=true"
+  },
+  {
+   "id": "SEC-A2",
+   "area": "bypass",
+   "title": "Anonymous alias sign-up yields NO session [guard DORMANT]",
+   "status": "XFAIL",
+   "evidence": "session_issued=true"
+  },
+  {
+   "id": "SEC-A3b",
+   "area": "bypass",
+   "title": "A possession-less alias account cannot claim the number as a profile phone [guard DORMANT]",
+   "status": "XFAIL",
+   "evidence": "claimed=true verified=false steps={\"record_consent\":\"ok\",\"onboarding_select_account_type\":\"ok\",\"profile_set_phone\":\"ok\"}"
+  },
+  {
+   "id": "SEC-A12",
+   "area": "observe",
+   "title": "shipped: nothing is recorded as an observation",
+   "status": "PASS",
+   "evidence": "observations 10 -> 10"
+  },
+  {
+   "id": "SEC-A4",
+   "area": "squatting",
+   "title": "An anonymous alias row does NOT block the real owner's account creation [guard DORMANT]",
+   "status": "XFAIL",
+   "evidence": "squat_rows=1 legit create -> 422:email_exists"
+  },
+  {
+   "id": "SEC-A5",
+   "area": "duplicate",
+   "title": "Anonymous sign-up on an EXISTING alias (also upper-cased) creates no second identity and changes nothing",
+   "status": "PASS",
+   "evidence": "plain=422:user_already_exists upper=422:user_already_exists"
+  },
+  {
+   "id": "SEC-A6",
+   "area": "duplicate",
+   "title": "Concurrent anonymous sign-ups on one alias produce at most one Auth user",
+   "status": "PASS",
+   "evidence": "rows=1 statuses=ok,500:23505,500:23505"
+  },
+  {
+   "id": "SEC-A7",
+   "area": "bypass",
+   "title": "A public /signup body cannot set raw_app_meta_data (forged grant marker never lands)",
+   "status": "PASS",
+   "evidence": "keys=provider,providers"
+  },
+  {
+   "id": "SEC-A7b",
+   "area": "bypass",
+   "title": "Forging the grant markers in the sign-up body (app_metadata AND user_metadata) cannot create an alias user [guard DORMANT]",
+   "status": "XFAIL",
+   "evidence": "status=ok"
+  },
+  {
+   "id": "SEC-A8",
+   "area": "bypass",
+   "title": "Direct GoTrue PHONE sign-up is refused (no Auth user with auth.users.phone)",
+   "status": "PASS",
+   "evidence": "status=400:phone_provider_disabled"
+  },
+  {
+   "id": "SEC-A9",
+   "area": "bypass",
+   "title": "Anonymous (no credential) sign-in is refused",
+   "status": "PASS",
+   "evidence": ""
+  },
+  {
+   "id": "SEC-A10",
+   "area": "bypass",
+   "title": "A signed-in e-mail user cannot swap their login e-mail for an alias directly",
+   "status": "PASS",
+   "evidence": "PUT /user -> ok"
+  },
+  {
+   "id": "SEC-A11",
+   "area": "enumeration",
+   "title": "Anonymous /signup answer for a FREE alias vs an EXISTING phone account (GoTrue-owned, not gated)",
+   "status": "EVAL",
+   "evidence": "free=ok existing=422:user_already_exists/422:user_already_exists identical=false"
+  },
+  {
+   "id": "SEC-C5",
+   "area": "legacy-path",
+   "title": "shipped: the OLD no-grant Admin creation of an alias user still works (the migration cannot break existing legitimate sign-up before the dependent flow is ready)",
+   "status": "PASS",
+   "evidence": "ok"
+  },
+  {
+   "id": "SEC-C1",
+   "area": "signup-state",
+   "title": "Proof-gated sign-up flow [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-C2",
+   "area": "signup-state",
+   "title": "Proof-gated sign-up flow [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-C2b",
+   "area": "signup-state",
+   "title": "Proof-gated sign-up flow [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-C2c",
+   "area": "signup-state",
+   "title": "Proof-gated sign-up flow [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-C3",
+   "area": "signup-state",
+   "title": "Proof-gated sign-up flow [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-C4",
+   "area": "signup-state",
+   "title": "Proof-gated sign-up flow [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-C4b",
+   "area": "signup-state",
+   "title": "Proof-gated sign-up flow [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-D1",
+   "area": "signup-proof",
+   "title": "Verified challenge bound to the NEW Auth user; phone_verified_at set for exactly the verified number [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-D2",
+   "area": "signup-proof",
+   "title": "Replay of a consumed proof is refused [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-D3",
+   "area": "signup-proof",
+   "title": "Expired proof cannot be used [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-D4",
+   "area": "signup-proof",
+   "title": "Wrong-account / wrong-number attach is refused [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-D5",
+   "area": "signup-proof",
+   "title": "Concurrent creation/attach: exactly one wins [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-D6",
+   "area": "signup-proof",
+   "title": "Alias creation without an attached proof is refused at the database [signup verification DORMANT]",
+   "status": "XFAIL",
+   "evidence": "signup_enabled=false by design until activation stage 2"
+  },
+  {
+   "id": "SEC-X1",
+   "area": "other-auth",
+   "title": "Email + password sign-up is unaffected",
+   "status": "PASS",
+   "evidence": "status=ok confirmed=true"
+  },
+  {
+   "id": "SEC-X2",
+   "area": "other-auth",
+   "title": "Email OTP (passwordless / sign-up code) is unaffected: the OTP request succeeds and creates the user row",
+   "status": "PASS",
+   "evidence": "status=ok"
+  },
+  {
+   "id": "SEC-X3",
+   "area": "other-auth",
+   "title": "Email recovery request is unaffected",
+   "status": "PASS",
+   "evidence": "ok"
+  },
+  {
+   "id": "SEC-X4",
+   "area": "other-auth",
+   "title": "Email + password sign-in of an existing account and legacy phone-alias sign-in are unaffected",
+   "status": "PASS",
+   "evidence": ""
+  },
+  {
+   "id": "SEC-X5",
+   "area": "other-auth",
+   "title": "Google-shaped, Facebook-without-e-mail and Facebook-unverified-e-mail users are created (the guard's WHEN clause never selects them)",
+   "status": "PASS",
+   "evidence": "rows=3"
+  },
+  {
+   "id": "SEC-E1",
+   "area": "legacy",
+   "title": "Legacy Installer, Showroom and e-mail identities are byte-identical (auth row, password digest, identities, MFA, profile, verified flag, memberships, consents) after every attack",
+   "status": "PASS",
+   "evidence": ""
+  },
+  {
+   "id": "SEC-E2",
+   "area": "legacy",
+   "title": "All legacy accounts still sign in with their original passwords",
+   "status": "PASS",
+   "evidence": "200,200,200"
+  },
+  {
+   "id": "SEC-E3",
+   "area": "legacy",
+   "title": "Legacy numbers stay UNVERIFIED (nothing in this suite writes their phone_verified_at)",
+   "status": "PASS",
+   "evidence": ""
+  },
+  {
+   "id": "SEC-E4",
+   "area": "legacy",
+   "title": "No duplicate alias identity exists in the whole database",
+   "status": "PASS",
+   "evidence": "dupes=0"
+  }
+ ]
+}

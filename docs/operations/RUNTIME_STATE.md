@@ -9,6 +9,76 @@
 - Branch `fix/persistent-workspace-shell-20261105` from `main` `f823d88c`. Frontend routing only: `/b2b/*` and `/showroom/*` now live under the `(workspace)` route group so the Showroom shell stays mounted when a link crosses between them ([ADR-0025](../decisions/ADR-0025-persistent-showroom-shell.md)). No URL, migration, permission, hosted or deploy change.
 - Verified locally: typecheck, lint, production build, focused and full Vitest (see the work log for the 5 failures and why each is or is not this change). Not verified in a browser; the new Playwright spec is unrun.
 
+## WhatsApp OTP admin-controlled limits (stacked PR on #127, code only) — 2026-11-02
+
+- Branch `feat/whatsapp-otp-admin-settings-20261103` (worktree `D:/projects/aladdin-b1-recon`) adds Super Admin control of the Daily Send Limit, the Hard Ceiling and the 70 % / 90 % alert thresholds from `/admin/whatsapp-otp`: Worker D1 migration `0002`, signed `/v1/admin/*` routes, a cron-driven alert outbox, Supabase migration `20261103090001` and the app page, action and `/api/internal/whatsapp-otp/notify` callback.
+- **Nothing hosted changed.** No migration applied, no Worker deployed, no secret created or rotated, no message sent. Production Worker and D1 are untouched (D1 inspected read-only: empty table, no `d1_migrations`).
+- The `OTP_DAILY_SEND_LIMIT` variable is gone; the limit lives only in D1. Until a Super Admin sets it, sending answers `503 budget_unconfigured`.
+
+## WhatsApp OTP Phase C CLOSED on Acceptance — 2026-11-02 (everything OFF)
+
+- **Pilot PASS:** the Worker delivered a real OTP from Meta sender `1458603463983505` (template `aladdin_otp`, `ar`) and an end-to-end sign-up was verified (grant consumed, `auth.users` 14, profile `phone_verified_at` set). Root cause of the earlier Meta code 10: the System User token lacked the granular `whatsapp_business_messaging` permission for the sender's WhatsApp Account; fixed by assigning the account and regenerating the token. Details: [work log 2026-11-02](AGENT_WORK_LOG.md).
+- **Current hosted state (Acceptance only):** Worker `aladdin-whatsapp-otp-preview` active version `4d41419c-3854-4b29-ad53-e9ec81d732fc` (100%, code `31b1d7ff`, sender `1458603463983505`, `WHATSAPP_DELIVERY_ENABLED=false`); delivery-ON build `56a4ffe6-f51b-42f2-aa98-40e791ffa8e1` is uploaded and inactive. `WHATSAPP_ACCESS_TOKEN` (Secrets Store) holds the new correctly-scoped token (modified 2026-11-02 13:29Z). DB `false|false|off`, limits `5 / 6 / 60 s`; frontend `c97050e6` with `PHONE_OTP_DELIVERY=off` and both `PHONE_*_ENABLED=false`. D1 journal: 4 `failed`, 2 `accepted`.
+- **Repo:** branch `integration/whatsapp-otp-worker-r2-20261031`; sender change committed as `bb4cf537` on top of `31b1d7ff`; PR #127 stays Draft and unmerged. Production, Auth providers and `main` untouched.
+- **Open:** one throwaway Acceptance test account (`pilotwa1106`) remains (owner decision to delete); approved display name "Aladdin" still pending activation; no webhook/delivery receipts (app unpublished); the old sender is untested with the new token; Production activation and PR merge need explicit owner approval.
+
+## WhatsApp OTP Phase C: C3/C4 attempt interrupted, back to OFF — 2026-11-01
+
+- C3 ran at 14:41-14:43Z; the owner's accidental *Create Account* click at **14:47:04Z** created one challenge, closed `delivery_failed` in 0.2 s (Worker delivery stayed `false`; no message; D1 0 rows; `auth.users` 13; 0 grants). The hourly pilot start is spent until **15:47:04Z**.
+- Safe state restored 14:50Z (frontend `7ff6c04d`): DB `false|false|off`, app flags `false`, `PHONE_OTP_DELIVERY=off`. Pilot limits `1 / 1 / '1 hour'` are still set (originals `5 / 6 / '1 minute'`). C5 not approved.
+- Findings F1 (client resend countdown ignores `resendAvailableAt`), F2 (code screen says sent after a delivery failure) and F3 (read-only C4) are in the [Phase C plan](../security/WHATSAPP_OTP_PHASE_C_PILOT_PLAN.md#preparation-incident-and-findings--2026-11-01-c4-attempt-no-message-sent).
+
+## WhatsApp OTP Phase B CLOSED; Phase C prepared, not approved — 2026-11-01
+
+- **Phase B CLOSED on Acceptance** (`nxossqhdfltcqdwvbewi`): `20261030090001` and `20261030090002` applied by a plain `supabase db push` (199 applied / 199 repo); `aladdin-frontend-preview` runs the integrated build from `b29a3169` with the seven `PHONE_*` secrets; final frontend version `dbe1a188-1583-410b-a5b5-f06bbd92f402`; rollback code target `da4eb8c9-f4f2-4434-9184-d92d9b18a90f`. Worker `aladdin-whatsapp-otp-preview` unchanged at `6eb9364d`, `WHATSAPP_DELIVERY_ENABLED="false"`. Evidence: [Phase B results](../security/WHATSAPP_OTP_PHASE_A_CLOSURE_AND_PHASE_B_PLAN.md#phase-b--actual-results-closed), [JSON](evidence/whatsapp-otp/phase-b-results-20261101.json).
+- **Current state: everything OFF.** DB `false|false|off`; `PHONE_VERIFICATION_ENABLED=false`, `PHONE_SIGNUP_VERIFICATION_ENABLED=false`, `PHONE_OTP_DELIVERY=off`; Worker delivery `false`. Two retained dry-run challenges (both `delivery_failed`) and 6 config audit rows; `auth.users` 13; D1 journal 0 rows. Phone sign-up shows "isn't available right now" on the preview.
+- **Not verified:** hosted authentication paths (email login, phone-alias login, OAuth) were not exercised; B6 was UI checks only. The Worker's `503 delivery_disabled` is inferred from `delivery_failed`.
+- **Phase C is prepared, not approved:** [Phase C pilot plan](../security/WHATSAPP_OTP_PHASE_C_PILOT_PLAN.md). It needs two approvals (preparation with Worker OFF; then the explicit `WHATSAPP_DELIVERY_ENABLED=true` window). The Worker has no per-recipient quota, so the pilot caps the database limits (`signup_phone_hourly=1`, `user_hourly_starts=1`, `resend_cooldown='1 hour'`); the dry-run challenges make the earliest start **14:40Z**.
+- Nothing merged (PR #127 draft); Production, Auth providers and `main` untouched.
+
+## WhatsApp OTP Worker Phase A closed; Phase B awaiting approval — 2026-11-01 (superseded by the Phase B CLOSED section above)
+
+- Branch `integration/whatsapp-otp-worker-r2-20261031` (reviewed code head `39523e4b`; 199 migrations, latest `20261030090002`). Nothing merged to `main`; Production untouched.
+- **Phase A CLOSED:** Worker `aladdin-whatsapp-otp-preview` active version `6eb9364d-aa89-4e30-9005-a516ac0cd29f` (100%), code version `3e02b69b-865f-4eb1-854a-d22f7359a8dd`. `IDEMPOTENCY_DB` → D1 `da65d5e4-8344-4078-9c2d-8a4bb4907f79`; `OTP_SIGNING_SECRET` and `WHATSAPP_ACCESS_TOKEN` → Secrets Store `acfaa67f391e499db6fde398022f50ce`; `OTP_ALLOWED_RECIPIENTS` present. Vars: `OTP_ENVIRONMENT=acceptance`, `OTP_RECIPIENT_MODE=allowlist`, `WHATSAPP_DELIVERY_ENABLED=false`, Graph `v25.0`, template `aladdin_otp`, language `ar`, sender `1415528588305492`.
+- The only Worker trigger is `https://aladdin-whatsapp-otp-preview.bstalent9.workers.dev`: `workers.dev` enabled, `routes: []`, zero routes on the `aladdindecore.com` zone, no custom domain. Signed preflight PASS with `delivery_enabled:false`, `environment:acceptance`, `allowlist_entries:1`. Rollback target `6dffc68b` (previous secret state) or `3e02b69b` (code, then re-apply signing secret/allowlist).
+- **Acceptance read-only history (2026-11-01):** project `nxossqhdfltcqdwvbewi`; 197 applied / 199 repo; latest `20261029090002`; only `20261030090001` and `20261030090002` missing; no applied-not-in-repo; no out-of-order; `plain_push_possible:true`; `--include-all`/repair not needed.
+- **Acceptance current state:** alias users 0; profiles with phone 4 / verified 0; legacy `public.phone_verification_challenges` approx. 0 rows; authority objects absent. Auth phone provider OFF, Send SMS hook OFF, before-user-created hook OFF, CAPTCHA ON, Google/Facebook ON. The 13 disputed functions keep `anon:false`, `service_role:false`, `authenticated:true`.
+- **Phase B prepared, not executed.** Plan: [Phase A closure and Phase B plan](../security/WHATSAPP_OTP_PHASE_A_CLOSURE_AND_PHASE_B_PLAN.md). It applies only the two dormant migrations, deploys the integrated build to `aladdin-frontend-preview` (current active version `da4eb8c9-f4f2-4434-9184-d92d9b18a90f`, the rollback target), sets the seven `PHONE_*` secrets with flags false, runs one dry run that must end in Worker `503 delivery_disabled` + challenge `delivery_failed`, then returns all switches to off. Edge delivery stays `false`; no Auth, Production or merge change.
+- **Local rehearsal PASS:** `supabase/tests/r2/acceptance_order_rehearsal.sh` on the exact 197-version local history; plain forward push applies the two; existing email/alias logins, profiles and old history rows unchanged; switches `false|false|off`; alias guard deferred/inert.
+
+## Instagram-style auth (PR #113 branch, not deployed) — 2026-10-28
+- Branch `claude/project-thread-1bi6x0` ([ADR-0025](../decisions/ADR-0025-one-field-sign-in-whatsapp-sign-up.md)): one-field sign-in (mobile number, username or email), centred sign-up with birthday and username, mobile sign-up for every account type verified by a WhatsApp code (Meta Cloud API), Google/Facebook on `/auth`, the installer/showroom phone pages removed (redirects). Plus [ADR-0026](../decisions/ADR-0026-account-basics-onboarding.md): a one-time "Complete your account" screen (`/onboarding/basics`) asking phone, governorate + town and specialties when missing; migration `20261029090001` not yet on any hosted project (reviewed 2026-10-29: owner-only branch fallback, persona-matched specialties).
+- Migration `20261028090001_sign_up_birthday_and_phone_codes.sql` is in the repo only: **not applied** to Acceptance or Production (owner approval pending). The preview needs it before sign-up works there.
+- Worker secrets `WHATSAPP_ACCESS_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID` are not set yet (owner step); until then mobile sign-up says it is unavailable. `WHATSAPP_OTP_TEMPLATE=aladdin_login_code` is in `wrangler.jsonc`.
+- Acceptance has Google/Facebook switched off, so the preview shows no provider buttons; Production has both on.
+
+## 2026-10-28 — WhatsApp OTP Acceptance D1 provisioned (not deployed)
+
+- Cloudflare D1 database `aladdin-whatsapp-otp-acceptance` (`da65d5e4-8344-4078-9c2d-8a4bb4907f79`) verified in the Aladdin account.
+- Added `IDEMPOTENCY_DB` binding in the isolated preview Worker's `wrangler.jsonc` to that database, without deploying the Worker.
+- Applied the exact two DDL statements from `edge/whatsapp-otp-worker/migrations/0001_hook_events.sql` to the dedicated D1 via Cloudflare API. Confirmed `whatsapp_hook_events` table and `whatsapp_hook_events_created_at` index with a read-only sqlite_master query. No OTP data inserted.
+- Existing `WHATSAPP_DELIVERY_ENABLED=false` remains. No Supabase Hook or Cloudflare Worker deployed, no Meta messages sent; Production untouched.
+- Next gates: remote D1 idempotency smoke test, Wrangler dry-run and CI checks, signed-hook secret creation and retention policy, current-phone-identity compatibility before activation.
+
+
+## 2026-10-28 — WhatsApp OTP replay-security progress (code only)
+
+- On Draft PR #114, isolated Worker now requires a signed Supabase HTTP Hook, a preview-only allowed-recipient list and a D1 `IDEMPOTENCY_DB` with atomic unique event-hash reservation; it records `reserved`/`accepted`/`failed` before/after a single Meta attempt. Duplicate webhook IDs never resend OTP; if storage is absent or unavailable, the request fails closed.
+- D1 migration `edge/whatsapp-otp-worker/migrations/0001_hook_events.sql` committed. **No remote D1 database created or bound, no hook secret set, no Preview Worker deployed.** `WHATSAPP_DELIVERY_ENABLED=false` remains.
+- Dedicated GitHub workflow `WhatsApp OTP Transport CI` completed **successfully** on PR run #2 (`40684963776`), covering typecheck and mocked replay/security tests. This is not a real D1/concurrency or live Meta integration test. General project CI still pending at that checkpoint.
+- Release blockers remain: Acceptance D1 provisioning and migration, verified live D1 tests, account identity compatibility for installer/showroom phone-password aliases, Supabase CAPTCHA/rate limits, controlled end-to-end Acceptance only, separate approval for deployment/activation.
+
+
+## 2026-10-28 — WhatsApp OTP preview-only groundwork (NOT HOSTED)
+
+- Branch `feat/whatsapp-otp-transport-20261028` created from protected `main` at `f823d88cc80e14daebc0fe50949724ee0120bd70`, separate from the live production services.
+- Proposed isolated Worker under `edge/whatsapp-otp-worker/`: signed Supabase HTTP Hook verification, Egyptian E.164 validation, Meta Arabic Copy Code sender, delivery OFF by default (`WHATSAPP_DELIVERY_ENABLED=false`), sanitized failures. Owner-supplied Meta Phone Number ID configured as non-secret preview variable; owner-created Meta System User token remains only in Cloudflare Secrets Store and is referenced by a not-yet-deployed binding. No credentials committed.
+- Local prototype typecheck and seven mock tests passed; repo-wide CI on branch not yet verified.
+- **Blockers:** synthetic email-alias Phone + Password login is not Supabase Phone Auth; no identity migration approved. Durable webhook replay/idempotency guard not yet implemented.
+- Hosted Acceptance `nxossqhdfltcqdwvbewi`, hosted Production `kkpkgjrweysgvhvkhzun`, and all Cloudflare Workers: **no write/deploy/secret/hook changes made by this work**.
+- Meta Arabic `aladdin_otp` was manually tested by owner prior to this branch. English approval and Meta System User token pending.
+
+
 ## Live site on Cloudflare Workers — 2026-10-27
 - `aladdindecore.com`, `www` and `next` are served by Worker `aladdin-frontend-production` (Custom Domains, attached by the owner 17:23–17:40Z). It binds `aladdin-backend-production` and uses the live Supabase project `kkpkgjrweysgvhvkhzun` (193 migrations). R2 and Redis are off in production.
 - DNS: Cloudflare zone `c90ddcdec7bacd2485e1e5bcbac8afce` (nameservers johnathan/mona.ns.cloudflare.com, registrar GoDaddy). Zoho MX/SPF/DKIM unchanged; wildcard `*` still CNAME to Vercel, DNS only. No DMARC.
@@ -26,7 +96,7 @@
 
 ## Sign-in CAPTCHA verification (ADR-0023, draft follow-up to #105) — 2026-10-26
 - Code, tests and docs only, on `claude/auth-turnstile-verification` (stacked on #105). Nothing merged or deployed.
-- Hosted Supabase Auth CAPTCHA protection: **not changed by Claude**; state unverified. Until the owner enables it (after the code is live), hosted sign-in tokens are only checked for presence.
+- Hosted Supabase Auth CAPTCHA protection: **ON for Acceptance and Production since 2026-10-28** (owner). Token-less and fake-token password grants answer `captcha_failed`; the owner's browser smoke test passed.
 - Local `config.toml`: `[auth.captcha]` off by default; CI's Auth CAPTCHA E2E turns it on with test secrets.
 
 ## Rebuilt Installer + Next 16.4.3 branch — 2026-10-24
@@ -735,3 +805,6 @@ Added PR84-only GitHub Actions job checking out exact PR head, pinned CLI tempor
 Exact committed8be67ba6: isolated GitHub functional run38697762123PASS24/24(0fail,0skip,58.7s), application CI38697762134and fullDB38697762167SUCCESS. All110versions/sixfeatureversions/old+v2RPCs verified; own runner teardown succeeded. Artifacts contain migration hashes and six desktop/mobile screenshots. No uncommitted CAPTCHA files included. Harness corrections preserve last-admin guards, use Node24 and settled action/UI assertions plus counter11; no product code/security weakening, no skipped tests/retries.
 
 Effective live alias and production target both dpl_6F4cLptBtEtR5LwF7mQAneigsc83/projectaladdin-staging/Node24/mainc7963c9. Supabase URLSensitiveSecret cannot be read back; Production and Preview share the configured entry, effective ref/isolation unconfirmed. Protected kkpkg as potentiallylive, read-only0/6versions/old9+submit1/no v2. No hosted mutations/settings/deploy. Full environment map and release gate document exact blockers, staging prerequisites, backup/rollback and beta restrictions; owner has not accepted account-throttle gap. Original14/external7 remain untouched. Local Docker control/API unavailable; no global/shared restart or cleanup. PR staysDraft, do notmerge/deploy/removeworktree. Documentation follow-up changes no tested application/harness.
+
+## R2 registration integration (Draft PR, not merged, nothing applied) — 2026-10-31
+- Branch `integration/unified-registration-r2-20261031`. Hosted state unchanged: the R1 alias guard is not installed, `20261030090001/2` and `20261031090001` are not applied anywhere, no `PHONE_*` flag is set, the interim hook is not enabled. Phone sign-up stays unavailable in any deployment that has all switches off.

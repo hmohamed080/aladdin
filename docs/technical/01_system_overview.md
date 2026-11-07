@@ -20,7 +20,7 @@ flowchart TB
   subgraph Client["Browser / PWA (untrusted)"]
     UI["Next.js App Router UI<br/>Server Components + Client islands"]
   end
-  subgraph Web["Next.js Web App (Vercel)"]
+  subgraph Web["Next.js Web App (Cloudflare Workers)"]
     SA["Server Actions (mutations)"]
     RH["Route Handlers (webhooks/BFF)"]
     RSC["Server Components (reads)"]
@@ -32,7 +32,7 @@ flowchart TB
     RT["Realtime"]
     Q["Queues"]
   end
-  subgraph FastAPI["Specialized FastAPI Service (Vercel Services · /api/backend)"]
+  subgraph FastAPI["Specialized FastAPI Service (Cloudflare Containers · /api/backend)"]
     AI["ai · retrieval · documents · ocr<br/>ingestion · embeddings"]
   end
   subgraph Workers["Background Workers (not built · host undecided)"]
@@ -68,10 +68,10 @@ flowchart TB
 
 | Part | Runtime | Owns | Never does |
 |---|---|---|---|
-| **Web app** | Next.js App Router (Vercel Services) | All product CRUD & user flows; i18n/RTL; theming; PWA; the primary path to Supabase via `supabase-js` preserving the user JWT | Hold service-role secrets in client code; embed heavy AI/OCR inline |
+| **Web app** | Next.js App Router (Cloudflare Workers, OpenNext) | All product CRUD & user flows; i18n/RTL; theming; PWA; the primary path to Supabase via `supabase-js` preserving the user JWT | Hold service-role secrets in client code; embed heavy AI/OCR inline |
 | **Data platform** | Supabase | System of record (Postgres), Auth, Storage, RLS, Realtime, Queues, search/vector/geo extensions | — (owns schema via migrations only) |
-| **Specialized service** | FastAPI (Vercel Services, same origin at `/api/backend`) | AI orchestration, OCR, document processing, chunking, embeddings, RAG, evaluations, NLP, large-Excel | Recreate application CRUD; be called from the browser |
-| **Workers** | Not implemented; host undecided ([ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)) | Async/slow/external work off the request path | Run inside the web request loop |
+| **Specialized service** | FastAPI (Cloudflare Containers, same origin at `/api/backend`) | AI orchestration, OCR, document processing, chunking, embeddings, RAG, evaluations, NLP, large-Excel | Recreate application CRUD; be called from the browser |
+| **Workers** | Not implemented; host undecided (the video transcode worker has its own container) | Async/slow/external work off the request path | Run inside the web request loop |
 
 ## 2. Bounded contexts
 

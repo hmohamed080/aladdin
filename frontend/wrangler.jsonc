@@ -1,6 +1,6 @@
 {
   // Cloudflare Workers host for the Next.js frontend (ADR-0021). Built with
-  // `pnpm cf:build` (OpenNext); Vercel stays the live host until cutover.
+  // `pnpm cf:build` (OpenNext). The live host since the 2026-10-27 cutover.
   // Secrets are never written here: set them with `wrangler secret put` per
   // environment (see docs/guides/cloudflare-frontend.md).
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -26,7 +26,9 @@
       "preview_urls": true,
       "services": [
         { "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend-preview" },
-        { "binding": "BACKEND", "service": "aladdin-backend-preview" }
+        { "binding": "BACKEND", "service": "aladdin-backend-preview" },
+        // Private route to the WhatsApp delivery Worker (it has no public URL). The target Worker must exist before this Worker is deployed.
+        { "binding": "OTP_WORKER", "service": "aladdin-whatsapp-otp-preview" }
       ],
       "images": { "binding": "IMAGES" },
       "version_metadata": { "binding": "CF_VERSION_METADATA" },
@@ -46,6 +48,7 @@
         // RESEND_API_KEY is a Worker secret.
         "EMAIL_FROM": "Aladdin <no-reply@aladdindecore.com>",
         "APP_PUBLIC_ORIGIN": "https://aladdin-frontend-preview.bstalent9.workers.dev"
+        // Phone verification (PHONE_*) is intentionally absent: it ships OFF and delivery is never configured here.
       }
     },
     // Production: deployed only after the owner approves the cutover. Routes
@@ -56,7 +59,10 @@
       "workers_dev": false,
       "services": [
         { "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend-production" },
-        { "binding": "BACKEND", "service": "aladdin-backend-production" }
+        { "binding": "BACKEND", "service": "aladdin-backend-production" },
+        // Private route to the WhatsApp delivery Worker (workers_dev off, no routes). DEPLOY ORDER GATE: `aladdin-whatsapp-otp-production` must
+        // already exist, or this Worker's deploy is refused. See docs/operations/WHATSAPP_OTP_PRODUCTION_B3_PREPARATION.md.
+        { "binding": "OTP_WORKER", "service": "aladdin-whatsapp-otp-production" }
       ],
       "images": { "binding": "IMAGES" },
       "version_metadata": { "binding": "CF_VERSION_METADATA" },
@@ -70,6 +76,8 @@
         // aladdindecore.com domain. RESEND_API_KEY is a Worker secret.
         "EMAIL_FROM": "Aladdin <no-reply@aladdindecore.com>",
         "APP_PUBLIC_ORIGIN": "https://aladdindecore.com",
+        // Mobile-number sign-up codes: PHONE_* switches are absent on purpose (feature OFF). The Meta token never
+        // lives in this app; it belongs to the separate delivery Worker (PR #114), which stays disabled.
         // First cutover: media stays on Supabase Storage and Redis stays off. Each one
         // is turned on later by its own approval.
         "R2_STORAGE_ENABLED": "false",

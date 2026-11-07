@@ -190,7 +190,7 @@ describe("middleware — session read (getClaims, no Auth request)", () => {
 
   it("bounces a signed-in caller off the sign-in / sign-up pages", async () => {
     claims = SIGNED_IN;
-    for (const path of ["/auth/sign-in", "/auth/sign-up", "/installer/sign-in", "/showroom/sign-up"]) {
+    for (const path of ["/auth/sign-in", "/auth/sign-up"]) {
       expect(pathOf(await at(path)), path).toBe("/onboarding");
     }
     claims = null;

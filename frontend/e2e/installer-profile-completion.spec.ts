@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { test, expect, type Page } from "@playwright/test";
-import { stubTurnstileWhenOffline } from "./helpers/auth";
+import { registerWithPhone } from "./helpers/phone-sign-up";
 
 /**
  * Installer profile completion across every surface that shows it, driven through the approved
@@ -23,7 +23,6 @@ import { stubTurnstileWhenOffline } from "./helpers/auth";
  */
 
 const DB = process.env.E2E_DB_CONTAINER ?? "supabase_db_aladdin";
-const PASSWORD = "green-tiles-on-roof";
 const TOTAL_ITEMS = 9;
 
 function sql(query: string): string {
@@ -91,16 +90,7 @@ async function pngBytes(page: Page, colour: string): Promise<Buffer> {
 }
 
 async function register(page: Page, name: string, phone: string): Promise<void> {
-  await stubTurnstileWhenOffline(page);
-  await page.goto("/installer/sign-up");
-  await page.getByLabel("الاسم الكامل").fill(name);
-  // Scoped by name: the sign-up page also has a labelled tab panel for the phone method.
-  await page.locator('input[name="phone"]').fill(phone);
-  await page.getByLabel("كلمة المرور", { exact: true }).fill(PASSWORD);
-  await page.getByRole("checkbox").check();
-  await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30_000 });
-  await page.getByRole("button", { name: "إنشاء الحساب" }).click();
-  await page.waitForURL(/\/home(\/|$)/, { waitUntil: "commit", timeout: 30_000 });
+  await registerWithPhone(page, { phone, name });
 }
 
 /** What each surface shows right now, as numbers. `null` = the surface is not drawn (hidden at 100%). */
@@ -150,11 +140,15 @@ test.describe("Installer profile completion — one figure on every surface", ()
 
     // The rule itself, at the start: only the shared items the sign-up gives can be done.
     const start = doneItems(userId);
-    for (const item of ["years_experience", "availability", "activities", "location", "portfolio", "avatar"]) {
+    // ADR-0026: "Complete your account" collects the location and the specialties (activities) at sign-up, so a brand-new installer already has
+    // those two; everything else still has to be done on the profile page.
+    for (const item of ["years_experience", "availability", "portfolio", "avatar"]) {
       expect(start, `a brand-new installer has not done ${item}`).not.toContain(item);
     }
+    for (const item of ["activities", "location"]) expect(start, `sign-up collected ${item}`).toContain(item);
     const first = await expectAgreement(page, userId, "after sign-up");
-    expect(first.percent).toBeLessThan(50);
+    // Not 50: sign-up now already collects the location and the specialties (ADR-0026). What matters is that it is incomplete and every surface agrees.
+    expect(first.percent).toBeLessThan(100);
 
     // Fill the approved page through its real controls and save.
     await page.goto("/home/profile");

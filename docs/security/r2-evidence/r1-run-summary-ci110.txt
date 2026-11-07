@@ -1,0 +1,10 @@
+== toolchain ci110: 2.110.0; project aladdin_r2sec
+-- mode confirm-on
+confirm-on/shipped: [sec] confirm-on/shipped: {"mode":"confirm-on","posture":"shipped","email_confirmations":true,"PASS":23,"FAIL":0,"XFAIL":16,"XPASS":0,"EVAL":2,"N/A":2,"total":43}
+confirm-on/observe: [sec] confirm-on/observe: {"mode":"confirm-on","posture":"observe","email_confirmations":true,"PASS":40,"FAIL":0,"XFAIL":4,"XPASS":0,"EVAL":2,"N/A":2,"total":48}
+confirm-on/enforce: [sec] confirm-on/enforce: {"mode":"confirm-on","posture":"enforce","email_confirmations":true,"PASS":44,"FAIL":0,"XFAIL":0,"XPASS":0,"EVAL":2,"N/A":2,"total":48}
+-- mode confirm-off
+confirm-off/shipped: [sec] confirm-off/shipped: {"mode":"confirm-off","posture":"shipped","email_confirmations":false,"PASS":23,"FAIL":0,"XFAIL":18,"XPASS":0,"EVAL":2,"N/A":0,"total":43}
+confirm-off/observe: [sec] confirm-off/observe: {"mode":"confirm-off","posture":"observe","email_confirmations":false,"PASS":40,"FAIL":0,"XFAIL":6,"XPASS":0,"EVAL":2,"N/A":0,"total":48}
+confirm-off/enforce: [sec] confirm-off/enforce: {"mode":"confirm-off","posture":"enforce","email_confirmations":false,"PASS":45,"FAIL":0,"XFAIL":0,"XPASS":0,"EVAL":2,"N/A":1,"total":48}
+RESULT [ci110]: all cells clean (no FAIL, no XPASS)

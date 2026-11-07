@@ -1,0 +1,832 @@
+{
+  "suite": "phone-identity-a2-local",
+  "run": "2026-10-29",
+  "summary": {
+    "suite": "phone-identity-a2-local",
+    "PASS": 61,
+    "FAIL": 0,
+    "GAP": 10,
+    "EVAL": 10,
+    "total": 81
+  },
+  "redaction": "phones masked to last 2 digits; aliases masked; user ids shortened; no tokens, passwords, hashes or raw OTPs recorded",
+  "results": [
+    {
+      "id": "A2-ENV-1",
+      "area": "guard",
+      "title": "Send SMS Hook is OFF on the isolated stack (no transport can run)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-ENV-2",
+      "area": "guard",
+      "title": "Supabase Advanced Phone MFA is OFF",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-ENV-3",
+      "area": "guard",
+      "title": "GoTrue phone provider uses FAKE credentials + fixed test_otp map (OTP confirmations ON, no autoconfirm)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-ENV-4",
+      "area": "guard",
+      "title": "Target is loopback API + explicitly named non-shared DB container",
+      "status": "PASS",
+      "evidence": "supabase_db_aladdin_a2"
+    },
+    {
+      "id": "A2-FX-1",
+      "area": "fixtures",
+      "title": "Four fixture classes built through the real signup path (Admin createUser -> password sign-in -> record_consent / account type / profile_set_phone / username / business draft)",
+      "status": "PASS",
+      "evidence": "LegacyInstaller:7f5b7c31 LegacyShowroom:c1ebca32 EmailSignup:03d86802 OrgContactOnly:0db58bba"
+    },
+    {
+      "id": "A2-SNAP-1",
+      "area": "invariance",
+      "title": "Baseline snapshot captured (auth user, identities, MFA, public user, profile, memberships+capabilities, platform/admin roles, login alias, registration state)",
+      "status": "PASS",
+      "evidence": "users=4"
+    },
+    {
+      "id": "A2-LEG-1",
+      "area": "legacy",
+      "title": "Legacy Installer: primary phone stored, phone_verified_at NULL (unverified, not converted), alias login works",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-LEG-2",
+      "area": "legacy",
+      "title": "Legacy Showroom: unverified primary, org membership + owner capabilities intact, alias login works",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-LEG-3",
+      "area": "legacy",
+      "title": "Email-signup account with a profile phone: unverified, auth.users.phone NULL, email sign-in works",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-LEG-4",
+      "area": "legacy",
+      "title": "Organization-only contact number: owner has NO profile phone; number lives on organizations.contact_phone only",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-LEG-5",
+      "area": "legacy",
+      "title": "All legacy fixtures pass the registration gate today without phone proof (state grants app access)",
+      "status": "PASS",
+      "evidence": "access_ready,active_personal,access_ready,active_personal"
+    },
+    {
+      "id": "A2-LEG-6",
+      "area": "legacy",
+      "title": "loadMyIdentity read contract: caller reads own phone_verified_at as null => UI 'unverified'",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-LEG-7",
+      "area": "legacy",
+      "title": "Org contact number is not any account's phone: no profile / auth.users row carries it",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-FORGE-1",
+      "area": "authority",
+      "title": "Direct PostgREST PATCH of phone_verified_at as the account owner is refused and the column stays NULL",
+      "status": "PASS",
+      "evidence": "http=403 code=42501"
+    },
+    {
+      "id": "A2-FORGE-2",
+      "area": "authority",
+      "title": "Forged user_metadata flags (GoTrue PUT /user data) do not change profiles.phone_verified_at",
+      "status": "PASS",
+      "evidence": "put=200"
+    },
+    {
+      "id": "A2-FORGE-3",
+      "area": "authority",
+      "title": "Re-submitting the same number via profile_set_phone does not verify it",
+      "status": "PASS",
+      "evidence": "rpc=ok"
+    },
+    {
+      "id": "A2-FORGE-4",
+      "area": "authority",
+      "title": "authenticated / anon hold no UPDATE on phone_verified_at",
+      "status": "PASS",
+      "evidence": "service_role_update=false"
+    },
+    {
+      "id": "A2-GAP-1",
+      "area": "authority",
+      "title": "Server-side writer that sets profiles.phone_verified_at after proof of possession",
+      "status": "GAP",
+      "evidence": "NOT IMPLEMENTED. Only journal-restore functions assign the column (public.installer_phone_change_settle); no definer function records a successful challenge."
+    },
+    {
+      "id": "A2-RES-1",
+      "area": "reservation",
+      "title": "Reserve a secondary with a fresh password receipt: active, 7 days, unverified, no auth/profile change",
+      "status": "PASS",
+      "evidence": "reserve=ok days=7"
+    },
+    {
+      "id": "A2-RES-2",
+      "area": "reservation",
+      "title": "Password reauthentication required: no receipt refused; wrong password yields no receipt",
+      "status": "PASS",
+      "evidence": "noReceipt=42501 wrong=wrong_password"
+    },
+    {
+      "id": "A2-RES-3",
+      "area": "reservation",
+      "title": "Receipt is bound to number+operation and single-use (wrong target refused, spent receipt cannot be replayed)",
+      "status": "PASS",
+      "evidence": "mismatch=42501 replay=42501"
+    },
+    {
+      "id": "A2-RES-4",
+      "area": "reservation",
+      "title": "5 wrong passwords lock confirmation; the CORRECT password is then also refused (locked)",
+      "status": "PASS",
+      "evidence": "wrong_password>wrong_password>wrong_password>wrong_password>locked then locked"
+    },
+    {
+      "id": "A2-RES-5",
+      "area": "reservation",
+      "title": "Uniqueness across accounts and kinds: other account cannot reserve an actively reserved number, cannot take it as primary, cannot reserve another account's primary",
+      "status": "PASS",
+      "evidence": "secondary=23505 primary=23505 vsPrimary=23505"
+    },
+    {
+      "id": "A2-RES-6",
+      "area": "reservation",
+      "title": "A number cannot be both primary and secondary of the same account",
+      "status": "PASS",
+      "evidence": "22023"
+    },
+    {
+      "id": "A2-RES-7",
+      "area": "reservation",
+      "title": "Legacy Installer's primary number cannot be reserved by anyone else",
+      "status": "PASS",
+      "evidence": "23505"
+    },
+    {
+      "id": "A2-RES-8",
+      "area": "reservation",
+      "title": "Exactly one renewal (+7 => 14 days max); a second renewal is refused",
+      "status": "PASS",
+      "evidence": "renew1=ok days=14 renew2=22023"
+    },
+    {
+      "id": "A2-RES-9",
+      "area": "reservation",
+      "title": "Expired reservation (7 days, unrenewed): cannot be renewed, is invisible to its owner as active, and the number enters the 30-day cooldown for any other secondary reservation",
+      "status": "PASS",
+      "evidence": "renew=P0002 owner_view=none_active otherReserve=23505"
+    },
+    {
+      "id": "A2-OBS-1",
+      "area": "reservation",
+      "title": "Low-severity observation: a FAILED renew/reserve rolls back the lazy finalize write, so an expired row can stay status='active' (past expires_at) until a non-failing touch; behaviour is still correct because expiry is derived from expires_at",
+      "status": "EVAL",
+      "evidence": "stored_status_after_failed_ops=active"
+    },
+    {
+      "id": "A2-RES-10",
+      "area": "reservation",
+      "title": "Cooldown blocks SECONDARY reservation only; primary claim of the number is not blocked (existing rule preserved)",
+      "status": "PASS",
+      "evidence": "ok"
+    },
+    {
+      "id": "A2-RES-11",
+      "area": "reservation",
+      "title": "Cooldown lifts after 30 days: refused at day 8, reservable again once 30 days have passed since expiry",
+      "status": "PASS",
+      "evidence": "day8=23505 day39=ok"
+    },
+    {
+      "id": "A2-RES-12",
+      "area": "reservation",
+      "title": "Cancellation starts the same 30-day cooldown for other accounts",
+      "status": "PASS",
+      "evidence": "cancel=ok otherReserve=23505"
+    },
+    {
+      "id": "A2-CON-1",
+      "area": "concurrency",
+      "title": "8 accounts claim one number as secondary at the same time: exactly one wins, the rest get the generic refusal",
+      "status": "PASS",
+      "evidence": "winners=1 errors=23505,ok"
+    },
+    {
+      "id": "A2-CON-2",
+      "area": "concurrency",
+      "title": "Primary-claim vs secondary-reservation race on one number (4 vs 4): exactly one claim of any kind survives",
+      "status": "PASS",
+      "evidence": "claims=1 ok=1"
+    },
+    {
+      "id": "A2-CON-3",
+      "area": "concurrency",
+      "title": "One account reserving 4 numbers simultaneously ends with exactly one active reservation",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-0",
+      "area": "authority",
+      "title": "Prototype functions are executable by service_role only (not anon / authenticated / PUBLIC)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-1",
+      "area": "authority",
+      "title": "START refuses a number that is not the caller's current claim (another account's primary, an unreserved number)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-2",
+      "area": "authority",
+      "title": "Wrong ACCOUNT presenting the correct code and challenge id: generic 'invalid', no state change, owner's attempt counter not burned",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-3",
+      "area": "authority",
+      "title": "Wrong code: 'invalid', attempts counted",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-4",
+      "area": "authority",
+      "title": "Correct code verifies exactly once; replay of the same code is 'invalid' and records no second evidence row",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-5",
+      "area": "authority",
+      "title": "Verified evidence grants nothing: no auth.users.phone, no phone identity, no MFA factor, profiles.phone_verified_at untouched, alias intact",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-6",
+      "area": "authority",
+      "title": "Expired challenge with the correct code is refused",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-7",
+      "area": "authority",
+      "title": "5 wrong codes exhaust the challenge; the correct code afterwards is refused",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-8",
+      "area": "authority",
+      "title": "Resend inside 60 s is rate-limited server-side",
+      "status": "PASS",
+      "evidence": "ERROR: rate limited CONTEXT: PL/pgSQL function a2_proto.start(uuid,text,text,interval) lin"
+    },
+    {
+      "id": "A2-AUTH-9",
+      "area": "authority",
+      "title": "A new challenge supersedes the previous one (old code dies, one open challenge per account+purpose)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-10",
+      "area": "authority",
+      "title": "Phone edited while a challenge is in flight: correct code for the OLD number is refused, challenge marked claim_changed, new number unverified",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-11",
+      "area": "authority",
+      "title": "Secondary proof on an ACTIVE reservation verifies without extending the reservation (7+7 window unchanged) and is capped by it",
+      "status": "PASS",
+      "evidence": "verified=verified"
+    },
+    {
+      "id": "A2-AUTH-12",
+      "area": "authority",
+      "title": "Secondary proof grants no login/recovery/primary/MFA: auth.users.phone NULL, reservation still 'active' (not converted), profile phone unchanged",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-13",
+      "area": "authority",
+      "title": "Cancelled reservation: in-flight proof refused (claim_changed); cancelled number cannot be re-proven; reservation is not resurrected",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-14",
+      "area": "authority",
+      "title": "Reservation expired by the clock: correct code refused and START refuses; expired reservation not marked verified",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-CON-4",
+      "area": "concurrency",
+      "title": "8 simultaneous verifications of one correct code: exactly one 'verified', seven 'invalid', one evidence row",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-CON-5",
+      "area": "concurrency",
+      "title": "6 simultaneous START calls for one account+number: one challenge issued, no parallel open challenges",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-CON-6",
+      "area": "concurrency",
+      "title": "Edit racing verification is atomic: evidence exists iff the verdict was 'verified', and is always for the number the challenge was bound to",
+      "status": "PASS",
+      "evidence": "verdict=invalid claimChanged=true"
+    },
+    {
+      "id": "A2-AUTH-L1",
+      "area": "authority",
+      "title": "Prototype evidence path on legacy LegacyInstaller: verifies the exact current number, identity untouched (see invariance)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-L2",
+      "area": "authority",
+      "title": "Prototype evidence path on legacy LegacyShowroom: verifies the exact current number, identity untouched (see invariance)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-AUTH-L3",
+      "area": "authority",
+      "title": "Prototype evidence path on legacy EmailSignup: verifies the exact current number, identity untouched (see invariance)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-NAT-1",
+      "area": "candidate:gotrue-native",
+      "title": "signInWithOtp({phone}) for a legacy account's profile number creates a PARALLEL Auth user",
+      "status": "EVAL",
+      "evidence": "otp=200 verify=200 newUserDiffersFromLegacy=true usersDelta=1 legacyAuthPhone=null"
+    },
+    {
+      "id": "A2-NAT-2",
+      "area": "candidate:gotrue-native",
+      "title": "phone_change verification on an alias account preserves user.id and the email alias",
+      "status": "EVAL",
+      "evidence": "put=200 verify=200 responseUserIsSame=true authPhoneSet=true aliasUnchanged=true"
+    },
+    {
+      "id": "A2-NAT-3",
+      "area": "candidate:gotrue-native",
+      "title": "…but it does NOT touch profiles.phone_verified_at (no link between GoTrue proof and the app's source of truth)",
+      "status": "EVAL",
+      "evidence": "profile.verified_at=null profilePhoneUnchanged=true"
+    },
+    {
+      "id": "A2-NAT-4",
+      "area": "candidate:gotrue-native",
+      "title": "…and the verified number silently becomes a LOGIN credential for the same user (possession proof => login permission)",
+      "status": "EVAL",
+      "evidence": "otp=200 verify=200 sessionUserIsProbe=true"
+    },
+    {
+      "id": "A2-NAT-5",
+      "area": "candidate:gotrue-native",
+      "title": "GoTrue phone uniqueness is independent of secondary reservations: a second account can verify a number another account has ACTIVELY reserved",
+      "status": "EVAL",
+      "evidence": "reserve=ok otherPut=200 otherVerify=200 authPhoneNowHeld=1"
+    },
+    {
+      "id": "A2-CAND-1",
+      "area": "candidate:db-authority",
+      "title": "DB-native challenge authority (prototype): binds account+number+purpose+claim, generic failures, single-use, no auth.users writes — see A2-AUTH-* / A2-CON-4..6",
+      "status": "EVAL",
+      "evidence": "prototype only; not applied"
+    },
+    {
+      "id": "A2-CAND-2",
+      "area": "candidate:worker-d1",
+      "title": "Cloudflare Worker D1 as proof authority: NOT evaluated locally by design (Phase A doc s3.4: transport store must not be the proof authority)",
+      "status": "EVAL",
+      "evidence": "design decision, no test"
+    },
+    {
+      "id": "A2-INV-1",
+      "area": "invariance",
+      "title": "Legacy fixtures: Auth user ids, login aliases, password digests, roles, memberships, capabilities, profile phones/usernames, MFA and registration state are byte-identical after every flow above",
+      "status": "PASS",
+      "evidence": "no drift"
+    },
+    {
+      "id": "A2-INV-2",
+      "area": "invariance",
+      "title": "No phone-verification flow added or changed an Auth user for the legacy set: users with auth.users.phone are only the GoTrue-native probes",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-INV-3",
+      "area": "invariance",
+      "title": "Auth user count grew only by the accounts this run deliberately created (no hidden duplicates from reservation / authority flows)",
+      "status": "PASS",
+      "evidence": "before=33 after=61 expected=61"
+    },
+    {
+      "id": "A2-INV-4",
+      "area": "invariance",
+      "title": "Every legacy user still has exactly one email identity and zero MFA factors",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-INV-5",
+      "area": "invariance",
+      "title": "Legacy accounts still sign in with the SAME password and receive the SAME user id",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "A2-GAP-2",
+      "area": "signup",
+      "title": "New phone sign-up must NOT reach app access before WhatsApp possession proof",
+      "status": "GAP",
+      "evidence": "NOT IMPLEMENTED. A brand-new alias signup with no proof reports registration state 'access_ready' (= hasAppAccess true)."
+    },
+    {
+      "id": "A2-GAP-3",
+      "area": "signup",
+      "title": "Unverified pending identity cannot use protected features (server + DB enforcement, not only a form step)",
+      "status": "GAP",
+      "evidence": "NOT IMPLEMENTED. No verified-phone predicate exists in my_registration_state or any RLS helper."
+    },
+    {
+      "id": "A2-GAP-4",
+      "area": "signup",
+      "title": "Mistyped signup number: edit invalidates the stale challenge and leaves no orphan/duplicate account",
+      "status": "GAP",
+      "evidence": "NOT IMPLEMENTED in product (prototype A2-AUTH-10 shows the primitive; no signup wiring)."
+    },
+    {
+      "id": "A2-GAP-5",
+      "area": "signup",
+      "title": "Expired/abandoned pending signup is cleaned up without orphan Auth users",
+      "status": "GAP",
+      "evidence": "NOT IMPLEMENTED. No pending-verification lifecycle or expiry sweep exists."
+    },
+    {
+      "id": "A2-GAP-6",
+      "area": "secondary",
+      "title": "Durable VERIFIED secondary contact (active reservation -> verified contact-only claim) without extending or resurrecting the reservation",
+      "status": "GAP",
+      "evidence": "NOT IMPLEMENTED. secondary_phone_reservations has no verified_* columns; status enum is active/expired/cancelled/converted only."
+    },
+    {
+      "id": "A2-GAP-7",
+      "area": "primary-change",
+      "title": "Verify-before-switch for primary phone replacement (old login not abandoned on an unreachable new number)",
+      "status": "GAP",
+      "evidence": "NOT IMPLEMENTED. profile_set_phone / installer_phone_change_* switch immediately and only reset phone_verified_at."
+    },
+    {
+      "id": "A2-GAP-8",
+      "area": "authority",
+      "title": "Challenge store, resend/attempt limits and anti-replay in the application database",
+      "status": "GAP",
+      "evidence": "NOT IMPLEMENTED. Existing relations matching otp/challenge/verification: public.phone_verification_challenges."
+    },
+    {
+      "id": "A2-GAP-9",
+      "area": "abuse",
+      "title": "Turnstile / direct-API rate-limit bypass tests for a verification endpoint",
+      "status": "GAP",
+      "evidence": "NOT TESTABLE: no verification endpoint exists yet (Phase B)."
+    },
+    {
+      "id": "A2-GAP-10",
+      "area": "mfa",
+      "title": "TOTP enrollment + AAL2 step-up separate from contact proof",
+      "status": "GAP",
+      "evidence": "Out of A2 scope (Phase D). Local evidence only: no MFA factor was created by any flow here."
+    },
+    {
+      "id": "A2-LOG-0",
+      "area": "hygiene",
+      "title": "Log scan is not blind: it captured non-empty output from all three services",
+      "status": "PASS",
+      "evidence": "900801/165374/205404"
+    },
+    {
+      "id": "A2-LOG-1",
+      "area": "hygiene",
+      "title": "Numbers that are NOT phone-login aliases (secondary reservations, org contacts, email-account phones, authority prototype) never appear in GoTrue, PostgREST or gateway logs",
+      "status": "PASS",
+      "evidence": "found=0/54"
+    },
+    {
+      "id": "A2-LOG-3",
+      "area": "hygiene",
+      "title": "SECURITY FINDING (pre-existing, by construction): a phone-login account's E.164 digits are embedded in its internal alias, and GoTrue prints the account email in user_signedup / login audit events, so those numbers are present in GoTrue logs",
+      "status": "EVAL",
+      "evidence": "aliasNumbersInGoTrueLogs=5/5"
+    },
+    {
+      "id": "A2-LOG-2",
+      "area": "hygiene",
+      "title": "GoTrue-native probes: number / fake OTP presence in service logs",
+      "status": "EVAL",
+      "evidence": "nativeNumbersInLogs=3/3 fakeOtpsInLogs=0/3"
+    },
+    {
+      "id": "A2-SEND-1",
+      "area": "guard",
+      "title": "Zero sends: no Worker/Meta env in the local stack, hook disabled, fake provider credentials only",
+      "status": "PASS",
+      "evidence": ""
+    }
+  ],
+  "invariance": {
+    "before": {
+      "fixture-1": {
+        "user_id": "03d86802",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": false,
+          "email_confirmed": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": null
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "public_user": {
+          "type": null,
+          "status": "pending_verification",
+          "verified": false
+        },
+        "profile": {
+          "has_phone": true,
+          "phone_verified": false,
+          "username_set": true
+        },
+        "memberships": [],
+        "platform_roles": [],
+        "admin_role_assignments": 0
+      },
+      "fixture-2": {
+        "user_id": "0db58bba",
+        "registration_state": "active_personal",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": false,
+          "email_confirmed": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": null
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "public_user": {
+          "type": null,
+          "status": "pending_verification",
+          "verified": false
+        },
+        "profile": {
+          "has_phone": false,
+          "phone_verified": false,
+          "username_set": true
+        },
+        "memberships": [
+          {
+            "org_type": "showroom_dealer",
+            "status": "active",
+            "capabilities": 31,
+            "org_contact_phone_set": true
+          }
+        ],
+        "platform_roles": [],
+        "admin_role_assignments": 0
+      },
+      "fixture-3": {
+        "user_id": "7f5b7c31",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": true,
+          "email_confirmed": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": "temporary_craftsman_password_flow"
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "public_user": {
+          "type": null,
+          "status": "pending_verification",
+          "verified": false
+        },
+        "profile": {
+          "has_phone": true,
+          "phone_verified": false,
+          "username_set": true
+        },
+        "memberships": [],
+        "platform_roles": [],
+        "admin_role_assignments": 0
+      },
+      "fixture-4": {
+        "user_id": "c1ebca32",
+        "registration_state": "active_personal",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": true,
+          "email_confirmed": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": "temporary_showroom_password_flow"
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "public_user": {
+          "type": null,
+          "status": "pending_verification",
+          "verified": false
+        },
+        "profile": {
+          "has_phone": true,
+          "phone_verified": false,
+          "username_set": true
+        },
+        "memberships": [
+          {
+            "org_type": "showroom_dealer",
+            "status": "active",
+            "capabilities": 31,
+            "org_contact_phone_set": true
+          }
+        ],
+        "platform_roles": [],
+        "admin_role_assignments": 0
+      }
+    },
+    "after": {
+      "fixture-1": {
+        "user_id": "03d86802",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": false,
+          "email_confirmed": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": null
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "public_user": {
+          "type": null,
+          "status": "pending_verification",
+          "verified": false
+        },
+        "profile": {
+          "has_phone": true,
+          "phone_verified": false,
+          "username_set": true
+        },
+        "memberships": [],
+        "platform_roles": [],
+        "admin_role_assignments": 0
+      },
+      "fixture-2": {
+        "user_id": "0db58bba",
+        "registration_state": "active_personal",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": false,
+          "email_confirmed": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": null
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "public_user": {
+          "type": null,
+          "status": "pending_verification",
+          "verified": false
+        },
+        "profile": {
+          "has_phone": false,
+          "phone_verified": false,
+          "username_set": true
+        },
+        "memberships": [
+          {
+            "org_type": "showroom_dealer",
+            "status": "active",
+            "capabilities": 31,
+            "org_contact_phone_set": true
+          }
+        ],
+        "platform_roles": [],
+        "admin_role_assignments": 0
+      },
+      "fixture-3": {
+        "user_id": "7f5b7c31",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": true,
+          "email_confirmed": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": "temporary_craftsman_password_flow"
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "public_user": {
+          "type": null,
+          "status": "pending_verification",
+          "verified": false
+        },
+        "profile": {
+          "has_phone": true,
+          "phone_verified": false,
+          "username_set": true
+        },
+        "memberships": [],
+        "platform_roles": [],
+        "admin_role_assignments": 0
+      },
+      "fixture-4": {
+        "user_id": "c1ebca32",
+        "registration_state": "active_personal",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": true,
+          "email_confirmed": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": "temporary_showroom_password_flow"
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "public_user": {
+          "type": null,
+          "status": "pending_verification",
+          "verified": false
+        },
+        "profile": {
+          "has_phone": true,
+          "phone_verified": false,
+          "username_set": true
+        },
+        "memberships": [
+          {
+            "org_type": "showroom_dealer",
+            "status": "active",
+            "capabilities": 31,
+            "org_contact_phone_set": true
+          }
+        ],
+        "platform_roles": [],
+        "admin_role_assignments": 0
+      }
+    }
+  }
+}

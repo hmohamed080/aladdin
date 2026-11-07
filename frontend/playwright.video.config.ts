@@ -13,7 +13,7 @@ import { defineConfig, devices } from "@playwright/test";
  *   * a production build of the app on port 3200 with R2, edge delivery and
  *     video enabled against those local services.
  *
- * Nothing reaches Cloudflare, R2, Vercel or a hosted Supabase project.
+ * Nothing reaches Cloudflare, R2 or a hosted Supabase project.
  */
 const PORT = 3200;
 const EDGE_PORT = Number(process.env.E2E_EDGE_PORT ?? 8788);

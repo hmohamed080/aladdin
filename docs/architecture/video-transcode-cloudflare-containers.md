@@ -63,7 +63,7 @@ cron */10 ───────────────────────�
 - **Durable coordination:** Postgres alone. The Durable Object stores only its alarm. A duplicate start finds nothing to claim and exits within seconds. A lost container leaves a lease that expires (≤ 15 min) and is reclaimed on the next kick.
 - **Concurrency:** `TRANSCODE_SLOTS` (2) equals `max_instances`. Each kick starts at most one new container: the first idle slot. A backlog therefore gains a second worker on the next kick.
 - **Why not a Queue?** A Cloudflare Queue would be a second job store that has to agree with `media_videos`. The database already queues. The Redis wake-up list (ADR-0019) stays for the `--loop` hosts. Containers need no long-lived listener, because `wake()` replaces `BLPOP`.
-- **Why not cron alone?** Cron alone means up to 10 minutes' latency, and each tick costs a start. The cron stays as the safety net for expired leases, retries and the purge. `wake()` gives immediate starts. When the frontend runs on Workers (ADR-0021), wire `wake()` through a service binding. A Vercel-hosted app has no binding, so it waits for the cron.
+- **Why not cron alone?** Cron alone means up to 10 minutes' latency, and each tick costs a start. The cron stays as the safety net for expired leases, retries and the purge. `wake()` gives immediate starts. The frontend runs on Workers (ADR-0021), so `wake()` can go through a service binding.
 - **Long jobs and the 6-hour inactivity cap:** the alarm wakes the object every 5 minutes while the container runs and renews a 30-minute inactivity timeout. A multi-hour transcode is therefore never stopped as idle. When the container exits, the alarm stops rescheduling.
 
 ## Monitoring
