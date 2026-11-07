@@ -6,7 +6,6 @@ import { parseKeyring } from "./otp";
 // The Worker is a separate package; importing its handler lets this test run the app's REAL signing code against the Worker's REAL verifier.
 import { handleRequest, type Env, type ReplayDb } from "../../../../edge/whatsapp-otp-worker/src/index";
 import { attestationCanonical as workerCanonical } from "../../../../edge/whatsapp-otp-worker/src/attest";
-import { signPayload } from "../../../../edge/whatsapp-otp-worker/src/signing";
 import { signBody } from "../whatsapp-otp/signing";
 
 const PHONE = "+201012345678";
