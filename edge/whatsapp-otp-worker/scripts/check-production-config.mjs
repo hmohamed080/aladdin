@@ -54,6 +54,10 @@ must(!raw.includes("SUPABASE_SEND_SMS_HOOK_SECRET"), "the Supabase Send-SMS-hook
 must(!("OTP_DAILY_SEND_LIMIT" in vars) && !("OTP_HARD_CEILING" in vars), "the budget is a Super Admin setting in D1, not an environment variable");
 must(!("WHATSAPP_GRAPH_BASE_URL" in vars), "the Graph URL override is for local rigs only");
 must(vars.OTP_NOTIFY_URL === "https://aladdindecore.com/api/internal/whatsapp-otp/notify", "OTP_NOTIFY_URL must be the Production app's notification endpoint");
+must(
+  Array.isArray(config.services) && config.services.length === 1 && config.services[0]?.binding === "APP_NOTIFY" && config.services[0]?.service === "aladdin-frontend-production",
+  "the alert callback and the delivery attestation need exactly one private Service Binding APP_NOTIFY -> aladdin-frontend-production",
+);
 must(Array.isArray(config.triggers?.crons) && config.triggers.crons.length >= 1, "the scheduled maintenance trigger must be configured");
 must(vars.WHATSAPP_PHONE_NUMBER_ID === "1458603463983505", "unexpected WhatsApp sender");
 must(vars.WHATSAPP_OTP_TEMPLATE === "aladdin_otp" && vars.WHATSAPP_OTP_LANGUAGES === "ar", "unapproved template or languages");

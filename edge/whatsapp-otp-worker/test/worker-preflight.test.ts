@@ -8,7 +8,7 @@ import { ADMIN_SECRET, GRANT_SECRET, NOTIFY_SECRET, NOTIFY_URL } from "./d1.ts";
 
 // A fully provisioned Worker: the send, admin and notify bindings, the notify URL and an initialized settings row.
 const baseEnv = (over: Partial<ReturnType<typeof plainEnv>> = {}) =>
-  plainEnv({ OTP_ADMIN_SIGNING_SECRET: { get: async () => ADMIN_SECRET }, OTP_ADMIN_GRANT_SECRET: { get: async () => GRANT_SECRET }, OTP_NOTIFY_SIGNING_SECRET: { get: async () => NOTIFY_SECRET }, OTP_NOTIFY_URL: NOTIFY_URL, ...over });
+  plainEnv({ OTP_ADMIN_SIGNING_SECRET: { get: async () => ADMIN_SECRET }, OTP_ADMIN_GRANT_SECRET: { get: async () => GRANT_SECRET }, OTP_NOTIFY_SIGNING_SECRET: { get: async () => NOTIFY_SECRET }, APP_NOTIFY: { fetch: async () => new Response(null, { status: 503 }) } as never, OTP_NOTIFY_URL: NOTIFY_URL, ...over });
 
 const through = (env: ReturnType<typeof baseEnv>, meta = mockMeta()) =>
   (async (url: string, init: RequestInit) => handleRequest(new Request(url, init), env, meta.fetcher)) as unknown as typeof fetch;
@@ -26,7 +26,7 @@ test("it fails (exit 1) with a clear hint for a wrong secret, a missing token bi
   assert.match(wrong.join(""), /signing secret differs/);
   for (const over of [{ WHATSAPP_ACCESS_TOKEN: { get: async () => "" } }, { IDEMPOTENCY_DB: undefined }, { OTP_ALLOWED_RECIPIENTS: "" },
     // the release gates added with the admin settings: uninitialized limits, no admin secret, no notify secret or URL
-    { IDEMPOTENCY_DB: memoryReplayDb({ settings: null }) }, { OTP_ADMIN_SIGNING_SECRET: undefined }, { OTP_NOTIFY_SIGNING_SECRET: undefined }, { OTP_NOTIFY_URL: undefined }] as Array<Partial<ReturnType<typeof baseEnv>>>)
+    { IDEMPOTENCY_DB: memoryReplayDb({ settings: null }) }, { OTP_ADMIN_SIGNING_SECRET: undefined }, { OTP_NOTIFY_SIGNING_SECRET: undefined }, { OTP_NOTIFY_URL: undefined }, { APP_NOTIFY: undefined }] as Array<Partial<ReturnType<typeof baseEnv>>>)
     assert.equal(await run("https://w.example.invalid", { PHONE_OTP_WORKER_SECRET: SECRET }, through(baseEnv(over)), () => {}), 1, JSON.stringify(Object.keys(over)));
 });
 test("missing input or an insecure URL calls nothing", async () => {
