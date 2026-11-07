@@ -10,7 +10,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(70);
+select plan(75);
 
 \set sa1   'b1000000-0000-4000-8000-000000000001'
 \set sa2   'b1000000-0000-4000-8000-000000000002'
@@ -231,6 +231,23 @@ select is(pg_temp.call_svc('public.admin_whatsapp_otp_delivery_authorized()'), '
 select is(pg_temp.call_as(:'sa1', 'public.admin_whatsapp_otp_delivery_authorized()') ->> 'sqlstate', '42501', 'F12 a signed-in Super Admin cannot read it either: service role only');
 select is(pg_temp.call_anon('public.admin_whatsapp_otp_delivery_authorized()') ->> 'sqlstate', '42501', 'F13 anon cannot');
 select is((select count(*)::int from app.whatsapp_otp_delivery_requests where status = 'applied'), 2, 'F14 ...and exactly the two applied requests exist, so a forged Worker audit row never becomes "authorized"');
+
+
+-- An OFF that was begun but never confirmed still counts as OFF (delivery must not fall back to an earlier ON), and an expired approval can
+-- never be resurrected by a Worker row that shows up later.
+create temp table off_req as select pg_temp.begin_as(:'sa1', 2, true, false, 'Switching off, but the confirmation is lost in transit') as r;
+select is(pg_temp.call_svc('public.admin_whatsapp_otp_delivery_authorized()'), '{"enabled": false, "version": 3}'::jsonb,
+  'F15 a pending OFF beyond the latest applied version is authorized as OFF at the version D1 would have (expected + 1)');
+update app.whatsapp_otp_delivery_requests set created_at = clock_timestamp() - interval '20 minutes' where id = (select (r ->> 'request_id')::uuid from off_req);
+select is(pg_temp.reconcile('[]'::jsonb) ->> 'abandoned', '1', 'F16 the unconfirmed OFF is eventually abandoned');
+select is(pg_temp.call_svc('public.admin_whatsapp_otp_delivery_authorized()'), '{"enabled": false, "version": 3}'::jsonb,
+  'F17 ...and an ABANDONED OFF still counts as OFF: the authorized state never falls back to an older ON');
+create temp table stale_on as select pg_temp.begin_as(:'sa1', 3, false, true, 'An approved ON that never reached the Worker in time') as r;
+update app.whatsapp_otp_delivery_requests set created_at = clock_timestamp() - interval '20 minutes' where id = (select (r ->> 'request_id')::uuid from stale_on);
+select is(pg_temp.reconcile(jsonb_build_array(jsonb_build_object('request_id', (select r ->> 'request_id' from stale_on), 'actor', :'sa1', 'version', 4, 'at', 1800000300, 'new', true))) ->> 'applied', '0',
+  'F18 an expired approval is NOT resurrected by a Worker row that appears later (the sweep runs first)');
+select is((select status from app.whatsapp_otp_delivery_requests where id = (select (r ->> 'request_id')::uuid from stale_on)), 'abandoned',
+  'F19 ...it stays abandoned, and the authorized state is still OFF');
 
 -- ===========================================================================
 -- E. Closed table, vocabulary, hardening, grants

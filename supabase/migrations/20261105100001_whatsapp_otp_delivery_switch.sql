@@ -235,6 +235,20 @@ begin
   if p_applied is null or jsonb_typeof(p_applied) <> 'array' or jsonb_array_length(p_applied) > 100 then
     raise exception 'whatsapp_otp: invalid_reconcile_input' using errcode = '22023';
   end if;
+  -- SWEEP FIRST: an approval that is older than 15 minutes is closed BEFORE any Worker row is considered, so an expired approval can never be
+  -- resurrected (promoted to applied) by a row that later appears in D1. A row can only ever confirm a request a Super Admin approved here.
+  for v_row in
+    update app.whatsapp_otp_delivery_requests
+       set status = 'abandoned', result_code = 'not_applied', finished_at = clock_timestamp()
+     where status = 'pending' and created_at < clock_timestamp() - interval '15 minutes'
+    returning *
+  loop
+    perform set_config('request.jwt.claims', json_build_object('sub', v_row.actor_id, 'role', 'authenticated')::text, true);
+    perform app.record_audit_event('whatsapp_otp.delivery_change_failed', 'whatsapp_otp_delivery', v_row.id, null,
+      jsonb_build_object('request_id', v_row.id, 'actor_id', v_row.actor_id, 'code', 'not_applied', 'reconciled', true));
+    perform set_config('request.jwt.claims', v_claims, true);
+    v_abandoned := v_abandoned + 1;
+  end loop;
   for e in select value from jsonb_array_elements(p_applied) loop
     continue when jsonb_typeof(e) <> 'object'
       or coalesce(e ->> 'request_id', '') !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
@@ -267,18 +281,6 @@ begin
       end if;
     end if;
   end loop;
-  for v_row in
-    update app.whatsapp_otp_delivery_requests
-       set status = 'abandoned', result_code = 'not_applied', finished_at = clock_timestamp()
-     where status = 'pending' and created_at < clock_timestamp() - interval '15 minutes'
-    returning *
-  loop
-    perform set_config('request.jwt.claims', json_build_object('sub', v_row.actor_id, 'role', 'authenticated')::text, true);
-    perform app.record_audit_event('whatsapp_otp.delivery_change_failed', 'whatsapp_otp_delivery', v_row.id, null,
-      jsonb_build_object('request_id', v_row.id, 'actor_id', v_row.actor_id, 'code', 'not_applied', 'reconciled', true));
-    perform set_config('request.jwt.claims', v_claims, true);
-    v_abandoned := v_abandoned + 1;
-  end loop;
   -- DRIFT: the Worker's switch row is not accounted for by ANY audit row (a direct write to D1 that bypassed the audit). The Worker already
   -- treats that as OFF; this raises the same once-per-(version, time) alert. Malformed input is ignored, never an error.
   if p_drift is not null and jsonb_typeof(p_drift) = 'object'
@@ -298,12 +300,22 @@ $$;
 -- ---------------------------------------------------------------------------
 create function public.admin_whatsapp_otp_delivery_authorized()
 returns jsonb language sql stable security definer set search_path = '' as $$
-  select coalesce(
-    (select jsonb_build_object('enabled', r.new_enabled, 'version', r.result_version)
-       from app.whatsapp_otp_delivery_requests r
-      where r.status = 'applied' and r.result_version is not null
-      order by r.result_version desc, r.finished_at desc limit 1),
-    jsonb_build_object('enabled', false, 'version', 0));
+  -- The latest APPLIED request is the authorized state (none = OFF, version 0), EXCEPT that an OFF which was begun but never confirmed (pending, or
+  -- abandoned after its completion was lost) still counts: an administrator asked for OFF, so delivery must not fall back to an earlier ON just
+  -- because the confirmation never arrived. It is then authorized as OFF at the version D1 would have had (expected_version + 1). A request
+  -- the Worker definitively refused (failed) never counts. A later applied change supersedes it.
+  with latest as (
+    select coalesce((select r.new_enabled from app.whatsapp_otp_delivery_requests r
+                      where r.status = 'applied' and r.result_version is not null order by r.result_version desc, r.finished_at desc limit 1), false) as enabled,
+           coalesce((select max(r.result_version) from app.whatsapp_otp_delivery_requests r
+                      where r.status = 'applied' and r.result_version is not null), 0) as version),
+  unconfirmed_off as (
+    select max(r.expected_version + 1) as version
+      from app.whatsapp_otp_delivery_requests r, latest l
+     where r.status in ('pending', 'abandoned') and r.new_enabled = false and r.expected_version + 1 > l.version)
+  select case when u.version is not null then jsonb_build_object('enabled', false, 'version', u.version)
+              else jsonb_build_object('enabled', l.enabled, 'version', l.version) end
+    from latest l, unconfirmed_off u;
 $$;
 
 -- ---------------------------------------------------------------------------

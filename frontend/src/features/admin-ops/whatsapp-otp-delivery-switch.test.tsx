@@ -19,6 +19,17 @@ describe("WhatsappOtpDeliverySwitch", () => {
     expect(toggle().getAttribute("aria-checked")).toBe("true");
   });
 
+  it("the OFF knob is always visible: it never uses the same token as its track (surface on surface-hover vanished in dark mode)", () => {
+    const off = renderWithI18n(<WhatsappOtpDeliverySwitch enabled={false} version={0} blockers={[]} />);
+    const knob = toggle().querySelector("span")!;
+    expect(knob.className).toContain("bg-fg-muted");
+    expect(knob.className).not.toContain("bg-surface");
+    expect(toggle().className).toContain("bg-surface-hover");
+    off.unmount();
+    renderWithI18n(<WhatsappOtpDeliverySwitch enabled version={1} blockers={[]} />);
+    expect(toggle().querySelector("span")!.className).toContain("bg-surface");
+  });
+
   it("is DISABLED while OFF and a prerequisite is missing, but turning OFF is never blocked", () => {
     const off = renderWithI18n(<WhatsappOtpDeliverySwitch enabled={false} version={0} blockers={["settings_not_initialized"]} />);
     expect(toggle().hasAttribute("disabled")).toBe(true);
