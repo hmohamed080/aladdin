@@ -24,7 +24,7 @@ import type { Locale } from "@/lib/i18n/locales";
  *
  * It is self-contained on purpose (no i18n provider, no shell, no data, no design-system component that could itself
  * throw), so it stays reliable exactly when something upstream broke. The product name and copy are inline for the
- * same reason. B2B keeps its own route-level boundary (`app/b2b/error.tsx`); this one sits above everything else.
+ * same reason. B2B keeps its own route-level boundary (`app/(workspace)/b2b/error.tsx`); this one sits above everything else.
  */
 const COPY = {
   ar: {

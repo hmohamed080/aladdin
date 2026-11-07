@@ -3,7 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
-import { loadWorkspaceContext } from "@/server/queries/context";
+import { loadRequestWorkspaceContext } from "@/server/queries/request-workspace";
 import { isShowroomBusinessType } from "./workspace-model";
 
 // Both layout and leaf pages call this; cached only within the server request.
@@ -12,7 +12,8 @@ export const requireShowroomContext = cache(async () => {
   if (state === "unverified") redirect("/auth/sign-in?next=%2Fshowroom%2Fhome");
   if (!hasAppAccess(state)) redirect("/onboarding");
   const supabase = await getServerSupabase();
-  const workspace = await loadWorkspaceContext(supabase);
+  // Shared with the layouts above this one, so a request reads the work context once, not once per layout.
+  const workspace = await loadRequestWorkspaceContext();
   if (!workspace.active || !isShowroomBusinessType(workspace.active.orgType)) redirect("/b2b");
   return { supabase, workspace, org: workspace.active };
 });

@@ -111,7 +111,7 @@ export function ActiveCarve({
    */
   narrow?: boolean;
   /**
-   * DESIGN-LAB PROTOTYPE GATE — see `app/b2b/layout.tsx`. One account only.
+   * DESIGN-LAB PROTOTYPE GATE — see `app/(workspace)/b2b/layout.tsx`. One account only.
    *
    * Draws the band as a self-contained rounded chip, inset from BOTH ends of
    * the nav column, instead of the shared shell's band — which runs flush to
