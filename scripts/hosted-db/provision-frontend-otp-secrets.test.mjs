@@ -16,7 +16,7 @@ const LIVE_BINDINGS = [
 const RUNTIME = { compatibility_date: "2026-10-01", compatibility_flags: ["nodejs_compat"] };
 
 /** A stateful fake of the four wrangler calls the script makes. Records every call and the stdin of the write. */
-function fake({ deployed = [{ version_id: LIVE_VERSION, percentage: 100 }], versions, bulkFails = false, mutate } = {}) {
+function fake({ deployed = [{ version_id: LIVE_VERSION, percentage: 100 }], versions, bulkFails = false, createOnFail = false, readsFailAfterWrite = false, viewFailsForNew = false, mutate } = {}) {
   const state = {
     deployment: { id: "dep-1", versions: deployed },
     versions: versions ?? [{ id: LIVE_VERSION, number: 11 }],
@@ -27,12 +27,16 @@ function fake({ deployed = [{ version_id: LIVE_VERSION, percentage: 100 }], vers
     state.calls.push({ args, hasInput: opts.input !== undefined });
     const cmd = args.slice(0, 2).join(" ");
     const json = (o) => ({ status: 0, stdout: JSON.stringify(o), stderr: "" });
+    if (readsFailAfterWrite && state.stdin !== null && (cmd === "deployments status" || cmd === "versions list")) return { status: 1, stdout: "", stderr: "network down" };
     if (cmd === "deployments status") return json(state.deployment);
     if (cmd === "versions list") return json(state.versions);
-    if (cmd === "versions view") return json(state.views[args[2]]);
+    if (cmd === "versions view") { if (viewFailsForNew && args[2] === "new-version-1") return { status: 1, stdout: "", stderr: "view failed" }; return json(state.views[args[2]]); }
     if (args.slice(0, 3).join(" ") === "versions secret bulk") {
       state.stdin = opts.input;
-      if (bulkFails) return { status: 1, stdout: "", stderr: `boom ${opts.input}` };
+      if (bulkFails) {
+        if (createOnFail) state.versions = [...state.versions, { id: "new-version-1", number: 12 }];
+        return { status: 1, stdout: "", stderr: `boom ${opts.input}` };
+      }
       const id = "new-version-1";
       const added = Object.keys(JSON.parse(opts.input)).map((name) => ({ name, type: "secret_text" }));
       state.versions = [...state.versions, { id, number: 12 }];
@@ -173,4 +177,61 @@ test("never in CI, never without a terminal, unknown arguments are refused", asy
 
 test("redact removes every occurrence of a secret", () => {
   assert.equal(redact("a SECRET123 b SECRET123", ["SECRET123"]), "a [redacted] b [redacted]");
+});
+
+const values3 = () => Object.fromEntries(SECRET_NAMES.map((n) => [n, secret()]));
+const noPromotion = (f) => {
+  const bulks = f.state.calls.filter((c) => c.args.includes("bulk")).length;
+  assert.equal(bulks, 1, "never retried");
+  assert.ok(!f.state.calls.some((c) => c.args.includes("deploy") || c.args.includes("rollback") || c.args.includes("put")), "never promotes or rolls back");
+};
+
+test("nonzero wrangler exit with no new version: verified read-only, then said so", async () => {
+  const f = fake({ bulkFails: true });
+  const r = await go(f, ["--apply"], prompts(values3()));
+  assert.equal(r.code, 1);
+  assert.match(r.text, /Verifying read-only/);
+  assert.match(r.text, /Verified read-only: no new version exists/);
+  assert.match(r.text, /live deployment is unchanged/);
+  noPromotion(f);
+});
+
+test("nonzero wrangler exit but a version WAS created: reports its id and recovery, never claims none", async () => {
+  const f = fake({ bulkFails: true, createOnFail: true });
+  const r = await go(f, ["--apply"], prompts(values3()));
+  assert.equal(r.code, 1);
+  assert.ok(r.text.includes("1 NEW VERSION(S) EXIST"));
+  assert.match(r.text, /new-version-1/);
+  assert.match(r.text, /NOT promoted/);
+  assert.doesNotMatch(r.text, /no new version exists/);
+  noPromotion(f);
+});
+
+test("nonzero wrangler exit and the check itself cannot read: refuses to claim anything", async () => {
+  const f = fake({ bulkFails: true, readsFailAfterWrite: true });
+  const r = await go(f, ["--apply"], prompts(values3()));
+  assert.equal(r.code, 1);
+  assert.match(r.text, /COULD NOT VERIFY/);
+  assert.doesNotMatch(r.text, /no new version exists/);
+  noPromotion(f);
+});
+
+test("postflight failure after a successful upload: reports the new version id and safe recovery, no retry, no promotion", async () => {
+  const f = fake({ mutate: (s) => { s.views["new-version-1"].resources.bindings = s.views["new-version-1"].resources.bindings.filter((b) => b.name !== "RESEND_API_KEY"); } });
+  const r = await go(f, ["--apply"], prompts(values3()));
+  assert.equal(r.code, 1);
+  assert.match(r.text, /POSTFLIGHT PROBLEMS after a successful upload/);
+  assert.ok(r.text.includes("New version id(s): new-version-1"));
+  assert.match(r.text, /will NOT retry/);
+  assert.match(r.text, /wrangler deployments status/);
+  noPromotion(f);
+});
+
+test("an error thrown during postflight still reports the verification and the new version id", async () => {
+  const f = fake({ viewFailsForNew: true });
+  const r = await go(f, ["--apply"], prompts(values3()));
+  assert.equal(r.code, 1);
+  assert.match(r.text, /unexpected error occurred after the write began/);
+  assert.match(r.text, /new-version-1/);
+  noPromotion(f);
 });

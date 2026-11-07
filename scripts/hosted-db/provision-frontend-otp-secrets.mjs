@@ -122,11 +122,42 @@ const parse = (r, what) => {
   return JSON.parse(t.slice(Math.min(...starts)));
 };
 
+/** Safe recovery text. It never retries and never promotes; every command is read-only unless it says otherwise. */
+export function recovery(newIds, live = LIVE_VERSION) {
+  const ids = newIds.length ? newIds.join(", ") : "none found";
+  return [
+    `New version id(s): ${ids}. They are NOT promoted by this script and it will NOT retry.`,
+    "Safe recovery (do not re-run --apply until you understand the state):",
+    "  1. Confirm the live deployment: cd frontend && pnpm exec wrangler deployments status --env production   (must show only the live version at 100%).",
+    "  2. Inspect each new version: pnpm exec wrangler versions view <id> --env production   (read-only).",
+    `  3. An undeployed version serves no traffic and is harmless; leave it, never deploy it. If the live deployment is NOT ${live.slice(0, 8)} at 100%: pnpm exec wrangler rollback ${live} --env production (needs approval), then stop.`,
+    "  4. To remove the names later, use `wrangler versions secret delete <NAME> --env production` (creates another undeployed version) after review.",
+  ].join("\n");
+}
+
+/** After a nonzero wrangler exit: a read-only look at deployments and versions, then an honest verdict. */
+export function verifyAfterFailure({ read, before, live }) {
+  let after;
+  try {
+    after = read();
+  } catch (e) {
+    return `COULD NOT VERIFY (${e.message}). Do not assume nothing was created: from frontend/ run, read-only, 'wrangler deployments status --env production' and 'wrangler versions list --env production' and compare with the version list before (latest was ${live}).`;
+  }
+  const added = after.versions.filter((v) => !before.versions.some((o) => o.id === v.id));
+  const dv = after.deployment?.versions ?? [];
+  const depOk = dv.length === 1 && dv[0].version_id === live && dv[0].percentage === 100;
+  const depLine = depOk ? `Verified: the live deployment is unchanged (${live.slice(0, 8)} at 100%).` : "WARNING: the live deployment is NOT the single expected version at 100%: investigate before anything else.";
+  if (added.length === 0) return `FAILED. Verified read-only: no new version exists (version list unchanged). ${depLine} Nothing to clean up.`;
+  return `FAILED, but ${added.length} NEW VERSION(S) EXIST despite the error. ${depLine}\n${recovery(added.map((v) => v.id), live)}`;
+}
+
 export async function run({ argv, wrangler, hidden, out, ci = false, isTTY = true, live = LIVE_VERSION }) {
   const apply = argv.includes("--apply");
   const bad = argv.filter((a) => a !== "--apply");
   if (bad.length) { out(`unexpected argument: ${bad[0]}`); return 2; }
   const secrets = [];
+  let maybeWrote = false; // set just before the write: from then on, an unexpected error must be followed by a read-only look
+  let ctx = null;
   const refuse = (msg) => { out(redact(msg, secrets)); return 1; };
   try {
     if (apply && ci) return refuse("REFUSED: never in CI");
@@ -162,22 +193,28 @@ export async function run({ argv, wrangler, hidden, out, ci = false, isTTY = tru
     if (pre2.length) return refuse(`REFUSED:\n${pre2.map((x) => `  - ${x}`).join("\n")}`);
 
     out("[4/5] creating ONE undeployed version (secrets passed on stdin)");
+    maybeWrote = true; ctx = { read, before };
     const payload = JSON.stringify({ ...values, [URL_NAME]: PLACEHOLDER_URL });
     secrets.push(payload);
     const w = wrangler(["versions", "secret", "bulk", "--env", WORKER_ENV, "--tag", TAG, "--message", "P-4-otp-secrets-not-deployed"], { input: payload });
     out(redact(`${w.stdout ?? ""}${w.stderr ?? ""}`, secrets).trim());
-    if (w.status !== 0) return refuse("FAILED: wrangler returned an error. Check postflight below by re-running without --apply; nothing was deployed.");
+    if (w.status !== 0) {
+      // A nonzero exit does not prove that nothing was created: look, read-only, before saying anything about it.
+      out(`wrangler exited with code ${w.status}. Verifying read-only what exists (not assuming)...`);
+      return refuse(verifyAfterFailure({ read, before, live }));
+    }
 
     out("[5/5] postflight (read-only)");
     const after = read();
     const added = after.versions.filter((v) => !before.versions.some((o) => o.id === v.id));
     const newView = added.length === 1 ? parse(wrangler(["versions", "view", added[0].id, "--env", WORKER_ENV, "--json"]), "versions view (new)") : null;
     const post = checkPostflight({ before, after: { ...after, newView }, baseline, live });
-    if (post.length) return refuse(`POSTFLIGHT PROBLEMS:\n${post.map((x) => `  - ${x}`).join("\n")}`);
+    if (post.length) return refuse(`POSTFLIGHT PROBLEMS after a successful upload:\n${post.map((x) => `  - ${x}`).join("\n")}\n${recovery(added.map((v) => v.id), live)}`);
     out(`Done. New version ${added[0].id} (tag ${TAG}) is NOT deployed. Live ${live.slice(0, 8)} is still 100%. Bindings preserved; added exactly: ${NEW_NAMES.join(", ")}.`);
     out("Record the version id and the three fingerprints in the release record. Do NOT promote it.");
     return 0;
   } catch (e) {
+    if (maybeWrote && ctx) return refuse(`An unexpected error occurred after the write began (${e.message}). Not assuming anything: ${verifyAfterFailure({ ...ctx, live })}`);
     return refuse(`FAILED safely: ${e.message}`);
   }
 }
