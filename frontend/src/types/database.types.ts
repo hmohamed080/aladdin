@@ -7848,6 +7848,15 @@ export type Database = {
         Returns: string
       }
       admin_whatsapp_otp_settings_reconcile: { Args: { p_applied: Json }; Returns: Json }
+      admin_whatsapp_otp_delivery_begin: {
+        Args: { p_actor: string; p_expected_version: number; p_old: boolean | null; p_new: boolean; p_reason: string }
+        Returns: Json
+      }
+      admin_whatsapp_otp_delivery_finish: {
+        Args: { p_actor: string; p_request: string; p_status: string; p_version?: number; p_code?: string }
+        Returns: string
+      }
+      admin_whatsapp_otp_delivery_reconcile: { Args: { p_applied: Json; p_drift?: Json }; Returns: Json }
       whatsapp_otp_notification_record: {
         Args: { p_event_key: string; p_kind: string; p_source_env: string; p_occurred_at: number; p_stats: Json }
         Returns: Json

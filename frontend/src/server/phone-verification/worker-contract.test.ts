@@ -24,6 +24,7 @@ function memoryDb(): ReplayDb {
             },
             async first<T>() {
               // The Worker reads its settings row from D1 before every delivery: a fixture row, never production configuration.
+              if (sql.includes("FROM otp_delivery_switch")) return { enabled: 1, version: 1, updated_at: 0, updated_by: "00000000-0000-4000-8000-000000000001" } as T; // the Super Admin switch is ON
               if (sql.includes("FROM otp_settings WHERE id = 1")) return { daily_limit: 100, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90, version: 1, updated_at: 0, updated_by: "00000000-0000-4000-8000-000000000001" } as T;
               return (rows.has(String(v[0])) ? { state: rows.get(String(v[0])) } : null) as T | null;
             },

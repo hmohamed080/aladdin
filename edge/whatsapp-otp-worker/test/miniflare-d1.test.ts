@@ -55,6 +55,8 @@ test("D1 real SQL engine: one challenge delivers once under concurrency, failure
   try {
     const d1 = await freshD1(mf);
     await configure(d1, 1000);
+    await d1.prepare("INSERT INTO otp_delivery_switch (id, enabled, version, updated_at, updated_by) VALUES (1, 1, 1, 0, '00000000-0000-4000-8000-000000000001')").run(); // the Super Admin switch is ON
+    await d1.prepare("INSERT INTO otp_delivery_audit (at, request_id, actor, old_enabled, new_enabled, new_version, reason) VALUES (0, '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-000000000001', NULL, 1, 1, 'fixture: audited switch change')").run(); // ...with the audit row the admin route always writes with it
     const db = d1 as unknown as ReplayDb;
     assert.equal((await claimEvent(db, `otp_${DELIVERY}`)).outcome, "new");
     assert.equal((await claimEvent(db, `otp_${DELIVERY}`)).outcome, "blocked");

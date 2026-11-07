@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { readPhoneVerificationEnv } from "@/lib/env/phone-verification";
-import { whatsappOtpSettingsBegin, whatsappOtpSettingsFinish } from "@/lib/supabase/admin-server";
+import { whatsappOtpDeliveryBegin, whatsappOtpDeliveryFinish, whatsappOtpSettingsBegin, whatsappOtpSettingsFinish } from "@/lib/supabase/admin-server";
 import { getCurrentUser } from "@/server/auth/session";
 import { loadAdminAccess } from "@/server/authorization/admin";
 import type { FormState } from "@/server/actions/sales-forms";
+import { changeDelivery } from "@/server/whatsapp-otp/delivery-change";
 import { changeSettings } from "@/server/whatsapp-otp/settings-change";
-import { applySettings, fetchUsage, probeNotify } from "@/server/whatsapp-otp/worker-admin";
+import { applyDelivery, applySettings, fetchUsage, probeNotify } from "@/server/whatsapp-otp/worker-admin";
 import { resolveWorkerTransport } from "@/server/whatsapp-otp/worker-binding";
 
 /**
@@ -71,4 +72,36 @@ export async function checkWhatsappOtpAlertPathAction(_p: FormState, _fd: FormDa
   const out = await probeNotify({ workerUrl: env.workerUrl, adminSecret: env.adminSecret, fetchImpl: route.fetchImpl });
   if (!out.ok) return { ok: false, code: "whatsappOtp.errors.unavailable" };
   return { ok: out.result === "reachable", code: `whatsappOtp.notifyCheck.${out.result}` };
+}
+
+/**
+ * Super Admin: switch WhatsApp code sending ON or OFF. Same rules as the limits: the actor is ALWAYS the verified session user, the state
+ * is re-read from the Worker (never from the form), the database checks `whatsapp_otp.manage` and signs a one-request grant, and the Worker
+ * persists the flag with its own audit row. The form carries only the version the admin saw, the requested state and the reason.
+ * Turning ON additionally needs every prerequisite the Worker reports; turning OFF never does.
+ */
+export async function setWhatsappOtpDeliveryAction(_p: FormState, fd: FormData): Promise<FormState> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, code: "whatsappOtp.errors.forbidden" };
+  const access = await loadAdminAccess();
+  if (!access.isStaff) return { ok: false, code: "whatsappOtp.errors.forbidden" };
+
+  const requested = String(fd.get("enabled") ?? "");
+  if (requested !== "on" && requested !== "off") return { ok: false, code: "whatsappOtp.errors.invalid" };
+
+  const env = readPhoneVerificationEnv();
+  const route = resolveWorkerTransport();
+  if (!route.ok) return { ok: false, code: "whatsappOtp.errors.unavailable" };
+  const config = { workerUrl: env.workerUrl, adminSecret: env.adminSecret, fetchImpl: route.fetchImpl };
+  const result = await changeDelivery(
+    {
+      fetchUsage: () => fetchUsage(config),
+      begin: (a) => whatsappOtpDeliveryBegin(a),
+      apply: (payload) => applyDelivery(config, payload),
+      finish: (a) => whatsappOtpDeliveryFinish(a),
+    },
+    { actorId: user.id, permissions: access.permissions, formVersion: num(fd, "version"), enable: requested === "on", reason: String(fd.get("reason") ?? "") },
+  );
+  revalidatePath("/admin/whatsapp-otp");
+  return result;
 }

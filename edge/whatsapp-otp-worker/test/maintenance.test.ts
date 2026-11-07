@@ -4,7 +4,7 @@ import worker, { handleRequest, purgeExpiredReplayClaims, type ReplayDb } from "
 import { deliverOutbox, evaluateAlerts, nextLevel, runMaintenance } from "../src/maintenance.ts";
 import { verifySignature } from "../src/signing.ts";
 import { goodBody, mockMeta, signedSend } from "./support.ts";
-import { ADMIN_SECRET, NOTIFY_SECRET, NOTIFY_URL, configure, envFor, seedJournal, withD1 } from "./d1.ts";
+import { ADMIN_SECRET, NOTIFY_SECRET, NOTIFY_URL, configure, envFor, seedJournal, setDeliverySwitch, withD1 } from "./d1.ts";
 
 const now = () => Math.floor(Date.now() / 1000);
 const purge = (db: any, n: number) => purgeExpiredReplayClaims(db as unknown as ReplayDb, n);
@@ -194,6 +194,7 @@ describe("alert delivery to the app: signed, idempotent, retried, never touching
 
   test("NOTIFICATION FAILURES NEVER INTERRUPT OTP DELIVERY: sends keep working while the app is down and the outbox is full", async () => {
     await withD1(async (d1, db) => {
+      await setDeliverySwitch(d1, true);
       await configure(d1, 200);
       const env = envFor(d1); const meta = mockMeta();
       await seedJournal(d1, 150, "accepted", now() - 10);

@@ -90,3 +90,32 @@ export async function seedJournal(d1: { prepare(sql: string): { bind(...v: (stri
 export async function configure(d1: { prepare(sql: string): { bind(...v: (string | number)[]): { run(): Promise<unknown> } } }, limit = 100, ceiling = 5000, warn = 70, critical = 90) {
   await d1.prepare("INSERT INTO otp_settings (id, daily_limit, hard_ceiling, warn_percent, critical_percent, version, updated_at, updated_by) VALUES (1, ?1, ?2, ?3, ?4, 1, 0, ?5)").bind(limit, ceiling, warn, critical, ACTOR).run();
 }
+
+export const DELIVERY_PATH = "/v1/admin/delivery";
+
+/** What the Aladdin database signs in admin_whatsapp_otp_delivery_begin (same canonical string, distinct "v1d" prefix). */
+export function deliveryGrantFor(b: SettingsBody, opts: { bytes?: Uint8Array; expires?: number } = {}): { grant: string; grant_expires: number } {
+  const expires = opts.expires ?? Math.floor(Date.now() / 1000) + 300;
+  const canonical = ["v1d", b.request_id, b.actor_id, b.expected_version, b.enabled ? 1 : 0, expires, createHash("sha256").update(String(b.reason)).digest("hex")].join("|");
+  return { grant: createHmac("sha256", Buffer.from(opts.bytes ?? GRANT_BYTES)).update(canonical).digest("base64"), grant_expires: expires };
+}
+
+export const deliveryBody = (over: SettingsBody = {}): SettingsBody => {
+  const base: SettingsBody = { request_id: crypto.randomUUID(), actor_id: ACTOR, expected_version: 0, enabled: true, reason: "Acceptance rehearsal window approved", ...over };
+  return { ...deliveryGrantFor(base), ...base };
+};
+
+/**
+ * Fixture: the persisted delivery switch row AND its audit row, exactly as the audited admin route writes them (production gets a row only
+ * from that route). A switch row WITHOUT a matching audit row is, by design, treated as OFF: use `setDeliverySwitchUnaudited` for that.
+ */
+export async function setDeliverySwitch(d1: { prepare(sql: string): { bind(...v: (string | number)[]): { run(): Promise<unknown> } } }, enabled: boolean, version = 1) {
+  await d1.prepare("INSERT OR REPLACE INTO otp_delivery_switch (id, enabled, version, updated_at, updated_by) VALUES (1, ?1, ?2, 0, ?3)").bind(enabled ? 1 : 0, version, ACTOR).run();
+  await d1.prepare("INSERT INTO otp_delivery_audit (at, request_id, actor, old_enabled, new_enabled, new_version, reason) VALUES (0, ?1, ?2, NULL, ?3, ?4, 'fixture: audited switch change')")
+    .bind(crypto.randomUUID(), ACTOR, enabled ? 1 : 0, version).run();
+}
+
+/** Fixture: a direct write to the switch table that bypassed the audit (what a break-glass or hostile D1 write looks like). */
+export async function setDeliverySwitchUnaudited(d1: { prepare(sql: string): { bind(...v: (string | number)[]): { run(): Promise<unknown> } } }, enabled: boolean, version = 1) {
+  await d1.prepare("INSERT OR REPLACE INTO otp_delivery_switch (id, enabled, version, updated_at, updated_by) VALUES (1, ?1, ?2, 1700000000, ?3)").bind(enabled ? 1 : 0, version, ACTOR).run();
+}

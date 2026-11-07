@@ -28,6 +28,8 @@ for (const file of readdirSync(new URL("../migrations/", import.meta.url)).filte
 }
 // A LOCAL RIG fixture only: the real Workers get their settings row from an explicit, audited Super Admin action.
 await d1.prepare("INSERT INTO otp_settings (id, daily_limit, hard_ceiling, warn_percent, critical_percent, version, updated_at, updated_by) VALUES (1, 100, 5000, 70, 90, 1, 0, '00000000-0000-4000-8000-000000000001')").run();
+// The Super Admin delivery switch defaults to OFF (no row); this LOCAL rig turns it ON so the phone E2E can exercise the send path.
+await d1.prepare("INSERT INTO otp_delivery_switch (id, enabled, version, updated_at, updated_by) VALUES (1, 1, 1, 0, '00000000-0000-4000-8000-000000000001')").run();
 
 const allowed = new Set();
 const messages = []; // what Meta "received": {at, to, code, template, language, buttonCode}

@@ -35,7 +35,7 @@ export type SettingsRow = { daily_limit: number; hard_ceiling: number; warn_perc
 export const DEFAULT_SETTINGS: SettingsRow = { daily_limit: 100, hard_ceiling: 5000, warn_percent: 70, critical_percent: 90, version: 1, updated_at: 0, updated_by: "00000000-0000-4000-8000-000000000001" };
 
 /** A fake D1 for the SEND path: the replay claim, the outcome update and the settings row. Admin and maintenance tests use real SQL (Miniflare). */
-export function memoryReplayDb(opts: { settings?: SettingsRow | null } = {}): ReplayDb & { rows: Map<string, string>; seed(hash: string, createdAt: number): void; settings: SettingsRow | null } {
+export function memoryReplayDb(opts: { settings?: SettingsRow | null; deliverySwitch?: boolean | null | "unreadable" } = {}): ReplayDb & { rows: Map<string, string>; seed(hash: string, createdAt: number): void; settings: SettingsRow | null } {
   const rows = new Map<string, string>();
   const created = new Map<string, number>();
   const settings = opts.settings === undefined ? { ...DEFAULT_SETTINGS } : opts.settings;
@@ -72,6 +72,12 @@ export function memoryReplayDb(opts: { settings?: SettingsRow | null } = {}): Re
               throw new Error("Unexpected SQL");
             },
             async first<T>() {
+              if (sql.includes("FROM otp_delivery_switch")) {
+                // The Super Admin switch. Default ON so send-path tests stay about the send path; null = no row; "unreadable" = D1 error.
+                const flag = opts.deliverySwitch === undefined ? true : opts.deliverySwitch;
+                if (flag === "unreadable") throw new Error("D1 unavailable");
+                return (flag === null ? null : { enabled: flag ? 1 : 0, version: 1, updated_at: 0, updated_by: DEFAULT_SETTINGS.updated_by }) as T | null;
+              }
               if (sql.includes("FROM otp_settings WHERE id = 1")) return (settings ? { ...settings } : null) as T | null;
               if (sql.startsWith("SELECT 1")) return { ok: 1 } as T;
               const id = String(values[0]);

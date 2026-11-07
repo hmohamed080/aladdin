@@ -7266,3 +7266,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Tests: Worker 134/134, pgTAP 121 (127 planned) plus 33/42/108 against the edited migration, frontend admin suite 38+ negatives, permission contract replayed (718 functions), tsc and eslint clean (0 errors).
 - **Needs the owner (nothing was done):** create the two grant-key secrets and insert the same bytes in each Supabase database, verify the real Meta messaging limit, approve the Acceptance sequence A0-A10 in docs/operations/WHATSAPP_OTP_PRODUCTION_B3_PREPARATION.md step by step.
 
+
+## 2026-11-05 - WhatsApp OTP delivery ON/OFF switch (PR #136 branch, code only)
+
+- Audit of the Production readiness tasks: A9 CLOSED / A10 OPEN is recorded in the B3 tracker (local commit `8b08d5a5`, unpushed). Nothing was pushed, merged, deployed, migrated or enabled.
+- Built the Super Admin delivery switch end to end: Worker D1 `0003_delivery_switch.sql`, `src/delivery.ts` and `POST /v1/admin/delivery` (v1d grant, atomic audit, prerequisites); the send path now requires the environment permit AND the D1 switch (fail closed). Supabase `20261105100001` (begin/finish/reconcile, three audit actions, permissions manifest derived by hand). Frontend action, change flow, `role="switch"` component with a reason-required confirmation, i18n en/ar, Administrator read-only; `ConfirmDialog` gained an optional `renderTrigger`.
+- Consequences recorded in docs/operations/WHATSAPP_OTP_PRODUCTION_B3_PREPARATION.md section 13: Production now lists EIGHT migrations; #137's `20261105090001` sorts before the new version; an environment with the permit already "true" is OFF until a Super Admin turns the switch on.
+- Validation: Worker 172/172 and tsc; frontend tsc, eslint, 58 focused tests; migration-policy clean. NOT run: pgTAP 123 (54 planned), full pgTAP, permission gate, browser (no free Docker network pool for a second Supabase stack). Two image-processing tests fail in the full frontend run; this change does not touch them and they were not checked on the base branch.
