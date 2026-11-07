@@ -3,7 +3,7 @@ import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  checkBindings, checkConfigFile, checkDeployment, checkSwitch, expectedBindings, parseJsonc, reachedWorker, run, SWITCH_SQL,
+  checkBindings, checkConfigFile, checkDeployment, checkPrivacy, checkSchedules, checkSwitch, expectedBindings, parseJsonc, reachedWorker, run, SWITCH_SQL,
 } from "../scripts/check-production-deployment.mjs";
 
 const config = parseJsonc(readFileSync(fileURLToPath(new URL("../wrangler.production.jsonc", import.meta.url)), "utf8"));
@@ -48,8 +48,8 @@ test("missing, extra and changed bindings and safety variables are refused", () 
   assert.match(checkBindings(withBinding((b) => [...b, { name: "OTP_ADMIN_GRANT_SECRET_EXTRA", type: "secret_text" }]), expected).join(), /unexpected binding/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "WHATSAPP_DELIVERY_ENABLED" ? { ...x, text: "true" } : x))), expected).join(), /WHATSAPP_DELIVERY_ENABLED/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "OTP_RECIPIENT_MODE" ? { ...x, text: "allowlist" } : x))), expected).join(), /OTP_RECIPIENT_MODE/);
-  assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "APP_NOTIFY" ? { ...x, service: "somewhere-else" } : x))), expected).join(), /points at somewhere-else/);
-  assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "OTP_SIGNING_SECRET" ? { ...x, secret_name: "OTHER" } : x))), expected).join(), /does not reference/);
+  assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "APP_NOTIFY" ? { ...x, service: "somewhere-else" } : x))), expected).join(), /must be type=service to aladdin-frontend-production[^]*service=somewhere-else/);
+  assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "OTP_SIGNING_SECRET" ? { ...x, secret_name: "OTHER" } : x))), expected).join(), /must be type=secrets_store_secret/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "IDEMPOTENCY_DB" ? { ...x, id: "other-db" } : x))), expected).join(), /D1 binding/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "OTP_ENVIRONMENT" ? { ...x, text: "preview" } : x))), expected).join(), /OTP_ENVIRONMENT/);
 });
@@ -73,7 +73,7 @@ test("the Worker's own answer is recognised; anything else is not the Worker", (
 });
 
 // ---- the whole run, with fakes: only reads, never anything else ----
-function fakes(over: { view?: unknown; d1?: unknown; status?: unknown; get?: (url: string) => Promise<any>; wranglerFails?: string } = {}) {
+function fakes(over: { view?: unknown; d1?: unknown; status?: unknown; get?: (url: string) => Promise<any>; wranglerFails?: string; evidence?: Record<string, unknown> } = {}) {
   const calls: string[][] = [];
   const urls: string[] = [];
   const wrangler = (args: string[]) => {
@@ -86,11 +86,29 @@ function fakes(over: { view?: unknown; d1?: unknown; status?: unknown; get?: (ur
     throw new Error(`unexpected wrangler call ${args.join(" ")}`);
   };
   const get = async (url: string) => { urls.push(url); return over.get ? over.get(url) : { status: 404, contentType: "text/html", body: "<html>nothing here</html>" }; };
-  return { calls, urls, wrangler, get };
+  const apiPaths: string[] = [];
+  const api = async (p: string) => {
+    apiPaths.push(p);
+    const ev = { ...goodEvidence, ...(over.evidence ?? {}) } as any;
+    if (p.includes("/subdomain")) return ev.subdomain;
+    if (p.includes("/schedules")) return ev.schedules;
+    if (p.includes("/workers/domains")) return ev.domains;
+    if (p.startsWith("/zones?")) return ev.zones.map((z: any, i: number) => ({ id: `z${i}`, name: z.name }));
+    const m = /^\/zones\/z(\d+)\/workers\/routes$/.exec(p);
+    if (m) return ev.zones[Number(m[1])].routes;
+    throw new Error(`unexpected api path ${p}`);
+  };
+  return { calls, urls, apiPaths, wrangler, get, api };
 }
+const goodEvidence = {
+  subdomain: { enabled: false, previews_enabled: false },
+  schedules: { schedules: [{ cron: "* * * * *" }] },
+  domains: [],
+  zones: [{ name: "aladdindecore.com", routes: [{ pattern: "aladdindecore.com/api/*", script: "aladdin-frontend-production" }] }],
+};
 const exec = async (f: ReturnType<typeof fakes>, argv: string[] = []) => {
   const lines: string[] = [];
-  const code = await run({ argv, wrangler: f.wrangler, get: f.get, out: (s: string) => lines.push(s), config });
+  const code = await run({ argv, wrangler: f.wrangler, get: f.get, api: f.api, accountId: "acct", out: (s: string) => lines.push(s), config });
   return { code, text: lines.join("\n") };
 };
 const onlyReads = (f: ReturnType<typeof fakes>) => {
@@ -131,6 +149,58 @@ test("before the Worker exists the check fails cleanly (nothing else is attempte
   assert.equal(r.code, 1);
   assert.match(r.text, /could not complete/);
   assert.equal(f.calls.length, 1);
+});
+
+test("binding types and structured fields are validated exactly, not by substring", () => {
+  const swap = (name: string, patch: Record<string, unknown>) => checkBindings(withBinding((b) => b.map((x) => (x.name === name ? { ...x, ...patch } : x))), expected).join();
+  // right values in the wrong type or the wrong field must fail
+  assert.match(swap("IDEMPOTENCY_DB", { type: "kv_namespace" }), /D1 binding/);
+  assert.match(swap("IDEMPOTENCY_DB", { id: undefined, note: expected.IDEMPOTENCY_DB.id }), /D1 binding/);
+  assert.match(swap("OTP_SIGNING_SECRET", { type: "secret_text" }), /secrets_store_secret/);
+  assert.match(swap("OTP_SIGNING_SECRET", { secret_name: undefined, store_id: "other", comment: expected.OTP_SIGNING_SECRET.secret_name }), /secrets_store_secret/);
+  assert.match(swap("OTP_SIGNING_SECRET", { store_id: "other-store" }), /store/);
+  assert.match(swap("APP_NOTIFY", { type: "plain_text" }), /type=service/);
+  assert.match(swap("APP_NOTIFY", { environment: "staging" }), /production/);
+  assert.match(swap("WHATSAPP_PHONE_NUMBER_ID", { type: "secret_text" }), /differs/);
+  assert.equal(swap("APP_NOTIFY", {}), "");
+});
+
+test("privacy by API: workers.dev, previews, custom domains and routes", () => {
+  const ok = { subdomain: { enabled: false, previews_enabled: false }, domains: [], zones: [{ name: "z", routes: [{ pattern: "x/*", script: "other" }] }] };
+  assert.deepEqual(checkPrivacy(ok), []);
+  assert.match(checkPrivacy({ ...ok, subdomain: { enabled: true, previews_enabled: false } }).join(), /workers\.dev is not disabled/);
+  assert.match(checkPrivacy({ ...ok, subdomain: { enabled: false, previews_enabled: true } }).join(), /preview URLs/);
+  assert.match(checkPrivacy({ ...ok, subdomain: undefined }).join(), /workers\.dev is not disabled/);
+  assert.match(checkPrivacy({ ...ok, domains: [{ hostname: "otp.example.com", service: "aladdin-whatsapp-otp-production" }] }).join(), /custom domain/);
+  assert.match(checkPrivacy({ ...ok, zones: [{ name: "z", routes: [{ pattern: "a/*", script: "aladdin-whatsapp-otp-production" }] }] }).join(), /route a\/\*/);
+  assert.match(checkPrivacy({ ...ok, zones: undefined }).join(), /could not be listed/);
+});
+
+test("cron trigger must equal the declared schedule", () => {
+  assert.deepEqual(checkSchedules({ schedules: [{ cron: "* * * * *" }] }, config), []);
+  assert.match(checkSchedules({ schedules: [] }, config).join(), /differ/);
+  assert.match(checkSchedules({ schedules: [{ cron: "* * * * *" }, { cron: "0 * * * *" }] }, config).join(), /differ/);
+});
+
+test("the run uses API evidence, refuses without it, and issues GET only", async () => {
+  const f = fakes();
+  assert.equal((await exec(f)).code, 0);
+  assert.ok(f.apiPaths.some((p) => p.endsWith("/subdomain")) && f.apiPaths.some((p) => p.endsWith("/schedules")) && f.apiPaths.some((p) => p.includes("/workers/domains?service=")) && f.apiPaths.some((p) => p.endsWith("/workers/routes")));
+  // a workers.dev address that is on, or a missing cron, fails even though both HTTP probes look private
+  assert.equal((await exec(fakes({ evidence: { subdomain: { enabled: true, previews_enabled: false } } }))).code, 1);
+  assert.equal((await exec(fakes({ evidence: { schedules: { schedules: [] } } }))).code, 1);
+  // no API credentials: HTTP probes are not sufficient, so the run is refused
+  const lines: string[] = [];
+  const f2 = fakes();
+  const code = await run({ argv: [], wrangler: f2.wrangler, get: f2.get, api: null, accountId: undefined, out: (s: string) => lines.push(s), config });
+  assert.equal(code, 1);
+  assert.match(lines.join("\n"), /CLOUDFLARE_API_TOKEN/);
+});
+
+test("wrangler is run without a shell, so the D1 SQL reaches it as one argument", () => {
+  const src = readFileSync(fileURLToPath(new URL("../scripts/check-production-deployment.mjs", import.meta.url)), "utf8");
+  assert.ok(src.includes("shell: false") && !/shell:\s*process\.platform/.test(src));
+  assert.ok(src.includes("process.execPath"));
 });
 
 test("an unexpected argument is a usage error and calls nothing", async () => {

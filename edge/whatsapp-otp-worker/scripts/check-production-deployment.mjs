@@ -79,18 +79,23 @@ export function checkDeployment(status) {
 export function checkBindings(view, expected) {
   const p = [];
   const got = new Map((view?.resources?.bindings ?? []).map((b) => [b.name, b]));
-  const text = (b) => JSON.stringify(b);
+  const shape = (b) => `type=${b.type ?? "?"}, fields=${Object.keys(b).filter((k) => k !== "text" && k !== "json").sort().join("/")}`;
   for (const [name, want] of Object.entries(expected)) {
     const b = got.get(name);
     if (!b) { p.push(`binding ${name} is MISSING on the deployed version`); continue; }
+    // Exact type and exact structured fields: no substring matching, so a wrong type or a value in the wrong field cannot pass.
     if (want.kind === "var") {
-      if (b.type !== "plain_text" || String(b.text) !== want.text) p.push(`variable ${name} differs from wrangler.production.jsonc`);
+      if (b.type !== "plain_text" || b.text !== want.text) p.push(`variable ${name} differs from wrangler.production.jsonc (${shape(b)})`);
     } else if (want.kind === "service") {
-      if (b.service !== want.service) p.push(`service binding ${name} points at ${b.service ?? "?"}, expected ${want.service}`);
+      if (b.type !== "service" || b.service !== want.service || (b.environment !== undefined && b.environment !== "production")) {
+        p.push(`service binding ${name} must be type=service to ${want.service} (production); found ${shape(b)}, service=${b.service ?? "?"}, environment=${b.environment ?? "(none)"}`);
+      }
     } else if (want.kind === "secret") {
-      if (!text(b).includes(want.secret_name) || !text(b).includes(want.store_id)) p.push(`secret binding ${name} does not reference ${want.secret_name}`);
+      if (b.type !== "secrets_store_secret" || b.store_id !== want.store_id || b.secret_name !== want.secret_name) {
+        p.push(`secret binding ${name} must be type=secrets_store_secret with store ${want.store_id} and secret ${want.secret_name}; found ${shape(b)}, secret_name=${b.secret_name ?? "?"}`);
+      }
     } else if (want.kind === "d1") {
-      if (!text(b).includes(want.id)) p.push(`D1 binding ${name} does not reference the Production database`);
+      if (b.type !== "d1" || b.id !== want.id) p.push(`D1 binding ${name} must be type=d1 with id ${want.id}; found ${shape(b)}`);
     }
   }
   for (const name of got.keys()) if (!(name in expected)) p.push(`unexpected binding ${name} on the deployed version`);
@@ -113,7 +118,26 @@ export function checkSwitch(d1) {
   return p;
 }
 
-/** res = { status, contentType, body } of an unauthenticated GET. */
+/** Cloudflare API evidence that the Worker has no public address. subdomain = GET .../scripts/<name>/subdomain, domains = GET .../workers/domains?service=<name>,
+ *  zones = [{ name, routes: GET /zones/<id>/workers/routes result }] for EVERY zone of the account. */
+export function checkPrivacy({ subdomain, domains, zones }) {
+  const p = [];
+  if (subdomain?.enabled !== false) p.push(`workers.dev is not disabled (enabled=${subdomain?.enabled})`);
+  if (subdomain?.previews_enabled !== false) p.push(`preview URLs are not disabled (previews_enabled=${subdomain?.previews_enabled})`);
+  for (const d of domains ?? []) if (d?.service === WORKER || d?.service === undefined) p.push(`custom domain attached: ${d?.hostname ?? "?"}`);
+  for (const z of zones ?? []) for (const r of z.routes ?? []) if (r?.script === WORKER) p.push(`route ${r.pattern} on zone ${z.name} points at this Worker`);
+  if (!Array.isArray(zones)) p.push("zone routes could not be listed");
+  return p;
+}
+
+/** schedules = GET .../scripts/<name>/schedules result; must equal triggers.crons of the config exactly. */
+export function checkSchedules(schedules, config) {
+  const got = (schedules?.schedules ?? []).map((s) => s.cron).sort();
+  const want = [...(config.triggers?.crons ?? [])].sort();
+  return JSON.stringify(got) === JSON.stringify(want) && want.length ? [] : [`registered cron triggers [${got.join(", ")}] differ from wrangler.production.jsonc [${want.join(", ")}]`];
+}
+
+/** res = { status, contentType, body } of an unauthenticated GET. SUPPLEMENTARY only: a GET that fails to reach the Worker proves nothing about routing. */
 export function reachedWorker(res) {
   if (!res) return false;
   const json = /application\/json/i.test(res.contentType ?? "");
@@ -128,7 +152,19 @@ const parse = (r, what) => {
   return JSON.parse(t.slice(Math.min(...starts)));
 };
 
-export async function run({ argv, wrangler, get, out, config }) {
+/** Reads the privacy and cron evidence from the Cloudflare API (GET only). api(path) resolves to the response's `result`. */
+export async function collectApiEvidence(api, accountId) {
+  const base = `/accounts/${accountId}/workers`;
+  const subdomain = await api(`${base}/scripts/${WORKER}/subdomain`);
+  const schedules = await api(`${base}/scripts/${WORKER}/schedules`);
+  const domains = await api(`${base}/domains?service=${WORKER}`);
+  const zoneList = await api(`/zones?account.id=${accountId}&per_page=50`);
+  const zones = [];
+  for (const z of zoneList) zones.push({ name: z.name, routes: await api(`/zones/${z.id}/workers/routes`) });
+  return { subdomain, schedules, domains, zones };
+}
+
+export async function run({ argv, wrangler, get, api, accountId, out, config }) {
   if (argv.length) { out(`unexpected argument: ${argv[0]}`); return 2; }
   const problems = [];
   const step = (label, list) => { out(`${list.length ? "FAIL" : "ok  "}  ${label}`); for (const x of list) { out(`        - ${x}`); problems.push(`${label}: ${x}`); } };
@@ -147,13 +183,21 @@ export async function run({ argv, wrangler, get, out, config }) {
     const d1 = parse(wrangler(["d1", "execute", D1_NAME, "--remote", "-c", "wrangler.production.jsonc", "--json", "--command", SWITCH_SQL]), "d1 execute");
     step("D1 switch tables empty (delivery never switched on)", checkSwitch(d1));
 
+    if (!api || !accountId) {
+      step("Cloudflare API evidence (workers.dev, previews, domains, routes, cron)", ["CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID must be set (read-only token: Workers Scripts Read, Account Zone Read, Workers Routes Read); HTTP probes alone are not evidence"]);
+    } else {
+      const ev = await collectApiEvidence(api, accountId);
+      step("private by Cloudflare API: workers.dev and preview URLs off, no custom domains, no routes", checkPrivacy(ev));
+      step("cron trigger registered as declared", checkSchedules(ev.schedules, config));
+    }
+
     const routing = [];
     for (const [label, url] of [["workers.dev address", `https://${WORKER}.${WORKERS_DEV_SUBDOMAIN}.workers.dev/`], ["Production site path", `${SITE}/v1/otp/send`]]) {
       let res;
       try { res = await get(url); } catch (e) { routing.push(`${label}: could not be probed (${e.message})`); continue; }
       if (reachedWorker(res)) routing.push(`${label} ANSWERS LIKE THE WORKER (status ${res.status}): the Worker is reachable from outside`);
     }
-    step("private routing (no public address)", routing);
+    step("supplementary HTTP probes (not sufficient evidence on their own)", routing);
   } catch (e) {
     out(`FAIL  could not complete: ${e.message}`);
     return 1;
@@ -164,11 +208,21 @@ export async function run({ argv, wrangler, get, out, config }) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const cwd = path.join(HERE, "..");
-  const wrangler = (args) => spawnSync("pnpm", ["exec", "wrangler", ...args], { cwd, encoding: "utf8", shell: process.platform === "win32", maxBuffer: 32 * 1024 * 1024 });
+  // No shell: node runs the pinned wrangler entry point directly, so every argument (the D1 SQL has spaces and parentheses) reaches wrangler verbatim on Windows too.
+  const wranglerJs = path.join(cwd, "node_modules", "wrangler", "bin", "wrangler.js");
+  const wrangler = (args) => spawnSync(process.execPath, [wranglerJs, ...args], { cwd, encoding: "utf8", shell: false, maxBuffer: 32 * 1024 * 1024 });
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const api = token && accountId ? async (p) => {
+    const r = await fetch(`https://api.cloudflare.com/client/v4${p}`, { method: "GET", headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20000) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.success === false) throw new Error(`Cloudflare API GET ${p.split("?")[0]} failed (HTTP ${r.status}; token needs read access)`);
+    return j.result;
+  } : null;
   const get = async (url) => {
     const r = await fetch(url, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(20000) });
     return { status: r.status, contentType: r.headers.get("content-type") ?? "", body: (await r.text()).slice(0, 200) };
   };
-  run({ argv: process.argv.slice(2), wrangler, get, out: (s) => console.log(s), config: parseJsonc(readFileSync(CONFIG, "utf8")) })
+  run({ argv: process.argv.slice(2), wrangler, get, api, accountId, out: (s) => console.log(s), config: parseJsonc(readFileSync(CONFIG, "utf8")) })
     .then((code) => { process.exitCode = code; }, () => { process.exitCode = 1; });
 }
