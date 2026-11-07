@@ -48,7 +48,9 @@ export function WhatsappOtpDeliverySwitch({ enabled, version, blockers }: { enab
             <span
               aria-hidden="true"
               className={cn(
-                "inline-block h-5 w-5 rounded-pill bg-surface shadow-sm transition-transform",
+                "inline-block h-5 w-5 rounded-pill shadow-sm transition-transform",
+                // OFF: a muted-foreground knob that stays visible on the track in light AND dark (surface on surface-hover vanished in dark)
+                enabled ? "bg-surface" : "bg-fg-muted",
                 // logical offsets keep the knob on the correct side in RTL
                 enabled ? "ltr:translate-x-6 rtl:-translate-x-6" : "ltr:translate-x-1 rtl:-translate-x-1",
               )}

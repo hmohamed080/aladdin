@@ -75,7 +75,15 @@ export default async function WhatsappOtpPage() {
   const deliveryHelp =
     canManage && delivery && !delivery.enabled && blockers.length > 0
       ? t("whatsappOtp.delivery.blockedHelp", { items: blockers.map((b) => t(`whatsappOtp.delivery.blockers.${b}`)).join(" · ") })
-      : t(deliveryOn ? "whatsappOtp.delivery.onHelp" : delivery?.enabled ? "whatsappOtp.delivery.offByEnvironmentHelp" : "whatsappOtp.delivery.offHelp");
+      : t(
+          deliveryOn
+            ? "whatsappOtp.delivery.onHelp"
+            : delivery?.enabled
+              ? runtime?.delivery_permitted === true
+                ? "whatsappOtp.delivery.awaitingConfirmationHelp" // permitted and switched on: waiting for the Aladdin database's signed confirmation
+                : "whatsappOtp.delivery.offByEnvironmentHelp"
+              : "whatsappOtp.delivery.offHelp",
+        );
   const canCeiling = can(access, "whatsapp_otp.ceiling_manage");
   const n = (v: number) => formatNumber(v, locale);
   const window = (label: string, w: FailureWindow) => (
