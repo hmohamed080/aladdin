@@ -54,6 +54,9 @@
     "production": {
       "name": "aladdin-frontend-production",
       "workers_dev": false,
+      // Stated explicitly: wrangler's default for an unset key made its pre-deploy diff print
+      // "preview_urls: true". Production has no preview URLs (the guard also enforces this).
+      "preview_urls": false,
       "services": [
         { "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend-production" },
         { "binding": "BACKEND", "service": "aladdin-backend-production" }
