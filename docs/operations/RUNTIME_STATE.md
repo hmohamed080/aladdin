@@ -1,5 +1,12 @@
 # Runtime State
 
+## Migration rollout preparation (PRs #148 merged, #153 open) — 2026-11-08
+- Live history read-only at 07:50Z: Acceptance (`nxossqhdfltcqdwvbewi`) 203 applied, latest `20261107090002`, pending `090003-090006` (plain push). Production (`kkpkgjrweysgvhvkhzun`) 203 applied, latest `20261107090003`, pending `20261105090001` (older than latest, needs `--include-all`) plus `090004-090006`. End state on both: 207, none pending. Nothing applied by this work.
+- Acceptance pre-migration snapshot `aladdin-acceptance-20261108T060819Z`: restore test PASS (aladdin-backups run 42461215127). The Acceptance push still needs its own owner GO; a read-only dry-run needs one too.
+- **Production approval prerequisite (open blocker):** a recovery rehearsal of a fresh Production snapshot, with the 4 pending migrations applied to the restored copy and permissions verified. `scripts/hosted-db/production-rehearsal.sh` is pinned to an old branch/SHA and the old 26-migration baseline, so it must be adapted first. See `docs/operations/MIGRATION_DRYRUN_RUNBOOK_20261108.md` section E.
+- Tooling: `p2-gate.mjs`/`production-p2-push.sh`/`production-recovery-snapshot.sh` updated to 203 / 4 pending (#148); `acceptance-preflight.sh` and `verify-permissions-readonly.sh` added (#153), tested offline only, never run against a hosted project.
+- Known gap: the `supabase-rls` permission gate is local-container only; hosted permissions are checked with `verify-permissions-readonly.sh`. No scripted restore into a new hosted Production project exists.
+
 ## Showroom social links (draft PR) — 2026-11-05
 - Branch `feat/showroom-social-links-20261105` (from `main` `f823d88c`): migrations `20261107090001` and `20261107090002` plus the frontend. Draft PR opened 2026-11-07; not applied to Acceptance or Production; both migrations are expand-only. Deploy order when approved: migrations first, then the frontend. Rollback: revert the frontend, the migrations may stay.
 - Review fix wave (local): links limited to showrooms in the RPCs, action and wizard; completion item mirrors the address rule; i18n and accessibility fixes. pgTAP now 145 files / 6513 tests PASS.

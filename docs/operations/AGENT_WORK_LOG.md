@@ -7382,3 +7382,11 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - P-4 run assessed from Wrangler's local debug log (counts and masked structure only): request/response bodies omitted, no secret strings, sanitize unset; exposure ruled out, no rotation recommended.
 - D1 binding validated by `database_id` (API-shaped fixtures); zone/route/domain discovery paginated and refuses partial results; owner commands given for Git Bash.
 - No Production writes, deployment, merge, rotation or P-4 rerun. Delivery OFF.
+
+## 2026-11-08 - Migration dry-run preparation (agent)
+
+- Read live migration history of both hosted projects (read-only): Acceptance 203 / `20261107090002`, Production 203 / `20261107090003`. The Production P-2 gate and snapshot scripts still expected 195 / 8 pending; updated to 203 / 4 pending (`20261105090001`, `090004-090006`), ending at 207 (PR #148, merged as a0aa229).
+- Wrote `docs/operations/MIGRATION_DRYRUN_RUNBOOK_20261108.md` (preflight, dry-run, backup gates, rollback). Review fixes: the permission gate is local-container only; `restore-acceptance.sh` is Acceptance-only and cannot restore into a new project.
+- PR #153 adds `acceptance-preflight.sh` + `acceptance-gate.mjs` and `verify-permissions-readonly.sh/.mjs`; offline tests 106/106 across `scripts/hosted-db/*.test.mjs` and the history guard; doc links 0 broken.
+- Outstanding: adapt `production-rehearsal.sh` (pinned to an old SHA and baseline) for the Production recovery rehearsal required before any Production GO; first real run of the new scripts is a read-only Acceptance baseline (needs owner GO). No hosted change was made.
+
