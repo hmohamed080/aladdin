@@ -23,11 +23,22 @@ for f in schema-fingerprint.sql rowcounts.sql auth-storage-columns.sql local-onl
   [ -s "$KIT/$f" ] || die "missing kit file $f"; done
 [ -s "$REPO_ROOT/supabase/config.toml" ] || die "no supabase/config.toml under $REPO_ROOT"
 # The throwaway stack must reproduce the hosted project's managed Auth/Storage schema EXACTLY (step 3 refuses otherwise).
-# Pinned to the CLI whose images match Acceptance: gotrue v2.197.0 (auth migrations through 20260831180000: SCIM, MFA
-# recovery codes, one-time-token expiry) and storage-api v1.79.28 (storage migrations through 0073: object versioning,
-# bucket lifecycle), postgres 17.11.0.002. 2.110.0 ran gotrue v2.193.0 / storage-api v1.66.4 and could not. Bump this
-# only together with the hosted project's Auth/Storage versions; db-backup.sh keeps its own dump-tool pin.
-RESTORE_SUPABASE_CLI_VERSION=2.119.0
+# The CLI is pinned to an exact release, and so are the three service images the schema depends on, written to the
+# stack's supabase/.temp/*-version files, which is how the CLI itself pins a local stack to a linked project:
+#   storage-api v1.89.13  what Acceptance reports at /storage/v1/version (2026-11-08); storage migrations through
+#                         0079 (object versioning, bucket lifecycle, lifecycle writer coordination). No stable v2 CLI
+#                         bundles one: 2.122.1 ships v1.84.19, which stops at 0074 and lacks storage.bucket_lifecycle_states
+#                         and storage.lifecycle_abandoned_artifacts, so the guard (rightly) refused. Releases v1.86.0
+#                         through v1.90.0 all end at 0079 and create the same tables.
+#   gotrue v2.197.0      auth migrations through 20260831180000 (SCIM, MFA recovery codes, one-time-token expiry).
+#   postgres 17.11.0.002 the image of the passing 2026-11-01 restore (run 41299245228), so a newer image cannot change
+#                        extension versions under the schema fingerprint.
+# Bump these only together with the hosted project's Auth/Storage versions and re-run restore-pin-test.sh; db-backup.sh
+# keeps its own dump-tool pin. The compatibility guard below is never relaxed to make a newer project pass.
+RESTORE_SUPABASE_CLI_VERSION=2.122.1
+RESTORE_STORAGE_API_VERSION=v1.89.13
+RESTORE_GOTRUE_VERSION=v2.197.0
+RESTORE_POSTGRES_VERSION=17.11.0.002
 read -r -a SB <<< "${SUPABASE_CLI:-npx --yes supabase@$RESTORE_SUPABASE_CLI_VERSION}"
 sb() { "${SB[@]}" "$@"; }
 umask 077
@@ -78,6 +89,11 @@ for f in roles.sql schema.sql data.sql security-tail.out.sql fingerprint.txt row
 R="$W/stack"; mkdir -p "$R/supabase/migrations"; cp -r "$REPO_ROOT/supabase/templates" "$R/supabase/" 2>/dev/null || true
 sed 's/^project_id = .*/project_id = "aladdin_restore_test"/; s/543\([0-9][0-9]\)/645\1/g; s/^sql_paths = .*/sql_paths = []/' \
   "$REPO_ROOT/supabase/config.toml" > "$R/supabase/config.toml"
+mkdir -p "$R/supabase/.temp"
+printf '%s' "$RESTORE_STORAGE_API_VERSION" > "$R/supabase/.temp/storage-version"
+printf '%s' "$RESTORE_GOTRUE_VERSION" > "$R/supabase/.temp/gotrue-version"
+printf '%s' "$RESTORE_POSTGRES_VERSION" > "$R/supabase/.temp/postgres-version"
+log "local stack images: storage-api $RESTORE_STORAGE_API_VERSION, gotrue $RESTORE_GOTRUE_VERSION, postgres $RESTORE_POSTGRES_VERSION"
 C="supabase_db_aladdin_restore_test"
 [ -n "${KEEP_STACK:-}" ] || trap 'sb stop --workdir "$R" --no-backup >/dev/null 2>&1 || true' EXIT
 sb start --workdir "$R" -x edge-runtime,logflare,vector,studio,supavisor,imgproxy,realtime,mailpit,postgres-meta > "$OUT/stack-start.log" 2>&1 \
@@ -88,7 +104,7 @@ lq() { docker exec -i "$C" psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 <
 lq "$KIT/auth-storage-columns.sql" > "$OUT/columns-local.txt"
 if ! diff <(grep -v '^marker ' "$B/columns.txt" | sort) <(grep -v '^marker ' "$OUT/columns-local.txt" | sort) > "$OUT/columns-diff.txt"; then
   { echo "STACK MISMATCH: the local Auth/Storage schema differs from the backed-up project (< backup, > local stack):"
-    sed 's/^/  /' "$OUT/columns-diff.txt"; echo "Update SUPABASE_CLI to the version the project runs, then retry."; } | tee "$OUT/REPORT.txt"
+    sed 's/^/  /' "$OUT/columns-diff.txt"; echo "Update the RESTORE_*_VERSION pins in restore-test.sh to the versions the project runs (README, Restore-test stack version), then retry."; } | tee "$OUT/REPORT.txt"
   exit 2
 fi
 
