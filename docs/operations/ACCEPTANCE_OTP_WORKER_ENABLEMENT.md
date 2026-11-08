@@ -4,11 +4,11 @@ Target: `aladdin-whatsapp-otp-preview` (Acceptance D1 `aladdin-whatsapp-otp-acce
 Owner decisions (2026-11-08): no allowlist and no dedicated test number; `OTP_RECIPIENT_MODE=open`; real CAPTCHA, rate limits, a low send budget and
 the kill switches stay in force. Every step below needs its own approval; none has been run.
 
-## Two separate changes, two approvals
+## Changes and approvals (W0 and W1 are done; W2 is five staged approvals)
 | | Change | Code | Effect |
 |---|---|---|---|
 | **W1** | Deploy open mode, delivery still OFF | PR #161 (merged first) | `OTP_ENVIRONMENT=acceptance`, `OTP_RECIPIENT_MODE=open`, `WHATSAPP_DELIVERY_ENABLED="false"`. Sending is impossible. |
-| **W2** | Delivery permit `"true"` | this change (stacked on #161; merge only after W1 is verified) | Adds the permit. Still nothing is sent until the Super Admin switch is ON and attestation is fresh. |
+| **W2** | Staged activation: low limits, permit `"true"`, guard, switch, signup (five separate approvals) | this change (merge only at W2 Stage 2) | Nothing is sent until Stage 5, the owner's E2E. |
 
 The permit is one of three Worker-side conditions: permit AND the audited Super Admin switch in D1 (starts OFF) AND a fresh attestation. Limits (D1, Super Admin) must exist first, or the Worker sends nothing.
 
@@ -31,30 +31,34 @@ Preconditions: #161 and #160 merged; checkout = exact `origin/main` SHA (pinned 
 4. Rollback: `cd frontend && pnpm exec wrangler rollback 6445cc17-188c-459c-b646-d02f57b1e6d5 --name aladdin-whatsapp-otp-preview --message "rollback W1"` (allowlist mode, delivery OFF, secret already removed). Do NOT roll back to the older `11b9f694`, which still carries the deleted `OTP_ALLOWED_RECIPIENTS` secret. Nothing in the database changes.
 5. Secret cleanup: DONE by the owner before W1 (see the precondition). W1 verification must show `OTP_ALLOWED_RECIPIENTS` absent.
 
-## W2: delivery permit and low budget
-Preconditions: W1 verified; the Acceptance frontend (A1 redeploy from the final main, incl. PR #160) is live; Acceptance DB migrations 090003-090006 applied.
-1. Merge this change (permit `"true"`; `check-preview-config.mjs` accepts `"true"`/`"false"` literals only, for the Acceptance Worker name and environment only). After #161 merges, this PR must show only its own commit(s): rebase or merge `main` into the branch before review.
-2. **Gate before the permit:** read-only D1 SELECT must show the delivery switch OFF. If it is not OFF, stop and ask. Only then, with the owner's approval, redeploy as in W1 step 2 and verify the vars show `WHATSAPP_DELIVERY_ENABLED=true` and that nothing was sent (journal count equal to its value before the deploy, switch still OFF).
-3. **Acceptance frontend flags** (the phone sign-up path is dormant without them; check names and presence only, never print values; set only with separate approval; the five names mirror the Production list in `provision-frontend-signup-secrets.mjs`): `PHONE_VERIFICATION_ENABLED=true`, `PHONE_SIGNUP_VERIFICATION_ENABLED=true`, `PHONE_OTP_DELIVERY=worker`, `PHONE_OTP_HMAC_KEYS`, `PHONE_SIGNUP_COOKIE_SECRET`; plus `PHONE_OTP_ADMIN_SECRET` (the delivery gate and the Super Admin page sign `/v1/admin/*` with it) and the service binding `OTP_WORKER -> aladdin-whatsapp-otp-preview` (already in `frontend/wrangler.jsonc`). A missing one leaves sign-up unavailable (fail closed).
-4. **Acceptance DB config** (`app.phone_verification_config`, audited, SQL-flippable, ships `enabled=false, signup_enabled=false, alias_guard_mode=off`).
-   - **Read and record first** (read-only SELECT of the three columns). Owner-verified 2026-11-08: `false, false, off`.
-   - **Constraint:** migration `20261030090002` adds `ck_config_signup_needs_guard`: `not signup_enabled or alias_guard_mode <> 'off'`. Setting `signup_enabled=true` while the guard is `off` is rejected by the database. The guard comes first.
-   - Set values only in steps 5-7 below, each change separately approved. `alias_guard_mode` goes to `observe` only, never `enforce` at this stage (enforce would refuse any alias creation without a grant and is tied to retiring every no-grant path).
-   - **Audit verification after every change:** a read-only SELECT on `app.phone_verification_config_log` must show exactly one new row per changed setting (`setting`, `old_value`, `new_value`) and the config row must show the new value; record both.
-5. **Super Admin on Acceptance** (`/admin/whatsapp-otp`) initialises the limits: **daily limit 20, hard ceiling 50, warn 70%, critical 90%** (typed confirmation of the ceiling, reason of 20+ characters, expected version 0), then turns the switch ON and waits for a fresh attestation.
-6. Runtime check through the signed usage path (the Super Admin page, or `/v1/admin/usage`): `runtime.delivery_enabled=true`, `configured=true`, `remaining>0`. This is exactly what the sign-up gate (#160) reads.
-7. **DB switches, each a separately approved write, in this order, with the audit check of step 4 after each:**
-   1. `alias_guard_mode = 'observe'` (only after delivery is ready: steps 2, 3, 5 and 6 verified).
-   2. `enabled = true`.
-   3. `signup_enabled = true` (accepted only now, because the guard is no longer `off`).
-   Then the owner runs the headed phone sign-up with real CAPTCHA (`docs/operations/ACCEPTANCE_E2E_HEADED_RUN.md`).
-8. **Rollback / afterwards, in this order** (each step instant, no deploy; the constraint makes the order mandatory, because the guard cannot return to `off` while `signup_enabled` is true):
-   1. `signup_enabled = false` first (new sign-ups are refused at once).
-   2. Super Admin delivery switch OFF (audited; the Worker then answers 503 `delivery_disabled`).
-   3. `enabled = false`.
-   4. `alias_guard_mode`: leave at `observe`, or restore to `off` (allowed only after step 1). Never `enforce` here.
-   5. Frontend flags (`PHONE_SIGNUP_VERIFICATION_ENABLED`, `PHONE_VERIFICATION_ENABLED`) off only if the whole path should be removed, and the permit back to `"false"` by redeploy if it should not stay.
-   Audit-check each change as in step 4.
+## W2: staged activation (Acceptance only). Each stage is a separate owner approval; stop at the first mismatch.
+Preconditions (verified 2026-11-08): W0, W1 and A1 live (Worker `27569886-4eef-4f5c-ba04-4700781fb621`, frontend `ad9bb9e7-6ce6-444f-b168-5e0c4ea0aa14`); Acceptance DB at 207 migrations; permit `"false"`; D1 switch has no row (OFF); attestation `enabled=0`.
+Facts the stages rely on (read-only, 2026-11-08): D1 `otp_settings` already exists: **daily 150, ceiling 5000, warn 70, critical 90, version 7** (audit history up to version 7). `app.phone_verification_config` = `enabled=false, signup_enabled=false, alias_guard_mode=off` (constraint `ck_config_signup_needs_guard`: signup needs the guard not `off`).
+Order logic: the limits are lowered FIRST, before the permit exists, so there is never a moment with delivery capable and a 5000 budget. The switch cannot go ON before the permit (`deliveryBlockers`: `environment_not_permitted`).
+
+**Stage 1: lower the limits (Super Admin UI on Acceptance, a Worker D1 write through the audited path; no deploy).**
+- Not an initialisation: it is an UPDATE of the existing row with **`expected_version` = the current version (7 now; the page reads it, a stale value is refused with `stale_version`)**. Never `0`.
+- Target: **daily 20, hard ceiling 50, warn 70, critical 90**. Both limit and ceiling change in one request (20 <= 50). Changing the ceiling is the sensitive path, so all of these are enforced:
+  - the actor is a **Super Admin** holding `whatsapp_otp.ceiling_manage` (the database checks the effective permission in `admin_whatsapp_otp_settings_begin`; Administrator-level `manage` is not enough);
+  - the database issues a 5-minute HMAC grant for exactly this request; the Worker refuses without it (`grant_invalid`) and refuses a ceiling change not marked authorized (`ceiling_not_authorized`);
+  - **typed confirmation of the new ceiling: `50`** (`ceiling_confirmation_required` otherwise);
+  - **reason of at least 20 characters** (`reason_too_short` otherwise);
+  - one atomic compare-and-set plus audit row (`otp_settings_audit`, kind `update`, new version 8), and an in-app notification.
+- Verify (read-only D1): `otp_settings` = 20/50/70/90 at version 8; the newest `otp_settings_audit` row shows old 150/5000 and new 20/50 with the reason; `/v1/admin/usage` through the Super Admin page shows the same numbers. **Gate: do not continue unless the low limits are verified.**
+- Rollback: another audited update (needs the then-current version).
+
+**Stage 2: permit (merge #162, deploy).** Gate: Stage 1 verified, D1 switch has no row or `enabled=0`.
+- Merge #162 (after review; CI green; it must show only its own changes). Then the same deploy as W1 from the exact new `main` SHA: `cd frontend && WRANGLER_LOG_SANITIZE=true pnpm exec wrangler deploy --config ../edge/whatsapp-otp-worker/wrangler.jsonc --message "W2 permit true, switch OFF (<sha12>)"`.
+- Verify: new version at 100%, `WHATSAPP_DELIVERY_ENABLED=true`, `OTP_RECIPIENT_MODE=open`, no `OTP_ALLOWED_RECIPIENTS`, bindings intact; D1 switch still no row, `whatsapp_hook_events` count unchanged; usage shows `runtime.delivery_enabled=false` (switch OFF).
+- Rollback: `wrangler rollback 27569886-4eef-4f5c-ba04-4700781fb621 --name aladdin-whatsapp-otp-preview` (permit false).
+
+**Stage 3: guard to observe (Acceptance DB write).** Gate: Stage 2 verified. Read and record `app.phone_verification_config` first, then `alias_guard_mode = 'observe'` only (never `enforce`). Verify the config row and exactly one new `app.phone_verification_config_log` row (`alias_guard_mode`, `off`, `observe`). Rollback: `off` (allowed while `signup_enabled` is false).
+
+**Stage 4: delivery switch ON (Super Admin UI, audited, with a reason of at least 10 characters).** Gate: Stages 1-3 verified. Preconditions the Worker checks (`settings_not_initialized`, `environment_not_permitted`, secrets bound, notify configured, D1 reachable) must be clear; the app server signs with a database-issued grant. Wait for a fresh attestation (age under 120 s). Verify: `otp_delivery_switch` row `enabled=1` version 1, `otp_delivery_audit` row, attestation `enabled=1`; usage shows `runtime.delivery_enabled=true`, `configured=true`, `remaining>0` (that is what the sign-up gate reads). Still nothing is sent: signup is off. Rollback: switch OFF (instant, audited; Worker answers 503 `delivery_disabled`).
+
+**Stage 5: signup switches (Acceptance DB write), then the owner's E2E.** Gate: Stage 4 verified. `enabled = true`, then `signup_enabled = true` (accepted because the guard is `observe`), audit-checked after each. Then the owner runs the headed phone sign-up with real CAPTCHA (`docs/operations/ACCEPTANCE_E2E_HEADED_RUN.md`): this is the first real OTP send (counted against the budget of 20).
+
+**Close-out / rollback, in this order:** `signup_enabled=false`, Super Admin switch OFF, `enabled=false`, guard to `off` or leave `observe` (never `enforce`), optionally limits back up (audited update) and permit back to `"false"` by redeploy. Audit-check each change.
 
 Kill switches, fastest first: Super Admin switch OFF (Worker answers 503 `delivery_disabled`; the sign-up gate sees it within about 5 s per isolate); `signup_enabled=false` in `app.phone_verification_config` (SQL, audited); redeploy with permit `"false"`.
 
