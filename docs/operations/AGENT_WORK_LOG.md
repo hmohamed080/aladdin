@@ -7382,3 +7382,9 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - P-4 run assessed from Wrangler's local debug log (counts and masked structure only): request/response bodies omitted, no secret strings, sanitize unset; exposure ruled out, no rotation recommended.
 - D1 binding validated by `database_id` (API-shaped fixtures); zone/route/domain discovery paginated and refuses partial results; owner commands given for Git Bash.
 - No Production writes, deployment, merge, rotation or P-4 rerun. Delivery OFF.
+
+## 2026-11-08 - R2 Acceptance and Production rollout preparation (agent, nothing hosted)
+
+- Added [`R2_ONLY_ROLLOUT_RUNBOOK.md`](r2/R2_ONLY_ROLLOUT_RUNBOOK.md): owner decisions, resources, credential matrix, Acceptance A-1..A-7 and Production P-1..P-7 GO gates, delta handling under the delete-not-migrate decision, rollback, reconcile readings.
+- Added `scripts/r2-provision-plan.mjs` (prints bucket/CORS/lifecycle/verify commands, runs nothing, validates names with the runtime isolation rules) and `scripts/r2-reconcile.mjs` (read-only database vs bucket reconciliation, counts and fingerprints only), 14 node tests.
+- NOT done: any hosted write, bucket, token, secret, migration, deployment or deletion. Site bucket names and the R2 account id are proposals awaiting the owner; the Production manifest stays null (fails closed) until then. The P-7 deletion path is deliberately not built.

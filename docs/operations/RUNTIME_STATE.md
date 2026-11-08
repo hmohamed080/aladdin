@@ -1,5 +1,9 @@
 # Runtime State
 
+## R2 rollout preparation — 2026-11-08 (docs and read-only tooling, nothing hosted)
+
+- Runbook [`r2/R2_ONLY_ROLLOUT_RUNBOOK.md`](r2/R2_ONLY_ROLLOUT_RUNBOOK.md); tools `scripts/r2-provision-plan.mjs` (prints only) and `scripts/r2-reconcile.mjs` (read-only). No Acceptance or Production R2 bucket, token, secret, migration or deployment changed. Production manifest buckets stay `null` (fail closed) until the owner confirms names.
+
 ## Showroom social links (draft PR) — 2026-11-05
 - Branch `feat/showroom-social-links-20261105` (from `main` `f823d88c`): migrations `20261107090001` and `20261107090002` plus the frontend. Draft PR opened 2026-11-07; not applied to Acceptance or Production; both migrations are expand-only. Deploy order when approved: migrations first, then the frontend. Rollback: revert the frontend, the migrations may stay.
 - Review fix wave (local): links limited to showrooms in the RPCs, action and wizard; completion item mirrors the address rule; i18n and accessibility fixes. pgTAP now 145 files / 6513 tests PASS.

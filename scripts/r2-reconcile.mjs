@@ -1,0 +1,157 @@
+#!/usr/bin/env node
+// R2 <-> database reconciliation. READ-ONLY: it lists and counts, never writes, copies or deletes.
+//
+// Compares the private media bucket with public.media_storage_locations (provider = 'r2'):
+//   missing        a verified, not-cleaned row whose original is absent from R2          -> BLOCKER
+//   sizeMismatch   original exists but its size differs from the receipt                 -> BLOCKER
+//   orphan         an original in R2 that no row (live or retired) refers to             -> review
+//   retiredLeft    an original still in R2 whose row is cleaned (cleanup did not finish) -> run `media-storage cleanup`
+//   orphanVariant  a variant (v/...) whose original has no row                           -> review
+//   stalePending   pending/ upload older than the lifecycle window (default 48 h)        -> lifecycle not applied?
+//   pendingFresh / video / other   informational
+//
+//   node scripts/r2-reconcile.mjs --project <ref|local> [--max-age-hours 48] [--json] [--allow-orphans]
+//
+// Needs SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+// R2_PRIVATE_BUCKET (read access is enough). Output is counts and short key fingerprints only: never keys, owners or
+// ids. Exit 1 when a blocker exists (or any orphan unless --allow-orphans), so it can gate a cutover step.
+import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
+
+export class ReconcileOperatorError extends Error {}
+
+const VARIANTS = ["thumb", "card", "full"];
+const fingerprint = (key) => createHash("sha256").update(key).digest("hex").slice(0, 10);
+
+/** The physical key of a row's original: the database-minted ids-only key, else the legacy namespace/object_key. */
+export const physicalKey = (row) => row.storage_key ?? `${row.namespace}/${row.object_key}`;
+
+/** Variant keys that belong to an original: ids-only `<folder>/v/<name>.webp`, legacy `v/<physical>/<name>.webp`. */
+export function variantKeys(original) {
+  return VARIANTS.map((name) => (/^[uo]\//.test(original)
+    ? original.replace(/\/original\.[a-z0-9]+$/, `/v/${name}.webp`)
+    : `v/${original}/${name}.webp`));
+}
+
+/**
+ * Pure classification. `rows`: media_storage_locations rows with provider 'r2'. `objects`: [{ key, size, lastModified }].
+ * Returns counts, per-namespace counts of live rows, and capped samples of fingerprints.
+ */
+export function reconcile(rows, objects, { now = Date.now(), maxAgeHours = 48, sampleLimit = 10 } = {}) {
+  const byKey = new Map(rows.map((row) => [physicalKey(row), row]));
+  const variantOwner = new Map();
+  for (const key of byKey.keys()) for (const v of variantKeys(key)) variantOwner.set(v, key);
+
+  const counts = { rows: rows.length, live: 0, objects: objects.length, ok: 0, missing: 0, sizeMismatch: 0, unverified: 0, orphan: 0,
+    retiredLeft: 0, orphanVariant: 0, variantsOk: 0, pendingFresh: 0, stalePending: 0, video: 0, other: 0 };
+  const samples = { missing: [], sizeMismatch: [], orphan: [], retiredLeft: [], orphanVariant: [], stalePending: [] };
+  const note = (kind, key) => { counts[kind]++; if (samples[kind].length < sampleLimit) samples[kind].push(fingerprint(key)); };
+  const perNamespace = {};
+  const seen = new Set();
+
+  for (const object of objects) {
+    const key = object.key;
+    const age = now - new Date(object.lastModified).getTime();
+    if (key.startsWith("pending/")) {
+      if (age > maxAgeHours * 3_600_000) note("stalePending", key); else counts.pendingFresh++;
+      continue;
+    }
+    if (key.startsWith("video/")) { counts.video++; continue; }
+    if (key.startsWith("site/")) { counts.other++; continue; } // site media belongs to the site bucket; reported, not judged
+    const row = byKey.get(key);
+    if (row) {
+      seen.add(key);
+      if (row.cleaned_at) { note("retiredLeft", key); continue; }
+      if (!row.verified_at) { counts.unverified++; continue; } // reserved but not yet verified: not a defect
+      if (row.size_bytes != null && Number(row.size_bytes) !== Number(object.size)) { note("sizeMismatch", key); continue; }
+      counts.ok++;
+      continue;
+    }
+    if (variantOwner.has(key)) { counts.variantsOk++; continue; }
+    if (/(^|\/)v\//.test(key)) { note("orphanVariant", key); continue; }
+    if (/^(avatar|portfolio|certificate|product|organization|request|verification)\//.test(key) || /^[uo]\/[0-9a-f-]{36}\//.test(key)) { note("orphan", key); continue; }
+    counts.other++;
+  }
+
+  for (const row of rows) {
+    if (row.cleaned_at || !row.verified_at) continue;
+    counts.live++;
+    perNamespace[row.namespace] = (perNamespace[row.namespace] ?? 0) + 1;
+    if (!seen.has(physicalKey(row))) note("missing", physicalKey(row));
+  }
+  const blockers = counts.missing + counts.sizeMismatch;
+  return { counts, perNamespace, samples, blockers, ok: blockers === 0 };
+}
+
+export function parseArgs(argv) {
+  const out = { project: null, maxAgeHours: 48, json: false, allowOrphans: false };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--json") out.json = true;
+    else if (arg === "--allow-orphans") out.allowOrphans = true;
+    else if (arg === "--project" || arg === "--max-age-hours") {
+      const value = argv[++i];
+      if (value === undefined || value.startsWith("--")) throw new ReconcileOperatorError(`${arg} needs a value`);
+      if (arg === "--project") out.project = value;
+      else {
+        out.maxAgeHours = Number(value);
+        if (!Number.isFinite(out.maxAgeHours) || out.maxAgeHours < 1 || out.maxAgeHours > 720) throw new ReconcileOperatorError("--max-age-hours must be 1..720");
+      }
+    } else throw new ReconcileOperatorError(`Unknown option ${arg}`);
+  }
+  if (!out.project) throw new ReconcileOperatorError("Explicit --project is required");
+  return out;
+}
+
+async function fetchRows(supabase) {
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from("media_storage_locations")
+      .select("namespace,object_key,storage_key,size_bytes,verified_at,cleaned_at").eq("provider", "r2")
+      .order("namespace").order("object_key").range(from, from + 999);
+    if (error) throw new ReconcileOperatorError("Row query failed; confirm the storage_key migration (20261107090004) is applied in this environment");
+    rows.push(...data);
+    if (data.length < 1000) return rows;
+  }
+}
+
+async function listBucket(env) {
+  const require = createRequire(new URL("../frontend/package.json", import.meta.url));
+  const { S3Client, ListObjectsV2Command } = require("@aws-sdk/client-s3");
+  const s3 = new S3Client({ region: "auto", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED", responseChecksumValidation: "WHEN_REQUIRED",
+    endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`, credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY }, maxAttempts: 3 });
+  const objects = [];
+  let token;
+  do {
+    const page = await s3.send(new ListObjectsV2Command({ Bucket: env.R2_PRIVATE_BUCKET, ContinuationToken: token, MaxKeys: 1000 }));
+    for (const o of page.Contents ?? []) objects.push({ key: o.Key, size: o.Size, lastModified: o.LastModified });
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+  return objects;
+}
+
+export async function main(argv = process.argv.slice(2)) {
+  const options = parseArgs(argv);
+  const { readMaintenanceEnv } = await import("../frontend/src/lib/env/media-maintenance.mjs");
+  const env = readMaintenanceEnv();
+  if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_PRIVATE_BUCKET) throw new ReconcileOperatorError("R2 settings are required");
+  if (/backup/i.test(env.R2_PRIVATE_BUCKET)) throw new ReconcileOperatorError("R2_PRIVATE_BUCKET names a backup bucket; refusing");
+  const host = new URL(env.SUPABASE_URL).hostname;
+  const project = ["localhost", "127.0.0.1"].includes(host) ? "local" : host.split(".")[0];
+  if (options.project !== project) throw new ReconcileOperatorError("Requested project does not match the configured environment");
+  const require = createRequire(new URL("../frontend/package.json", import.meta.url));
+  const supabase = require("@supabase/supabase-js").createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const [rows, objects] = await Promise.all([fetchRows(supabase), listBucket(env)]);
+  const result = reconcile(rows, objects, { maxAgeHours: options.maxAgeHours });
+  console.log(JSON.stringify({ project, readOnly: true, bucket: env.R2_PRIVATE_BUCKET, ...result }, null, options.json ? 0 : 2));
+  const orphans = result.counts.orphan + result.counts.orphanVariant;
+  if (!result.ok || (!options.allowOrphans && orphans > 0)) process.exitCode = 1;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error instanceof ReconcileOperatorError ? error.message : "Reconciliation failed; verify the environment, credentials and permissions. Nothing was changed.");
+    process.exitCode = 1;
+  });
+}
