@@ -92,15 +92,28 @@ describe("switches and recipient policy", () => {
     }
     assert.equal(recipientAllowed(PHONE, baseEnv({ OTP_ALLOWED_RECIPIENTS: `+201099999999, ${PHONE}` })), true);
   });
-  test("'open' recipient mode works ONLY when the Worker is explicitly production; elsewhere it is still the allowlist", async () => {
-    for (const environment of ["acceptance", "local", undefined]) {
+  test("'open' recipient mode is honoured ONLY in acceptance and production; local, missing and unknown environments fail closed to the allowlist", async () => {
+    for (const environment of ["local", undefined, "", "staging", "Production", "ACCEPTANCE"]) {
       const meta = mockMeta();
       const res = await handleRequest(await signedSend(), baseEnv({ OTP_RECIPIENT_MODE: "open", OTP_ENVIRONMENT: environment, OTP_ALLOWED_RECIPIENTS: "" }), meta.fetcher);
       assert.equal(res.status, 403, String(environment)); assert.equal(meta.calls.length, 0);
+      assert.equal(recipientAllowed(PHONE, baseEnv({ OTP_RECIPIENT_MODE: "open", OTP_ENVIRONMENT: environment, OTP_ALLOWED_RECIPIENTS: "" })), false);
     }
-    const meta = mockMeta();
-    assert.equal((await handleRequest(await signedSend(), baseEnv({ OTP_RECIPIENT_MODE: "open", OTP_ENVIRONMENT: "production", OTP_ALLOWED_RECIPIENTS: "" }), meta.fetcher)).status, 200);
-    assert.equal(meta.calls.length, 1);
+    for (const environment of ["acceptance", "production"]) {
+      const meta = mockMeta();
+      assert.equal((await handleRequest(await signedSend(), baseEnv({ OTP_RECIPIENT_MODE: "open", OTP_ENVIRONMENT: environment, OTP_ALLOWED_RECIPIENTS: "" }), meta.fetcher)).status, 200, environment);
+      assert.equal(meta.calls.length, 1);
+    }
+  });
+  test("allowlist mode is unchanged in acceptance and production, and a non-'open' mode value never opens the gate", async () => {
+    for (const environment of ["acceptance", "production"]) {
+      for (const mode of ["allowlist", undefined, "OPEN", "all"]) {
+        const meta = mockMeta();
+        const res = await handleRequest(await signedSend(), baseEnv({ OTP_RECIPIENT_MODE: mode, OTP_ENVIRONMENT: environment, OTP_ALLOWED_RECIPIENTS: "+201099999999" }), meta.fetcher);
+        assert.equal(res.status, 403, `${environment}/${mode}`); assert.equal(meta.calls.length, 0);
+      }
+      assert.equal(recipientAllowed(PHONE, baseEnv({ OTP_RECIPIENT_MODE: "allowlist", OTP_ENVIRONMENT: environment, OTP_ALLOWED_RECIPIENTS: PHONE })), true);
+    }
   });
 });
 

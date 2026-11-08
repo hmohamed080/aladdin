@@ -7,7 +7,8 @@
 set -euo pipefail
 export LC_ALL=C
 HERE="$(cd "$(dirname "$0")" && pwd)"; ROOT="$(cd "$HERE/../.." && pwd)"; cd "$ROOT"
-PROD_LATEST="20261020090001"          # Production's latest applied migration (165 in total)
+PROD_LATEST="20261107090003"          # Production's latest applied migration (203 applied; 20261105090001 is still pending there)
+SKIP_OLDER="20261105090001"           # applied nowhere on Production yet, older than PROD_LATEST: the rehearsal must apply it with --include-all
 sb() { pnpm exec supabase "$@"; }
 dk() { MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker "$@"; }
 S="$(mktemp -d)/selftest-source"; mkdir -p "$S/supabase/.temp" "$S/supabase/migrations"; cp -r supabase/templates "$S/supabase/"
@@ -21,7 +22,7 @@ done
 echo "Self-test source stack ports: ${P}20-${P}29"
 sed "s/project_id = \"aladdin\"/project_id = \"aladdin_selftest_src\"/; s/543\([0-9][0-9]\)/$P\1/g; s/^sql_paths = .*/sql_paths = []/" supabase/config.toml > "$S/supabase/config.toml"
 printf v2.197.0 > "$S/supabase/.temp/gotrue-version"; printf v1.80.2 > "$S/supabase/.temp/storage-version"; printf 17.6.1.155 > "$S/supabase/.temp/postgres-version"
-for f in supabase/migrations/*.sql; do b="$(basename "$f")"; [ "${b:0:14}" \> "$PROD_LATEST" ] || cp "$f" "$S/supabase/migrations/"; done
+for f in supabase/migrations/*.sql; do b="$(basename "$f")"; [ "${b:0:14}" \> "$PROD_LATEST" ] || [ "${b:0:14}" = "$SKIP_OLDER" ] || cp "$f" "$S/supabase/migrations/"; done
 [ -n "${SELFTEST_KEEP:-}" ] || trap 'sb stop --workdir "$S" --no-backup >/dev/null 2>&1 || true' EXIT
 sb start --workdir "$S" -x edge-runtime,logflare,vector,studio,supavisor,imgproxy,realtime,mailpit,postgres-meta > "$S/start.log" 2>&1 || { tail -20 "$S/start.log"; exit 1; }
 SRC="supabase_db_aladdin_selftest_src"
