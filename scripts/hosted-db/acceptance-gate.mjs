@@ -33,9 +33,30 @@ export function checkAcceptance({ list, dry, localVersions }) {
   return p;
 }
 
+/** After the real push: 207 applied, latest 090006, none pending, no remote-only. */
+export function checkAcceptancePost({ list }) {
+  const p = [];
+  const rows = list?.migrations ?? [];
+  const remote = rows.filter((r) => r.remote).map((r) => String(r.remote)).sort();
+  if (remote.length !== EXPECT_APPLIED + EXPECT_PENDING.length) p.push(`${remote.length} applied after the push, expected ${EXPECT_APPLIED + EXPECT_PENDING.length}`);
+  if (remote.at(-1) !== EXPECT_PENDING.at(-1)) p.push(`latest applied is ${remote.at(-1)}, expected ${EXPECT_PENDING.at(-1)}`);
+  for (const v of EXPECT_PENDING) if (!remote.includes(v)) p.push(`${v} is not applied`);
+  const pending = rows.filter((r) => r.local && !r.remote);
+  if (pending.length) p.push(`still pending: ${pending.map((r) => r.local).join(", ")}`);
+  const remoteOnly = rows.filter((r) => r.remote && !r.local);
+  if (remoteOnly.length) p.push(`remote-only: ${remoteOnly.map((r) => r.remote).join(", ")}`);
+  return p;
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
-  const [l, d, dir] = process.argv.slice(2);
   const j = (f) => JSON.parse(readFileSync(f, "utf8").replace(/^[^{]*/, ""));
+  if (process.argv[2] === "post") {
+    const problems = checkAcceptancePost({ list: j(process.argv[3]) });
+    if (problems.length) { console.error("Acceptance post-push gate: FAILED\n" + problems.map((x) => `  - ${x}`).join("\n")); process.exit(1); }
+    console.log("Acceptance post-push gate: ok (207 applied, latest 090006, none pending)");
+    process.exit(0);
+  }
+  const [l, d, dir] = process.argv.slice(2);
   const problems = checkAcceptance({ list: j(l), dry: j(d), localVersions: readdirSync(dir).filter((f) => f.endsWith(".sql")).map((f) => f.slice(0, 14)) });
   if (problems.length) { console.error("Acceptance gate: REFUSED\n" + problems.map((x) => `  - ${x}`).join("\n")); process.exit(1); }
   console.log("Acceptance gate: ok (203 applied, exactly 090003-090006 pending, plain push, no drift)");

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkAcceptance, EXPECT_PENDING } from "./acceptance-gate.mjs";
+import { checkAcceptance, checkAcceptancePost, EXPECT_PENDING } from "./acceptance-gate.mjs";
 
 const list = (extra = []) => ({ migrations: [
   ...Array.from({ length: 202 }, (_, i) => ({ local: `2025${1000 + i}000000`, remote: `2025${1000 + i}000000` })),
@@ -25,3 +25,12 @@ test("Production history (latest 090003) is refused here", () => {
   const l = list(); l.migrations = l.migrations.filter((r) => r.local !== "20261107090003").concat([{ local: "20261107090003", remote: "20261107090003" }]);
   has(checkAcceptance({ list: l, dry: dry(), localVersions: local }), /latest applied|applied migrations/);
 });
+
+const after = (drop = []) => ({ migrations: [
+  ...Array.from({ length: 202 }, (_, i) => ({ local: `2025${1000 + i}000000`, remote: `2025${1000 + i}000000` })),
+  { local: "20261107090002", remote: "20261107090002" },
+  ...EXPECT_PENDING.filter((v) => !drop.includes(v)).map((v) => ({ local: v, remote: v })),
+  ...drop.map((v) => ({ local: v, remote: null }))] });
+test("post-push: 207 applied, none pending passes", () => assert.deepEqual(checkAcceptancePost({ list: after() }), []));
+test("post-push: a migration left pending is refused", () => has(checkAcceptancePost({ list: after(["20261107090006"]) }), /still pending|not applied|206 applied/));
+test("post-push: the pre-push state is refused", () => has(checkAcceptancePost({ list: list() }), /203 applied after the push|still pending/));

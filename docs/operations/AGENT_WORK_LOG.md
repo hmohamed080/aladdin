@@ -7396,3 +7396,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - L1 run 42450831535 stopped at its preflight: the preview is behind Cloudflare Access and the workflow had no token (0 tests ran).
 - Code-only fix on branch fix/acceptance-e2e-access-token-20261108: exact-origin Access headers (no global extraHTTPHeaders), no redirect following, fail closed on missing credentials or an Access redirect; tests in frontend/e2e-acceptance/access.test.ts; owner setup in docs/operations/ACCEPTANCE_E2E_ACCESS_TOKEN.md.
 - No secret created or changed, no Cloudflare Access policy changed, nothing merged, deployed or re-run.
+
+## 2026-11-08 - Acceptance apply plan and readiness gates (agent)
+
+- Owner ran the Acceptance dry-run on Scorpion: 203 applied, exactly 090003-090006 pending, no drift, permissions 731/731 vs `20261107090002`. Cross-checked read-only from the cloud session. Nothing applied.
+- Added `acceptance-apply.sh`, `acceptance-postcheck.mjs`, `table-counts.sql`, `acceptance-structure.sql` and the gate `post` mode (PR #153). Offline tests plus a stubbed-CLI exercise of the apply script. Runbook sections F-H hold the evidence, gate status and exact plan.
+- Open: backup freshness decision (4 auth rows touched since the 06:08Z snapshot), merge of #153 before the apply, owner GO. No push, merge or Production change.
+
