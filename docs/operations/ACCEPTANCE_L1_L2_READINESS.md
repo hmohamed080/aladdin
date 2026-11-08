@@ -79,6 +79,78 @@ identity exists for it.
 Header of the run note: date, the SHA/version id from section 1.3, browser, tester. Row 17 expectation is the intended role
 rule for Admin; if a non-owner can open an Admin page, record it as a defect, not a pass.
 
+## 2a. Results (owner-reported summary, RC fc62c4b5)
+
+Date: 2026-11-08. Build: RC `fc62c4b5` (origin/main is now `7d965394`, runtime paths unchanged vs the RC). The Acceptance
+preview was redeployed from `fc62c4b5` (workflow run 42469324988, preview version `d8ff501d-4d01-4d4c-95ac-e0948347a46b`,
+2026-11-08T10:00Z).
+
+**Owner-reported (summary, no per-row evidence attached).** Recorded as reported by the owner, not re-checked by an agent:
+
+- Backend: PASS
+- Owner account: PASS
+- Sales Manager: PASS
+- Sales Rep: PASS
+- Other authentication methods: PASS
+
+**Agent-verified (separate from the owner report).** Seen by the agent in the run log of 42469324988:
+
+- Workflow smoke: `/api/health` 200, `/` 200, `/auth/sign-in` 200, `/legal/terms` 200, `/showroom` 307 (with the Access token; the
+  redirect target was not recorded).
+- Read-only `wrangler` verification of the bindings: Acceptance Supabase, backend, and OTP preview Worker (staging).
+- NOT verified by the agent: Backend `env:staging` health JSON, and `/installer/sign-in` 308.
+
+### Re-assessment of all 19 checklist rows
+
+Legend: **OR** = Owner-reported PASS (category summary only, no per-row evidence); **AV** = Agent-verified; **NE** = NO explicit
+evidence yet. A category summary is not treated as proof of a specific row unless it plainly covers it. Nothing here is marked
+passed on the agent's own judgement.
+
+| # | Check | Status | Basis |
+|---|---|---|---|
+| 1 | Sign in by email (O, M, R) | OR | Owner / Sales Manager / Sales Rep PASS |
+| 2 | Sign in by username | OR | Same account summaries; no list of which accounts have a username |
+| 3 | Sign in by legacy phone | OR | "Other authentication methods: PASS"; "no code requested" not stated |
+| 4 | Google, then Facebook (O) | OR | "Other authentication methods: PASS"; whether linked identities exist not stated |
+| 5 | Wrong password message | NE | Not covered by any stated result |
+| 6 | Forgot password code step | NE | Not covered |
+| 7 | Sign out, Back shows nothing protected | NE | Not covered |
+| 8 | Workspace routes render (O, M, R) | OR | Account summaries; routes not enumerated |
+| 9 | People page for O (form present) | OR | Owner account summary; not itemised |
+| 10 | People refused for M, R (exact message) | NE | Role denial message not stated |
+| 11 | Branch filter for O (3 branches) | NE | Branch isolation not stated |
+| 12 | Branch filter for M (3 branches) | NE | Not stated |
+| 13 | Branch filter for R (ACC6 Cairo only) | NE | Not stated |
+| 14 | Retired routes answer 308 | NE | `/installer/sign-in` 308 not verified; other routes not checked |
+| 15 | `/showroom`, `/showroom/home` signed out redirect | NE | Only `/showroom` 307 seen (token attached, target not recorded); `/showroom/home` not seen |
+| 16 | Admin pages for O (incl. Backups) | NE | Admin and Backups not stated |
+| 17 | Admin hidden from M, R | NE | Not stated |
+| 18 | No account created, no data edited | NE | No before/after Auth user counts |
+| 19 | WhatsApp delivery stays OFF | NE | Not stated |
+
+Total: 0 rows with explicit per-row evidence, 6 rows (1-4, 8, 9) covered only by an owner category summary, 13 rows with no
+explicit evidence. Row 14 and 15 partly relate to agent-seen facts (`/showroom` 307) but are not satisfied by them. The agent
+facts (health, `/`, sign-in and legal 200, bindings) support the deployment and smoke prerequisites, not any L2 row.
+
+### Rows still lacking explicit evidence: what to capture (never passwords)
+
+| Rows | Capture |
+|---|---|
+| 5 | Screenshot of the generic invalid-credentials message on `/auth/sign-in` for O, M, R |
+| 6 | Screenshot of the email-code step; note "reset not completed" |
+| 7 | Screenshot after pressing Back post sign-out (per account) |
+| 10 | Screenshot of "You're not allowed to manage members here." for M and R, no invite form |
+| 11, 12, 13 | Screenshot of the open Branch filter for O, M and R (options listed) |
+| 14 | DevTools Network (Preserve log) lines showing 308 to `/auth/sign-in` for the retired routes, signed out |
+| 15 | Screenshot of the URL bar after `/showroom` and `/showroom/home`, signed out (landing on a sign-in page) |
+| 16 | Per Admin URL for O: loads, no error or console error; Backups page included; activate/run not pressed |
+| 17 | Per account M, R: screenshot of redirect, 404 or access-denied; no Backups nav entry |
+| 18 | Acceptance Supabase Auth user count and newest `created_at`, before and after the session |
+| 19 | Note "no WhatsApp message arrived"; screenshot of the Admin WhatsApp OTP page showing delivery off |
+| Also | Backend `env:staging` health JSON (`/api/backend/health`), read-only |
+
+For rows 1-4, 8 and 9 an itemised owner note (accounts, methods, routes) would upgrade the summary to explicit evidence.
+
 ## 3. Automation coverage gaps and the release-gate exception
 
 Real CAPTCHA is ON, but the hosted spec stubs Turnstile with a dummy token (`TURNSTILE_STUB`), which Supabase Auth refuses.
@@ -95,8 +167,11 @@ persona sign-in failures with a CAPTCHA/auth message is the expected result unde
 **Proposed release-gate exception (wording; no workflow is changed by this PR):**
 
 > L1 automated persona run is waived for the release candidate `<SHA>` because real CAPTCHA remains ON on hosted Acceptance; it is
-> replaced by the signed-off manual L1/L2 table (section 2, all rows pass on the deployed RC build), and the public smoke test
-> must still pass.
+> replaced by the manual L1/L2 table (section 2) on the deployed RC build, and the public smoke test must still pass.
+
+Basis today: the owner-reported category summary (section 2a, all five categories PASS, no per-row evidence). Before signing,
+either supply explicit evidence for every row marked NE in section 2a, or record an explicit owner waiver per row. A category
+summary alone does not satisfy rows 5-7, 10-19.
 
 Signed by the repository owner (`hmohamed080`) in the run note, with the SHA, date and the smoke run id. A second reviewer
 is optional.
