@@ -9,6 +9,8 @@
 #   secrets: ACCEPTANCE_E2E_OWNER_PASSWORD, ACCEPTANCE_E2E_MANAGER_PASSWORD, ACCEPTANCE_E2E_REP_PASSWORD,
 #            CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET (a DEDICATED Cloudflare Access service token for this job only,
 #            with a Service Auth policy on the preview application; the preview is behind Access and answers 302 without it)
+# CAPTCHA: Supabase Auth CAPTCHA (Turnstile) is ON for Acceptance and stays ON. The tests use the real widget and its real
+# token; nothing is stubbed. The Turnstile widget's hostname allowlist must include the preview host.
 # Without all three the run stops at the first step and tests nothing.
 #
 # Runs on pushes to its branch: GitHub only offers the manual button for workflows on the default branch.
