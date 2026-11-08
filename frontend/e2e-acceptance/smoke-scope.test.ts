@@ -22,7 +22,7 @@ describe("hosted acceptance smoke scope", () => {
     const re = new RegExp(grepSource ?? "(?!)");
     const block = /test\.describe\("public smoke", \(\) => \{([\s\S]*?)\n\}\);/.exec(spec)?.[1];
     expect(block, "the spec must still contain describe('public smoke')").toBeTruthy();
-    const titles = [...(block ?? "").matchAll(/^\s{2}test\("([^"]+)"/gm)].map((m) => m[1]);
+    const titles = [...(block ?? "").matchAll(/^\s{2}test\("([^"]+)"/gm)].map((m) => m[1] ?? "");
     expect(titles.length).toBeGreaterThan(0);
     for (const title of titles) expect(re.test(titlePath("public smoke", title)), title).toBe(true);
   });
