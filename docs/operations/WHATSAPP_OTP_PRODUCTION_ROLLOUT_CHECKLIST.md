@@ -163,7 +163,7 @@ Run it from the owner's machine: dry run first (`node provision-grant-key-produc
 | `frontend-upload` stage is on `main` and runs only from `main` | yes (`if: github.ref == 'refs/heads/main'`); it also requires the private OTP Worker (now deployed) and the backend Worker |
 | Upload switch | **closed (kept `false` on purpose):** `CLOUDFLARE_PRODUCTION_ENABLED=false` in the `cloudflare-production` environment; without it every stage only builds |
 | Reviewer on the `cloudflare-production` environment | **set 2026-11-07:** `hmohamed080` is a required reviewer (self-review allowed because the owner is the only user; admin bypass is still the GitHub default `true`). Every Production stage now waits for that approval. |
-| Acceptance preview build (L1/L2) | **A1 readiness verified 2026-11-07 (read-only):** `cloudflare-preview` allows `main` (custom branch policy), `CLOUDFLARE_PREVIEW_ENABLED=true`, `NEXT_PUBLIC_SUPABASE_URL` is the isolated Acceptance project `nxossqhdfltcqdwvbewi`, its publishable key equals that project's key (not Production's), and the workflow refuses any URL containing the Production ref. The preview Worker still runs an older build (run `47d4fe0b`, 2026-11-05), so A1 is needed; **not run, awaiting approval.** |
+| Acceptance preview build (L1/L2) | **UPDATED 2026-11-08: A1 done (preview `d8ff501d` from `fc62c4b5`); manual L1/L2 summary PASS as reported by the owner, per-row evidence incomplete (PR #151).** Historical readiness note: **A1 readiness verified 2026-11-07 (read-only):** `cloudflare-preview` allows `main` (custom branch policy), `CLOUDFLARE_PREVIEW_ENABLED=true`, `NEXT_PUBLIC_SUPABASE_URL` is the isolated Acceptance project `nxossqhdfltcqdwvbewi`, its publishable key equals that project's key (not Production's), and the workflow refuses any URL containing the Production ref. The preview Worker still runs an older build (run `47d4fe0b`, 2026-11-05), (superseded: A1 has since been run). |
 | Hosted Acceptance E2E (L1) | `hosted-acceptance-e2e.yml` already signs in through the one-field `/auth/sign-in` form and checks `/installer/sign-in`; the three test-account secrets exist in `acceptance-e2e` |
 | Post-upload verification of secrets and bindings | **new, read-only:** `scripts/hosted-db/verify-frontend-upload.mjs --version=<id> --expect-sha=<40 hex>` (JSON parsing tolerates wrangler banner lines; also run against real Production data, where it correctly refuses the P-4 version as "not a new upload"; `--expect-sha` checks the version's `workers/message` label, see step B3) |
 
@@ -195,7 +195,7 @@ Build everything below from `RC` (see the RC rule above: empty runtime diff agai
 **A. Acceptance (L1/L2), no Production resource involved**
 
 ```bash
-gh workflow run cloudflare-frontend-preview.yml --ref main          # A1: redeploy the Acceptance preview from the RC (the preview still runs 5861d879); check the run's head SHA equals $RC
+gh workflow run cloudflare-frontend-preview.yml --ref main          # A1: redeploy the Acceptance preview from the RC (DONE 2026-11-08: preview d8ff501d from fc62c4b5; re-run only if the RC changes); check the run's head SHA equals $RC
 gh run watch                                                         # wait for green
 gh workflow run hosted-acceptance-e2e.yml --ref main                # A2: L1, read-only sign-in of the 3 test accounts
 gh run watch
@@ -243,7 +243,11 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST -H "$H" https://aladdindecore.c
 ```
 
 Rollback never touches the OTP Worker or D1 (delivery is OFF); never `wrangler delete` the frontend. Rolling the frontend back does not undo applied database migrations (they are additive and harmless to the old build). Before promotion there is nothing to roll back; the rollback target is always `a3b08a22-f82e-4851-9786-9442c01e43c8`, and this plan must be re-read if the live version is no longer that id.
-### NEXT EXECUTABLE STEP FOR THE OWNER (2026-11-08): A1, redeploy the Acceptance preview from the RC
+### STATE AND NEXT GATE (2026-11-08): A1 done, owner-reported L1/L2 PASS, next Gate M / B0-B3
+
+**STATE 2026-11-08 (owner-reported, not agent-verified):** A1 is **done** (Acceptance preview `d8ff501d-4d01-4d4c-95ac-e0948347a46b`, built from `fc62c4b5`). The owner reports the manual L1/L2 **summary as PASS**; per-row evidence is incomplete (see PR #151), so treat it as the owner's statement, not as a recorded matrix. **Next gate: Gate M / B0 to B3 per the owner's approvals** (each step needs its own approval; Gate M only blocks promotion D1, not the 0% upload B1). Live Production frontend is still `a3b08a22-f82e-4851-9786-9442c01e43c8` at 100%; delivery OFF.
+
+The A1 commands below are kept as the record and as the re-run procedure if the RC changes (A1 must be repeated from a new RC); they are **not** the next step.
 
 Exactly one step is next. It touches **Acceptance only** (no Production resource, no secret, no switch, no migration). Git Bash, repository root:
 
@@ -288,7 +292,7 @@ There is **no automated paging** today: the events are searchable but nobody is 
 
 **Rollback summary:** P-2 is additive: forward-fix with a new migration, or restore from the P-0b snapshot (hours, loses writes since the snapshot); P-1 delete one row; P-3 leave empty tables; P-4 nothing live changes (ignore the undeployed version); P-6 delete the new Worker (before the frontend binds to it); frontend: uploaded versions serve 0% until promoted, and `wrangler rollback --env production` returns to `a3b08a22`.
 
-**Remaining blockers (updated 2026-11-08, RC = `main` with an empty runtime diff against `fc62c4b5`):** (1) `CLOUDFLARE_PRODUCTION_ENABLED` is `false` (owner switch, steps B0/B2; kept closed on purpose; the owner is the required reviewer of the environment); (2) the Acceptance preview runs the older `5861d879`, so A1 to A3 must be redone from `RC`; (3) **Gate M, before promotion only:** the 4 pending Production migrations (`20261105090001`, `20261107090004` to `090006`) applied with `--include-all` after a fresh snapshot (#148 is merged); (4) the hosted login gate L1 to L5 and the P-7a runtime probe before any promotion; (5) P-8 limits initialisation and P-9 alert-connection and attestation checks after promotion; (6) alert recipients and A10, which block only live activation. Resolved: `main` holds the integrated build, P-6 is done and verified.
+**Remaining blockers (updated 2026-11-08, RC = `main` with an empty runtime diff against `fc62c4b5`):** (1) `CLOUDFLARE_PRODUCTION_ENABLED` is `false` (owner switch, steps B0/B2; kept closed on purpose; the owner is the required reviewer of the environment); (2) A1 is done (preview `d8ff501d` from `fc62c4b5`) and the owner reports the manual L1/L2 summary PASS (per-row evidence incomplete, PR #151); no further A step is required unless the RC changes; (3) **Gate M, before promotion only:** the 4 pending Production migrations (`20261105090001`, `20261107090004` to `090006`) applied with `--include-all` after a fresh snapshot (#148 is merged); (4) the hosted login gate L1 to L5 and the P-7a runtime probe before any promotion; (5) P-8 limits initialisation and P-9 alert-connection and attestation checks after promotion; (6) alert recipients and A10, which block only live activation. Resolved: `main` holds the integrated build, P-6 is done and verified.
 
 ## 8. A10 and activation (not part of this checklist)
 

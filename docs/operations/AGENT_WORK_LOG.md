@@ -7431,3 +7431,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Added `acceptance-apply.sh`, `acceptance-postcheck.mjs`, `table-counts.sql`, `acceptance-structure.sql` and the gate `post` mode (PR #153). Offline tests plus a stubbed-CLI exercise of the apply script. Runbook sections F-H hold the evidence, gate status and exact plan.
 - Open: backup freshness decision (4 auth rows touched since the 06:08Z snapshot), merge of #153 before the apply, owner GO. No push, merge or Production change.
 
+
+## 2026-11-08 - #145 final review after #153 (Track 3)
+
+- Merged `origin/main` (`7d965394`, includes #153) into the #145 branch; only `AGENT_WORK_LOG.md` conflicted (kept both sides). Targeted tests pass (56).
+- Re-read `verify-frontend-upload.mjs` and the P-7 sections against the current `cloudflare-production.yml`: stage `frontend-upload`, environment `cloudflare-production`, `CLOUDFLARE_PRODUCTION_ENABLED == 'true'`, message `upload-only ${GITHUB_SHA::12}` all match what `--expect-sha` checks. No defect found.
+- Checklist state lines: A1 done (preview `d8ff501d` from `fc62c4b5`); owner-reported manual L1/L2 summary PASS (per-row evidence incomplete, PR #151); next gate Gate M / B0-B3 per the owner's approvals. Nothing beyond what the owner reported is claimed.
+- No Production write, upload, deployment, merge, secret change or WhatsApp enablement.
