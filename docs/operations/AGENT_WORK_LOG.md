@@ -7403,3 +7403,8 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Added `acceptance-apply.sh`, `acceptance-postcheck.mjs`, `table-counts.sql`, `acceptance-structure.sql` and the gate `post` mode (PR #153). Offline tests plus a stubbed-CLI exercise of the apply script. Runbook sections F-H hold the evidence, gate status and exact plan.
 - Open: backup freshness decision (4 auth rows touched since the 06:08Z snapshot), merge of #153 before the apply, owner GO. No push, merge or Production change.
 
+
+## 2026-11-08 - Production release sequence (agent)
+
+- Added docs/operations/PRODUCTION_RELEASE_SEQUENCE_20261108.md: ordered gates G0 to G7 (merges and RC check, Gate M, 0% upload, override-header tests, single-recipient WhatsApp path, promotion, limits, first live message), parallel-vs-blocked table, shortest safe path, and 13 contradictions or gaps between sources.
+- Document only. No merge, deployment, dispatch, Production or database write, secret change or WhatsApp activation. Commands are owner-run and each step needs its own approval.
