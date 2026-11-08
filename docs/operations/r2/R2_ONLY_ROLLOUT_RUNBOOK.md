@@ -12,8 +12,9 @@ Supersedes the "migrate everything" sequence in [`PRODUCTION_R2_MIGRATION_PLAN.m
   manifest (see section 4) and explicit approval.
 - Also moved to R2: landing videos and posters, required documents and certificates (private), website static assets.
 - Cloudflare account id `a4c2b7ac45e58a81691b9165492ce6a2` and site bucket names `aladdin-acceptance-site-media` / `aladdin-site-media`
-  are owner-confirmed (2026-11-08). The account id is pinned for both environments and the Acceptance site bucket in
-  `environment-manifest.ts`; Production bucket names are pinned in the commit that follows their creation (until then Production fails closed).
+  are owner-confirmed (2026-11-08). They are **not** pinned in `environment-manifest.ts` yet: existing guard tests assume an unpinned
+  account, and pinning belongs in the commit that follows bucket creation (account id for both environments, both site buckets,
+  Production private bucket, plus the matching `wrangler.jsonc` vars and updated guard tests). Until then Production fails closed.
 - Every hosted step below is a separate GO. Preparation (this document, scripts, tests) is not.
 
 ## 1. What is prepared (all local, all read-only or print-only)
@@ -39,8 +40,8 @@ Tests: `node --test scripts/r2-reconcile.test.mjs scripts/r2-provision-plan.test
 | Backup bucket (never media) | `aladdin-acceptance-backups-weur` | `aladdin-production-db-backups` |
 | Worker | `aladdin-frontend-preview` | `aladdin-frontend-production` |
 
-Names and account id are owner-confirmed. After Production creation a reviewed commit pins the two Production bucket names in
-`frontend/src/lib/storage/environment-manifest.ts` and `wrangler.jsonc` (a test keeps them equal). Until then Production fails closed by design.
+Names and account id are owner-confirmed. After creation, one reviewed commit pins the account id and bucket names in
+`frontend/src/lib/storage/environment-manifest.ts` and `wrangler.jsonc` (tests keep them equal) and updates the guard tests that assume an unpinned account. Until then Production fails closed by design.
 
 ### Credentials (least privilege, one per consumer)
 

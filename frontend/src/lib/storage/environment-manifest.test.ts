@@ -15,11 +15,6 @@ describe("committed Wrangler config agrees with the environment manifest", () =>
     expect(vars.R2_PRIVATE_BUCKET ?? null).toBe(ENVIRONMENT_MANIFEST.production.buckets.private);
     expect(vars.R2_SITE_BUCKET ?? null).toBe(ENVIRONMENT_MANIFEST.production.buckets.site);
   });
-  it("pins the owner-confirmed Cloudflare account for both environments and the Acceptance site bucket", () => {
-    expect(ENVIRONMENT_MANIFEST.production.r2AccountId).toBe("a4c2b7ac45e58a81691b9165492ce6a2");
-    expect(ENVIRONMENT_MANIFEST.staging.r2AccountId).toBe("a4c2b7ac45e58a81691b9165492ce6a2");
-    expect(ENVIRONMENT_MANIFEST.staging.buckets.site).toBe("aladdin-acceptance-site-media");
-  });
   it("keeps every environment's bucket, backup and project identities disjoint", () => {
     const names = [ENVIRONMENT_MANIFEST.production, ENVIRONMENT_MANIFEST.staging]
       .flatMap((e) => [...Object.values(e.buckets), ...e.backupBuckets]).filter((n): n is string => n !== null);
