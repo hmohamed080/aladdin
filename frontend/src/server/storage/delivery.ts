@@ -23,7 +23,7 @@ export async function deliverMedia(client: SupabaseClient, namespace: MediaNames
     const before = await resolveMedia(client, namespace, key, "read", workspace);
     const types: readonly string[] = mediaPolicy(namespace).types;
     if (before.state !== "ready" || !types.includes(before.contentType)) return mediaNotFound();
-    const provider = mediaProvider(before.provider === "supabase" ? privilegedStorageClient() : client, namespace, before.provider);
+    const provider = await mediaProvider(before.provider === "supabase" ? privilegedStorageClient() : client, namespace, before.provider, key);
     const url = await provider.getReadAccess(key, 30);
     // "manual", not "error": Workers throws on redirect "error". A 3xx is not ok, so it is never followed or served.
     upstream = await fetch(url, { cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(30_000) });
@@ -48,7 +48,10 @@ export async function deliverMedia(client: SupabaseClient, namespace: MediaNames
     }));
     // No upstream ETag, Location, token, Set-Cookie or cache headers are forwarded.
     return new Response(bounded, { headers: { ...MEDIA_NO_STORE, "content-type": before.contentType,
-      "content-disposition": "inline", "content-security-policy": "sandbox" } });
+      "content-disposition": "inline",
+      // Verification documents are PDFs reviewers must view in the browser's PDF viewer, which a sandbox CSP blocks
+      // (the previous route sent none). Their type is verified from the stored bytes and nosniff is set.
+      ...(namespace === "verification" ? {} : { "content-security-policy": "sandbox" }) } });
   } catch {
     await upstream?.body?.cancel().catch(() => undefined);
     return mediaNotFound();

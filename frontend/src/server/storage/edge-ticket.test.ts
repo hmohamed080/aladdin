@@ -87,6 +87,18 @@ describe("URL switch", () => {
     expect((await verifyTicket(ticketOf(personal), workerKeys, vectors.now))?.ws).toBeNull();
   });
 
+  it("flag on: a request photo ticket carries the viewing workspace; a verification ticket never does", async () => {
+    enableEdge();
+    const c = client(viewer);
+    const now = vectors.now * 1000;
+    const req = await privateMediaUrl(c, "request", PRODUCT, "r2", { workspace: WS, nowMs: now });
+    expect(req.startsWith("https://media.example.test/m/request/original?t=")).toBe(true);
+    expect((await verifyTicket(ticketOf(req), workerKeys, vectors.now))?.ws).toBe(WS);
+    const doc = await privateMediaUrl(c, "verification", KEY, "r2", { workspace: WS, nowMs: now });
+    expect(doc.startsWith("https://media.example.test/m/verification/original?t=")).toBe(true);
+    expect((await verifyTicket(ticketOf(doc), workerKeys, vectors.now))?.ws).toBeNull();
+  });
+
   it("flag on without a verified session falls back to the proxy (which then refuses)", async () => {
     enableEdge();
     expect(await privateMediaUrl(client(null), "certificate", KEY, "r2")).toBe(`/api/media/certificate?key=${encodeURIComponent(KEY)}`);

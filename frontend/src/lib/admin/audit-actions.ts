@@ -96,6 +96,15 @@ export const AUDIT_ACTIONS = [
   "whatsapp_otp.delivery_requested",
   "whatsapp_otp.delivery_changed",
   "whatsapp_otp.delivery_change_failed",
+  // 20261107090006: Admin backup control (schedule, Production activation, runs).
+  "backup.environment_initialized",
+  "backup.settings_changed",
+  "backup.production_activated",
+  "backup.production_deactivated",
+  "backup.run_requested",
+  "backup.run_dispatched",
+  "backup.run_failed",
+  "backup.run_verified",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

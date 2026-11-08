@@ -18,6 +18,7 @@ import {
   BarChartIcon,
   ScrollIcon,
   SettingsIcon,
+  PackageIcon,
 } from "@/components/ui/icons";
 
 type Item = { href: string; key: string; exact: boolean; Icon: ComponentType<{ size?: number }> };
@@ -38,6 +39,7 @@ const items: Item[] = [
   { href: "/admin/staff", key: "admin.preview.nav.staff", exact: false, Icon: UserIcon },
   { href: "/admin/analytics", key: "admin.preview.nav.analytics", exact: false, Icon: BarChartIcon },
   { href: "/admin/audit", key: "admin.preview.nav.audit", exact: false, Icon: ScrollIcon },
+  { href: "/admin/backups", key: "backups.title", exact: false, Icon: PackageIcon },
   { href: "/admin/settings", key: "admin.preview.nav.settings", exact: false, Icon: SettingsIcon },
 ];
 

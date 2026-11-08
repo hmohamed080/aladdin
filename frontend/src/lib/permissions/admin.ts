@@ -47,6 +47,11 @@ export const ADMIN_PERMISSIONS = [
   "whatsapp_otp.view",
   "whatsapp_otp.manage",
   "whatsapp_otp.ceiling_manage",
+  // Backups: view = Administrator and higher; execute / schedule_manage / restore_test = Super Admin only (by default).
+  "backup.view",
+  "backup.execute",
+  "backup.schedule_manage",
+  "backup.restore_test",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
@@ -113,6 +118,7 @@ export const ADMIN_ROUTE_RULES: Readonly<Record<string, AdminRequirement>> = {
   "/admin/business-verification": ["organizations.read", "organizations.verify", "verification.approve"],
   "/admin/phone-cooldowns": "phones.cooldown_override",
   "/admin/whatsapp-otp": "whatsapp_otp.view",
+  "/admin/backups": "backup.view",
   "/admin/points": "points.read",
   "/admin/analytics": "analytics.read",
   "/admin/audit": "audit.read",

@@ -47,3 +47,25 @@ it("does not consult the limiter for an anonymous caller", async () => {
   await read("portfolio");
   expect(mocks.limit).not.toHaveBeenCalled();
 });
+
+const REQUEST_KEY = "bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb/cccccccc-1111-4111-8111-cccccccccccc/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa.png";
+const BV_KEY = "bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa.pdf";
+const WORKSPACE = "dddddddd-1111-4111-8111-dddddddddddd";
+const readWith = (namespace: string, key: string, extra = "") =>
+  GET(new Request(`https://local.test/api/media/${namespace}?key=${encodeURIComponent(key)}${extra}`), { params: Promise.resolve({ namespace }) });
+
+it("serves purchase-request photos and verification documents through the central delivery with the viewing workspace", async () => {
+  mocks.deliver.mockResolvedValue(new Response(null, { status: 200 }));
+  expect((await readWith("request", REQUEST_KEY, `&workspace=${WORKSPACE}`)).status).toBe(200);
+  expect(mocks.deliver).toHaveBeenLastCalledWith(expect.anything(), "request", REQUEST_KEY, undefined, WORKSPACE);
+  expect((await readWith("verification", BV_KEY)).status).toBe(200);
+  expect(mocks.deliver).toHaveBeenLastCalledWith(expect.anything(), "verification", BV_KEY, undefined, null);
+});
+it("refuses malformed request/verification keys and cross-namespace key shapes before any lookup", async () => {
+  mocks.deliver.mockClear();
+  expect((await readWith("request", BV_KEY)).status).toBe(404);
+  expect((await readWith("verification", REQUEST_KEY)).status).toBe(404);
+  expect((await readWith("request", "../x")).status).toBe(404);
+  expect((await readWith("verification", BV_KEY, "&workspace=not-a-uuid")).status).toBe(404);
+  expect(mocks.deliver).not.toHaveBeenCalled();
+});
