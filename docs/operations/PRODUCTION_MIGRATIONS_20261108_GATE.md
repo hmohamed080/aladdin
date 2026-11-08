@@ -6,7 +6,7 @@ Supersedes nothing; it adds the review, the ordering proof, the owner commands a
 
 ## 1. Pending set (verified)
 
-Source: read-only Supabase `list_migrations` on Production `kkpkgjrweysgvhvkhzun`, 2026-11-08, compared with `supabase/migrations` on main `a0aa2296` (207 files).
+Source: read-only Supabase `list_migrations` on Production `kkpkgjrweysgvhvkhzun`, 2026-11-08, compared with `supabase/migrations` on main `fc62c4b5` (207 files; the pending set is unchanged since `a0aa2296`).
 
 - Production: 203 applied, latest `20261107090003`, no remote-only version.
 - Pending, exactly four, in apply order: `20261105090001_admin_staff_invitations`, `20261107090004_media_id_storage_keys`, `20261107090005_request_and_verification_media`, `20261107090006_admin_backup_control`.
@@ -17,7 +17,7 @@ Source: read-only Supabase `list_migrations` on Production `kkpkgjrweysgvhvkhzun
 
 Verdict: correct and safe to rely on, with three items to fix in a follow-up (none blocks the gate).
 
-1. Frontend rollback target is wrong or ambiguous. #148 says the Production frontend rollback target is `39bdf3a2`. But the LIVE version is `a3b08a22` (100%, per the P-4 record). `39bdf3a2` is the version before it. After the release candidate (RC) is promoted, the instant rollback target is `a3b08a22`; `39bdf3a2` only applies if `a3b08a22` itself must be abandoned. Use `a3b08a22` in this runbook.
+1. Frontend rollback target was wrong or ambiguous (corrected in `MIGRATION_DRYRUN_RUNBOOK_20261108.md` in this PR). #148 says the Production frontend rollback target is `39bdf3a2`. But the LIVE version is `a3b08a22` (100%, per the P-4 record). `39bdf3a2` is the version before it. After the release candidate (RC) is promoted, the instant rollback target is `a3b08a22`; `39bdf3a2` only applies if `a3b08a22` itself must be abandoned. Use `a3b08a22` in this runbook.
 2. `WHATSAPP_OTP_PRODUCTION_ROLLOUT_CHECKLIST.md` still shows the old 195 applied / 8 pending numbers (#148 says so itself). Two documents give different counts; treat this file and #148's runbook as current.
 3. `production-post-migration-check.sh` still expects 191 versions / `20261024090011`. It is stale and must NOT be used for post-apply verification here (it would fail on a correct database). Use section 6 instead.
 4. Small: the restore text in #148 section C says Production has no scripted restore; correct, and consistent with section 7 below. Its "all four are additive" claim is true for schema, with the caveats in section 3 (constraint replacement, function redefinition).
@@ -49,6 +49,8 @@ Does the RC frontend require them? Yes. Code in the RC calls `admin_staff_invite
 
 ### Safe ordering
 
+Explicit statement: these migrations are forward-only. There is no down migration and the push is not reversible by `migration repair` or `db reset --linked`. The 0% frontend upload does NOT require them (an undeployed version serves no traffic and does not touch the database). Any promotion above 0% of the release candidate DOES require them, and must not start before post-apply verification passes.
+
 1. Apply the four migrations (this gate).
 2. Verify (section 6).
 3. Only then upload and promote the frontend. A 0% frontend upload (version created, not deployed) is inert before or after the migrations: it serves no traffic and does not touch the database, so it may be done at any time; the gradual or 100% promotion must wait for step 2.
@@ -76,36 +78,22 @@ Pass criteria, checked by the owner: snapshot reports history 203 / `20261107090
 
 ## 6. Owner-run commands (Git Bash, repo root)
 
-Dry run (connects to Production; read-only; needs the database password at a hidden prompt):
+One source of truth: the scripts from #148 own every command that touches Production. Do not retype `supabase link`, `migration list` or `db push` by hand; the scripts do them with the project-ref guard (`kkpkgjrweysgvhvkhzun`), the hidden password prompt and the `supabase/.temp` cleanup. Required order, no step skipped or reordered:
 
-```bash
-export SUPABASE_DB_PASSWORD   # set via hidden read -s; never echo it, never put it in a file
-pnpm exec supabase link --project-ref kkpkgjrweysgvhvkhzun
-cat supabase/.temp/project-ref                                   # must print kkpkgjrweysgvhvkhzun
-pnpm exec supabase migration list --linked --output-format json > list.json
-node scripts/migration-history-guard.mjs list.json --expect plan
-pnpm exec supabase db push --linked --dry-run --include-all --output-format json > dry.json
-node scripts/migration-history-guard.mjs list.json --dry-run dry.json
-```
+1. Fresh logical backup (read-only on Production; section 5): `production-recovery-snapshot.sh`, then `encrypt-backup.sh`. Stop point B.
+2. Dry run plus every gate, no push: `bash scripts/hosted-db/production-p2-push.sh ~/aladdin-production-snapshot-<stamp> --check-only`. It checks clean checkout equal to `origin/main`, snapshot (project, 203 / `20261107090003`, row counts, at most 60 minutes old, checksums, encrypted copy and recovery proof), linked project is Production, exactly 203 applied and none remote-only, exactly the four pending, and `db push --dry-run --include-all` would push exactly those four in order. It cannot push. Review its output (stop point C).
+3. Push, only with a separate GO: `bash scripts/hosted-db/production-p2-push.sh ~/aladdin-production-snapshot-<stamp>` (same script, no flag). It re-runs all gates, requires the typed phrase `PUSH 4 MIGRATIONS TO PRODUCTION` (stop point D), re-checks the snapshot age after the prompt, runs `db push --linked --include-all`, then requires 207 applied and none pending.
+4. Post-apply verification below (read-only), then stop point E before any promotion.
 
-The dry run must list exactly the four versions in section 1, in that order. Then the scripted gate with no push:
+The 60-minute snapshot limit covers steps 1 to 3 together: if review of step 2 runs long, take a new snapshot. Optional extra, read-only, run before step 2 if wanted: `node scripts/migration-history-guard.mjs list.json --expect plan` on a `migration list --linked --output-format json` file (the script already runs the equivalent `p2-gate.mjs pending` check).
 
-```bash
-bash scripts/hosted-db/production-p2-push.sh ~/aladdin-production-snapshot-<stamp> --check-only
-```
+Do not run `db push` by hand, `migration repair`, SQL Editor DDL or `db reset --linked`. Do NOT run `scripts/hosted-db/production-post-migration-check.sh`: it still expects 191 versions / `20261024090011` and would report a correct database as failed. Its fingerprint baseline is also the 191-migration one.
 
-Apply (separate approval; the script enforces the snapshot age, the typed phrase `PUSH 4 MIGRATIONS TO PRODUCTION` and the post-push 207 check):
-
-```bash
-bash scripts/hosted-db/production-p2-push.sh ~/aladdin-production-snapshot-<stamp>
-rm -rf supabase/.temp ; unset SUPABASE_DB_PASSWORD
-```
-
-Do not run `db push` by hand, `migration repair`, SQL Editor DDL or `db reset --linked`.
+Environment guards in the scripts, as reviewed: wrong project is refused (`project-ref` must equal Production); snapshot of another project is refused; dirty tree or HEAD different from `origin/main` is refused; every `--linked` call happens after the guard; `trap` removes `supabase/.temp` on exit, so a later read-only check must link again and re-verify the ref first. The scripts do not check that Acceptance is done or that the live frontend is `a3b08a22`; those are manual preconditions (section 4).
 
 ### Post-apply verification (read-only)
 
-Run through `pnpm exec supabase db query --linked -f <file>` or the dashboard SQL editor with SELECT only.
+The script's cleanup unlinks the project. To query again: `pnpm exec supabase link --project-ref kkpkgjrweysgvhvkhzun` (hidden password), `cat supabase/.temp/project-ref` must print that ref, run the SELECT-only file with `pnpm exec supabase db query --linked -f <file>`, then `rm -rf supabase/.temp; unset SUPABASE_DB_PASSWORD`. The dashboard SQL editor with SELECT only is equivalent. Never put anything but SELECT in these files.
 
 ```sql
 -- history: 207, none missing, latest 20261107090006
