@@ -7453,3 +7453,13 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Runtime diff `fc62c4b5..d0517c2f` over the RC runtime paths is exactly one line (`frontend/package.json` script `e2e:acceptance:headed`). RC baseline in the rollout checklist re-pinned to `d0517c2f`; A1 preview `d8ff501d` was built from `fc62c4b5` (not `d0517c2f`) and is runtime-equivalent to `d0517c2f`; L1 evidence (11/11) is preserved and L2 per-row evidence stays marked incomplete. L1 row now names the headed real-browser run (11/11) instead of the headless workflow.
 - No hosted write, deploy, secret change, migration or OTP activation. Delivery stays OFF. Next owner-gated steps unchanged: B0 to B3 (0% upload + `verify-frontend-upload.mjs --expect-sha`), C, Gate M, D1.
 
+
+## 2026-11-08 Track 2: Production recovery rehearsal adapted
+- `production-rehearsal.sh` now takes `--sha`, expects exactly the 4 pending Production migrations, applies them with `--include-all`, and verifies history, structure, row counts and permissions (contract 20261107090006). Old 26-migration pins/manifest/fingerprint baseline removed. `rehearsal-selftest.sh` updated to Production's 203-applied state.
+- Not yet executed with Docker (cloud container has none). Next: Scorpion self-test, then the real rehearsal against a fresh Production snapshot; Production push still needs a separate owner GO.
+
+## 2026-11-08 - RC re-fixed to main b44061a1 (Track 3)
+
+- Merged `origin/main` (b44061a1, #160/#161/#164) into the #145 branch; only `AGENT_WORK_LOG.md` conflicted (kept both sides).
+- The runtime diff against `d0517c2f` is NOT empty: #160 (frontend phone sign-up delivery-availability gate) and #161 (OTP Worker `open` recipient mode for acceptance). Per the RC rule the baseline is re-fixed to `b44061a1`; preview `d8ff501d` (from `fc62c4b5`) is no longer equivalent, so A1/A2/A3 must be redone. Production Worker `4415c515` behaviour unchanged (production config untouched); redeploy decision is the owner's.
+- No hosted write, deploy, secret change, migration or OTP activation. Delivery stays OFF.

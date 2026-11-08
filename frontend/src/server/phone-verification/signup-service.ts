@@ -41,6 +41,12 @@ type Deps = {
    * number already has an account. With deferral both cases return right after the database call, in the same shape.
    */
   defer?: (task: Promise<void>) => void;
+  /**
+   * GLOBAL delivery-availability gate (delivery-gate.ts), consulted before a challenge is opened. false, or a throw, answers UNAVAILABLE
+   * with no database call and no send. It never receives the number, so the answer cannot depend on it. Omitted = no gate (tests only;
+   * runtime.ts always passes one).
+   */
+  deliveryAvailable?: () => Promise<boolean>;
 };
 
 const UNAVAILABLE = { status: "unavailable" } as const;
@@ -63,6 +69,11 @@ export function createPhoneSignupService(deps: Deps) {
   async function start(registrationId: string, e164: string, clientIp: string | null, locale: "en" | "ar" = "ar"): Promise<SignupStartOutcome> {
     if (!deps.enabled) return UNAVAILABLE;
     if (!UUID.test(registrationId) || !E164.test(e164)) return UNAVAILABLE;
+    if (deps.deliveryAvailable) {
+      let up = false;
+      try { up = await deps.deliveryAvailable(); } catch { up = false; }
+      if (!up) return UNAVAILABLE;
+    }
 
     const challengeId = newChallengeId();
     const code = generateCode();

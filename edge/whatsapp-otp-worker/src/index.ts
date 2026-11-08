@@ -59,9 +59,9 @@ export interface Env {
    * grant-protected admin route) must ALSO be on. No row = OFF.
    */
   WHATSAPP_DELIVERY_ENABLED: string;
-  /** "acceptance" | "production" | "local". Only "production" may use recipient mode "open"; only "local" may redirect the Graph URL. */
+  /** "acceptance" | "production" | "local". Only "acceptance" and "production" may use recipient mode "open" ("local", unset and unknown values are refused); only "local" may redirect the Graph URL. */
   OTP_ENVIRONMENT?: string;
-  /** "allowlist" (default; no list = no send) | "open" (production only, explicit). */
+  /** "allowlist" (default; no list = no send) | "open" (acceptance and production only, explicit). */
   OTP_RECIPIENT_MODE?: string;
   /**
    * The global rolling-24h send budget is NOT configured here: its authoritative value (the Daily Send Limit, bounded by the Hard Ceiling)
@@ -187,9 +187,13 @@ export function parseSend(body: string): SendRequest | null {
 function allowedRecipients(env: Env): string[] {
   return (env.OTP_ALLOWED_RECIPIENTS ?? "").split(",").map((x) => x.trim()).filter((x) => MOBILE.test(x));
 }
-/** An isolated allow-list is the default and mandatory outside production: no list means no send. "open" only counts in production. */
+/** Recipient mode "open" is honoured only for the two real environments; "local", an unset or any unknown OTP_ENVIRONMENT fails closed to the allowlist. */
+function openRecipientMode(env: Env): boolean {
+  return env.OTP_RECIPIENT_MODE === "open" && (env.OTP_ENVIRONMENT === "acceptance" || env.OTP_ENVIRONMENT === "production");
+}
+/** An isolated allow-list is the default: no list means no send. "open" counts only in acceptance and production (see openRecipientMode). */
 export function recipientAllowed(phone: string, env: Env): boolean {
-  if (env.OTP_RECIPIENT_MODE === "open" && env.OTP_ENVIRONMENT === "production") return true;
+  if (openRecipientMode(env)) return true;
   return allowedRecipients(env).includes(phone);
 }
 
@@ -386,7 +390,7 @@ async function preflightReport(env: Env): Promise<Record<string, string | number
     delivery_attestation_age: attested.delivery_attestation_age,
     delivery_enabled: permitted && switchOn, // effective: both the permit and the audited Super Admin switch
     environment: env.OTP_ENVIRONMENT ?? "unset",
-    recipient_mode: env.OTP_RECIPIENT_MODE === "open" && env.OTP_ENVIRONMENT === "production" ? "open" : "allowlist",
+    recipient_mode: openRecipientMode(env) ? "open" : "allowlist",
     allowlist_entries: allowedRecipients(env).length,
     settings_initialized: settings !== null,
     daily_send_limit: settings?.dailyLimit ?? 0, // 0 = missing/invalid, which makes the Worker send nothing
