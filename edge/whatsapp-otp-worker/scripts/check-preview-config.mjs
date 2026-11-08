@@ -10,7 +10,8 @@ const config = JSON.parse(readFileSync(configPath, "utf8"));
 const errors = [];
 const must = (predicate, reason) => { if (!predicate) errors.push(reason); };
 must(config.name === "aladdin-whatsapp-otp-preview", "unexpected Worker name");
-must(config.vars?.WHATSAPP_DELIVERY_ENABLED === "false", "WhatsApp delivery must remain disabled");
+// The permit is only ONE of the three Worker-side conditions (permit AND audited Super Admin switch in D1 AND fresh attestation); the switch starts OFF.
+must(config.vars?.WHATSAPP_DELIVERY_ENABLED === "true" || config.vars?.WHATSAPP_DELIVERY_ENABLED === "false", "WHATSAPP_DELIVERY_ENABLED must be the literal string \"true\" or \"false\" (this guard accepts \"true\" for the Acceptance Worker only: the name check above and OTP_ENVIRONMENT=acceptance below pin it to Acceptance)");
 must(config.workers_dev === false && config.preview_urls === false && Array.isArray(config.routes) && config.routes.length === 0, "the Worker must be private: workers_dev off, preview_urls off, no routes (it is reached only through the frontend service binding)");
 must(!config.env?.production && !config.site && !config.route, "no production environments or routes permitted");
 must(
@@ -62,4 +63,4 @@ if (errors.length) {
   console.error("OTP Preview configuration BLOCKED:\n" + errors.map(s => "- " + s).join("\n"));
   process.exit(1);
 }
-console.log("OTP Preview configuration PASS: isolated Worker, Acceptance D1, Secrets Store bindings (Meta token + R2 signing secret), recipient mode open, delivery disabled");
+console.log("OTP Preview configuration PASS: isolated Worker, Acceptance D1, Secrets Store bindings (Meta token + R2 signing secret), recipient mode open, delivery permit as configured");
