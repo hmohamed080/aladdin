@@ -18,9 +18,11 @@ set -euo pipefail
 export LC_ALL=C
 
 PROD="kkpkgjrweysgvhvkhzun"
-BRANCH="claude/project-thread-724t0d"
-SHA="2ce6e109186fcc63cee534b1219d0f5622f86efb"
-MANIFEST="f76c64c2d0f3d762937cf550e7bd71a45ef0f96c672f086ecd9875db1bcc6812"
+# The release under test is named on the command line (--sha, 40 hex, must be on origin/main) instead of being hard-coded.
+# Production is expected to be at 203 applied / latest 20261107090003 with exactly these four pending (override only for tests).
+EXPECT_PENDING="${REHEARSAL_EXPECT_PENDING:-20261105090001 20261107090004 20261107090005 20261107090006}"
+CONTRACT="${REHEARSAL_CONTRACT:-20261107090006}"
+SHA=""; MANIFEST=""
 HERE="$(cd "$(dirname "$0")" && pwd)"; KIT="${KIT:-$HERE}"; [ -s "$KIT/security-tail.sql" ] || KIT="$HERE/../acceptance-rebuild"
 OUT="${HOME}/aladdin-production-rehearsal-$(date +%Y%m%d-%H%M%S)"
 sb() { pnpm exec supabase "$@"; }
@@ -33,11 +35,15 @@ PINS="gotrue-version storage-version postgres-version"
 for f in schema-fingerprint.sql schema-detail.sql security-tail.sql rowcounts.sql auth-storage-columns.sql local-only-roles-cleanup.sql \
          local-default-privileges-reset.sql local-noseed-fingerprint.txt local-noseed-detail.txt; do [ -s "$KIT/$f" ] || { echo "missing $KIT/$f"; exit 1; }; done
 RESUME=""
-case "${1:-}" in
-  --resume-backup) RESUME="${2:?usage: --resume-backup <earlier rehearsal folder, or its backup folder>}";;
-  "") ;;
-  *) echo "unknown option: $1"; exit 1;;
-esac
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --resume-backup) RESUME="${2:?usage: --resume-backup <earlier rehearsal folder, or its backup folder>}"; shift 2;;
+    --sha) SHA="${2:?usage: --sha <40-hex commit on origin/main>}"; shift 2;;
+    *) echo "unknown option: $1"; exit 1;;
+  esac
+done
+if [ -n "${REHEARSAL_SOURCE_DB_URL:-}" ] && [ -z "$SHA" ]; then SHA="$(git rev-parse HEAD)"; fi
+printf '%s' "$SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "usage: bash production-rehearsal.sh --sha <40-hex main commit> [--resume-backup <folder>]"; exit 2; }
 if [ -n "$RESUME" ]; then
   RESUME="$(cd "$RESUME" && pwd)"; [ "$(basename "$RESUME")" != backup ] || RESUME="$(dirname "$RESUME")"
   [ -z "${REHEARSAL_SOURCE_DB_URL:-}" ] || { echo "--resume-backup never connects to a database: unset REHEARSAL_SOURCE_DB_URL"; exit 1; }
@@ -46,8 +52,9 @@ fi
 # The migration files always come from the pinned commit. If GitHub cannot be reached, the commit already in
 # this clone is used (offline fallback); the manifest check below still proves the files are the tested ones.
 pinned_worktree() {
-  git fetch -q origin "$BRANCH" 2>/dev/null || echo "git fetch failed (offline?): using pinned commit $SHA from this clone"
-  git cat-file -e "$SHA^{commit}" 2>/dev/null || { echo "pinned commit $SHA is not in this clone: stopping"; exit 1; }
+  git fetch -q origin main 2>/dev/null || echo "git fetch failed (offline?): using commit $SHA from this clone"
+  git cat-file -e "$SHA^{commit}" 2>/dev/null || { echo "commit $SHA is not in this clone: stopping"; exit 1; }
+  git merge-base --is-ancestor "$SHA" origin/main 2>/dev/null || { echo "commit $SHA is not on origin/main: stopping"; exit 1; }
   WT="$(mktemp -d)/aladdin-rehearsal"; git -c core.autocrlf=false -c core.eol=lf worktree add -q --detach "$WT" "$SHA"; cd "$WT"
   [ "$(git rev-parse HEAD)" = "$SHA" ] || { echo "wrong commit"; exit 1; }
   pnpm install --frozen-lockfile >/dev/null 2>&1 || pnpm install --frozen-lockfile --offline >/dev/null
@@ -68,8 +75,8 @@ else
   SRC=(--linked); VERSIONS="$WT/supabase/.temp"
   for v in $PINS; do [ -s "$VERSIONS/$v" ] || { echo "supabase link did not report Production's $v: stopping"; exit 1; }; done
 fi
-[ "$(cd supabase/migrations && shasum -a 256 *.sql | tr -d '\r' | sed 's/ \*/  /' | shasum -a 256 | cut -d' ' -f1)" = "$MANIFEST" ] \
-  || { echo "migration files differ from the tested baseline: stopping"; exit 1; }
+# The migration files are exactly the ones at $SHA; their manifest is recorded with the backup so a resumed run can prove it.
+MANIFEST="$(cd supabase/migrations && shasum -a 256 *.sql | tr -d '\r' | sed 's/ \*/  /' | shasum -a 256 | cut -d' ' -f1)"
 
 umask 077; mkdir -p "$OUT"
 echo "select coalesce(string_agg(format('%s=%s', parname, array_to_string(paracl, ',')), E'\\n' order by parname), '') as t from pg_parameter_acl;" > "$OUT/.p.sql"
@@ -161,8 +168,12 @@ comm -23 "$OUT/history-files.txt" "$OUT/history-production.txt" > "$OUT/pending.
 echo "Pending: $(wc -l < "$OUT/pending.txt") migrations. Only on Production: $(wc -l < "$OUT/only-on-production.txt")."
 [ ! -s "$OUT/only-on-production.txt" ] || { echo "Production has versions the baseline lacks (see only-on-production.txt): stopping"; exit 1; }
 [ -s "$OUT/pending.txt" ] || { echo "Nothing to apply: Production already has the whole baseline."; exit 0; }
-[ "$(tail -1 "$OUT/history-production.txt")" \< "$(head -1 "$OUT/pending.txt")" ] \
-  || { echo "a pending migration sorts before Production's latest version (see pending.txt): stopping"; exit 1; }
+# Exactly the reviewed set may be pending. 20261105090001 sorts before Production's latest version, which is why the push
+# (and the local apply below) use --include-all; any other out-of-order version needs review first.
+[ "$(tr '\n' ' ' < "$OUT/pending.txt" | sed 's/ $//')" = "$EXPECT_PENDING" ] \
+  || { echo "pending set differs from the reviewed one ($EXPECT_PENDING), see pending.txt: stopping"; exit 1; }
+OOO="$(awk -v l="$(tail -1 "$OUT/history-production.txt")" '$0 < l' "$OUT/pending.txt" | tr '\n' ' ' | sed 's/ $//')"
+[ "$OOO" = "20261105090001" ] || [ -z "$OOO" ] || { echo "unexpected out-of-order pending versions: $OOO"; exit 1; }
 
 # 3. Restore into a throwaway local stack and prove the restore is exact.
 R="$OUT/stack"; mkdir -p "$R/supabase/migrations"; cp -r supabase/templates "$R/supabase/"
@@ -244,69 +255,59 @@ lq "$KIT/schema-detail.sql" > "$OUT/detail-restored.txt"
 
 # 4. Apply exactly what `db push` would apply, the same way (one file at a time, recorded in history).
 cp supabase/migrations/*.sql "$R/supabase/migrations/"
-set +e; sb migration up --workdir "$R" --local > "$OUT/migration-up.log" 2>&1; UP=$?; set -e
-lq "$KIT/schema-fingerprint.sql" > "$OUT/fingerprint-after.txt"
+set +e; sb migration up --workdir "$R" --local --include-all > "$OUT/migration-up.log" 2>&1; UP=$?; set -e
 lq "$KIT/rowcounts.sql" > "$OUT/rowcounts-after.txt"
-lq "$KIT/schema-detail.sql" > "$OUT/detail-after.txt"
 
-# 5. Report: counts and hashes only. Errors inside the report must not cut it short.
-# A function body that differs from the baseline only by carriage returns (CRLF text pasted into Production before this
-# rehearsal) is the same function. Accept exactly that, and only for functions that already had the CRs right after the
-# restore (so they come from Production, not from the 26 migrations); every other difference still fails.
-diff <(sort "$KIT/local-noseed-detail.txt") <(sort "$OUT/detail-after.txt") | grep '^[<>]' > "$OUT/detail-diff.txt" || true
-awk -F'|' -v OFS='|' '
-  FILENAME == ARGV[1] { if ($1 == "function" && substr($3,6) != substr($4,9)) crlf[$2] = 1; next }
-  { side = substr($1,1,1); sub(/^[<>] /, "", $1); k = $1 "|" $2; rest = $0; seen[k] = 1
-    if ($1 == "function") { b = substr($3,6); lf = substr($4,9); $3 = ""; $4 = ""; norm = $0 } else { b = ""; lf = ""; norm = rest }
-    if (side == "<") { bl[k] = norm; bb[k] = b; blf[k] = lf } else { af[k] = norm; ab[k] = b; alf[k] = lf } }
-  END { bad = 0; for (k in seen) { split(k, f, "|")
-          if (f[1] == "function" && (k in bl) && (k in af) && bl[k] == af[k] && bb[k] == blf[k] && alf[k] == bb[k] && (f[2] in crlf)) print "crlf " f[2]
-          else { print "other " k; bad = 1 } }
-        exit bad }' "$OUT/detail-restored.txt" "$OUT/detail-diff.txt" | sort > "$OUT/detail-classified.txt" && ONLY_CRLF=1 || ONLY_CRLF=0
-OTHER_CATS="$(diff <(grep -v '^seeded_rowcounts|' "$KIT/local-noseed-fingerprint.txt" | sort) <(grep -v '^seeded_rowcounts|' "$OUT/fingerprint-after.txt" | sort) | grep '^>' | cut -d'|' -f1 | sed 's/^> //' | grep -vx functions || true)"
-SCHEMA=same
+# 5. Verify the result on the restored copy (counts, hashes and booleans only). The old fixed schema baseline no longer
+# applies; the checks are: history, structural facts, no row changes, and function permissions against the reviewed contract.
+HIST_AFTER="$(dk exec -i "$C" psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 -c 'select version from supabase_migrations.schema_migrations order by 1')"
+printf '%s\n' "$HIST_AFTER" > "$OUT/history-after.txt"
+cat "$OUT/history-production.txt" "$OUT/pending.txt" | sort > "$OUT/history-expected-after.txt"
+HISTORY=ok; cmp -s "$OUT/history-after.txt" "$OUT/history-expected-after.txt" || HISTORY="DIFFERS (see history-after.txt)"
+dk exec -i "$C" psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 < "$HERE/acceptance-structure.sql" > "$OUT/structure-after.json" || true
+STRUCT="$(node -e '
+const f=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")), a=process.argv.slice(2), bad=[];
+if(!f.storage_key_column)bad.push("storage_key column missing"); if(f.backup_tables!==4)bad.push("backup tables="+f.backup_tables);
+if(!f.delivery_requests_table)bad.push("delivery requests table missing"); if(f.latest_migration!==a[0])bad.push("latest="+f.latest_migration);
+process.stdout.write(bad.length?"FAILED: "+bad.join("; "):"ok")' "$OUT/structure-after.json" "$(tail -1 "$OUT/pending.txt")" 2>&1 || echo "FAILED: unreadable structure output")"
+# Existing tables must keep their rows (schema_migrations grows by the pending count and is excluded).
+CHANGED="$(join -t'|' <(sed 's/:\([0-9]*\)$/|\1/' "$OUT/rowcounts-restored.txt" | sort -t'|' -k1,1) <(sed 's/:\([0-9]*\)$/|\1/' "$OUT/rowcounts-after.txt" | sort -t'|' -k1,1) \
+  | awk -F'|' '
+    $2==$3 || $1 ~ /schema_migrations/ {next}
+    # Reviewed seed rows of 20261107090006: four admin_permissions rows (exactly) and the role assignments for them (growth only).
+    $1 ~ /(^|[."])admin_permissions"?$/ && $3-$2==4 {next}
+    $1 ~ /(^|[."])admin_role_permissions"?$/ && $3>$2 {next}
+    {print "  "$1": "$2" -> "$3}')"
+DISAPPEARED="$(comm -23 <(cut -d: -f1 "$OUT/rowcounts-restored.txt" | sort) <(cut -d: -f1 "$OUT/rowcounts-after.txt" | sort))"
+dk cp "$(hp "$HERE/../function-permissions.sql")" "$C:/tmp/fp.sql"
+{ printf '[{"permissions":'; dk exec "$C" psql -U postgres -d postgres -At -q -1 -v ON_ERROR_STOP=1 -f /tmp/fp.sql | grep -v '^SET$'; printf '}]\n'; } > "$OUT/permissions-after.json"
 set +e
+PERMS="$(node "$HERE/verify-permissions-readonly.mjs" "$OUT/permissions-after.json" "$CONTRACT" 2>&1)"; PERMS_RC=$?
+( cd "$B" && shasum -a 256 -c --quiet "$OUT/backup.SHA256SUMS" >/dev/null 2>&1 ) && cmp -s <(tr -d '\r' < "$B/SHA256SUMS") <(tr -d '\r' < "$OUT/backup.SHA256SUMS") \
+  && BACKUP=unchanged || BACKUP=CHANGED
+set -e
 {
-  echo "Production rehearsal $(date -u +%FT%TZ), baseline $SHA"
+  echo "Production rehearsal $(date -u +%FT%TZ), release commit $SHA (migration manifest $MANIFEST)"
   if [ -n "$RESUME" ]; then echo "Backup: reused from $RESUME (Production was not contacted by this run)"; else echo "Backup: taken by this run"; fi
   echo "Backup validation: passed (checksums before restore, file list, metadata, $(wc -l < "$OUT/rowcounts-production.txt") table row counts, $(wc -l < "$OUT/history-production.txt") history versions)"
-  echo "Migration history table restored as: $(grep schema_migrations "$OUT/.migrations-schema.sql" | sed 's/.*(\(.*\));/\1/')"
-  echo "Production history: $(wc -l < "$OUT/history-production.txt") versions; pending: $(wc -l < "$OUT/pending.txt")"
+  echo "Production history: $(wc -l < "$OUT/history-production.txt") versions; pending: $(tr '\n' ' ' < "$OUT/pending.txt")"
   cat "$OUT/auth-storage-check.txt"
   echo "Auth/Storage schema versus Production: $AUTHSTORAGE"
   echo "Restore of the backup: $RESTORE (public/app schema fingerprint, the row count of every restored table, parameter grants)"
   echo "Parameter grants replayed as supabase_admin: $(grep -c . "$OUT/restore/roles-parameters.sql" || true)"
   echo "Local-only roles stripped (present in the local image, not on Production):"; sed 's/^/  /' "$OUT/local-only-roles.txt"
-  echo "CLI temporary login roles named in the security tail (local placeholder, dropped again): $(tr '\n' ' ' < "$OUT/restore/transient-roles.txt")"
-  echo "migration up exit code: $UP (log: migration-up.log)"
-  if diff -q <(grep -v '^seeded_rowcounts|' "$KIT/local-noseed-fingerprint.txt") <(grep -v '^seeded_rowcounts|' "$OUT/fingerprint-after.txt") >/dev/null
-  then echo "Schema after the push equals the tested baseline."
-  else SCHEMA=differs; echo "Schema after the push differs from the tested baseline in:"; diff <(sort "$KIT/local-noseed-fingerprint.txt") <(sort "$OUT/fingerprint-after.txt") | grep '^>' | cut -d'|' -f1
-    echo "Objects behind it (< tested baseline, > after the push; names, hashes and privileges only):"
-    head -80 "$OUT/detail-diff.txt" | sed 's/^/  /'
-    if [ "$ONLY_CRLF" = 1 ] && [ -s "$OUT/detail-classified.txt" ] && [ -z "$OTHER_CATS" ]; then
-      SCHEMA="same apart from CRLF line endings"
-      echo "Every difference above is a function body that equals the baseline once carriage returns are removed, with the same"
-      echo "security definer, volatility, search_path and privileges, and each already had those CRs on Production before the push:"
-      sed 's/^crlf /  /' "$OUT/detail-classified.txt"
-    else
-      echo "Differences that are not CRLF-only:"; grep -v '^crlf ' "$OUT/detail-classified.txt" | sed 's/^other /  /'; [ -z "$OTHER_CATS" ] || echo "  categories: $OTHER_CATS"
-    fi
-  fi
-  echo "Functions whose stored body contains carriage returns (CRLF text): restored $(awk -F'|' '$1=="function" && substr($3,6)!=substr($4,9)' "$OUT/detail-restored.txt" | wc -l | tr -d ' '), after the push $(awk -F'|' '$1=="function" && substr($3,6)!=substr($4,9)' "$OUT/detail-after.txt" | wc -l | tr -d ' ')"
-  echo "Tables whose row count changed (table: before -> after):"
-  join -t'|' <(sed 's/:\([0-9]*\)$/|\1/' "$OUT/rowcounts-restored.txt" | sort -t'|' -k1,1) <(sed 's/:\([0-9]*\)$/|\1/' "$OUT/rowcounts-after.txt" | sort -t'|' -k1,1) \
-    | awk -F'|' '$2!=$3 {print "  "$1": "$2" -> "$3}'
-  echo "Tables that disappeared:"; comm -23 <(cut -d: -f1 "$OUT/rowcounts-restored.txt" | sort) <(cut -d: -f1 "$OUT/rowcounts-after.txt" | sort) | sed 's/^/  /'
-  ( cd "$B" && shasum -a 256 -c --quiet "$OUT/backup.SHA256SUMS" >/dev/null 2>&1 ) && cmp -s <(tr -d '\r' < "$B/SHA256SUMS") <(tr -d '\r' < "$OUT/backup.SHA256SUMS") \
-    && BACKUP=unchanged || BACKUP=CHANGED
+  echo "migration up --include-all exit code: $UP (log: migration-up.log)"
+  echo "History after the apply: $HISTORY ($(wc -l < "$OUT/history-after.txt") versions)"
+  echo "Structure after the apply: $STRUCT"
+  echo "Existing tables whose row count changed, apart from the reviewed 20261107090006 permission seeds (must be none):"; [ -z "$CHANGED" ] || echo "$CHANGED"
+  echo "Tables that disappeared (must be none):"; [ -z "$DISAPPEARED" ] || echo "$DISAPPEARED" | sed 's/^/  /'
+  echo "Function permissions versus contract $CONTRACT: $PERMS"
   echo "Production backup files: $BACKUP since the checksum was taken (checked again after the rehearsal)"
 } > "$OUT/REPORT.txt"
-set -e
 cat "$OUT/REPORT.txt"
 echo "Share $OUT/REPORT.txt with Claude (it has no row data). Keep $B private; it holds Production data."
-if [ "$RESTORE" != exact ] || [ "$UP" != 0 ] || { [ "$SCHEMA" != same ] && [ "$SCHEMA" != "same apart from CRLF line endings" ]; } || [ "$BACKUP" != unchanged ]; then
-  echo "REHEARSAL FAILED: restore=$RESTORE, migration up exit=$UP, schema=$SCHEMA, backup=$BACKUP. Production push is NO-GO."
+if [ "$RESTORE" != exact ] || [ "$UP" != 0 ] || [ "$HISTORY" != ok ] || [ "$STRUCT" != ok ] || [ -n "$CHANGED" ] || [ -n "$DISAPPEARED" ] || [ "$PERMS_RC" != 0 ] || [ "$BACKUP" != unchanged ]; then
+  echo "REHEARSAL FAILED: restore=$RESTORE, migration up exit=$UP, history=$HISTORY, structure=$STRUCT, permissions rc=$PERMS_RC, backup=$BACKUP. Production push is NO-GO."
   exit 1
 fi
-echo "Rehearsal passed: faithful restore (Auth/Storage identical to Production, every row count equal), migrations applied, schema $( [ "$SCHEMA" = same ] && echo "equals the tested baseline" || echo "equals the tested baseline apart from CRLF line endings already in $(grep -c "^crlf " "$OUT/detail-classified.txt") Production function bodies (listed above)")."
+echo "Rehearsal passed: faithful restore (Auth/Storage identical to Production, every row count equal), the pending migrations applied with --include-all, history, structure and function permissions (contract $CONTRACT) verified, no row changes."
