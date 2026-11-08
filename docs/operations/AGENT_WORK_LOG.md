@@ -7404,6 +7404,14 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Checklist: RC rule (`main` HEAD, application-identical to `78d1b5c0`, proven by an empty diff of the application directories), single B0-B3 sequence with stop conditions, Gate M now blocks promotion (D1) only, since `frontend-upload` has no database access (confirmed from the workflow), rollback block clarified.
 - No Production write, upload, deployment, merge, secret change or WhatsApp enablement.
 
+## 2026-11-08 - Migration dry-run preparation (agent)
+
+- Read live migration history of both hosted projects (read-only): Acceptance 203 / `20261107090002`, Production 203 / `20261107090003`. The Production P-2 gate and snapshot scripts still expected 195 / 8 pending; updated to 203 / 4 pending (`20261105090001`, `090004-090006`), ending at 207 (PR #148, merged as a0aa229).
+- Wrote `docs/operations/MIGRATION_DRYRUN_RUNBOOK_20261108.md` (preflight, dry-run, backup gates, rollback). Review fixes: the permission gate is local-container only; `restore-acceptance.sh` is Acceptance-only and cannot restore into a new project.
+- PR #153 adds `acceptance-preflight.sh` + `acceptance-gate.mjs` and `verify-permissions-readonly.sh/.mjs`; offline tests 106/106 across `scripts/hosted-db/*.test.mjs` and the history guard; doc links 0 broken.
+- Outstanding: adapt `production-rehearsal.sh` (pinned to an old SHA and baseline) for the Production recovery rehearsal required before any Production GO; first real run of the new scripts is a read-only Acceptance baseline (needs owner GO). No hosted change was made.
+
+
 ## 2026-11-08 - Hosted Acceptance E2E: Cloudflare Access service-token support (agent)
 
 - L1 run 42450831535 stopped at its preflight: the preview is behind Cloudflare Access and the workflow had no token (0 tests ran).
@@ -7416,3 +7424,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - RC rule now precise: RUNTIME path list plus the exact `git diff --stat fc62c4b5... origin/main -- <paths>` command (must print nothing, else stop and re-fix the RC). Stale facts fixed: Production is 203 applied / 4 pending, rollback target `a3b08a22-f82e-4851-9786-9442c01e43c8` (not `39bdf3a2`; also fixed in the migration runbook and release plan). `production-post-migration-check.sh` (expects 191 versions) now exits 2 and the checklist says not to use it.
 - `verify-frontend-upload.mjs`: `--expect-sha` is now required (without it an older version with identical bindings would pass); tests updated (39 pass). Checklist: B1 run lookup restricted to workflow_dispatch on main, switch-timing note, explicit "next executable step" (A1) and the gate list.
 - No Production write, upload, deployment, merge, secret change or WhatsApp enablement.
+
+## 2026-11-08 - Acceptance apply plan and readiness gates (agent)
+
+- Owner ran the Acceptance dry-run on Scorpion: 203 applied, exactly 090003-090006 pending, no drift, permissions 731/731 vs `20261107090002`. Cross-checked read-only from the cloud session. Nothing applied.
+- Added `acceptance-apply.sh`, `acceptance-postcheck.mjs`, `table-counts.sql`, `acceptance-structure.sql` and the gate `post` mode (PR #153). Offline tests plus a stubbed-CLI exercise of the apply script. Runbook sections F-H hold the evidence, gate status and exact plan.
+- Open: backup freshness decision (4 auth rows touched since the 06:08Z snapshot), merge of #153 before the apply, owner GO. No push, merge or Production change.
+
