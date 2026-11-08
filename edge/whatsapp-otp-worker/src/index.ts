@@ -200,7 +200,7 @@ async function allowedRecipients(env: Env): Promise<string[]> {
   const raw = await readAllowList(env);
   if (raw === null) return [];
   const parts = raw.split(",").map((x) => x.trim()).filter((x) => x !== "");
-  if (env.OTP_ENVIRONMENT === "production" && (parts.length !== 1 || !MOBILE.test(parts[0]))) return [];
+  if (env.OTP_ENVIRONMENT === "production" && (parts.length !== 1 || !MOBILE.test(parts[0] ?? ""))) return [];
   return parts.filter((x) => MOBILE.test(x));
 }
 /** An isolated allow-list is the default and mandatory outside production: no list means no send. "open" only counts in production. */
