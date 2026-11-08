@@ -61,6 +61,10 @@ test.beforeAll(async () => {
       res.writeHead(302, { location: `http://team.cloudflareaccess.com:${otherPort}/cdn-cgi/access/login` });
       return res.end();
     }
+    if (path === "/to-access-path") {
+      res.writeHead(302, { location: "/cdn-cgi/access/login/preview?kid=x" });
+      return res.end();
+    }
     if (path === "/same-1") {
       // like Access after a valid service token: issue the session cookie with the first answer
       res.writeHead(308, { location: "/same-2", "set-cookie": "CF_Authorization=issued-by-access; Path=/; HttpOnly" });
@@ -143,6 +147,29 @@ test("a redirect to an Access login host is a violation and never reaches that h
   expect(violations.join(" | ")).toMatch(/Cloudflare Access login redirect \(team\.cloudflareaccess\.com/);
   expect(other.filter((s) => s.host.startsWith("team.cloudflareaccess.com"))).toEqual([]);
   expect(other.some((s) => s.id !== null || s.secret !== null)).toBe(false);
+  await context.close();
+});
+
+test("same-origin Access login endpoints never get the token (blocker takes precedence over the preview route)", async ({ browser }) => {
+  // /cdn-cgi/access/* on the PREVIEW origin matches both routes; the blocker must win, so the server never sees the request.
+  const { context, violations } = await routedContext(browser);
+  const page = await context.newPage();
+  await page.goto(`${scopeOrigin}/cdn-cgi/access/login/preview?kid=x`).catch(() => {});
+  const page2 = await context.newPage();
+  await page2.goto(`${scopeOrigin}/plain`);
+  await page2.evaluate((u) => fetch(u, { credentials: "include" }).catch(() => {}), `${scopeOrigin}/cdn-cgi/access/get-identity`);
+  expect(violations.join(" | ")).toMatch(/Cloudflare Access login request \(127\.0\.0\.1:\d+\)/);
+  expect(scope.filter((s) => s.url.startsWith("/cdn-cgi/access/") && (s.id !== null || s.secret !== null))).toEqual([]);
+  expect(scope.filter((s) => s.url.startsWith("/cdn-cgi/access/login"))).toEqual([]); // the browser request never left the browser
+  await context.close();
+});
+
+test("a same-origin redirect to /cdn-cgi/access/login is a violation and the token never follows it", async ({ browser }) => {
+  const { context, violations } = await routedContext(browser);
+  const page = await context.newPage();
+  await page.goto(`${scopeOrigin}/to-access-path`).catch(() => {});
+  expect(violations.join(" | ")).toMatch(/Cloudflare Access login redirect/);
+  expect(scope.filter((s) => s.url.startsWith("/cdn-cgi/access/"))).toEqual([]);
   await context.close();
 });
 

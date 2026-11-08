@@ -54,12 +54,16 @@ export function accessHeadersFor(url, creds, origin = ACCEPTANCE_PREVIEW_ORIGIN)
  * exact preview origin. A redirect (or any request) to a Cloudflare Access login host is aborted and reported.
  */
 export async function installAccessRouting(context, creds, { origin = ACCEPTANCE_PREVIEW_ORIGIN, onViolation = () => {} } = {}) {
-  await context.route((url) => isAccessLogin(url.href), (route) => {
-    onViolation(`Cloudflare Access login redirect (${new URL(route.request().url()).host})`);
-    return route.abort();
-  });
+  // ORDER MATTERS: Playwright runs the most recently registered matching route first. The credential route is registered
+  // FIRST and the Access-login blocker LAST, so the blocker wins for every request that is an Access login, including the
+  // same-origin /cdn-cgi/access/* paths that the preview-origin route also matches. A login endpoint must never get the token.
   await context.route((url) => isPreviewOrigin(url.href, origin), async (route) => {
     const url = route.request().url();
+    if (isAccessLogin(url)) {
+      // Defence in depth: unreachable while the blocker below is registered after this route.
+      onViolation(`Cloudflare Access login request (${new URL(url).host}${new URL(url).pathname.split("/").slice(0, 3).join("/")})`);
+      return route.abort();
+    }
     const response = await route.fetch({ headers: { ...route.request().headers(), ...accessHeadersFor(url, creds, origin) }, maxRedirects: 0 });
     const location = response.headers()["location"];
     if (response.status() >= 300 && response.status() < 400 && location && isAccessLogin(new URL(location, url).href)) {
@@ -67,6 +71,11 @@ export async function installAccessRouting(context, creds, { origin = ACCEPTANCE
       return route.abort();
     }
     return route.fulfill({ response });
+  });
+  await context.route((url) => isAccessLogin(url.href), (route) => {
+    const u = new URL(route.request().url());
+    onViolation(`Cloudflare Access login ${u.host === new URL(origin).host ? "request" : "redirect"} (${u.host})`);
+    return route.abort();
   });
 }
 
