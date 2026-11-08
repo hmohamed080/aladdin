@@ -69,7 +69,9 @@ describe("Access login detection", () => {
     expect(isAccessLogin("https://team.cloudflareaccess.com/cdn-cgi/access/login/x")).toBe(true);
     expect(isAccessLogin("https://cloudflareaccess.com/")).toBe(true);
     expect(isAccessLogin("https://notcloudflareaccess.com/")).toBe(false);
+    expect(isAccessLogin(`${ORIGIN}/cdn-cgi/access/login/aladdin-frontend-preview.bstalent9.workers.dev?kid=x`)).toBe(true);
     expect(isAccessLogin(`${ORIGIN}/auth/sign-in`)).toBe(false);
+    expect(isAccessLogin(`${ORIGIN}/auth/sign-in?next=/cdn-cgi/access/`)).toBe(false);
   });
 });
 
