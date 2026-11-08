@@ -82,8 +82,11 @@ export interface Env {
   APP_NOTIFY?: { fetch(input: string, init?: RequestInit): Promise<Response> };
   /** https URL of the app's notification endpoint (this Worker holds no database credential; it only posts signed statistics there). */
   OTP_NOTIFY_URL?: string;
-  /** Exact E.164 numbers, comma separated. Set in the Worker dashboard, never in the repository. */
-  OTP_ALLOWED_RECIPIENTS?: string;
+  /**
+   * Exact E.164 numbers, comma separated. Never in the repository. Outside production it may be a plain variable or a Secrets Store binding.
+   * In PRODUCTION it is honoured ONLY as a Secrets Store binding (a plain variable is ignored) and must hold EXACTLY ONE valid number.
+   */
+  OTP_ALLOWED_RECIPIENTS?: string | { get(): Promise<string> };
   /** LOCAL rigs only (OTP_ENVIRONMENT=local): a loopback http URL standing in for graph.facebook.com. */
   WHATSAPP_GRAPH_BASE_URL?: string;
 }
@@ -184,13 +187,26 @@ export function parseSend(body: string): SendRequest | null {
   return { to: o.to, code: o.code, purpose: o.purpose as SendRequest["purpose"], locale: o.locale as SendRequest["locale"], ttlSeconds: o.ttl_seconds, deliveryId: o.delivery_id.toLowerCase() };
 }
 
-function allowedRecipients(env: Env): string[] {
-  return (env.OTP_ALLOWED_RECIPIENTS ?? "").split(",").map((x) => x.trim()).filter((x) => MOBILE.test(x));
+async function readAllowList(env: Env): Promise<string | null> {
+  const v = env.OTP_ALLOWED_RECIPIENTS;
+  if (typeof v === "string") return env.OTP_ENVIRONMENT === "production" ? null : v; // production: a plain variable never counts
+  if (v && typeof v.get === "function") {
+    try { return await v.get(); } catch { return null; }
+  }
+  return null;
+}
+/** Valid allow-listed numbers. In production the list must be exactly ONE valid number; anything else (missing, empty, several, malformed) is empty = fail closed. */
+async function allowedRecipients(env: Env): Promise<string[]> {
+  const raw = await readAllowList(env);
+  if (raw === null) return [];
+  const parts = raw.split(",").map((x) => x.trim()).filter((x) => x !== "");
+  if (env.OTP_ENVIRONMENT === "production" && (parts.length !== 1 || !MOBILE.test(parts[0]))) return [];
+  return parts.filter((x) => MOBILE.test(x));
 }
 /** An isolated allow-list is the default and mandatory outside production: no list means no send. "open" only counts in production. */
-export function recipientAllowed(phone: string, env: Env): boolean {
+export async function recipientAllowed(phone: string, env: Env): Promise<boolean> {
   if (env.OTP_RECIPIENT_MODE === "open" && env.OTP_ENVIRONMENT === "production") return true;
-  return allowedRecipients(env).includes(phone);
+  return (await allowedRecipients(env)).includes(phone);
 }
 
 /** Template language for a locale: the locale if Meta approved it for the template, otherwise Arabic (which must itself be approved). */
@@ -387,7 +403,7 @@ async function preflightReport(env: Env): Promise<Record<string, string | number
     delivery_enabled: permitted && switchOn, // effective: both the permit and the audited Super Admin switch
     environment: env.OTP_ENVIRONMENT ?? "unset",
     recipient_mode: env.OTP_RECIPIENT_MODE === "open" && env.OTP_ENVIRONMENT === "production" ? "open" : "allowlist",
-    allowlist_entries: allowedRecipients(env).length,
+    allowlist_entries: (await allowedRecipients(env)).length,
     settings_initialized: settings !== null,
     daily_send_limit: settings?.dailyLimit ?? 0, // 0 = missing/invalid, which makes the Worker send nothing
     hard_ceiling: settings?.hardCeiling ?? 0,
@@ -432,7 +448,7 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
   // The signed id must BE this delivery's identity, so a valid signature for one challenge cannot be replayed as another.
   if (eventId !== `otp_${req.deliveryId}`) return answer(400);
   if (env.WHATSAPP_DELIVERY_ENABLED !== "true") return answer(503, { error: "delivery_disabled" });
-  if (!recipientAllowed(req.to, env)) return answer(403);
+  if (!(await recipientAllowed(req.to, env))) return answer(403);
   const db = env.IDEMPOTENCY_DB;
   if (!db) return answer(503, { error: "idempotency_unavailable" });
   // The Super Admin switch, read from D1 on EVERY send (no cache, so an OFF takes effect on the next request). Missing, OFF and unreadable

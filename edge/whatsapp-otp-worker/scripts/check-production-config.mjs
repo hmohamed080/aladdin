@@ -23,13 +23,17 @@ const EXPECTED_BINDINGS = [
   ["OTP_NOTIFY_SIGNING_SECRET", "OTP_NOTIFY_SIGNING_SECRET_PRODUCTION"],
   ["OTP_ADMIN_GRANT_SECRET", "OTP_ADMIN_GRANT_SECRET_PRODUCTION"],
 ];
+// First-live-test recipient restriction: ONE number, held only in this Secrets Store binding (never a variable, never in Git).
+const ALLOWLIST_BINDING = ["OTP_ALLOWED_RECIPIENTS", "OTP_ALLOWED_RECIPIENTS_PRODUCTION"];
 const raw = JSON.stringify(config);
 
 must(config.name === "aladdin-whatsapp-otp-production", "unexpected Worker name (must be aladdin-whatsapp-otp-production)");
 must(config.main === "src/index.ts", "unexpected entry point");
 must(vars.WHATSAPP_DELIVERY_ENABLED === "false", "WhatsApp delivery must stay disabled until the approved cutover");
 must(vars.OTP_ENVIRONMENT === "production", "OTP_ENVIRONMENT must be production");
-must(vars.OTP_RECIPIENT_MODE === "open", "Production recipient mode must be open");
+must(vars.OTP_RECIPIENT_MODE === "allowlist" || vars.OTP_RECIPIENT_MODE === "open", "Production recipient mode must be allowlist (first live test) or open");
+must(!(vars.OTP_RECIPIENT_MODE === "open" && vars.WHATSAPP_DELIVERY_ENABLED !== "false"), "open recipient mode must never be combined with delivery enabled: the first live test is allowlist mode with one secret-bound recipient");
+const allowlistMode = vars.OTP_RECIPIENT_MODE === "allowlist";
 must(config.workers_dev === false && config.preview_urls === false && Array.isArray(config.routes) && config.routes.length === 0 && !config.route && !config.site, "the Worker must be PRIVATE: workers_dev off, preview_urls off, no routes (reached only through the frontend service binding)");
 must(!config.env, "no wrangler environments: this file IS the Production Worker");
 must(
@@ -43,13 +47,14 @@ must(
 must(!raw.includes(ACCEPTANCE_D1) && !raw.toLowerCase().includes("acceptance") && !raw.includes("-preview"), "no Acceptance or preview resource may appear in the Production config");
 const bindings = config.secrets_store_secrets ?? [];
 must(
-  bindings.length === EXPECTED_BINDINGS.length &&
-  EXPECTED_BINDINGS.every(([b, n]) => bindings.some((x) => x.binding === b && x.secret_name === n && x.store_id === STORE)) &&
-  new Set(bindings.map((x) => x.secret_name)).size === EXPECTED_BINDINGS.length,
-  "exactly five distinct *_PRODUCTION secrets (Meta token, send, admin, notify, admin grant key) from the account Secrets Store"
+  bindings.length === EXPECTED_BINDINGS.length + (allowlistMode ? 1 : 0) &&
+  [...EXPECTED_BINDINGS, ...(allowlistMode ? [ALLOWLIST_BINDING] : [])].every(([b, n]) => bindings.some((x) => x.binding === b && x.secret_name === n && x.store_id === STORE)) &&
+  new Set(bindings.map((x) => x.secret_name)).size === bindings.length,
+  "exactly five distinct *_PRODUCTION secrets (Meta token, send, admin, notify, admin grant key) from the account Secrets Store, plus the single-recipient OTP_ALLOWED_RECIPIENTS_PRODUCTION binding in allowlist mode and nothing else"
 );
 must(bindings.every((x) => x.secret_name.endsWith("_PRODUCTION") && !ACCEPTANCE_SECRETS.includes(x.secret_name)), "Production must never bind an Acceptance secret");
-must(!raw.includes("OTP_ALLOWED_RECIPIENTS"), "no recipient allowlist variable or binding in Production (recipient mode is open)");
+must(!("OTP_ALLOWED_RECIPIENTS" in vars), "the recipient allowlist must never be a plain variable (it would put a phone number in Git); it is a Secrets Store binding only");
+must(allowlistMode || !raw.includes("OTP_ALLOWED_RECIPIENTS"), "no recipient allowlist binding in open mode");
 must(!raw.includes("SUPABASE_SEND_SMS_HOOK_SECRET"), "the Supabase Send-SMS-hook secret must not be bound: Supabase Phone Auth is never activated for this flow");
 must(!("OTP_DAILY_SEND_LIMIT" in vars) && !("OTP_HARD_CEILING" in vars), "the budget is a Super Admin setting in D1, not an environment variable");
 must(!("WHATSAPP_GRAPH_BASE_URL" in vars), "the Graph URL override is for local rigs only");
@@ -71,4 +76,4 @@ if (errors.length) {
   console.error("OTP Production configuration BLOCKED:\n" + errors.map((s) => "- " + s).join("\n"));
   process.exit(1);
 }
-console.log("OTP Production configuration PASS: private Production Worker + isolated D1, five *_PRODUCTION secrets, recipient mode open without an allowlist, delivery disabled");
+console.log("OTP Production configuration PASS: private Production Worker + isolated D1, five *_PRODUCTION secrets, recipient mode allowlist with one secret-bound recipient (no number in Git), delivery disabled");

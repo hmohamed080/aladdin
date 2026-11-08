@@ -90,7 +90,7 @@ describe("switches and recipient policy", () => {
       const res = await handleRequest(await signedSend(), baseEnv({ OTP_ALLOWED_RECIPIENTS: list }), meta.fetcher);
       assert.equal(res.status, 403, String(list)); assert.equal(meta.calls.length, 0);
     }
-    assert.equal(recipientAllowed(PHONE, baseEnv({ OTP_ALLOWED_RECIPIENTS: `+201099999999, ${PHONE}` })), true);
+    assert.equal(await recipientAllowed(PHONE, baseEnv({ OTP_ALLOWED_RECIPIENTS: `+201099999999, ${PHONE}` })), true);
   });
   test("'open' recipient mode works ONLY when the Worker is explicitly production; elsewhere it is still the allowlist", async () => {
     for (const environment of ["acceptance", "local", undefined]) {
@@ -101,6 +101,37 @@ describe("switches and recipient policy", () => {
     const meta = mockMeta();
     assert.equal((await handleRequest(await signedSend(), baseEnv({ OTP_RECIPIENT_MODE: "open", OTP_ENVIRONMENT: "production", OTP_ALLOWED_RECIPIENTS: "" }), meta.fetcher)).status, 200);
     assert.equal(meta.calls.length, 1);
+  });
+});
+
+describe("production single-recipient allowlist (first live test)", () => {
+  const OTHER_PHONE = "+201099999999";
+  const bound = (value: string | undefined | (() => Promise<string>)) =>
+    typeof value === "function" ? { get: value } : value === undefined ? undefined : { get: async () => value };
+  const prod = (list: string | undefined | (() => Promise<string>), over: Partial<Env> = {}) =>
+    baseEnv({ OTP_ENVIRONMENT: "production", OTP_RECIPIENT_MODE: "allowlist", OTP_ALLOWED_RECIPIENTS: bound(list), ...over });
+  const send = async (env: Env) => { const meta = mockMeta(); const res = await handleRequest(await signedSend(), env, meta.fetcher); return { status: res.status, calls: meta.calls.length }; };
+
+  test("the one secret-bound number is delivered to; another number is refused with no Meta call", async () => {
+    assert.deepEqual(await send(prod(PHONE)), { status: 200, calls: 1 });
+    assert.deepEqual(await send(prod(OTHER_PHONE)), { status: 403, calls: 0 });
+  });
+  test("fails closed: missing, empty, whitespace, unreadable, malformed binding", async () => {
+    for (const list of [undefined, "", "  ", ",", "01012345678", "+2010123"]) assert.deepEqual(await send(prod(list)), { status: 403, calls: 0 }, String(list));
+    assert.deepEqual(await send(prod(async () => { throw new Error("secret store down"); })), { status: 403, calls: 0 });
+  });
+  test("more than one entry is rejected, even when the requested number is one of them", async () => {
+    for (const list of [`${PHONE},${OTHER_PHONE}`, `${OTHER_PHONE}, ${PHONE}`, `${PHONE},${PHONE}`, `${PHONE},bad`]) assert.deepEqual(await send(prod(list)), { status: 403, calls: 0 }, list);
+    assert.equal(await recipientAllowed(PHONE, prod(`${PHONE},${OTHER_PHONE}`)), false);
+  });
+  test("a plain variable is never honoured in production (only the Secrets Store binding)", async () => {
+    assert.deepEqual(await send(prod(undefined, { OTP_ALLOWED_RECIPIENTS: PHONE })), { status: 403, calls: 0 });
+  });
+  test("outside production the allowlist (variable or binding, several entries) behaves as before; open mode is unchanged", async () => {
+    assert.deepEqual(await send(baseEnv({ OTP_ALLOWED_RECIPIENTS: `${OTHER_PHONE},${PHONE}` })), { status: 200, calls: 1 });
+    assert.deepEqual(await send(baseEnv({ OTP_ALLOWED_RECIPIENTS: bound(`${OTHER_PHONE},${PHONE}`) })), { status: 200, calls: 1 });
+    assert.deepEqual(await send(baseEnv({ OTP_RECIPIENT_MODE: "open", OTP_ENVIRONMENT: "acceptance", OTP_ALLOWED_RECIPIENTS: "" })), { status: 403, calls: 0 });
+    assert.deepEqual(await send(baseEnv({ OTP_RECIPIENT_MODE: "open", OTP_ENVIRONMENT: "production", OTP_ALLOWED_RECIPIENTS: undefined })), { status: 200, calls: 1 });
   });
 });
 
@@ -183,7 +214,7 @@ describe("global rolling-24h send budget (settings row in D1)", () => {
   test("a missing settings row fails closed in every environment: nothing is sent and the token is never read", async () => {
     for (const environment of ["acceptance", "production"]) {
       const meta = mockMeta(); const reads = { n: 0 };
-      const res = await handleRequest(await signedSend(), baseEnv({ IDEMPOTENCY_DB: memoryReplayDb({ settings: null, attestationEnv: environment }), OTP_ENVIRONMENT: environment, tokenReads: reads }), meta.fetcher);
+      const res = await handleRequest(await signedSend(), baseEnv({ IDEMPOTENCY_DB: memoryReplayDb({ settings: null, attestationEnv: environment }), OTP_ENVIRONMENT: environment, OTP_ALLOWED_RECIPIENTS: { get: async () => PHONE }, tokenReads: reads }), meta.fetcher);
       assert.equal(res.status, 503, environment);
       assert.deepEqual(await res.json(), { error: "budget_unconfigured" });
       assert.equal(meta.calls.length, 0); assert.equal(reads.n, 0);

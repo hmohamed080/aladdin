@@ -31,7 +31,7 @@ function blocked(reason: string, change: (c: any) => void) {
   assert.match(r.stderr, /BLOCKED/);
 }
 
-test("the checked-in Production config passes: isolated, delivery OFF, open mode, no allowlist", () => {
+test("the checked-in Production config passes: isolated, delivery OFF, allowlist mode, one secret-bound recipient", () => {
   const r = invoke();
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /PASS/);
@@ -39,14 +39,27 @@ test("the checked-in Production config passes: isolated, delivery OFF, open mode
 
 test("delivery cannot be enabled, and the environment/mode are pinned", () => {
   blocked("delivery on", (c) => { c.vars.WHATSAPP_DELIVERY_ENABLED = "true"; });
-  blocked("allowlist mode", (c) => { c.vars.OTP_RECIPIENT_MODE = "allowlist"; });
+  blocked("open mode with delivery enabled", (c) => { c.vars.OTP_RECIPIENT_MODE = "open"; c.vars.WHATSAPP_DELIVERY_ENABLED = "true"; });
+  blocked("unknown mode", (c) => { c.vars.OTP_RECIPIENT_MODE = "any"; });
   blocked("acceptance marker", (c) => { c.vars.OTP_ENVIRONMENT = "acceptance"; });
   blocked("local marker", (c) => { c.vars.OTP_ENVIRONMENT = "local"; });
 });
 
-test("no recipient allowlist can be bound or set, in vars or as a Secrets Store binding", () => {
+test("the single-recipient allowlist is ONLY a Secrets Store binding: never a variable, never a number, never missing in allowlist mode", () => {
   blocked("allowlist var", (c) => { c.vars.OTP_ALLOWED_RECIPIENTS = "+201000000000"; });
-  blocked("allowlist binding", (c) => { c.secrets_store_secrets.push({ binding: "OTP_ALLOWED_RECIPIENTS", store_id: "acfaa67f391e499db6fde398022f50ce", secret_name: "OTP_ALLOWED_RECIPIENTS_PRODUCTION" }); });
+  blocked("allowlist binding missing", (c) => { c.secrets_store_secrets = c.secrets_store_secrets.filter((x: any) => x.binding !== "OTP_ALLOWED_RECIPIENTS"); });
+  blocked("allowlist binding wrong secret", (c) => { c.secrets_store_secrets.find((x: any) => x.binding === "OTP_ALLOWED_RECIPIENTS").secret_name = "OTP_ALLOWED_RECIPIENTS"; });
+  blocked("allowlist binding to an acceptance-style name", (c) => { c.secrets_store_secrets.find((x: any) => x.binding === "OTP_ALLOWED_RECIPIENTS").secret_name = "OTP_ALLOWED_RECIPIENTS_PREVIEW"; });
+  blocked("second allowlist-like binding", (c) => { c.secrets_store_secrets.push({ binding: "OTP_ALLOWED_RECIPIENTS_2", store_id: "acfaa67f391e499db6fde398022f50ce", secret_name: "OTP_ALLOWED_RECIPIENTS_2_PRODUCTION" }); });
+  blocked("a phone number committed", (c) => { c.vars.OTP_NOTIFY_URL += "?x=+201000000000"; });
+});
+
+test("open mode (delivery OFF) is still a valid shape but must not carry the allowlist binding", () => {
+  const open = structuredClone(baseline);
+  open.vars.OTP_RECIPIENT_MODE = "open";
+  open.secrets_store_secrets = open.secrets_store_secrets.filter((x: any) => x.binding !== "OTP_ALLOWED_RECIPIENTS");
+  assert.equal(invoke(open).status, 0);
+  blocked("open mode with the allowlist binding", (c) => { c.vars.OTP_RECIPIENT_MODE = "open"; });
 });
 
 test("the Worker is isolated: name, routes, environments", () => {

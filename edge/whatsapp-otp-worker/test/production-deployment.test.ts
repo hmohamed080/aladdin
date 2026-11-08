@@ -25,9 +25,9 @@ const withBinding = (fn: (b: Record<string, any>[]) => Record<string, any>[]) =>
 test("the declared configuration is what the check expects: private, delivery false, no routes", () => {
   assert.deepEqual(checkConfigFile(config), []);
   assert.equal(expected.WHATSAPP_DELIVERY_ENABLED.text, "false");
-  assert.equal(expected.OTP_RECIPIENT_MODE.text, "open");
+  assert.equal(expected.OTP_RECIPIENT_MODE.text, "allowlist");
   assert.equal(expected.APP_NOTIFY.service, "aladdin-frontend-production");
-  assert.equal(Object.values(expected).filter((e: any) => e.kind === "secret").length, 5);
+  assert.equal(Object.values(expected).filter((e: any) => e.kind === "secret").length, 6);
   assert.match(checkConfigFile({ ...config, workers_dev: true }).join(), /workers_dev/);
   assert.match(checkConfigFile({ ...config, routes: [{ pattern: "x/*" }] }).join(), /routes/);
   assert.match(checkConfigFile({ ...config, vars: { ...config.vars, WHATSAPP_DELIVERY_ENABLED: "true" } }).join(), /must be "false"/);
@@ -47,7 +47,7 @@ test("missing, extra and changed bindings and safety variables are refused", () 
   assert.match(checkBindings(withBinding((b) => b.filter((x) => x.name !== "APP_NOTIFY")), expected).join(), /APP_NOTIFY is MISSING/);
   assert.match(checkBindings(withBinding((b) => [...b, { name: "OTP_ADMIN_GRANT_SECRET_EXTRA", type: "secret_text" }]), expected).join(), /unexpected binding/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "WHATSAPP_DELIVERY_ENABLED" ? { ...x, text: "true" } : x))), expected).join(), /WHATSAPP_DELIVERY_ENABLED/);
-  assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "OTP_RECIPIENT_MODE" ? { ...x, text: "allowlist" } : x))), expected).join(), /OTP_RECIPIENT_MODE/);
+  assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "OTP_RECIPIENT_MODE" ? { ...x, text: "open" } : x))), expected).join(), /OTP_RECIPIENT_MODE/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "APP_NOTIFY" ? { ...x, service: "somewhere-else" } : x))), expected).join(), /must be type=service to aladdin-frontend-production[^]*service=somewhere-else/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "OTP_SIGNING_SECRET" ? { ...x, secret_name: "OTHER" } : x))), expected).join(), /must be type=secrets_store_secret/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "IDEMPOTENCY_DB" ? { ...x, database_id: "other-db" } : x))), expected).join(), /D1 binding/);

@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 // READ-ONLY post-deploy check for the PRIVATE Production WhatsApp OTP Worker (P-6 of docs/operations/WHATSAPP_OTP_PRODUCTION_ROLLOUT_CHECKLIST.md).
 // It REPLACES worker-preflight.mjs for Production: that script needs a public Worker URL and assumes allowlist mode, while this Worker has no
-// public address and runs recipient mode "open". Nothing here sends, writes, deploys, rolls back, tails or changes anything:
+// public address and runs recipient mode "allowlist" (one secret-bound recipient). Nothing here sends, writes, deploys, rolls back, tails or changes anything:
 //
 //   node edge/whatsapp-otp-worker/scripts/check-production-deployment.mjs
 //
 // Checks (any failure exits 1 with the reasons):
 //   1. DEPLOYMENT      `wrangler deployments status --name aladdin-whatsapp-otp-production --json`: exactly one version at 100%.
 //   2. CONFIGURATION   `wrangler versions view <that version> --json`: the deployed bindings are EXACTLY what wrangler.production.jsonc declares
-//                      (D1, the five Secrets Store secrets, the APP_NOTIFY service binding, the plain variables, nothing extra), and the
-//                      safety variables read WHATSAPP_DELIVERY_ENABLED="false", OTP_RECIPIENT_MODE="open", OTP_ENVIRONMENT="production".
+//                      (D1, the six Secrets Store secrets incl. the single-recipient allowlist, the APP_NOTIFY service binding, the plain variables, nothing extra), and the
+//                      safety variables read WHATSAPP_DELIVERY_ENABLED="false", OTP_RECIPIENT_MODE="allowlist", OTP_ENVIRONMENT="production".
 //                      The config file itself must have workers_dev=false and no routes.
 //   3. D1 SWITCH       one SELECT: otp_delivery_switch, otp_delivery_audit and otp_delivery_attestation are EMPTY (delivery has never been
 //                      switched on, so nothing can send) and otp_alert_state has its single seed row.
@@ -102,7 +102,7 @@ export function checkBindings(view, expected) {
   for (const name of got.keys()) if (!(name in expected)) p.push(`unexpected binding ${name} on the deployed version`);
   const v = (n) => got.get(n)?.text;
   if (v("WHATSAPP_DELIVERY_ENABLED") !== "false") p.push('WHATSAPP_DELIVERY_ENABLED is not "false" on the deployed version');
-  if (v("OTP_RECIPIENT_MODE") !== "open") p.push('OTP_RECIPIENT_MODE is not "open" on the deployed version');
+  if (v("OTP_RECIPIENT_MODE") !== "allowlist") p.push('OTP_RECIPIENT_MODE is not "allowlist" on the deployed version');
   if (v("OTP_ENVIRONMENT") !== "production") p.push('OTP_ENVIRONMENT is not "production" on the deployed version');
   return p;
 }
