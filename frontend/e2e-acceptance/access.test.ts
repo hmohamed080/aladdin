@@ -7,6 +7,7 @@ import {
   judgePreflight,
   preflight,
   readAccessCredentials,
+  scrubError,
 } from "./access.mjs";
 
 const creds = { id: "id-value", secret: "secret-value" };
@@ -50,6 +51,16 @@ describe("headers are scoped to the exact preview origin", () => {
   ])("sends nothing to %s", (url) => {
     expect(isPreviewOrigin(url)).toBe(false);
     expect(accessHeadersFor(url, creds)).toEqual({});
+  });
+});
+
+describe("error scrubbing for the uploaded artifact", () => {
+  it("keeps one line and removes both credential values", () => {
+    const e = new Error("connect ECONNRESET id-value\n  → GET https://x\n  CF-Access-Client-Secret: secret-value");
+    const out = scrubError(e, creds);
+    expect(out).toBe("connect ECONNRESET [redacted]");
+    expect(out).not.toMatch(/secret-value|id-value|CF-Access/);
+    expect(scrubError("plain secret-value text", creds)).toBe("plain [redacted] text");
   });
 });
 

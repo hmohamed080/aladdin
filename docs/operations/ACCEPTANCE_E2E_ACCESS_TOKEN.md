@@ -44,3 +44,7 @@ Recommended Cloudflare setup (owner-run, in Zero Trust):
 
 `gh workflow run hosted-acceptance-e2e.yml --ref main` once this change is on `main`. The first step must say
 "Preview answered through Cloudflare Access: backend ok, env staging."
+
+## Log hygiene
+
+Only a scrubbed first line of any failed Access-authenticated API call reaches `run.log` and the JSON report (Playwright's call log lists request headers); both credential values are removed from it. Playwright documents that `route.continue` header overrides do not carry over to a redirected request, which is re-routed and receives the token only if it is the exact preview origin.

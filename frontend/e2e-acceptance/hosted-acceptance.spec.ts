@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { accessHeadersFor, isAccessLogin, isPreviewOrigin, readAccessCredentials } from "./access.mjs";
+import { accessHeadersFor, isAccessLogin, isPreviewOrigin, readAccessCredentials, scrubError } from "./access.mjs";
 
 /**
  * Hosted, READ-ONLY acceptance E2E for the Cloudflare Acceptance preview (playwright.acceptance.config.ts).
@@ -42,7 +42,12 @@ const accessCreds = () => readAccessCredentials(process.env);
 /** GET on the preview with the Access headers, without following redirects (a redirect could carry them elsewhere). */
 async function apiGet(context: BrowserContext, path: string) {
   const url = new URL(path, required("ACCEPTANCE_BASE_URL")).href;
-  const res = await context.request.get(url, { headers: accessHeadersFor(url, accessCreds()), maxRedirects: 0 });
+  const creds = accessCreds();
+  // A failed API call's message carries Playwright's call log, which lists request headers: keep only a scrubbed first line,
+  // because run.log and the JSON report are uploaded as an artifact.
+  const res = await context.request.get(url, { headers: accessHeadersFor(url, creds), maxRedirects: 0 }).catch((e: unknown) => {
+    throw new Error(`GET ${path} failed: ${scrubError(e, creds)}`);
+  });
   const location = res.headers()["location"] ?? "";
   if (res.status() >= 300 && res.status() < 400 && (isAccessLogin(location) || !location)) {
     throw new Error(`Cloudflare Access answered ${res.status()} for ${path}: the Access service token is wrong, expired or not authorised for the preview.`);

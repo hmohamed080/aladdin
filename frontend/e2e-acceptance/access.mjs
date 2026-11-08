@@ -25,6 +25,13 @@ export function readAccessCredentials(env) {
   return { id, secret };
 }
 
+/** An error message safe for logs and the uploaded artifact: first line only (Playwright's call log lists request headers), credential values removed. */
+export function scrubError(error, creds) {
+  let text = String((error && error.message) ?? error).split("\n")[0] ?? "";
+  for (const v of [creds.id, creds.secret]) if (v) text = text.split(v).join("[redacted]");
+  return text.slice(0, 300);
+}
+
 /** True only for the exact Acceptance preview origin (scheme, host and port). */
 export function isPreviewOrigin(url) {
   try {
