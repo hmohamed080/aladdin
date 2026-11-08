@@ -7389,3 +7389,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Verified `main` (`5861d879`) contains the integration branch, #143 and #144 with green CI. Found: `CLOUDFLARE_PRODUCTION_ENABLED=false`, no required reviewer on `cloudflare-production`, Acceptance preview on an older build (`47d4fe0b`).
 - Added `scripts/hosted-db/verify-frontend-upload.mjs` (+7 tests): read-only post-upload check of secrets and bindings by name and type; checklist now has the A to D execution sequence, L3/L4/P-7a tests and rollback.
 - No upload, deployment, merge, promotion, WhatsApp enablement or Production data change.
+
+## 2026-11-08 - P-7 plan pinned to release candidate 78d1b5c0 (agent, Track B)
+
+- Merged `origin/main` (`78d1b5c0`, includes Admin Backups #140) into the #145 branch. Targeted tests (verify-frontend-upload, provision-frontend-otp-secrets): 37 pass.
+- Reviewed `verify-frontend-upload.mjs`: fixed the JSON extraction (a wrangler banner line containing `[` could be taken as the JSON start; now every line start is tried and it fails closed). Test added. The real read-only run still refuses the P-4 version as "not a new upload".
+- Checklist: P-7 pinned to SHA `78d1b5c0c743ef3afb40285d01baeb8d62152692`; A1 to A3 must be redone (preview runs `5861d879`); new Gate M: the frontend depends on 4 migrations not yet in Production (`20261105090001`, `20261107090004` to `090006`), so upload/promotion is blocked until they are applied with `--include-all` (runbook in #148). Rollback stays `wrangler rollback a3b08a22...`, never delete.
+- No Production write, upload, deployment, merge, secret change or WhatsApp enablement.

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkUpload, run, P4_VERSION, OTP_WORKER_TARGET } from "./verify-frontend-upload.mjs";
+import { checkUpload, run, parse, P4_VERSION, OTP_WORKER_TARGET } from "./verify-frontend-upload.mjs";
 import { LIVE_VERSION } from "./provision-frontend-otp-secrets.mjs";
 
 const UP = "11111111-2222-4333-8444-555555555555";
@@ -82,4 +82,12 @@ test("a missing or malformed version id, or any other argument, is a usage error
     assert.equal((await go(f, argv)).code, 2);
     assert.equal(f.calls.length, 0);
   }
+});
+
+test("parse skips wrangler banner lines (even ones starting with [) and fails closed without JSON", () => {
+  const ok = (stdout) => ({ status: 0, stdout });
+  assert.deepEqual(parse(ok(' ⛅️ wrangler 4.0\n[wrangler:info] hi\n{"a":1}\n'), "x"), { a: 1 });
+  assert.deepEqual(parse(ok('﻿[1,2]'), "x"), [1, 2]);
+  assert.throws(() => parse(ok("[wrangler:info] nothing"), "x"), /no JSON/);
+  assert.throws(() => parse({ status: 1, stdout: "{}" }, "x"), /failed/);
 });

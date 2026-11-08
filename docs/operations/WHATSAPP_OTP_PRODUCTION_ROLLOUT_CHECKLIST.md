@@ -165,14 +165,24 @@ Run it from the owner's machine: dry run first (`node provision-grant-key-produc
 | Reviewer on the `cloudflare-production` environment | **set 2026-11-07:** `hmohamed080` is a required reviewer (self-review allowed because the owner is the only user; admin bypass is still the GitHub default `true`). Every Production stage now waits for that approval. |
 | Acceptance preview build (L1/L2) | **A1 readiness verified 2026-11-07 (read-only):** `cloudflare-preview` allows `main` (custom branch policy), `CLOUDFLARE_PREVIEW_ENABLED=true`, `NEXT_PUBLIC_SUPABASE_URL` is the isolated Acceptance project `nxossqhdfltcqdwvbewi`, its publishable key equals that project's key (not Production's), and the workflow refuses any URL containing the Production ref. The preview Worker still runs an older build (run `47d4fe0b`, 2026-11-05), so A1 is needed; **not run, awaiting approval.** |
 | Hosted Acceptance E2E (L1) | `hosted-acceptance-e2e.yml` already signs in through the one-field `/auth/sign-in` form and checks `/installer/sign-in`; the three test-account secrets exist in `acceptance-e2e` |
-| Post-upload verification of secrets and bindings | **new, read-only:** `scripts/hosted-db/verify-frontend-upload.mjs --version=<id>` (7 tests; also run against real Production data, where it correctly refuses the P-4 version as "not a new upload") |
+| Post-upload verification of secrets and bindings | **new, read-only:** `scripts/hosted-db/verify-frontend-upload.mjs --version=<id>` (8 tests; JSON parsing tolerates wrangler banner lines; also run against real Production data, where it correctly refuses the P-4 version as "not a new upload") |
+
+### Release candidate and migration gate (added 2026-11-08, before any A or B step)
+
+**Fixed release-candidate SHA: `78d1b5c0c743ef3afb40285d01baeb8d62152692`** (`main` after the Admin Backups integration #140; 69 commits beyond `5861d879`). Acceptance A1 and the Production upload B1 must both be built from this exact SHA; if `main` moves, stop and re-pin. The Acceptance preview still runs the older `5861d879`, so **A1 (and A2, A3) must be redone from `78d1b5c0`**; results obtained on `5861d879` do not count.
+
+**Gate M (blocks B1 and everything after it): the Production database must first have the 4 pending migrations.** From repository files only (no Production connection was made): `main` has 207 migrations; `5861d879` had 203, which is what P-2 applied. The delta `5861d879..78d1b5c0` adds exactly `20261105090001_admin_staff_invitations`, `20261107090004_media_id_storage_keys`, `20261107090005_request_and_verification_media` and `20261107090006_admin_backup_control`. The frontend of `78d1b5c0` depends on them (staff-invitation pages and actions, media-id storage keys and the media route, purchase-request and business-verification uploads, `/admin/backups` and its server actions; `database.types.ts` gained their tables and functions). Uploading at 0% is inert, but promoting it against a database without them would break those features, so **a Production frontend upload or promotion from `78d1b5c0` is blocked until a separately approved P-2 follow-up applies the 4 migrations.** Notes: (a) `20261105090001` is older than the latest applied `20261107090003`, so the push needs `db push --include-all` (the same out-of-order handling as the first P-2); (b) the runbook and gate for this follow-up are in PR #148 (`EXPECT_APPLIED` 203, latest `20261107090003`, 4 pending) and are not on `main` yet, so `p2-gate.mjs` on `main` still expects the old 195 state: merge #148 first; (c) take a fresh Production recovery snapshot (P-0b) before the push; (d) re-verify the applied count and the four names read-only right before B0. The migrations are additive, and the OTP path (L1 to L5, P-7a) does not itself need them, but the build as a whole does.
+
+Other gating items: the verifier checks bindings only, not the source SHA of a version, so record the SHA printed by the B1 run summary and confirm it equals `78d1b5c0c743ef3afb40285d01baeb8d62152692`; `LIVE_VERSION` in `provision-frontend-otp-secrets.mjs` is pinned to `a3b08a22`, so the verifier fails closed (REFUSED) if the live version changes in between.
 
 ### P-7 owner-approved execution sequence (Git Bash, repository root; every step needs its own approval)
+
+Build everything below from `main` at `78d1b5c0c743ef3afb40285d01baeb8d62152692`, and only after Gate M is closed.
 
 **A. Acceptance (L1/L2), no Production resource involved**
 
 ```bash
-gh workflow run cloudflare-frontend-preview.yml --ref main          # A1: main's build to the Acceptance preview
+gh workflow run cloudflare-frontend-preview.yml --ref main          # A1: REDO from 78d1b5c0 (the preview runs 5861d879); check the run's head SHA
 gh run watch                                                         # wait for green
 gh workflow run hosted-acceptance-e2e.yml --ref main                # A2: L1, read-only sign-in of the 3 test accounts
 gh run watch
@@ -183,8 +193,8 @@ A3 (L2, owner, manual, on `https://aladdin-frontend-preview.bstalent9.workers.de
 **B. Production upload only (0% of traffic)**
 
 ```bash
-gh variable set CLOUDFLARE_PRODUCTION_ENABLED --env cloudflare-production --body true     # B0: the only switch (add a required reviewer first)
-gh workflow run cloudflare-production.yml --ref main -f stage=frontend-upload              # B1: new version, not deployed
+gh variable set CLOUDFLARE_PRODUCTION_ENABLED --env cloudflare-production --body true     # B0: the only switch (reviewer is set); only after Gate M
+gh workflow run cloudflare-production.yml --ref main -f stage=frontend-upload              # B1: new version, not deployed; the run's head SHA must be 78d1b5c0c743ef3afb40285d01baeb8d62152692
 gh run watch                                                                               # the run summary prints the version id
 gh variable set CLOUDFLARE_PRODUCTION_ENABLED --env cloudflare-production --body false    # B2: close the switch again
 node scripts/hosted-db/verify-frontend-upload.mjs --version=<UPLOADED_VERSION_ID>          # B3: read-only; stop if it says REFUSED
@@ -211,7 +221,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST -H "$H" https://aladdindecore.c
 (cd frontend && pnpm exec wrangler versions deploy <UPLOADED_VERSION_ID>@100% --env production)   # D1: goes live
 # L5: repeat L3/L4 without the header within minutes. The cron attestation noise (app_404) should stop within a minute.
 # ROLLBACK, if anything is wrong:
-(cd frontend && pnpm exec wrangler rollback a3b08a22-f82e-4851-9786-9442c01e43c8 --env production -m "rollback P-7")
+(cd frontend && pnpm exec wrangler rollback a3b08a22-f82e-4851-9786-9442c01e43c8 --env production -m "rollback P-7 (78d1b5c0)")   # never wrangler delete
 ```
 
 Rollback never touches the OTP Worker or D1 (delivery is OFF); never `wrangler delete` the frontend. Before promotion there is nothing to roll back.
@@ -245,7 +255,7 @@ There is **no automated paging** today: the events are searchable but nobody is 
 
 **Rollback summary:** P-2 is additive: forward-fix with a new migration, or restore from the P-0b snapshot (hours, loses writes since the snapshot); P-1 delete one row; P-3 leave empty tables; P-4 nothing live changes (ignore the undeployed version); P-6 delete the new Worker (before the frontend binds to it); frontend: uploaded versions serve 0% until promoted, and `wrangler rollback --env production` returns to `a3b08a22`.
 
-**Remaining blockers (checked 2026-11-07):** (1) `CLOUDFLARE_PRODUCTION_ENABLED` is `false` (owner switch, step B0; kept closed on purpose; the owner is now the required reviewer of the environment); (2) the Acceptance preview runs an older build, so L1/L2 need step A1 first; (3) the hosted login gate L1 to L5 and the P-7a runtime probe before any promotion; (4) P-8 limits initialisation and P-9 alert-connection and attestation checks after promotion; (5) alert recipients and A10, which block only live activation. Resolved: `main` holds the integrated build (`5861d879`), P-6 is done and verified.
+**Remaining blockers (updated 2026-11-08, release candidate `78d1b5c0`):** (0) **Gate M: the 4 pending Production migrations (`20261105090001`, `20261107090004` to `090006`) must be applied first, with `--include-all`, after #148 and a fresh snapshot;** (1) `CLOUDFLARE_PRODUCTION_ENABLED` is `false` (owner switch, step B0; kept closed on purpose; the owner is now the required reviewer of the environment); (2) the Acceptance preview runs the older `5861d879`, so A1 to A3 must be redone from `78d1b5c0`; (3) the hosted login gate L1 to L5 and the P-7a runtime probe before any promotion; (4) P-8 limits initialisation and P-9 alert-connection and attestation checks after promotion; (5) alert recipients and A10, which block only live activation. Resolved: `main` holds the integrated build (`5861d879`), P-6 is done and verified.
 
 ## 8. A10 and activation (not part of this checklist)
 

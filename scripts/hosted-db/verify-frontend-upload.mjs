@@ -62,11 +62,14 @@ export function checkUpload({ live, p4, up, deployment, versionId }) {
   return p;
 }
 
-const parse = (r, what) => {
+// wrangler may print banner/log lines (even ones containing "[") before the JSON: try each line that starts a JSON value.
+export const parse = (r, what) => {
   if (r.status !== 0) throw new Error(`${what} failed (exit ${r.status})`);
-  const t = String(r.stdout);
-  const i = Math.min(...["{", "["].map((c) => t.indexOf(c)).filter((x) => x >= 0));
-  return JSON.parse(t.slice(i));
+  const t = String(r.stdout).replace(/^﻿/, "");
+  for (const m of t.matchAll(/^[\t ]*[{[]/gm)) {
+    try { return JSON.parse(t.slice(m.index)); } catch { /* not the JSON start, keep looking */ }
+  }
+  throw new Error(`${what}: no JSON in the wrangler output`);
 };
 
 export async function run({ argv, wrangler, out }) {
