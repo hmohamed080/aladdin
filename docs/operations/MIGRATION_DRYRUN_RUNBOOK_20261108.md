@@ -45,3 +45,19 @@ Known reviewed risk: 20261105090001 applies out of order. The 2026-11-07 review 
 - Data loss or bad state, Production: there is NO scripted restore into a new project. `production-recovery-snapshot.sh` plus `encrypt-backup.sh` produce a verified, recoverable dump, and `production-rehearsal.sh` proved a local restore on 2026-10-25. Restoring into a new hosted project would be a new procedure needing its own design and approval; do not improvise it. `db reset --linked` is not a rollback.
 - Frontend: keep the previous Worker version; frontend rollback target for Production is 39bdf3a2. The old frontend works with the new schema because the migrations are additive.
 - Never run repair, SQL Editor DDL or `migration repair` without separate approval.
+
+## D. Read-only tooling added 2026-11-08 (all tested offline; none has been run against a hosted project)
+| Script | What it does | Tests |
+|---|---|---|
+| `scripts/hosted-db/acceptance-preflight.sh` | Real CLI `migration list` + `db push --dry-run` (no `--include-all`) on Acceptance, then `acceptance-gate.mjs` and the history guard. Refuses unless checkout = origin/main, linked ref is Acceptance, 203 applied / latest 090002, exactly 090003-090006 pending, no drift, no out-of-order. Never pushes. | `acceptance-gate.test.mjs` 6/6 |
+| `scripts/hosted-db/verify-permissions-readonly.sh acceptance\|production [version]` | Runs only the SELECT-only `scripts/function-permissions.sql` through `supabase db query --linked`, compares with `supabase/permissions/<version>.json` using the CI gate's own `compare()`. Run it as a baseline BEFORE the push (expect the previous contract, e.g. `20261107090002`) and after (expect `20261107090006`, 753 functions). | `verify-permissions-readonly.test.mjs` 6/6 (exact contract passes in all output shapes; widened grant, unreviewed, missing, changed owner/search_path and unusable output all fail) |
+
+Limits, stated plainly: the comparison logic is tested against the committed contract files, but the `supabase db query` output shape was only modelled on what the existing scripts parse (array or `{rows}`, jsonb column as value or string); the first real run is the first end-to-end test, so run it read-only on Acceptance as a baseline before the push.
+
+## E. Production recovery rehearsal requirement (must be satisfied BEFORE Production migration approval is requested)
+Owner decision basis: Production holds real accounts, so "a backup exists" is not enough; recovery must be shown to work for the exact change.
+1. Fresh Production snapshot taken within 60 minutes of the push (`production-recovery-snapshot.sh`), encrypted and recovered once (`encrypt-backup.sh`: decrypt-and-compare passes).
+2. A restore rehearsal of THAT snapshot into a throwaway local Supabase stack on the owner machine: schema fingerprint and per-table row counts match the snapshot exactly.
+3. On that restored copy, apply the 4 pending migrations in Production order (`20261105090001` out of order, then 090004-090006) with `db push --include-all`; then run `verify-permissions-readonly.mjs` logic against it (expect contract 20261107090006) and the schema fingerprint against the canonical replay. The 2026-11-07 review already showed the out-of-order replay differs only in element order of `ck_audit_action_known`.
+4. Report counts and hashes only (no row data); owner reviews before the Production GO.
+Gap found: `scripts/hosted-db/production-rehearsal.sh` is pinned to branch `claude/project-thread-724t0d`, an old commit SHA and manifest, and applies the old 26-migration baseline, so it cannot do step 3 as is. It must be re-pinned/adapted (new tested change, local Docker only) before the Production rehearsal. The 2026-10-25 rehearsal proved the method, not this change. Rollback for Production remains forward-fix or restore of the rehearsed snapshot; a restore into a new hosted project has no script and needs its own approved design.
