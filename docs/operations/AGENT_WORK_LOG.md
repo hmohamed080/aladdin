@@ -7450,6 +7450,6 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 ## 2026-11-08 - WhatsApp OTP release prep re-pinned to main d0517c2f (Track 3)
 
 - Merged `origin/main` (`d0517c2f`, #152/#153/#156) into the #145 branch; clean merge, no conflicts. `node --test scripts/hosted-db/*.test.mjs`: 125/125 pass.
-- Runtime diff `fc62c4b5..d0517c2f` over the RC runtime paths is exactly one line (`frontend/package.json` script `e2e:acceptance:headed`). RC baseline in the rollout checklist re-pinned to `d0517c2f`; A1 preview `d8ff501d` and L1/L2 remain valid (same application bytes). L1 row now names the headed real-browser run (11/11) instead of the headless workflow.
+- Runtime diff `fc62c4b5..d0517c2f` over the RC runtime paths is exactly one line (`frontend/package.json` script `e2e:acceptance:headed`). RC baseline in the rollout checklist re-pinned to `d0517c2f`; A1 preview `d8ff501d` was built from `fc62c4b5` (not `d0517c2f`) and is runtime-equivalent to `d0517c2f`; L1 evidence (11/11) is preserved and L2 per-row evidence stays marked incomplete. L1 row now names the headed real-browser run (11/11) instead of the headless workflow.
 - No hosted write, deploy, secret change, migration or OTP activation. Delivery stays OFF. Next owner-gated steps unchanged: B0 to B3 (0% upload + `verify-frontend-upload.mjs --expect-sha`), C, Gate M, D1.
 
