@@ -7389,3 +7389,9 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Added `scripts/r2-provision-plan.mjs` (prints bucket/CORS/lifecycle/verify commands, runs nothing, validates names with the runtime isolation rules) and `scripts/r2-reconcile.mjs` (read-only database vs bucket reconciliation, counts and fingerprints only), 14 node tests.
 - NOT done: any hosted write, bucket, token, secret, migration, deployment or deletion. Site bucket names and the R2 account id are proposals awaiting the owner; the Production manifest stays null (fails closed) until then. The P-7 deletion path is deliberately not built.
 - Update 2026-11-08 (owner): deleting legacy user media is NOT assumed. Runbook now preserves everything active users need via verified copy (`media-storage.mjs`), reconcile and delta before cutover; deletion needs a separate manifest and approval. Cloudflare account id and both site bucket names confirmed by the owner; pinning them in `environment-manifest.ts` was tried and reverted (guard tests assume an unpinned account); it happens in the commit after bucket creation. Still nothing hosted.
+
+## 2026-11-08 - Hosted Acceptance E2E: Cloudflare Access service-token support (agent)
+
+- L1 run 42450831535 stopped at its preflight: the preview is behind Cloudflare Access and the workflow had no token (0 tests ran).
+- Code-only fix on branch fix/acceptance-e2e-access-token-20261108: exact-origin Access headers (no global extraHTTPHeaders), no redirect following, fail closed on missing credentials or an Access redirect; tests in frontend/e2e-acceptance/access.test.ts; owner setup in docs/operations/ACCEPTANCE_E2E_ACCESS_TOKEN.md.
+- No secret created or changed, no Cloudflare Access policy changed, nothing merged, deployed or re-run.

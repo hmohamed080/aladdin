@@ -144,3 +144,30 @@ bucket grew; after P-6 the Storage policy closure is the backstop.
 - **Not verifiable with the available tools** (the MCP returns names and dates only; the API credential is OAuth and gets an authentication error on bucket settings): CORS, lifecycle, r2.dev public URL, custom domains, Worker bindings, token permissions. The `--site-only` plan prints the read-only `wrangler` checks for these; the operator's output is the evidence.
 - Acceptance site bucket only: `node scripts/r2-provision-plan.mjs --env acceptance --site-only` (2 writes: create the bucket, apply `lifecycle-public.json`; the private bucket is only read). Minimum credential: a 1-day R2 admin token (Workers R2 Storage Edit). No S3 key, Worker secret or variable changes are needed to create it; adding the bucket to a Worker credential and `R2_SITE_BUCKET` is a later GO when site media is first used.
 - Rollback of the site bucket: it is empty at creation; `wrangler r2 bucket delete aladdin-acceptance-site-media` removes it. Nothing references it until the Worker variable is set.
+
+## 9. Acceptance site bucket: final commands and safety checks (for approval, not executed)
+
+Run from `frontend/` with only the 1-day R2 admin token in the environment (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID=a4c2b7ac45e58a81691b9165492ce6a2`). Stop at the first unexpected result.
+
+**Before (read-only; all must hold)**
+1. `pnpm exec wrangler whoami` shows the Aladdin account only.
+2. `pnpm exec wrangler r2 bucket list` shows the four known buckets and **no** `aladdin-acceptance-site-media` (if it exists, stop: reuse it, run only the checks below).
+3. `node scripts/r2-provision-plan.mjs --env acceptance --site-only` prints exactly 2 `write` steps, both naming `aladdin-acceptance-site-media`.
+
+**Execute (the only two writes)**
+```
+pnpm exec wrangler r2 bucket create aladdin-acceptance-site-media --location weur
+pnpm exec wrangler r2 bucket lifecycle set aladdin-acceptance-site-media --file ../docs/operations/r2/lifecycle-public.json
+```
+
+**After (read-only; record the output as evidence)**
+```
+pnpm exec wrangler r2 bucket info aladdin-acceptance-site-media            # WEUR, Standard, default jurisdiction
+pnpm exec wrangler r2 bucket dev-url get aladdin-acceptance-site-media     # must be disabled
+pnpm exec wrangler r2 bucket domain list aladdin-acceptance-site-media     # must be empty
+pnpm exec wrangler r2 bucket lifecycle list aladdin-acceptance-site-media  # only the 7-day multipart abort
+pnpm exec wrangler r2 bucket list                                           # the four known buckets + this one, nothing else changed
+pnpm exec wrangler r2 bucket info aladdin-r2-acceptance-20261011-private   # unchanged
+```
+Then delete the admin token. Not part of this GO: CORS, any change to the private bucket, S3 keys, Worker variables or secrets, Production.
+Rollback: `pnpm exec wrangler r2 bucket delete aladdin-acceptance-site-media` (valid only while empty).

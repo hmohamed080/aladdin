@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { readAccessCredentials } from "./e2e-acceptance/access.mjs";
 
 /**
  * Hosted, READ-ONLY E2E against the Cloudflare Acceptance preview (run by .github/workflows/hosted-acceptance-e2e.yml).
@@ -16,6 +17,11 @@ const baseURL = process.env.ACCEPTANCE_BASE_URL;
 if (baseURL !== ACCEPTANCE_PREVIEW) {
   throw new Error(`ACCEPTANCE_BASE_URL must be exactly ${ACCEPTANCE_PREVIEW} (the Acceptance preview Worker).`);
 }
+
+// Cloudflare Access service token (GitHub `acceptance-e2e` Environment): both values are required, or nothing runs. They are
+// NOT put in `use.extraHTTPHeaders` (that is global and would reach Supabase, Turnstile and any redirect target); the spec
+// attaches them per request, to the exact preview origin only (e2e-acceptance/access.mjs).
+readAccessCredentials(process.env);
 
 export default defineConfig({
   testDir: "./e2e-acceptance",

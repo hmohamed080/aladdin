@@ -56,6 +56,9 @@ jobs:
       - run: pnpm --filter frontend typecheck
       - run: pnpm --filter frontend lint
       - run: pnpm --filter frontend test
+      # Real-Chromium regression test (local servers, no secret): Cloudflare Access credentials never follow a redirect.
+      - run: pnpm --filter frontend exec playwright install --with-deps chromium
+      - run: pnpm --filter frontend e2e:access-routing
       - run: pnpm --filter frontend build
       # Media Worker (edge/media-worker): unit tests with fake R2/database bindings, no Cloudflare account.
       - run: pnpm --filter @aladdin/media-worker typecheck

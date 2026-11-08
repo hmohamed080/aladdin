@@ -229,7 +229,8 @@ Rollback: set `ACCEPTANCE_BACKUP_SCHEDULE=off`. Nothing else runs on its own.
 
 ### Restore-test stack version
 
-`restore-test.sh` starts a throwaway local Supabase stack and refuses to restore (exit 2, "STACK MISMATCH") unless its Auth/Storage columns equal the backed-up project's. The stack comes from the pinned CLI (`RESTORE_SUPABASE_CLI_VERSION`, now 2.119.0: gotrue v2.197.0, storage-api v1.79.28, postgres 17.11.0.002), which reproduces Acceptance's managed schema (SCIM, MFA recovery codes, one-time-token expiry, storage versioning and bucket lifecycle). 2.110.0 (gotrue v2.193.0, storage-api v1.66.4) did not. When Supabase upgrades the hosted Auth/Storage, the guard fails again by design: bump the pin to the CLI whose `pkg/config/templates/Dockerfile` images match, never weaken the guard. `restore-pin-test.sh` pins both.
+`restore-test.sh` starts a throwaway local Supabase stack and refuses to restore (exit 2, "STACK MISMATCH") unless its Auth/Storage columns equal the backed-up project's. The stack comes from the pinned CLI (`RESTORE_SUPABASE_CLI_VERSION`, now 3.0.0: gotrue v2.197.0, storage-api v1.88.0, postgres 17.11.0.011), which reproduces Acceptance's managed schema (SCIM, MFA recovery codes, one-time-token expiry, storage versioning and bucket lifecycle). 2.110.0 (gotrue v2.193.0, storage-api v1.66.4) did not. When Supabase upgrades the hosted Auth/Storage, the guard fails again by design: bump the pin to the CLI whose `pkg/config/templates/Dockerfile` images match, never weaken the guard. `restore-pin-test.sh` pins both. 2026-11-08: Acceptance's Storage gained `bucket_lifecycle_states` and `lifecycle_abandoned_artifacts` (storage migrations 0076-0079), which no v2 CLI ships (2.122.1 = storage-api v1.84.19, through 0074); CLI 3.0.0's local stack matched Acceptance's 342 Auth/Storage columns exactly (same md5), so the pin moved to 3.0.0 and the guard did not change.
+
 
 ## Acceptance activation runbook (automatic backups)
 
