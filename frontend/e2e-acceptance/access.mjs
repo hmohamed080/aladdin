@@ -64,7 +64,15 @@ export async function installAccessRouting(context, creds, { origin = ACCEPTANCE
       onViolation(`Cloudflare Access login request (${new URL(url).host}${new URL(url).pathname.split("/").slice(0, 3).join("/")})`);
       return route.abort();
     }
-    const response = await route.fetch({ headers: { ...route.request().headers(), ...accessHeadersFor(url, creds, origin) }, maxRedirects: 0 });
+    // route.fetch's error text embeds a call log that lists the request headers, i.e. BOTH Access credentials (reproduced in
+    // real Chromium). Never let it escape: record a scrubbed first line and fail the request instead.
+    let response;
+    try {
+      response = await route.fetch({ headers: { ...route.request().headers(), ...accessHeadersFor(url, creds, origin) }, maxRedirects: 0 });
+    } catch (e) {
+      onViolation(`Access-routed request failed (${new URL(url).host}): ${scrubError(e, creds)}`);
+      return route.abort();
+    }
     const location = response.headers()["location"];
     if (response.status() >= 300 && response.status() < 400 && location && isAccessLogin(new URL(location, url).href)) {
       onViolation(`Cloudflare Access login redirect (${new URL(location, url).host})`);

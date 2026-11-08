@@ -61,6 +61,10 @@ test.beforeAll(async () => {
       res.writeHead(302, { location: `http://team.cloudflareaccess.com:${otherPort}/cdn-cgi/access/login` });
       return res.end();
     }
+    if (path === "/reset") {
+      req.socket.destroy(); // the connection dies mid-request: route.fetch throws
+      return;
+    }
     if (path === "/to-access-path") {
       res.writeHead(302, { location: "/cdn-cgi/access/login/preview?kid=x" });
       return res.end();
@@ -170,6 +174,22 @@ test("a same-origin redirect to /cdn-cgi/access/login is a violation and the tok
   await page.goto(`${scopeOrigin}/to-access-path`).catch(() => {});
   expect(violations.join(" | ")).toMatch(/Cloudflare Access login redirect/);
   expect(scope.filter((s) => s.url.startsWith("/cdn-cgi/access/"))).toEqual([]);
+  await context.close();
+});
+
+test("a failed in-scope request never exposes the token in an error or a violation", async ({ browser }) => {
+  // route.fetch's own error text includes a call log with the request headers (the token). It must be scrubbed, not thrown.
+  const { context, violations } = await routedContext(browser);
+  const page = await context.newPage();
+  const seen: string[] = [];
+  page.on("pageerror", (e) => seen.push(String(e.message)));
+  page.on("console", (m) => seen.push(m.text()));
+  const navError = await page.goto(`${scopeOrigin}/reset`).then(() => "", (e: Error) => String(e.message));
+  await page.waitForTimeout(300);
+  const everything = JSON.stringify([navError, seen, violations]);
+  expect(everything).not.toContain(CREDS.secret);
+  expect(everything).not.toContain(CREDS.id);
+  expect(violations.join(" | ")).toMatch(/request failed/i);
   await context.close();
 });
 
