@@ -10,9 +10,11 @@ import { accessHeadersFor, installAccessRouting, isAccessLogin, readAccessCreden
  *    attached ONLY to requests to the exact preview origin (context route + per-call API headers, never global extraHTTPHeaders), is
  *    never sent to another host or on a redirect, and an Access login redirect fails the run instead of being followed.
  *  - Acceptance only. Any request to the live Supabase project or the live domain is aborted and fails the run.
- *  - Turnstile is stubbed INSIDE the test browser (the stand-in the local suites use). That is valid only because hosted
- *    CAPTCHA protection is OFF on Acceptance, so Supabase Auth does not verify the token; once it is switched on this
- *    suite must use the real widget with an always-pass test key instead.
+ *  - CAPTCHA stays ON and untouched. Acceptance has Supabase Auth CAPTCHA protection ON (Turnstile, since 2026-10-28), which
+ *    refuses a made-up token ("That verification challenge didn't pass"). The suite therefore uses the REAL Turnstile widget
+ *    and waits for the genuine token it produces (sign-in is an interaction-only challenge, so a normal browser gets it with
+ *    no click). Nothing is stubbed, bypassed or switched off. If Cloudflare shows a challenge that needs a person, the run
+ *    fails with a clear message. The widget's hostname allowlist must include the preview host (the owner confirmed it does).
  *  - The "Showroom RC2 drift" block records what renders today for each of the 17 local spec drifts
  *    (docs/operations/e2e-shared-failures-triage-2026-10-22.md) as annotations. It never fails on them: they need product
  *    review, and asserting either the old or the new labels here would decide that review silently.
@@ -26,7 +28,6 @@ const NOT_AUTHORIZED = "You're not allowed to manage members here.";
 
 const FORBIDDEN_HOSTS = /kkpkgjrweysgvhvkhzun|aladdindecore\.com/i;
 const GENERIC_ERROR = /Application error|a server-side exception has occurred|Digest:/i;
-const TURNSTILE_STUB = `window.turnstile={render:function(el,o){setTimeout(function(){o.callback("XXXX.DUMMY.TOKEN.XXXX")},0);return "acceptance-e2e"},remove:function(){},reset:function(){}};`;
 
 function required(name: string): string {
   const value = process.env[name];
@@ -49,7 +50,7 @@ async function apiGet(context: BrowserContext, path: string) {
     throw new Error(`GET ${path} failed: ${scrubError(e, creds)}`);
   });
   const location = res.headers()["location"] ?? "";
-  if (res.status() >= 300 && res.status() < 400 && (isAccessLogin(location) || !location)) {
+  if (res.status() >= 300 && res.status() < 400 && (!location || isAccessLogin(new URL(location, url).href))) {
     throw new Error(`Cloudflare Access answered ${res.status()} for ${path}: the Access service token is wrong, expired or not authorised for the preview.`);
   }
   return res;
@@ -64,9 +65,6 @@ async function guardedContext(context: BrowserContext): Promise<BrowserContext> 
     violations.push(new URL(route.request().url()).host);
     return route.abort();
   });
-  await context.route("https://challenges.cloudflare.com/turnstile/v0/api.js*", (route) =>
-    route.fulfill({ contentType: "application/javascript", body: TURNSTILE_STUB }),
-  );
   const host = new URL(required("ACCEPTANCE_BASE_URL")).hostname;
   await context.addCookies([{ name: "NEXT_LOCALE", value: "en", domain: host, path: "/", secure: true, sameSite: "Lax" }]);
   return context;
@@ -86,7 +84,15 @@ async function signIn(context: BrowserContext, email: string, password: string, 
     await page.getByLabel(/^password$/i).fill(password).catch(() => {
       throw new Error(`The ${who} password field could not be filled on /auth/sign-in.`);
     });
-    await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30_000 });
+    // The real Turnstile widget fills this hidden field with a genuine single-use token; nothing here fakes it.
+    await expect(page.locator('input[name="captchaToken"]'))
+      .not.toHaveValue("", { timeout: 45_000 })
+      .catch(async () => {
+        const widget = await page.locator('iframe[src*="challenges.cloudflare.com"]').count();
+        throw new Error(
+          `The ${who} sign-in got no Turnstile token in 45 s (${widget ? "Cloudflare showed a challenge that needs a person" : "the widget did not load; check its hostname allowlist includes the preview host"}). CAPTCHA is not bypassed.`,
+        );
+      });
     await page.getByRole("button", { name: /^log in$/i }).click();
     await page.waitForURL((url) => !/\/sign-in(\/|$)/.test(url.pathname), { timeout: 45_000 }).catch(async () => {
       const alert = (await page.getByRole("alert").allInnerTexts().catch(() => [])).join(" | ").slice(0, 200);
@@ -108,6 +114,7 @@ async function openHealthy(page: Page, path: string, who: string): Promise<strin
   // next goto on this page is aborted mid-redirect (net::ERR_ABORTED). Realtime websockets do not hold networkidle.
   await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
   const finalPath = new URL(page.url()).pathname;
+  expect(isAccessLogin(page.url()), `${who}: ${path} ended on a Cloudflare Access login page (the service token did not reach a redirect hop)`).toBe(false);
   expect(finalPath, `${who}: ${path} sent the account to ${finalPath} (signed out?)`).not.toMatch(/\/sign-in(\/|$)/);
   await expect(page.locator("main").first(), `${who}: no authenticated shell on ${path}`).toBeVisible();
   await expect(page.getByTestId("aladdin-error-boundary"), `${who}: ${path} rendered the Aladdin error screen`).toHaveCount(0);
@@ -153,9 +160,15 @@ test.describe("public smoke", () => {
       expect(`${target.origin}${target.pathname}`, "/installer/sign-in must redirect to /auth/sign-in on the same origin").toBe(
         `${new URL(required("ACCEPTANCE_BASE_URL")).origin}/auth/sign-in`,
       );
-      const page = await context.newPage();
-      await page.goto("/showroom", { waitUntil: "domcontentloaded" });
-      expect(new URL(page.url()).pathname, "/showroom must ask a signed-out visitor to sign in").toMatch(/sign-in/);
+      // A signed-out visitor to /showroom must be sent to the APP's sign-in page. Checked on the first hop, without following
+      // it, so a Cloudflare Access login (a different, infrastructure redirect) can never be mistaken for the app's answer:
+      // apiGet already fails on a cloudflareaccess.com / /cdn-cgi/access/ redirect.
+      const showroom = await apiGet(context, "/showroom");
+      expect([301, 302, 303, 307, 308], `/showroom answered HTTP ${showroom.status()}`).toContain(showroom.status());
+      const dest = new URL(showroom.headers()["location"] ?? "", required("ACCEPTANCE_BASE_URL"));
+      expect(`${dest.origin}${dest.pathname}`, "/showroom must ask a signed-out visitor to sign in (same origin)").toBe(
+        `${new URL(required("ACCEPTANCE_BASE_URL")).origin}/auth/sign-in`,
+      );
     } finally {
       await context.close();
     }

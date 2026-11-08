@@ -70,10 +70,15 @@ export async function installAccessRouting(context, creds, { origin = ACCEPTANCE
   });
 }
 
-/** True when a request/redirect target is a Cloudflare Access login page rather than the app. */
+/**
+ * True when a request/redirect target is a Cloudflare Access login page rather than the app: either a cloudflareaccess.com
+ * host, or the same-origin /cdn-cgi/access/ path Access uses for a workers.dev application (seen on the hosted preview as
+ * /cdn-cgi/access/login/<host>, which a host-only check missed).
+ */
 export function isAccessLogin(url) {
   try {
-    return /(^|\.)cloudflareaccess\.com$/i.test(new URL(url).hostname);
+    const u = new URL(url);
+    return /(^|\.)cloudflareaccess\.com$/i.test(u.hostname) || /^\/cdn-cgi\/access\//i.test(u.pathname);
   } catch {
     return false;
   }
@@ -86,7 +91,7 @@ export function isAccessLogin(url) {
 export function judgePreflight({ status, location, contentType, body }) {
   const problems = [];
   if (status >= 300 && status < 400) {
-    problems.push(isAccessLogin(location ?? "") || !location
+    problems.push(!location || isAccessLogin(new URL(location, ACCEPTANCE_PREVIEW_ORIGIN).href)
       ? `Cloudflare Access answered ${status} with a login redirect: the service token is missing, wrong, expired or not authorised for the preview application.`
       : `the preview answered an unexpected redirect (${status}); expected HTTP 200.`);
     return problems;
