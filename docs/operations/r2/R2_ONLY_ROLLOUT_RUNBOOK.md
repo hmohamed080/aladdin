@@ -5,11 +5,15 @@ Supersedes the "migrate everything" sequence in [`PRODUCTION_R2_MIGRATION_PLAN.m
 
 ## 0. Owner decisions this runbook follows
 
-- R2 is the only application file store, Production included. Supabase keeps database, Auth and metadata (2026-10-31).
-- Legacy Supabase Storage **user** media (avatars, portfolio, product, organization images, videos) is **deleted, not migrated** (2026-10-31).
-- Kept and moved to R2: landing videos and posters, required documents and certificates (private), website static assets.
-  Production has 0 request photos and 0 verification documents; `professional-certificates` holds 3 zero-byte objects. So the
-  copy tool (`scripts/media-storage.mjs migrate`) is only needed if a kept legacy object exists at cutover time.
+- R2 is the only application file store for **new** bytes, Production included. Supabase keeps database, Auth and metadata (2026-10-31).
+- **2026-11-08 update (reverses the earlier "delete, don't migrate" assumption):** legacy Supabase user media is **not** assumed
+  deletable. Every object that an active user, organization, product, request or verification record still needs is first
+  **copied to R2 and verified**, then reconciled. Deletion of any legacy object is a separate, later decision that needs its own
+  manifest (see section 4) and explicit approval.
+- Also moved to R2: landing videos and posters, required documents and certificates (private), website static assets.
+- Cloudflare account id `a4c2b7ac45e58a81691b9165492ce6a2` and site bucket names `aladdin-acceptance-site-media` / `aladdin-site-media`
+  are owner-confirmed (2026-11-08). The account id is pinned for both environments and the Acceptance site bucket in
+  `environment-manifest.ts`; Production bucket names are pinned in the commit that follows their creation (until then Production fails closed).
 - Every hosted step below is a separate GO. Preparation (this document, scripts, tests) is not.
 
 ## 1. What is prepared (all local, all read-only or print-only)
@@ -30,13 +34,13 @@ Tests: `node --test scripts/r2-reconcile.test.mjs scripts/r2-provision-plan.test
 |---|---|---|
 | Supabase | `nxossqhdfltcqdwvbewi` | `kkpkgjrweysgvhvkhzun` |
 | Private user media bucket | `aladdin-r2-acceptance-20261011-private` (exists) | `aladdin-media-private` (ADR-0018 name) |
-| Site media bucket (`R2_SITE_BUCKET`) | `aladdin-acceptance-site-media` (to create) | `aladdin-site-media` (to create) |
+| Site media bucket (`R2_SITE_BUCKET`) | `aladdin-acceptance-site-media` (confirmed, to create) | `aladdin-site-media` (confirmed, to create) |
 | Public bucket | not used (no code path writes to it; leave unused) | none |
 | Backup bucket (never media) | `aladdin-acceptance-backups-weur` | `aladdin-production-db-backups` |
 | Worker | `aladdin-frontend-preview` | `aladdin-frontend-production` |
 
-The site bucket names are **proposals**; the owner confirms them at GO-3. After creation a reviewed commit pins them (and the
-R2 account id) in `frontend/src/lib/storage/environment-manifest.ts`. Until then Production fails closed by design.
+Names and account id are owner-confirmed. After Production creation a reviewed commit pins the two Production bucket names in
+`frontend/src/lib/storage/environment-manifest.ts` and `wrangler.jsonc` (a test keeps them equal). Until then Production fails closed by design.
 
 ### Credentials (least privilege, one per consumer)
 
@@ -77,21 +81,36 @@ Production (each its own GO, none implied):
 | P-2 | Create Production buckets, CORS, lifecycle, tokens: `r2-provision-plan.mjs --env production`; commit manifest names | P-1 done |
 | P-3 | Independent R2 media backup active and one restore test (ADR-0027 decision 6) | P-2 done |
 | P-4 | Worker version with R2 variables and secrets (undeployed), verify bindings | P-2 |
-| P-5 | Cutover window: `media-reset.mjs snapshot`; promote P-4 version (R2-only writes, no fallback); run the Production E2E subset (one upload per namespace with a test account) | P-3, P-4 |
+| P-4b | **Copy and verify all required legacy media** (section 4): `media-storage.mjs plan`, `migrate --execute` per namespace within `--max-bytes`, `rehash`, `r2-reconcile.mjs`. Needs a fresh Production backup and the Supabase egress check | P-3, P-4 |
+| P-5 | Cutover window: `delta` must report `cutoverReady`; `media-reset.mjs snapshot`; promote P-4 version (R2-only writes, no fallback); run the Production E2E subset (one upload per namespace with a test account) | P-4b |
 | P-6 | Close Supabase writes: `r2-only-storage-write-closure.sql`; rerun `snapshot`/`compare` | P-5 verified; no pending Supabase upload |
-| P-7 | Legacy cleanup (separate): deletion manifest from a fresh `media-reset.mjs inventory` including post-2026-10-25 uploads, its hash approved, a reviewed execution path (none exists yet: `media-reset.mjs` has no delete mode on purpose), a final database backup | P-6; keep landing videos, documents and certificates |
+| P-7 | Legacy cleanup (separate, optional, irreversible): see section 4 deletion manifest; reviewed execution path (none exists: `media-reset.mjs` and `media-storage.mjs` never delete Supabase sources), a final database backup, at least 30 days after P-5 | P-6 and a clean reconcile; only objects proven copied and unreferenced |
 
-Kept-object copy (only if the P-5 inventory shows any): `media-storage.mjs plan`, then `migrate --execute` per namespace with `--max-bytes`, `rehash`, and
-`delta` until `cutoverReady` is true, run once more inside the window. Production execution also needs `MEDIA_MIGRATION_APPROVED_PROJECT`.
+## 4. Preserve, copy, reconcile, then (maybe) delete
 
-## 4. Delta handling under the delete decision
+**What must be preserved:** every `ready` object that a live record refers to, in all seven namespaces (avatar, portfolio,
+certificate, product, organization, request, verification). `media-storage.mjs` already inventories exactly that
+(`media_migration_inventory`: ready rows still on `provider = 'supabase'`). Production on 2026-11-07: 890 objects, about 193 MB
+(avatars 201, portfolio 683, product 3, certificates 3 empty); 134 uploaded since Nov 5, so the inventory is re-taken at each step.
+Pending and deleted rows are not copied; objects with no live record are reported (`media-reset.mjs inventory`), never copied or removed automatically.
 
-Because user media is not copied, "delta" means two checks only:
+**Verified copy (per namespace, smallest first):**
+1. `media-storage.mjs plan --project <ref> --json` (metadata only; shows bytes, batches and estimated egress).
+2. Fresh encrypted backup of the database plus the Storage copy of the backup track (so the originals have an independent copy).
+3. `migrate --execute --namespace <ns> --max-bytes <N> --journal <file> --remaining-egress-bytes <N>`. Each object: read from Supabase, sha256 and size
+   verified by read-back from R2 (`If-None-Match`, never overwritten), the source re-checked, then the reference switched in the database. Journal is append-only and resumable.
+4. `rehash --journal <file>`: re-reads every R2 copy against the journal.
+5. `node scripts/r2-reconcile.mjs --project <ref>`: every live R2 row has its object with the receipt size (missing = 0, sizeMismatch = 0).
+6. `delta --journal <file>`: nothing new or replaced at the source; `cutoverReady` must be true, then run once more inside the cutover window.
+Rollback of the pointer switch: `rollback --journal <file> [--execute]`; originals and copies are both kept.
 
-1. **Nothing kept is left behind.** `media-storage.mjs delta` for `certificate`, `request`, `verification` must report nothing waiting (cutover precondition).
-2. **Nothing new lands in Supabase.** The `snapshot`/`compare` pair around the window fails if any bucket grew; after P-6 the policy closure is the backstop.
+**Deletion is not part of the cutover.** Supabase originals stay untouched through P-5/P-6. If the owner later wants them gone:
+1. Manifest = output of a fresh `media-reset.mjs inventory` plus, per object, proof it is `provider = 'r2'` in the database, verified in the journal (`rehash`), present and size-equal per `r2-reconcile`, and covered by the independent media backup.
+2. Retained regardless of anything else: submitted verification evidence, landing assets, documents and certificates until separately released.
+3. The manifest hash is approved in writing; a reviewed deletion path is written and tested on Acceptance first (it does not exist); minimum 30 days after cutover; a final backup immediately before.
 
-New uploads between GO-5 and GO-6 are impossible from the app (no fallback); a Supabase write from any other path shows up as growth and blocks P-6.
+New uploads between P-5 and P-6 cannot reach Supabase from the app (no fallback). The `snapshot`/`compare` pair around the window fails if any
+bucket grew; after P-6 the Storage policy closure is the backstop.
 
 ## 5. Rollback
 
@@ -112,7 +131,7 @@ New uploads between GO-5 and GO-6 are impossible from the app (no fallback); a S
 
 ## 7. Not done / needs the owner
 
-- Confirm the two site-bucket names and the R2 account id (GO-3/A-2).
 - Create the R2 tokens (the Cloudflare OAuth credential in cloud sessions cannot create API tokens).
-- The deletion execution path for P-7 is intentionally not built until its manifest is approved.
+- Read the remaining Supabase egress for the cycle before any `migrate --execute` (about 193 MB of media; the tool refuses without `--remaining-egress-bytes`).
+- Production GO-by-GO as in section 3. The legacy deletion path is intentionally not built until a manifest is approved.
 - Video (HLS) stays off; its keys are already ids-only.

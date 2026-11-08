@@ -7385,6 +7385,7 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 
 ## 2026-11-08 - R2 Acceptance and Production rollout preparation (agent, nothing hosted)
 
-- Added [`R2_ONLY_ROLLOUT_RUNBOOK.md`](r2/R2_ONLY_ROLLOUT_RUNBOOK.md): owner decisions, resources, credential matrix, Acceptance A-1..A-7 and Production P-1..P-7 GO gates, delta handling under the delete-not-migrate decision, rollback, reconcile readings.
+- Added [`R2_ONLY_ROLLOUT_RUNBOOK.md`](r2/R2_ONLY_ROLLOUT_RUNBOOK.md): owner decisions, resources, credential matrix, Acceptance A-1..A-7 and Production P-1..P-7 GO gates, delta handling under the preserve-then-copy decision, rollback, reconcile readings.
 - Added `scripts/r2-provision-plan.mjs` (prints bucket/CORS/lifecycle/verify commands, runs nothing, validates names with the runtime isolation rules) and `scripts/r2-reconcile.mjs` (read-only database vs bucket reconciliation, counts and fingerprints only), 14 node tests.
 - NOT done: any hosted write, bucket, token, secret, migration, deployment or deletion. Site bucket names and the R2 account id are proposals awaiting the owner; the Production manifest stays null (fails closed) until then. The P-7 deletion path is deliberately not built.
+- Update 2026-11-08 (owner): deleting legacy user media is NOT assumed. Runbook now preserves everything active users need via verified copy (`media-storage.mjs`), reconcile and delta before cutover; deletion needs a separate manifest and approval. Cloudflare account id and both site bucket names confirmed by the owner; account id pinned for both environments and the Acceptance site bucket pinned in `environment-manifest.ts` (Production bucket names pinned after creation). Still nothing hosted.

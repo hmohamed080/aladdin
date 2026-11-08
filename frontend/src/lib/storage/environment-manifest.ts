@@ -23,14 +23,15 @@ export type EnvironmentIdentity = {
 export const ENVIRONMENT_MANIFEST: Record<"production" | "staging", EnvironmentIdentity> = {
   production: {
     supabaseRef: "kkpkgjrweysgvhvkhzun",
-    r2AccountId: null,
+    // Owner-confirmed 2026-11-08. Bucket names stay null until the buckets exist (they are pinned in the commit that follows creation).
+    r2AccountId: "a4c2b7ac45e58a81691b9165492ce6a2",
     buckets: { private: null, public: null, site: null },
     backupBuckets: ["aladdin-production-db-backups"],
   },
   staging: {
     supabaseRef: "nxossqhdfltcqdwvbewi",
-    r2AccountId: null,
-    buckets: { private: "aladdin-r2-acceptance-20261011-private", public: "aladdin-r2-acceptance-20261011-public", site: null },
+    r2AccountId: "a4c2b7ac45e58a81691b9165492ce6a2",
+    buckets: { private: "aladdin-r2-acceptance-20261011-private", public: "aladdin-r2-acceptance-20261011-public", site: "aladdin-acceptance-site-media" },
     backupBuckets: ["aladdin-acceptance-backups-weur"],
   },
 };
