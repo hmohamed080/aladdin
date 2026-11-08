@@ -77,18 +77,33 @@ async function newPersonaContext(browser: import("@playwright/test").Browser): P
 
 async function signIn(context: BrowserContext, email: string, password: string, who: string): Promise<void> {
   const page = await context.newPage();
-  // Turnstile diagnostics only: host + path + status of Cloudflare challenge requests and the first console errors that
-  // mention Turnstile/CAPTCHA. No query strings, headers, bodies or tokens are ever recorded.
+  // Turnstile diagnostics only. Everything recorded is a FIXED category word, an HTTP status, an allowlisted network error
+  // name, or a purely numeric Turnstile error code. No URL (not even its path), query string, header, console text, token or
+  // credential is ever copied into the log or the uploaded report.
   const trace: string[] = [];
-  const short = (u: string) => {
-    const x = new URL(u);
-    return `${x.host}${x.pathname.slice(0, 60)}`;
+  const add = (line: string) => {
+    if (trace.length < 20) trace.push(line);
   };
-  // Observe (never alter) the real widget: wrap turnstile.render only to record lifecycle events and Cloudflare's error CODE
-  // (a short code such as "300030"; never a token, which is not recorded). The widget still runs exactly as in production.
+  const category = (u: string): string => {
+    try {
+      const x = new URL(u);
+      if (x.hostname !== "challenges.cloudflare.com" && !x.hostname.endsWith(".challenges.cloudflare.com")) return "";
+      const sub = x.hostname === "challenges.cloudflare.com" ? "" : "subdomain ";
+      if (/\/turnstile\/v0\/(b\/[^/]+\/)?api\.js$/.test(x.pathname)) return `${sub}api.js`;
+      if (x.pathname.startsWith("/cdn-cgi/challenge-platform/")) return `${sub}challenge-platform`;
+      return `${sub}other`;
+    } catch {
+      return "";
+    }
+  };
+  // Observe (never alter) the real widget: wrap turnstile.render only to record lifecycle events and Cloudflare's NUMERIC error
+  // code. The widget still runs exactly as in production.
   await page.addInitScript(() => {
-    const w = window as unknown as { __tsDiag: string[]; turnstile?: { render: (...a: unknown[]) => unknown } };
+    const w = window as unknown as { __tsDiag: string[] };
     w.__tsDiag = [];
+    const note = (line: string) => {
+      if (w.__tsDiag.length < 12) w.__tsDiag.push(line);
+    };
     let real: { render: (...a: unknown[]) => unknown } | undefined;
     Object.defineProperty(window, "turnstile", {
       configurable: true,
@@ -98,16 +113,16 @@ async function signIn(context: BrowserContext, email: string, password: string, 
         if (!v || typeof v.render !== "function") return;
         const render = v.render.bind(v);
         v.render = (el: unknown, opts: Record<string, unknown>) => {
-          w.__tsDiag.push(`render appearance=${String(opts.appearance)} action=${String(opts.action)}`);
+          note(`render appearance=${opts.appearance === "interaction-only" ? "interaction-only" : opts.appearance === "always" ? "always" : "other"}`);
           const wrap = (name: string, label: (a: unknown[]) => string) => {
             const orig = opts[name] as ((...a: unknown[]) => unknown) | undefined;
             opts[name] = (...a: unknown[]) => {
-              w.__tsDiag.push(label(a));
+              note(label(a));
               return orig?.(...a);
             };
           };
           wrap("callback", () => "token received");
-          wrap("error-callback", (a) => `error-callback code=${String(a[0]).slice(0, 12)}`);
+          wrap("error-callback", (a) => `error-callback code=${/^\d{3,6}$/.test(String(a[0])) ? String(a[0]) : "non-numeric"}`);
           wrap("timeout-callback", () => "timeout-callback");
           wrap("expired-callback", () => "expired-callback");
           wrap("unsupported-callback", () => "unsupported-callback");
@@ -118,13 +133,17 @@ async function signIn(context: BrowserContext, email: string, password: string, 
     });
   });
   page.on("response", (r) => {
-    if (/challenges\.cloudflare\.com/.test(r.url()) && trace.length < 16) trace.push(`${r.status()} ${short(r.url())}`);
+    const c = category(r.url());
+    if (c) add(`${r.status()} ${c}`);
   });
   page.on("requestfailed", (r) => {
-    if (/challenges\.cloudflare\.com/.test(r.url()) && trace.length < 16) trace.push(`FAILED ${short(r.url())}: ${(r.failure()?.errorText ?? "").slice(0, 60)}`);
+    const c = category(r.url());
+    const err = r.failure()?.errorText ?? "";
+    if (c) add(`FAILED ${c}: ${/^net::ERR_[A-Z_]{3,40}$/.test(err) ? err : "other"}`);
   });
   page.on("console", (m) => {
-    if (m.type() === "error" && /turnstile|captcha|challenge|content security policy/i.test(m.text()) && trace.length < 16) trace.push(`console: ${m.text().replace(/[?#]\S*/g, "").slice(0, 160)}`);
+    if (m.type() === "error" && /content security policy/i.test(m.text())) add("console: csp-violation");
+    else if (m.type() === "error" && /turnstile|captcha|challenge/i.test(m.text())) add("console: turnstile-related error");
   });
   try {
     await page.goto("/auth/sign-in", { waitUntil: "domcontentloaded" });
