@@ -40,7 +40,21 @@ async function guardedContext(context: BrowserContext): Promise<BrowserContext> 
   await context.route("https://challenges.cloudflare.com/turnstile/v0/api.js*", (route) =>
     route.fulfill({ contentType: "application/javascript", body: TURNSTILE_STUB }),
   );
-  const host = new URL(required("ACCEPTANCE_BASE_URL")).hostname;
+  // The preview sits behind Cloudflare Access: answer it with a service token, on the preview origin ONLY (never to
+  // Turnstile, Supabase or any other host). Without a token Access redirects every request (HTTP 302) to its login page.
+  const clientId = process.env.CF_ACCESS_CLIENT_ID?.trim();
+  const clientSecret = process.env.CF_ACCESS_CLIENT_SECRET?.trim();
+  const origin = new URL(required("ACCEPTANCE_BASE_URL")).origin;
+  if (clientId && clientSecret) {
+    await context.route(
+      (url) => url.origin === origin,
+      (route) =>
+        route.fallback({
+          headers: { ...route.request().headers(), "CF-Access-Client-Id": clientId, "CF-Access-Client-Secret": clientSecret },
+        }),
+    );
+  }
+  const host = new URL(origin).hostname;
   await context.addCookies([{ name: "NEXT_LOCALE", value: "en", domain: host, path: "/", secure: true, sameSite: "Lax" }]);
   return context;
 }
