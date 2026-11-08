@@ -183,11 +183,3 @@ There is **no automated paging** today: the events are searchable but nobody is 
 ## 8. A10 and activation (not part of this checklist)
 
 A10 (evidence pack, rollback drill, hosted login matrix) gates **live activation**: P-10 (G-META evidence), the permit change and the first controlled send. Section 5 is the login gate for **P-7**; it is a prerequisite for user-facing activation, not for the infrastructure phase.
-
-## Kill-switch rule for mobile sign-up (added 2026-11-08)
-
-- Mobile sign-up asks for a code independently of delivery by design (anti-enumeration), so an OFF delivery switch alone leaves people waiting for a code that never arrives.
-- Interim rule until the sign-up delivery gate (branch `feat/phone-signup-delivery-gate-20261108`) is deployed: whenever the Super Admin delivery kill switch is turned OFF, also set `app.phone_verification_config.signup_enabled = false` in the same change window.
-- Set `signup_enabled` back to `true` only after delivery is confirmed back ON (switch ON, budget not exhausted, one allowlisted test code received).
-- Once the gate ships, sign-up answers "unavailable" within seconds of the Worker reporting no effective delivery; keep the rule as belt and braces for outages where the Worker status call itself is unreachable.
-- The gate adds only a way to say "unavailable"; CAPTCHA, rate limits and the existing flags are unchanged.

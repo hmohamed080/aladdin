@@ -15,6 +15,18 @@ import type { UsageResult, WorkerUsage } from "@/server/whatsapp-otp/worker-admi
  * The signal never depends on a phone number (nothing number-derived is read, sent or logged), so the reply cannot become an
  * existence oracle. A definitive answer is cached per isolate for a few seconds as plain data; each request on a cache miss runs its own probe (nothing is shared
  * across requests but that value). Errors and timeouts answer UNAVAILABLE and are not cached, so recovery is immediate.
+ *
+ * LIMITS (full text: docs/security/PHONE_SIGNUP_R2_INTEGRATION.md, "Delivery-availability gate (sign-up)"):
+ *   - The 5 s positive cache is per isolate. After the kill switch goes OFF or the budget is exhausted, mobile sign-up can keep creating
+ *     challenges for up to ~5 s per isolate; the Worker then answers 503 and those challenges are invalidated (the user waits for a code
+ *     that never comes). This narrows the window, it does not make it zero.
+ *   - 3 s probe timeout, fail closed: a slow or failing Worker blocks MOBILE sign-up only (email is unaffected). Failures are not cached,
+ *     so each mobile attempt probes again (recovery is immediate; an outage costs one probe per attempt).
+ *   - It reuses PHONE_OTP_ADMIN_SECRET on the public sign-up server path; rotating that secret affects Super Admin settings and this gate.
+ *   - It does not replace the budget, ceiling, rate limits or kill switch, which the Worker enforces. Outbox mode (local) counts as
+ *     available, "off" as unavailable.
+ *   - Not covered: per-number recipient policy, Meta-side failures after acceptance (no delivery receipts or webhooks), in-flight challenges.
+ *   - Until this is live, turning delivery OFF must also set app.phone_verification_config.signup_enabled=false (PR #158 release sequence).
  */
 export type DeliveryAvailability = () => Promise<boolean>;
 

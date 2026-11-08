@@ -66,6 +66,22 @@ With the defaults the phone sign-up screen answers "unavailable" and **no mobile
 * **Logs:** no code, number or secret is written by any R2 path (`logStepFailure` carries a step name and an error code only; the outbox writes files, never the console). A unit test asserts the Admin payload keeps the grant out of `user_metadata`.
 * `PHONE_OTP_DELIVERY=off` stays the default; the Cloudflare Worker (#114) is not activated and `WORKER_WIRED` is untouched.
 
+## 5a. Delivery-availability gate (sign-up)
+
+Before a mobile sign-up challenge is opened, `signup-service` asks `delivery-gate.ts` whether a code can be delivered right now. What it does and does not do:
+
+* **Checks.** The Worker's signed `/v1/admin/usage` answer must show `runtime.delivery_enabled === true`, `configured === true`, `level !== 'exhausted'` and `remaining > 0`. An error, a timeout, or an older Worker without `runtime` counts as unavailable.
+* **Cache is per isolate.** A definitive answer is reused for 5 seconds per isolate (per Workers instance). After the kill switch is turned OFF, or the budget runs out, mobile sign-up can therefore keep creating challenges for up to about 5 seconds per isolate. Those challenges are invalidated when the Worker answers 503, so the user waits for a code that never comes. The gate narrows that window; it does not make it zero.
+* **Timeout and failure.** The probe times out after 3 seconds and fails closed. A slow or failing Worker blocks mobile sign-up only; email sign-up is unaffected. Failures are never cached: every request probes again, so recovery is immediate, but a Worker outage adds one probe per mobile sign-up attempt.
+* **Anti-enumeration preserved.** The signal is global and never receives the phone number, so the identical reply for registered and unregistered numbers is unchanged.
+* **UI.** The sign-up page still shows the mobile option; users get the existing "unavailable" state.
+* **Secret reuse.** The public sign-up server path reuses `PHONE_OTP_ADMIN_SECRET` (it already exists in this Worker). Rotating it affects both the Super Admin settings and this gate.
+* **Not a replacement for Worker enforcement.** Budget, hard ceiling, rate limits and the kill switch stay enforced by the Worker; the gate only avoids asking for codes that cannot be sent.
+* **Modes.** `outbox` (local rig) is treated as available; `off` is unavailable. Only `worker` mode probes.
+* **Not covered.** Per-number recipient policy; Meta-side failures after the Worker accepted a message (delivery receipts and webhooks are not flowing); challenges already in flight when delivery is switched OFF.
+
+**Operational rule.** Until this gate is live, turning delivery OFF must also set `app.phone_verification_config.signup_enabled=false` (see the release sequence in PR #158).
+
 ## 6. Regression and security evidence
 
 Local = Windows 11, Docker, Node 24, isolated scratch Supabase stacks outside the repo (`supabase/tests/r2/stack.sh`; other worktrees' stacks untouched), CLI 2.110.0 (GoTrue v2.193.0) and 2.122.0 (v2.197.0). GitHub = runners on the pushed branch. Nothing was sent anywhere.
