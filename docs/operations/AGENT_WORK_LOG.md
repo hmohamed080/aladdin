@@ -7388,8 +7388,23 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Rewrote docs/operations/ACCEPTANCE_L1_L2_READINESS.md for RC fc62c4b5: A1 redeploy and verify commands (not run), manual L1/L2 table for the three accounts, automation gaps (real CAPTCHA stays ON, #155 on hold) with proposed release-gate exception wording, failure triage. Token setup is done (see ACCEPTANCE_E2E_ACCESS_TOKEN.md).
 - Documentation only. No Production write, merge, deploy, secret, Access change or workflow dispatch. WhatsApp delivery OFF.
 
+## 2026-11-08 - Migration dry-run preparation (agent)
+
+- Read live migration history of both hosted projects (read-only): Acceptance 203 / `20261107090002`, Production 203 / `20261107090003`. The Production P-2 gate and snapshot scripts still expected 195 / 8 pending; updated to 203 / 4 pending (`20261105090001`, `090004-090006`), ending at 207 (PR #148, merged as a0aa229).
+- Wrote `docs/operations/MIGRATION_DRYRUN_RUNBOOK_20261108.md` (preflight, dry-run, backup gates, rollback). Review fixes: the permission gate is local-container only; `restore-acceptance.sh` is Acceptance-only and cannot restore into a new project.
+- PR #153 adds `acceptance-preflight.sh` + `acceptance-gate.mjs` and `verify-permissions-readonly.sh/.mjs`; offline tests 106/106 across `scripts/hosted-db/*.test.mjs` and the history guard; doc links 0 broken.
+- Outstanding: adapt `production-rehearsal.sh` (pinned to an old SHA and baseline) for the Production recovery rehearsal required before any Production GO; first real run of the new scripts is a read-only Acceptance baseline (needs owner GO). No hosted change was made.
+
+
 ## 2026-11-08 - Hosted Acceptance E2E: Cloudflare Access service-token support (agent)
 
 - L1 run 42450831535 stopped at its preflight: the preview is behind Cloudflare Access and the workflow had no token (0 tests ran).
 - Code-only fix on branch fix/acceptance-e2e-access-token-20261108: exact-origin Access headers (no global extraHTTPHeaders), no redirect following, fail closed on missing credentials or an Access redirect; tests in frontend/e2e-acceptance/access.test.ts; owner setup in docs/operations/ACCEPTANCE_E2E_ACCESS_TOKEN.md.
 - No secret created or changed, no Cloudflare Access policy changed, nothing merged, deployed or re-run.
+
+## 2026-11-08 - Acceptance apply plan and readiness gates (agent)
+
+- Owner ran the Acceptance dry-run on Scorpion: 203 applied, exactly 090003-090006 pending, no drift, permissions 731/731 vs `20261107090002`. Cross-checked read-only from the cloud session. Nothing applied.
+- Added `acceptance-apply.sh`, `acceptance-postcheck.mjs`, `table-counts.sql`, `acceptance-structure.sql` and the gate `post` mode (PR #153). Offline tests plus a stubbed-CLI exercise of the apply script. Runbook sections F-H hold the evidence, gate status and exact plan.
+- Open: backup freshness decision (4 auth rows touched since the 06:08Z snapshot), merge of #153 before the apply, owner GO. No push, merge or Production change.
+
