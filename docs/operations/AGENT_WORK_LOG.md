@@ -7409,3 +7409,6 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Real CAPTCHA stays ON on hosted Acceptance, so the persona sign-in tests (dummy Turnstile token) cannot pass; the owner runs L1 persona checks manually.
 - `workflow_dispatch` gets `scope` (smoke default, full). Smoke needs only the two Access credentials, exports no persona password, runs `--grep` on the anchored public smoke describe and fails on zero or non-smoke matches. Pushes stay `full`.
 - Pinned by frontend/e2e-acceptance/smoke-scope.test.ts. No CAPTCHA, secret, Access or Production change; workflow not dispatched.
+## 2026-11-08 Track 2: Production recovery rehearsal adapted
+- `production-rehearsal.sh` now takes `--sha`, expects exactly the 4 pending Production migrations, applies them with `--include-all`, and verifies history, structure, row counts and permissions (contract 20261107090006). Old 26-migration pins/manifest/fingerprint baseline removed. `rehearsal-selftest.sh` updated to Production's 203-applied state.
+- Not yet executed with Docker (cloud container has none). Next: Scorpion self-test, then the real rehearsal against a fresh Production snapshot; Production push still needs a separate owner GO.
