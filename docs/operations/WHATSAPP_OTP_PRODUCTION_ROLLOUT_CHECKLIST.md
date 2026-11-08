@@ -164,7 +164,7 @@ Run it from the owner's machine: dry run first (`node provision-grant-key-produc
 | Upload switch | **closed (kept `false` on purpose):** `CLOUDFLARE_PRODUCTION_ENABLED=false` in the `cloudflare-production` environment; without it every stage only builds |
 | Reviewer on the `cloudflare-production` environment | **set 2026-11-07:** `hmohamed080` is a required reviewer (self-review allowed because the owner is the only user; admin bypass is still the GitHub default `true`). Every Production stage now waits for that approval. |
 | Acceptance preview build (L1/L2) | **UPDATED 2026-11-08: the earlier A1 (preview `d8ff501d` from `fc62c4b5`) is HISTORICAL; A1 to A3 are PENDING for the current RC `b44061a1`; manual L1/L2 summary PASS as reported by the owner, per-row evidence incomplete (PR #151).** Historical readiness note: **A1 readiness verified 2026-11-07 (read-only):** `cloudflare-preview` allows `main` (custom branch policy), `CLOUDFLARE_PREVIEW_ENABLED=true`, `NEXT_PUBLIC_SUPABASE_URL` is the isolated Acceptance project `nxossqhdfltcqdwvbewi`, its publishable key equals that project's key (not Production's), and the workflow refuses any URL containing the Production ref. The preview Worker still runs an older build (run `47d4fe0b`, 2026-11-05), (superseded: A1 has since been run). |
-| Hosted Acceptance E2E (L1) | `hosted-acceptance-e2e.yml` already signs in through the one-field `/auth/sign-in` form and checks `/installer/sign-in`; the three test-account secrets exist in `acceptance-e2e` |
+| Hosted Acceptance E2E (L1) | the headed runner (`e2e:acceptance:headed`; the headless `hosted-acceptance-e2e.yml` cannot pass real Turnstile) already signs in through the one-field `/auth/sign-in` form and checks `/installer/sign-in`; the three test-account secrets exist in `acceptance-e2e` |
 | Post-upload verification of secrets and bindings | **new, read-only:** `scripts/hosted-db/verify-frontend-upload.mjs --version=<id> --expect-sha=<40 hex>` (JSON parsing tolerates wrangler banner lines; also run against real Production data, where it correctly refuses the P-4 version as "not a new upload"; `--expect-sha` checks the version's `workers/message` label, see step B3) |
 
 ### Release candidate and migration gate (added 2026-11-08, before any A or B step)
@@ -214,7 +214,7 @@ Build everything below from `RC` (see the RC rule above: empty runtime diff agai
 ```bash
 gh workflow run cloudflare-frontend-preview.yml --ref main          # A1: redeploy the Acceptance preview from the RC (PENDING for RC b44061a1: the earlier A1, preview d8ff501d, was built from fc62c4b5 and is NOT equivalent to the current RC; it must be re-run from the current RC); check the run's head SHA equals $RC
 gh run watch                                                         # wait for green
-gh workflow run hosted-acceptance-e2e.yml --ref main                # A2: L1, read-only sign-in of the 3 test accounts
+pnpm --filter frontend e2e:acceptance:headed                         # A2: L1, owner-run in real Chrome/Edge (prompts hidden); the headless workflow hosted-acceptance-e2e.yml cannot pass real Turnstile (docs/operations/ACCEPTANCE_E2E_HEADED_RUN.md)
 gh run watch
 ```
 
@@ -277,7 +277,7 @@ gh run watch <RUN_ID>                                   # must end green
 gh run view <RUN_ID> --json headSha -q .headSha         # must equal $RC
 ```
 
-Real CAPTCHA stays ON on hosted Acceptance (owner decision; PR #155 is on hold). **Gate list after A1, in order, each needing its own approval; stop at the first failure:** A2 (`hosted-acceptance-e2e.yml`, L1) then A3 (L2, manual) then the runtime-diff command again, then B0 (open switch), B1 (dispatch `frontend-upload`, approve the environment review), B2 (close switch), B3 (`verify-frontend-upload.mjs --version=<id> --expect-sha="$RC"`) then C (override-header tests L4, L3, P-7a) then **Gate M** (the 4 migrations, fresh P-0b snapshot first) then D1 (promotion) then L5. WhatsApp delivery stays OFF in all of them.
+Real CAPTCHA stays ON on hosted Acceptance (owner decision; PR #155 is on hold). **Gate list after A1, in order, each needing its own approval; stop at the first failure:** A2 (`pnpm --filter frontend e2e:acceptance:headed`, L1, owner-run in a real browser) then A3 (L2, manual) then the runtime-diff command again, then B0 (open switch), B1 (dispatch `frontend-upload`, approve the environment review), B2 (close switch), B3 (`verify-frontend-upload.mjs --version=<id> --expect-sha="$RC"`) then C (override-header tests L4, L3, P-7a) then **Gate M** (the 4 migrations, fresh P-0b snapshot first) then D1 (promotion) then L5. WhatsApp delivery stays OFF in all of them.
 
 ## 6. Expected ON/OFF behaviour and monitoring
 
