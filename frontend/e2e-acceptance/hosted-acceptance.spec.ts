@@ -96,40 +96,20 @@ async function signIn(context: BrowserContext, email: string, password: string, 
       return "";
     }
   };
-  // Observe (never alter) the real widget: wrap turnstile.render only to record lifecycle events and Cloudflare's NUMERIC error
-  // code. The widget still runs exactly as in production.
+  // PASSIVE observation only: a window "message" listener (no wrapping, no property override, nothing that touches the widget or
+  // window.turnstile). The Turnstile iframe reports its lifecycle to the page by postMessage; we record only the event NAME
+  // (letters only, max 24) and, for failures, a purely numeric code. Nothing else from the message is read or stored.
+  // (A previous version wrapped turnstile.render; that changed the widget's behaviour in the hosted run, so it was removed.)
   await page.addInitScript(() => {
     const w = window as unknown as { __tsDiag: string[] };
     w.__tsDiag = [];
-    const note = (line: string) => {
-      if (w.__tsDiag.length < 12) w.__tsDiag.push(line);
-    };
-    let real: { render: (...a: unknown[]) => unknown } | undefined;
-    Object.defineProperty(window, "turnstile", {
-      configurable: true,
-      get: () => real,
-      set: (v) => {
-        real = v;
-        if (!v || typeof v.render !== "function") return;
-        const render = v.render.bind(v);
-        v.render = (el: unknown, opts: Record<string, unknown>) => {
-          note(`render appearance=${opts.appearance === "interaction-only" ? "interaction-only" : opts.appearance === "always" ? "always" : "other"}`);
-          const wrap = (name: string, label: (a: unknown[]) => string) => {
-            const orig = opts[name] as ((...a: unknown[]) => unknown) | undefined;
-            opts[name] = (...a: unknown[]) => {
-              note(label(a));
-              return orig?.(...a);
-            };
-          };
-          wrap("callback", () => "token received");
-          wrap("error-callback", (a) => `error-callback code=${/^\d{3,6}$/.test(String(a[0])) ? String(a[0]) : "non-numeric"}`);
-          wrap("timeout-callback", () => "timeout-callback");
-          wrap("expired-callback", () => "expired-callback");
-          wrap("unsupported-callback", () => "unsupported-callback");
-          wrap("before-interactive-callback", () => "before-interactive (a visible challenge is about to show)");
-          return render(el, opts);
-        };
-      },
+    window.addEventListener("message", (e: MessageEvent) => {
+      if (e.origin !== "https://challenges.cloudflare.com" || w.__tsDiag.length >= 14) return;
+      const d = e.data as { source?: unknown; event?: unknown; code?: unknown } | null;
+      if (!d || typeof d !== "object" || d.source !== "cloudflare-challenge") return;
+      const event = typeof d.event === "string" && /^[A-Za-z]{2,24}$/.test(d.event) ? d.event : "other";
+      const code = d.code !== undefined && /^\d{3,6}$/.test(String(d.code)) ? ` code=${String(d.code)}` : "";
+      w.__tsDiag.push(`widget event: ${event}${code}`);
     });
   });
   page.on("response", (r) => {
@@ -162,7 +142,7 @@ async function signIn(context: BrowserContext, email: string, password: string, 
         trace.push(`widget iframes=${widget}${box ? ` size=${Math.round(box.width)}x${Math.round(box.height)}` : ""}`);
         trace.push(...(await page.evaluate(() => (window as unknown as { __tsDiag?: string[] }).__tsDiag ?? []).catch(() => ["lifecycle unavailable"])));
         throw new Error(
-          `The ${who} sign-in got no Turnstile token in 45 s (${widget && trace.some((t) => t.startsWith("before-interactive")) ? "Cloudflare showed a challenge that needs a person" : "the widget did not produce a token"}). CAPTCHA is not bypassed. Turnstile diagnostics: ${trace.join(" | ") || "no Cloudflare challenge request was made"}.`,
+          `The ${who} sign-in got no Turnstile token in 45 s (${widget && trace.some((t) => t.startsWith("widget event: interactiveBefore")) ? "Cloudflare showed a challenge that needs a person" : "the widget did not produce a token"}). CAPTCHA is not bypassed. Turnstile diagnostics: ${trace.join(" | ") || "no Cloudflare challenge request was made"}.`,
         );
       });
     await page.getByRole("button", { name: /^log in$/i }).click();
