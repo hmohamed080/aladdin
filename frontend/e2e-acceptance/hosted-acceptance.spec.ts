@@ -32,6 +32,13 @@ function required(name: string): string {
 
 const violations: string[] = [];
 
+/** The Cloudflare Access service-token headers (empty when no token is configured). Never logged. */
+function accessHeaders(): Record<string, string> {
+  const id = process.env.CF_ACCESS_CLIENT_ID?.trim();
+  const secret = process.env.CF_ACCESS_CLIENT_SECRET?.trim();
+  return id && secret ? { "CF-Access-Client-Id": id, "CF-Access-Client-Secret": secret } : {};
+}
+
 async function guardedContext(context: BrowserContext): Promise<BrowserContext> {
   await context.route(FORBIDDEN_HOSTS, (route) => {
     violations.push(new URL(route.request().url()).host);
@@ -42,16 +49,12 @@ async function guardedContext(context: BrowserContext): Promise<BrowserContext> 
   );
   // The preview sits behind Cloudflare Access: answer it with a service token, on the preview origin ONLY (never to
   // Turnstile, Supabase or any other host). Without a token Access redirects every request (HTTP 302) to its login page.
-  const clientId = process.env.CF_ACCESS_CLIENT_ID?.trim();
-  const clientSecret = process.env.CF_ACCESS_CLIENT_SECRET?.trim();
   const origin = new URL(required("ACCEPTANCE_BASE_URL")).origin;
-  if (clientId && clientSecret) {
+  const access = accessHeaders();
+  if (Object.keys(access).length) {
     await context.route(
       (url) => url.origin === origin,
-      (route) =>
-        route.fallback({
-          headers: { ...route.request().headers(), "CF-Access-Client-Id": clientId, "CF-Access-Client-Secret": clientSecret },
-        }),
+      (route) => route.fallback({ headers: { ...route.request().headers(), ...access } }),
     );
   }
   const host = new URL(origin).hostname;
@@ -123,14 +126,14 @@ test.describe("public smoke", () => {
   test("health, sign-in and backend binding answer on the preview", async ({ browser }) => {
     const context = await newPersonaContext(browser);
     try {
-      const health = await context.request.get("/api/health");
+      const health = await context.request.get("/api/health", { headers: accessHeaders() });
       expect(health.status(), "/api/health").toBe(200);
-      const backend = await context.request.get("/api/backend/health");
+      const backend = await context.request.get("/api/backend/health", { headers: accessHeaders() });
       expect(backend.status(), "/api/backend/health").toBe(200);
       const body = await backend.json();
       expect(body, "the backend must be the staging/acceptance service").toMatchObject({ status: "ok", service: "backend", env: "staging" });
       for (const path of ["/", "/auth/sign-in", "/installer/sign-in", "/legal/terms"]) {
-        expect((await context.request.get(path)).status(), path).toBe(200);
+        expect((await context.request.get(path, { headers: accessHeaders() })).status(), path).toBe(200);
       }
       const page = await context.newPage();
       await page.goto("/showroom", { waitUntil: "domcontentloaded" });
