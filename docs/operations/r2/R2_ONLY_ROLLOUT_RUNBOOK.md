@@ -191,13 +191,16 @@ Preconditions: Acceptance at 207/207 migrations (done 2026-11-08), site bucket d
 
 For every flow: the object appears only under `u/` or `o/` with ids, never a name; B's attempts return the same 404/denied as a missing object (no existence oracle); replace and delete leave no original, `pending/` copy or variant (checked by reconcile); a deleted object's URL stops working on the next request.
 
+**Ownership proof is isolation evidence, not key shape.** A `u/` or `o/` prefix only shows where bytes went. While running the matrix the operator records each result in an evidence file (no ids, keys or tokens) and checks it with `node scripts/r2-e2e-evidence.mjs evidence.json`. It requires, for every one of the seven flows: A reads (allow), **B read, replace and delete (all denied)**, A read after delete (denied), and anonymous results: `avatar` current allow and replaced deny; `portfolio` published allow and unpublished deny; the other five anonymous read denied. A missing cell or an unexpected result fails the file. The reconcile `window` block additionally proves each new key's `u/<id>` or `o/<id>` equals the record's own owner or organization (`ownerMismatch = 0`), which shows consistency of key and record, not authorization. Database side: `supabase/tests/125_media_anon_resolve_test.sql` (anon can never resolve organization-scoped, certificate, upload or delete).
+
 **Negative/guard checks (once):** with the Preview Worker pointed at a private bucket whose name lacks "acceptance", uploads are refused; with `R2_ACCESS_KEY_ID` disabled, uploads pause and create no Supabase object; Production Supabase URL is refused (covered by `environment-guard.test.ts`; the hosted run proves the deployed variables).
 
 **After (all read-only):**
-1. `node scripts/r2-reconcile.mjs --project nxossqhdfltcqdwvbewi --since <T0>` must exit 0: `missing = 0`, `sizeMismatch = 0`, no orphans (or each orphan explained by a test the operator aborted), and the `window` block shows `supabaseCreated = 0`, `missingStorageKey = 0`, `badKeyShape = 0`, `allFlowsCovered = true`. Needs read-only R2 keys and `SUPABASE_SERVICE_ROLE_KEY` in the operator shell only.
+1. `node scripts/r2-reconcile.mjs --project nxossqhdfltcqdwvbewi --since <T0>` must exit 0: `missing = 0`, `sizeMismatch = 0`, no orphans (or each orphan explained by a test the operator aborted), and the `window` block shows `supabaseCreated = 0`, `missingStorageKey = 0`, `badKeyShape = 0`, `ownerMismatch = 0`, `allFlowsCovered = true`. Needs read-only R2 keys and `SUPABASE_SERVICE_ROLE_KEY` in the operator shell only.
 2. `node scripts/media-reset.mjs snapshot ... > after.json` then `node scripts/media-reset.mjs compare --before before.json --after after.json` (no Supabase Storage bucket grew).
-3. `node scripts/media-storage.mjs cleanup --project nxossqhdfltcqdwvbewi` (dry run) lists no candidate that still has bytes.
+3. `node scripts/r2-e2e-evidence.mjs evidence.json` exits 0 (all isolation cells recorded and as expected).
+4. `node scripts/media-storage.mjs cleanup --project nxossqhdfltcqdwvbewi` (dry run) lists no candidate that still has bytes.
 
 **Rollback / abort:** the E2E writes only test-account media. To undo: delete the test objects through the app (preferred, which retires rows and removes bytes), then `media-storage.mjs cleanup --execute` on Acceptance for anything left; reconcile again. Setting `R2_STORAGE_ENABLED=false` on the Preview Worker version pauses new uploads without data change. Nothing in this E2E touches Production or legacy Supabase Storage objects.
 
-**Evidence:** save the three command outputs under `docs/operations/evidence/` with the run date and the Worker version id.
+**Evidence:** save the command outputs and the evidence file under `docs/operations/evidence/` with the run date and the Worker version id.

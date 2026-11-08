@@ -73,7 +73,7 @@ test("arguments: explicit project, bounded age, unknown options refused", () => 
 });
 
 const NS = ["avatar", "portfolio", "certificate", "product", "organization", "request", "verification"];
-const fresh = (namespace, over = {}) => ({ namespace, provider: "r2", created_at: hoursAgo(1), storage_key: `u/${U}/${namespace}/${M}/original.png`, ...over });
+const fresh = (namespace, over = {}) => ({ namespace, provider: "r2", created_at: hoursAgo(1), owner_user_id: U, organization_id: null, storage_key: `u/${U}/${namespace}/${M}/original.png`, ...over });
 
 test("window check: seven R2 ids-only flows pass and cover every namespace", () => {
   const r = windowReport(NS.map((n) => fresh(n)), hoursAgo(2));
@@ -91,4 +91,13 @@ test("window check: reports namespaces whose flow did not run", () => {
   const r = windowReport(NS.slice(0, 5).map((n) => fresh(n)), hoursAgo(2));
   assert.deepEqual(r.uncovered, ["request", "verification"]);
   assert.equal(r.allFlowsCovered, false);
+});
+
+test("window check: the id inside the key must be the record's own owner or organization", () => {
+  const O = "44444444-4444-4444-4444-444444444444";
+  const ok = windowReport([fresh("product", { organization_id: O, storage_key: `o/${O}/products/${M}/${M}/original.png` })], hoursAgo(2));
+  assert.equal(ok.ownerMismatch, 0);
+  const wrong = windowReport([fresh("avatar", { owner_user_id: "55555555-5555-5555-5555-555555555555" }), fresh("product", { organization_id: null, storage_key: `o/${O}/products/${M}/${M}/original.png` })], hoursAgo(2));
+  assert.equal(wrong.ownerMismatch, 2);
+  assert.equal(wrong.ok, false);
 });

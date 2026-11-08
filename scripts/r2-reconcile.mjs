@@ -99,17 +99,25 @@ export function windowReport(rows, since) {
   if (!Number.isFinite(t)) throw new ReconcileOperatorError("--since must be an ISO timestamp");
   const fresh = rows.filter((r) => new Date(r.created_at).getTime() >= t);
   const perNamespace = Object.fromEntries(NAMESPACES.map((ns) => [ns, { r2: 0, supabase: 0 }]));
-  let supabaseCreated = 0, missingStorageKey = 0, badKeyShape = 0;
+  let supabaseCreated = 0, missingStorageKey = 0, badKeyShape = 0, ownerMismatch = 0;
   for (const r of fresh) {
     const bucket = perNamespace[r.namespace] ?? (perNamespace[r.namespace] = { r2: 0, supabase: 0 });
     if (r.provider === "supabase") { bucket.supabase++; supabaseCreated++; continue; }
     bucket.r2++;
     if (!r.storage_key) missingStorageKey++;
     else if (!IDS_ONLY_KEY.test(r.storage_key)) badKeyShape++;
+    else {
+      // The id inside the key must be the record's own owner (u/) or organization (o/). Consistency of key and record only:
+      // authorization is proven separately by the cross-user denial evidence (r2-e2e-evidence.mjs), never by the key.
+      const [scope, id] = r.storage_key.split("/");
+      const expected = scope === "u" ? r.owner_user_id : r.organization_id;
+      if (expected && expected !== id) ownerMismatch++;
+      else if (!expected) ownerMismatch++;
+    }
   }
   const uncovered = NAMESPACES.filter((ns) => perNamespace[ns].r2 === 0);
-  return { since, newRows: fresh.length, perNamespace, supabaseCreated, missingStorageKey, badKeyShape, uncovered,
-    ok: supabaseCreated + missingStorageKey + badKeyShape === 0, allFlowsCovered: uncovered.length === 0 };
+  return { since, newRows: fresh.length, perNamespace, supabaseCreated, missingStorageKey, badKeyShape, ownerMismatch, uncovered,
+    ok: supabaseCreated + missingStorageKey + badKeyShape + ownerMismatch === 0, allFlowsCovered: uncovered.length === 0 };
 }
 
 export function parseArgs(argv) {
@@ -139,7 +147,7 @@ async function fetchRows(supabase) {
   const rows = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase.from("media_storage_locations")
-      .select("namespace,object_key,provider,created_at,storage_key,size_bytes,verified_at,cleaned_at")
+      .select("namespace,object_key,provider,created_at,owner_user_id,organization_id,storage_key,size_bytes,verified_at,cleaned_at")
       .order("namespace").order("object_key").range(from, from + 999);
     if (error) throw new ReconcileOperatorError("Row query failed; confirm the storage_key migration (20261107090004) is applied in this environment");
     rows.push(...data);
