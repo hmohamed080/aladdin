@@ -14,7 +14,7 @@
     "WHATSAPP_OTP_TEMPLATE": "aladdin_otp",
     "WHATSAPP_OTP_LANGUAGES": "ar",
     "OTP_ENVIRONMENT": "acceptance",
-    "OTP_RECIPIENT_MODE": "allowlist",
+    "OTP_RECIPIENT_MODE": "open",
     "WHATSAPP_GRAPH_API_VERSION": "v25.0",
     "OTP_NOTIFY_URL": "https://aladdin-frontend-preview.bstalent9.workers.dev/api/internal/whatsapp-otp/notify",
     "WHATSAPP_DELIVERY_ENABLED": "false"
