@@ -7463,3 +7463,7 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Merged `origin/main` (b44061a1, #160/#161/#164) into the #145 branch; only `AGENT_WORK_LOG.md` conflicted (kept both sides).
 - The runtime diff against `d0517c2f` is NOT empty: #160 (frontend phone sign-up delivery-availability gate) and #161 (OTP Worker `open` recipient mode for acceptance). Per the RC rule the baseline is re-fixed to `b44061a1`; preview `d8ff501d` (from `fc62c4b5`) is no longer equivalent, so A1/A2/A3 must be redone. Production Worker `4415c515` behaviour unchanged (production config untouched); redeploy decision is the owner's.
 - No hosted write, deploy, secret change, migration or OTP activation. Delivery stays OFF.
+
+## 2026-11-08 - A2 gate uses the headed run (Track 3)
+
+- Codex finding on #145 (P2): the A2 command and gate list still dispatched the headless workflow, which cannot pass real Turnstile. A2 is now `pnpm --filter frontend e2e:acceptance:headed` (owner-run, real browser) everywhere in the P-7 sequence. Docs only; no hosted change.
