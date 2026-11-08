@@ -23,6 +23,10 @@ if (baseURL !== ACCEPTANCE_PREVIEW) {
 // attaches them per request, to the exact preview origin only (e2e-acceptance/access.mjs).
 readAccessCredentials(process.env);
 
+// Manual, headed run (owner's PC, visible Chrome; e2e-acceptance/run-headed.mjs): a person completes a genuine Turnstile challenge
+// in the browser window if Cloudflare shows one. Nothing about Turnstile or Access changes; only the waits and the browser do.
+const headed = process.env.ACCEPTANCE_E2E_HEADED === "1";
+
 export default defineConfig({
   testDir: "./e2e-acceptance",
   testMatch: /\.spec\.ts$/,
@@ -30,11 +34,12 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   forbidOnly: true,
-  timeout: 90_000,
+  timeout: headed ? 20 * 60_000 : 90_000,
   expect: { timeout: 20_000 },
-  reporter: [["list"], ["json", { outputFile: "../.artifacts/acceptance-e2e/results.json" }]],
+  reporter: [["list"], ["json", { outputFile: process.env.ACCEPTANCE_E2E_REPORT_FILE || "../.artifacts/acceptance-e2e/results.json" }]],
   use: {
     ...devices["Desktop Chrome"],
+    ...(headed ? { headless: false, channel: "chrome" as const } : {}),
     baseURL,
     locale: "en-US",
     trace: "off",
