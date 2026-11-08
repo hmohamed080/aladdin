@@ -7390,3 +7390,9 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - PR #153 adds `acceptance-preflight.sh` + `acceptance-gate.mjs` and `verify-permissions-readonly.sh/.mjs`; offline tests 106/106 across `scripts/hosted-db/*.test.mjs` and the history guard; doc links 0 broken.
 - Outstanding: adapt `production-rehearsal.sh` (pinned to an old SHA and baseline) for the Production recovery rehearsal required before any Production GO; first real run of the new scripts is a read-only Acceptance baseline (needs owner GO). No hosted change was made.
 
+
+## 2026-11-08 - Hosted Acceptance E2E: Cloudflare Access service-token support (agent)
+
+- L1 run 42450831535 stopped at its preflight: the preview is behind Cloudflare Access and the workflow had no token (0 tests ran).
+- Code-only fix on branch fix/acceptance-e2e-access-token-20261108: exact-origin Access headers (no global extraHTTPHeaders), no redirect following, fail closed on missing credentials or an Access redirect; tests in frontend/e2e-acceptance/access.test.ts; owner setup in docs/operations/ACCEPTANCE_E2E_ACCESS_TOKEN.md.
+- No secret created or changed, no Cloudflare Access policy changed, nothing merged, deployed or re-run.

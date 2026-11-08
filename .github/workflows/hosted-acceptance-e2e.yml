@@ -6,8 +6,10 @@
 # the database directly. See frontend/playwright.acceptance.config.ts and frontend/e2e-acceptance/.
 #
 # GitHub Environment `acceptance-e2e` (separate from `cloudflare-preview`, so this job never sees a deploy token):
-#   secrets: ACCEPTANCE_E2E_OWNER_PASSWORD, ACCEPTANCE_E2E_MANAGER_PASSWORD, ACCEPTANCE_E2E_REP_PASSWORD
-# Without all three the run stops at the first step and tests nothing.
+#   secrets: ACCEPTANCE_E2E_OWNER_PASSWORD, ACCEPTANCE_E2E_MANAGER_PASSWORD, ACCEPTANCE_E2E_REP_PASSWORD,
+#            ACCEPTANCE_E2E_ACCESS_CLIENT_ID, ACCEPTANCE_E2E_ACCESS_CLIENT_SECRET (a DEDICATED Cloudflare Access service token,
+#            authorised only for the aladdin-frontend-preview application; the preview is behind Access)
+# Without all five the run stops at the first step and tests nothing.
 #
 # Runs on pushes to its branch: GitHub only offers the manual button for workflows on the default branch.
 
@@ -37,10 +39,12 @@ jobs:
       ACCEPTANCE_E2E_OWNER_PASSWORD: ${{ secrets.ACCEPTANCE_E2E_OWNER_PASSWORD }}
       ACCEPTANCE_E2E_MANAGER_PASSWORD: ${{ secrets.ACCEPTANCE_E2E_MANAGER_PASSWORD }}
       ACCEPTANCE_E2E_REP_PASSWORD: ${{ secrets.ACCEPTANCE_E2E_REP_PASSWORD }}
+      ACCEPTANCE_E2E_ACCESS_CLIENT_ID: ${{ secrets.ACCEPTANCE_E2E_ACCESS_CLIENT_ID }}
+      ACCEPTANCE_E2E_ACCESS_CLIENT_SECRET: ${{ secrets.ACCEPTANCE_E2E_ACCESS_CLIENT_SECRET }}
     steps:
       - name: Require the three test-account secrets
         run: |
-          for name in ACCEPTANCE_E2E_OWNER_PASSWORD ACCEPTANCE_E2E_MANAGER_PASSWORD ACCEPTANCE_E2E_REP_PASSWORD; do
+          for name in ACCEPTANCE_E2E_OWNER_PASSWORD ACCEPTANCE_E2E_MANAGER_PASSWORD ACCEPTANCE_E2E_REP_PASSWORD ACCEPTANCE_E2E_ACCESS_CLIENT_ID ACCEPTANCE_E2E_ACCESS_CLIENT_SECRET; do
             [ -n "${!name}" ] || { echo "::error::$name is missing from the acceptance-e2e Environment"; exit 1; }
           done
       - uses: actions/checkout@v4
@@ -55,11 +59,13 @@ jobs:
           corepack prepare pnpm@9.0.0 --activate
           pnpm install --frozen-lockfile --filter frontend
           pnpm --filter frontend exec playwright install --with-deps chromium
-      - name: Confirm the preview serves Acceptance
-        run: |
-          body=$(curl -fsS "$ACCEPTANCE_BASE_URL/api/backend/health")
-          echo "$body"
-          echo "$body" | grep -q '"env":"staging"' || { echo "::error::the preview backend is not the acceptance service"; exit 1; }
+      - name: Credential-scoping regression (local servers, real Chromium, no network)
+        # The token must never follow a redirect to another origin; if this fails, nothing below runs with the token.
+        run: pnpm --filter frontend e2e:access-routing
+      - name: Confirm the preview serves Acceptance (through Cloudflare Access)
+        # Fails closed: both Access credentials required; an Access redirect (no auto-follow) or any non-200 JSON answer fails.
+        # The token goes only to the exact preview origin hard-coded in e2e-acceptance/access.mjs.
+        run: node frontend/e2e-acceptance/access.mjs
       - name: Hosted read-only E2E
         run: |
           set -o pipefail

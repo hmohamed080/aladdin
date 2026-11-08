@@ -24,10 +24,12 @@ for f in schema-fingerprint.sql rowcounts.sql auth-storage-columns.sql local-onl
 [ -s "$REPO_ROOT/supabase/config.toml" ] || die "no supabase/config.toml under $REPO_ROOT"
 # The throwaway stack must reproduce the hosted project's managed Auth/Storage schema EXACTLY (step 3 refuses otherwise).
 # Pinned to the CLI whose images match Acceptance: gotrue v2.197.0 (auth migrations through 20260831180000: SCIM, MFA
-# recovery codes, one-time-token expiry) and storage-api v1.79.28 (storage migrations through 0073: object versioning,
-# bucket lifecycle), postgres 17.11.0.002. 2.110.0 ran gotrue v2.193.0 / storage-api v1.66.4 and could not. Bump this
-# only together with the hosted project's Auth/Storage versions; db-backup.sh keeps its own dump-tool pin.
-RESTORE_SUPABASE_CLI_VERSION=2.119.0
+# recovery codes, one-time-token expiry) and storage-api v1.88.0 (storage migrations through 0079 lifecycle-writer-
+# coordination: object versioning, bucket lifecycle, bucket_lifecycle_states, lifecycle_abandoned_artifacts), postgres
+# 17.11.0.011. No v2 CLI can do this: the last one, 2.122.1, ships storage-api v1.84.19 (through 0074) and lacks both
+# lifecycle tables; 2.119.0 (v1.79.28) lacked them too, and 2.110.0 (gotrue v2.193.0, storage-api v1.66.4) more. Bump
+# this only together with the hosted project's Auth/Storage versions; db-backup.sh keeps its own dump-tool pin.
+RESTORE_SUPABASE_CLI_VERSION=3.0.0
 read -r -a SB <<< "${SUPABASE_CLI:-npx --yes supabase@$RESTORE_SUPABASE_CLI_VERSION}"
 sb() { "${SB[@]}" "$@"; }
 umask 077
