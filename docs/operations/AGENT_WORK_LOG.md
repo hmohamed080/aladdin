@@ -7330,3 +7330,9 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - P-4 run assessed from Wrangler's local debug log (counts and masked structure only): request/response bodies omitted, no secret strings, sanitize unset; exposure ruled out, no rotation recommended.
 - D1 binding validated by `database_id` (API-shaped fixtures); zone/route/domain discovery paginated and refuses partial results; owner commands given for Git Bash.
 - No Production writes, deployment, merge, rotation or P-4 rerun. Delivery OFF.
+
+## 2026-11-08 - Hosted Acceptance E2E: Cloudflare Access service-token support (agent)
+
+- L1 run 42450831535 stopped at its preflight: the preview is behind Cloudflare Access and the workflow had no token (0 tests ran).
+- Code-only fix on branch fix/acceptance-e2e-access-token-20261108: exact-origin Access headers (no global extraHTTPHeaders), no redirect following, fail closed on missing credentials or an Access redirect; tests in frontend/e2e-acceptance/access.test.ts; owner setup in docs/operations/ACCEPTANCE_E2E_ACCESS_TOKEN.md.
+- No secret created or changed, no Cloudflare Access policy changed, nothing merged, deployed or re-run.

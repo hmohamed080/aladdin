@@ -1,10 +1,14 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { accessHeadersFor, isAccessLogin, isPreviewOrigin, readAccessCredentials } from "./access.mjs";
 
 /**
  * Hosted, READ-ONLY acceptance E2E for the Cloudflare Acceptance preview (playwright.acceptance.config.ts).
  *
  * Rules:
  *  - READ-ONLY. Navigation and sign-in only: nothing is created, edited, deleted or submitted beyond the sign-in form.
+ *  - The preview sits behind Cloudflare Access. The service token (ACCEPTANCE_E2E_ACCESS_CLIENT_ID/SECRET, same GitHub Environment) is
+ *    attached ONLY to requests to the exact preview origin (context route + per-call API headers, never global extraHTTPHeaders), is
+ *    never sent to another host or on a redirect, and an Access login redirect fails the run instead of being followed.
  *  - Acceptance only. Any request to the live Supabase project or the live domain is aborted and fails the run.
  *  - Turnstile is stubbed INSIDE the test browser (the stand-in the local suites use). That is valid only because hosted
  *    CAPTCHA protection is OFF on Acceptance, so Supabase Auth does not verify the token; once it is switched on this
@@ -32,7 +36,31 @@ function required(name: string): string {
 
 const violations: string[] = [];
 
+// Both credentials are required before anything runs: fail closed, never fall back to unauthenticated requests.
+const accessCreds = () => readAccessCredentials(process.env);
+
+/** GET on the preview with the Access headers, without following redirects (a redirect could carry them elsewhere). */
+async function apiGet(context: BrowserContext, path: string) {
+  const url = new URL(path, required("ACCEPTANCE_BASE_URL")).href;
+  const res = await context.request.get(url, { headers: accessHeadersFor(url, accessCreds()), maxRedirects: 0 });
+  const location = res.headers()["location"] ?? "";
+  if (res.status() >= 300 && res.status() < 400 && (isAccessLogin(location) || !location)) {
+    throw new Error(`Cloudflare Access answered ${res.status()} for ${path}: the Access service token is wrong, expired or not authorised for the preview.`);
+  }
+  return res;
+}
+
 async function guardedContext(context: BrowserContext): Promise<BrowserContext> {
+  const creds = accessCreds();
+  // Any request to a Cloudflare Access login host means the token did not work: record it and abort, never follow it.
+  await context.route((url) => isAccessLogin(url.href), (route) => {
+    violations.push(`Cloudflare Access login redirect (${new URL(route.request().url()).host})`);
+    return route.abort();
+  });
+  // Service token: exact preview origin only. Every other host (Supabase, Turnstile, ...) gets the request untouched.
+  await context.route((url) => isPreviewOrigin(url.href), (route) =>
+    route.continue({ headers: { ...route.request().headers(), ...accessHeadersFor(route.request().url(), creds) } }),
+  );
   await context.route(FORBIDDEN_HOSTS, (route) => {
     violations.push(new URL(route.request().url()).host);
     return route.abort();
@@ -109,14 +137,14 @@ test.describe("public smoke", () => {
   test("health, sign-in and backend binding answer on the preview", async ({ browser }) => {
     const context = await newPersonaContext(browser);
     try {
-      const health = await context.request.get("/api/health");
+      const health = await apiGet(context, "/api/health");
       expect(health.status(), "/api/health").toBe(200);
-      const backend = await context.request.get("/api/backend/health");
+      const backend = await apiGet(context, "/api/backend/health");
       expect(backend.status(), "/api/backend/health").toBe(200);
       const body = await backend.json();
       expect(body, "the backend must be the staging/acceptance service").toMatchObject({ status: "ok", service: "backend", env: "staging" });
       for (const path of ["/", "/auth/sign-in", "/installer/sign-in", "/legal/terms"]) {
-        expect((await context.request.get(path)).status(), path).toBe(200);
+        expect((await apiGet(context, path)).status(), path).toBe(200);
       }
       const page = await context.newPage();
       await page.goto("/showroom", { waitUntil: "domcontentloaded" });
