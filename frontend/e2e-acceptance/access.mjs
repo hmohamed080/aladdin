@@ -32,18 +32,42 @@ export function scrubError(error, creds) {
   return text.slice(0, 300);
 }
 
-/** True only for the exact Acceptance preview origin (scheme, host and port). */
-export function isPreviewOrigin(url) {
+/** True only for the exact Acceptance preview origin (scheme, host and port). `origin` is overridable for the local browser test only. */
+export function isPreviewOrigin(url, origin = ACCEPTANCE_PREVIEW_ORIGIN) {
   try {
-    return new URL(url).origin === ACCEPTANCE_PREVIEW_ORIGIN;
+    return new URL(url).origin === origin;
   } catch {
     return false;
   }
 }
 
 /** The Access headers for `url`: both headers on the exact preview origin, and an EMPTY object for any other URL. */
-export function accessHeadersFor(url, creds) {
-  return isPreviewOrigin(url) ? { "CF-Access-Client-Id": creds.id, "CF-Access-Client-Secret": creds.secret } : {};
+export function accessHeadersFor(url, creds, origin = ACCEPTANCE_PREVIEW_ORIGIN) {
+  return isPreviewOrigin(url, origin) ? { "CF-Access-Client-Id": creds.id, "CF-Access-Client-Secret": creds.secret } : {};
+}
+
+/**
+ * Browser routing for a Playwright context. Verified in real Chromium: `route.continue({headers})` makes the overridden
+ * headers FOLLOW a redirect to another origin, so it must not be used. Instead the in-scope request is performed with
+ * `route.fetch({maxRedirects: 0})` and the answer (a 3xx included) is handed back with `route.fulfill`: the browser then
+ * follows the redirect itself as a NEW request, which is routed again and receives the token only if it is, once more, the
+ * exact preview origin. A redirect (or any request) to a Cloudflare Access login host is aborted and reported.
+ */
+export async function installAccessRouting(context, creds, { origin = ACCEPTANCE_PREVIEW_ORIGIN, onViolation = () => {} } = {}) {
+  await context.route((url) => isAccessLogin(url.href), (route) => {
+    onViolation(`Cloudflare Access login redirect (${new URL(route.request().url()).host})`);
+    return route.abort();
+  });
+  await context.route((url) => isPreviewOrigin(url.href, origin), async (route) => {
+    const url = route.request().url();
+    const response = await route.fetch({ headers: { ...route.request().headers(), ...accessHeadersFor(url, creds, origin) }, maxRedirects: 0 });
+    const location = response.headers()["location"];
+    if (response.status() >= 300 && response.status() < 400 && location && isAccessLogin(new URL(location, url).href)) {
+      onViolation(`Cloudflare Access login redirect (${new URL(location, url).host})`);
+      return route.abort();
+    }
+    return route.fulfill({ response });
+  });
 }
 
 /** True when a request/redirect target is a Cloudflare Access login page rather than the app. */

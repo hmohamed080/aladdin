@@ -59,6 +59,9 @@ jobs:
           corepack prepare pnpm@9.0.0 --activate
           pnpm install --frozen-lockfile --filter frontend
           pnpm --filter frontend exec playwright install --with-deps chromium
+      - name: Credential-scoping regression (local servers, real Chromium, no network)
+        # The token must never follow a redirect to another origin; if this fails, nothing below runs with the token.
+        run: pnpm --filter frontend e2e:access-routing
       - name: Confirm the preview serves Acceptance (through Cloudflare Access)
         # Fails closed: both Access credentials required; an Access redirect (no auto-follow) or any non-200 JSON answer fails.
         # The token goes only to the exact preview origin hard-coded in e2e-acceptance/access.mjs.

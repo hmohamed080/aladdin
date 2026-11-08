@@ -47,4 +47,17 @@ Recommended Cloudflare setup (owner-run, in Zero Trust):
 
 ## Log hygiene
 
-Only a scrubbed first line of any failed Access-authenticated API call reaches `run.log` and the JSON report (Playwright's call log lists request headers); both credential values are removed from it. Playwright documents that `route.continue` header overrides do not carry over to a redirected request, which is re-routed and receives the token only if it is the exact preview origin.
+Only a scrubbed first line of any failed Access-authenticated API call reaches `run.log` and the JSON report (Playwright's call log lists request headers); both credential values are removed from it.
+
+## Redirects (verified in real Chromium)
+
+`route.continue({headers})` forwards the overridden headers to a cross-origin redirect target (reproduced with two local
+servers before the fix), so it is not used. In-scope browser requests are performed with `route.fetch({maxRedirects: 0})` and
+returned with `route.fulfill`; the browser follows any redirect itself, and a redirect hop is not routed again, so **the token
+travels on the first request only**. Later same-origin hops rely on the `CF_Authorization` cookie that Access issues for a valid
+service token (the fulfilled response carries its `Set-Cookie`). This part is simulated locally and can only be confirmed by
+the first hosted run. `e2e-access-routing/access-routing.spec.ts` (real Chromium, local servers, run by `ci.yml` and before the
+hosted suite) fails if the token reaches another origin, an Access login host, or a cross-origin subresource.
+
+`/installer/sign-in` is a permanent redirect to `/auth/sign-in`: the smoke test asserts status 308 and the same-origin
+destination without following it.

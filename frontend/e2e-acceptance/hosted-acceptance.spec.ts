@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { accessHeadersFor, isAccessLogin, isPreviewOrigin, readAccessCredentials, scrubError } from "./access.mjs";
+import { accessHeadersFor, installAccessRouting, isAccessLogin, readAccessCredentials, scrubError } from "./access.mjs";
 
 /**
  * Hosted, READ-ONLY acceptance E2E for the Cloudflare Acceptance preview (playwright.acceptance.config.ts).
@@ -56,16 +56,10 @@ async function apiGet(context: BrowserContext, path: string) {
 }
 
 async function guardedContext(context: BrowserContext): Promise<BrowserContext> {
-  const creds = accessCreds();
-  // Any request to a Cloudflare Access login host means the token did not work: record it and abort, never follow it.
-  await context.route((url) => isAccessLogin(url.href), (route) => {
-    violations.push(`Cloudflare Access login redirect (${new URL(route.request().url()).host})`);
-    return route.abort();
-  });
-  // Service token: exact preview origin only. Every other host (Supabase, Turnstile, ...) gets the request untouched.
-  await context.route((url) => isPreviewOrigin(url.href), (route) =>
-    route.continue({ headers: { ...route.request().headers(), ...accessHeadersFor(route.request().url(), creds) } }),
-  );
+  // Service token for the exact preview origin only, never carried across a redirect; an Access login redirect is a violation.
+  // (route.continue({headers}) is NOT used: in real Chromium it forwards the headers to a cross-origin redirect target,
+  // see e2e-access-routing/access-routing.spec.ts.)
+  await installAccessRouting(context, accessCreds(), { onViolation: (m) => violations.push(m) });
   await context.route(FORBIDDEN_HOSTS, (route) => {
     violations.push(new URL(route.request().url()).host);
     return route.abort();
@@ -148,9 +142,17 @@ test.describe("public smoke", () => {
       expect(backend.status(), "/api/backend/health").toBe(200);
       const body = await backend.json();
       expect(body, "the backend must be the staging/acceptance service").toMatchObject({ status: "ok", service: "backend", env: "staging" });
-      for (const path of ["/", "/auth/sign-in", "/installer/sign-in", "/legal/terms"]) {
+      for (const path of ["/", "/auth/sign-in", "/legal/terms"]) {
         expect((await apiGet(context, path)).status(), path).toBe(200);
       }
+      // The retired /installer/sign-in is a permanent redirect (next.config.ts). Check it WITHOUT following it: the status and
+      // that the destination is the same-origin /auth/sign-in (a redirect anywhere else, or a temporary one, is a failure).
+      const installer = await apiGet(context, "/installer/sign-in");
+      expect(installer.status(), "/installer/sign-in must be a permanent redirect").toBe(308);
+      const target = new URL(installer.headers()["location"] ?? "", required("ACCEPTANCE_BASE_URL"));
+      expect(`${target.origin}${target.pathname}`, "/installer/sign-in must redirect to /auth/sign-in on the same origin").toBe(
+        `${new URL(required("ACCEPTANCE_BASE_URL")).origin}/auth/sign-in`,
+      );
       const page = await context.newPage();
       await page.goto("/showroom", { waitUntil: "domcontentloaded" });
       expect(new URL(page.url()).pathname, "/showroom must ask a signed-out visitor to sign in").toMatch(/sign-in/);
