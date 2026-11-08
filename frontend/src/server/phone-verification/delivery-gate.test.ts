@@ -32,18 +32,30 @@ describe("usageAllowsDelivery", () => {
 });
 
 describe("delivery gate cache and failure behaviour", () => {
-  it("caches an answer for the ttl and shares one in-flight call", async () => {
+  it("reuses a cached positive answer within the ttl, then probes again", async () => {
     let t = 1000;
     const fetchUsage = vi.fn(async () => usage());
     const gate = createDeliveryGate({ fetchUsage, ttlMs: 5000, now: () => t });
-    expect(await Promise.all([gate(), gate(), gate()])).toEqual([true, true, true]);
-    expect(fetchUsage).toHaveBeenCalledTimes(1);
+    expect(await gate()).toBe(true);
     t += 4000;
-    await gate();
+    expect(await gate()).toBe(true);
     expect(fetchUsage).toHaveBeenCalledTimes(1);
     t += 2000;
     await gate();
     expect(fetchUsage).toHaveBeenCalledTimes(2);
+  });
+
+  it("two concurrent callers each run their OWN probe; neither depends on the other's promise", async () => {
+    const releases: ((r: UsageResult) => void)[] = [];
+    const fetchUsage = vi.fn(() => new Promise<UsageResult>((resolve) => { releases.push(resolve); }));
+    const gate = createDeliveryGate({ fetchUsage, timeoutMs: 1000 });
+    const a = gate();
+    const b = gate();
+    expect(fetchUsage).toHaveBeenCalledTimes(2);
+    releases[1]!(usage({ delivery_enabled: false }));
+    expect(await b).toBe(false);
+    releases[0]!(usage());
+    expect(await a).toBe(true);
   });
 
   it("a switch turned OFF is seen after the ttl", async () => {
@@ -56,18 +68,27 @@ describe("delivery gate cache and failure behaviour", () => {
     expect(await gate()).toBe(false);
   });
 
-  it("an error, a refusal and a hang all answer false (fail closed); failures are cached too", async () => {
-    const thrown = vi.fn(async (): Promise<UsageResult> => { throw new Error("boom"); });
-    expect(await createDeliveryGate({ fetchUsage: thrown })()).toBe(false);
+  it("an error, a refusal and a hang all answer false (fail closed)", async () => {
+    expect(await createDeliveryGate({ fetchUsage: async (): Promise<UsageResult> => { throw new Error("boom"); } })()).toBe(false);
     expect(await createDeliveryGate({ fetchUsage: async () => ({ ok: false, code: "unavailable" }) })()).toBe(false);
     expect(await createDeliveryGate({ fetchUsage: async () => ({ ok: false, code: "unconfigured" }) })()).toBe(false);
-    const hang = createDeliveryGate({ fetchUsage: () => new Promise<UsageResult>(() => undefined), timeoutMs: 20 });
-    expect(await hang()).toBe(false);
-    const failing = vi.fn(async (): Promise<UsageResult> => ({ ok: false, code: "unavailable" }));
-    const g = createDeliveryGate({ fetchUsage: failing, ttlMs: 5000, now: () => 0 });
-    await g();
-    await g();
-    expect(failing).toHaveBeenCalledTimes(1);
+    expect(await createDeliveryGate({ fetchUsage: () => new Promise<UsageResult>(() => undefined), timeoutMs: 20 })()).toBe(false);
+  });
+
+  it("a failed or timed-out probe does not poison the cache: the next call recovers at once", async () => {
+    let mode: "fail" | "hang" | "ok" = "fail";
+    const fetchUsage = vi.fn((): Promise<UsageResult> => {
+      if (mode === "fail") return Promise.reject(new Error("down"));
+      if (mode === "hang") return new Promise<UsageResult>(() => undefined);
+      return Promise.resolve(usage());
+    });
+    const gate = createDeliveryGate({ fetchUsage, ttlMs: 60_000, timeoutMs: 20, now: () => 0 });
+    expect(await gate()).toBe(false);
+    mode = "hang";
+    expect(await gate()).toBe(false);
+    mode = "ok";
+    expect(await gate()).toBe(true);
+    expect(fetchUsage).toHaveBeenCalledTimes(3);
   });
 });
 

@@ -13,7 +13,8 @@ import type { UsageResult, WorkerUsage } from "@/server/whatsapp-otp/worker-admi
  * Anything else, an error, a timeout or an older Worker without `runtime`, is UNAVAILABLE.
  *
  * The signal never depends on a phone number (nothing number-derived is read, sent or logged), so the reply cannot become an
- * existence oracle. Result is cached per isolate for a few seconds and concurrent callers share one in-flight call.
+ * existence oracle. A definitive answer is cached per isolate for a few seconds as plain data; each request on a cache miss runs its own probe (nothing is shared
+ * across requests but that value). Errors and timeouts answer UNAVAILABLE and are not cached, so recovery is immediate.
  */
 export type DeliveryAvailability = () => Promise<boolean>;
 
@@ -37,32 +38,32 @@ export function createDeliveryGate(options: DeliveryGateOptions): DeliveryAvaila
   const ttl = options.ttlMs ?? 5_000;
   const timeout = options.timeoutMs ?? 3_000;
   const now = options.now ?? Date.now;
+  // The ONLY thing shared across requests: plain data. Never a promise or an I/O object (on Workers those are bound to the request that
+  // created them and can be cancelled when it ends). Only a definitive answer from the Worker is stored, never an error or a timeout.
   let cached: { value: boolean; until: number } | null = null;
-  let inflight: Promise<boolean> | null = null;
 
-  async function probe(): Promise<boolean> {
+  /** One probe, entirely owned by the calling request: its own timer, its own call. definitive=false means error or timeout. */
+  async function probe(): Promise<{ value: boolean; definitive: boolean }> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const result = await Promise.race([
         options.fetchUsage(),
         new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), timeout); }),
       ]);
-      return result !== null && result.ok && usageAllowsDelivery(result.usage);
+      if (result === null || !result.ok) return { value: false, definitive: false };
+      return { value: usageAllowsDelivery(result.usage), definitive: true };
     } catch {
-      return false;
+      return { value: false, definitive: false };
     } finally {
       if (timer) clearTimeout(timer);
     }
   }
 
   return async function available(): Promise<boolean> {
-    if (cached && cached.until > now()) return cached.value;
-    if (!inflight) {
-      inflight = probe().then((value) => {
-        cached = { value, until: now() + ttl }; // a failure is cached too, so an outage is not hammered
-        return value;
-      }).finally(() => { inflight = null; });
-    }
-    return inflight;
+    const hit = cached;
+    if (hit && hit.until > now()) return hit.value;
+    const { value, definitive } = await probe();
+    if (definitive) cached = { value, until: now() + ttl };
+    return value;
   };
 }
