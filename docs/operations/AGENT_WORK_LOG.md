@@ -7396,3 +7396,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Reviewed `verify-frontend-upload.mjs`: fixed the JSON extraction (a wrangler banner line containing `[` could be taken as the JSON start; now every line start is tried and it fails closed). Test added. The real read-only run still refuses the P-4 version as "not a new upload".
 - Checklist: P-7 pinned to SHA `78d1b5c0c743ef3afb40285d01baeb8d62152692`; A1 to A3 must be redone (preview runs `5861d879`); new Gate M: the frontend depends on 4 migrations not yet in Production (`20261105090001`, `20261107090004` to `090006`), so upload/promotion is blocked until they are applied with `--include-all` (runbook in #148). Rollback stays `wrangler rollback a3b08a22...`, never delete.
 - No Production write, upload, deployment, merge, secret change or WhatsApp enablement.
+
+## 2026-11-08 - P-7 sequence finalized (Track B)
+
+- Merged `origin/main` (`a0aa2296`, #148: migration runbook and P-2 gate scripts; no application code) into the #145 branch.
+- `verify-frontend-upload.mjs`: new optional `--expect-sha=<40 hex>`; asserts the version annotation `workers/message` equals `upload-only <12 hex>` (what the workflow's `--message` writes). It is a label, not a build attestation; the run's head SHA stays a mandatory manual cross-check. 2 new tests (targeted suites: 39 pass).
+- Checklist: RC rule (`main` HEAD, application-identical to `78d1b5c0`, proven by an empty diff of the application directories), single B0-B3 sequence with stop conditions, Gate M now blocks promotion (D1) only, since `frontend-upload` has no database access (confirmed from the workflow), rollback block clarified.
+- No Production write, upload, deployment, merge, secret change or WhatsApp enablement.

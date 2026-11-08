@@ -91,3 +91,24 @@ test("parse skips wrangler banner lines (even ones starting with [) and fails cl
   assert.throws(() => parse(ok("[wrangler:info] nothing"), "x"), /no JSON/);
   assert.throws(() => parse({ status: 1, stdout: "{}" }, "x"), /failed/);
 });
+
+const SHA = "a0aa22962851c4ea466c03c240f835e7ade2943a";
+const withMsg = (m) => ({ ...good(), annotations: m === undefined ? {} : { "workers/message": m } });
+
+test("--expect-sha: the version message must carry the first 12 hex of the expected SHA", () => {
+  assert.equal(check(withMsg("upload-only a0aa22962851"), { expectSha: SHA }), "");
+  assert.match(check(withMsg("upload-only 78d1b5c0c743"), { expectSha: SHA }), /source commit mismatch/);
+  assert.match(check(withMsg(undefined), { expectSha: SHA }), /no workers[/]message annotation/);
+  assert.match(check(withMsg("P-4-otp-secrets-not-deployed"), { expectSha: SHA }), /source commit mismatch/);
+  assert.equal(check(withMsg("anything")), "", "without the flag the message is not checked");
+});
+
+test("run: --expect-sha is validated, optional, and reported", async () => {
+  for (const argv of [[`--version=${UP}`, "--expect-sha=abc"], [`--version=${UP}`, `--expect-sha=${SHA.toUpperCase()}`], [`--version=${UP}`, `--expect-sha=${SHA}`, `--expect-sha=${SHA}`]]) {
+    const f = wr(); assert.equal((await go(f, argv)).code, 2); assert.equal(f.calls.length, 0);
+  }
+  const ok = await go(wr({ up: withMsg("upload-only a0aa22962851") }), [`--version=${UP}`, `--expect-sha=${SHA}`]);
+  assert.equal(ok.code, 0, ok.text); assert.match(ok.text, /Source label matches a0aa22962851/);
+  assert.equal((await go(wr({ up: withMsg("upload-only 000000000000") }), [`--version=${UP}`, `--expect-sha=${SHA}`])).code, 1);
+  assert.match((await go(wr(), [`--version=${UP}`])).text, /Source commit NOT checked/);
+});

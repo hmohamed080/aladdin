@@ -2,7 +2,11 @@
 // READ-ONLY verification of the Production frontend version uploaded by `cloudflare-production` stage=frontend-upload (checklist P-7).
 // It never uploads, deploys, rolls back, writes a secret or sends anything: only `deployments status` and `versions view`.
 //
-//   node scripts/hosted-db/verify-frontend-upload.mjs --version=<uploaded version id>
+//   node scripts/hosted-db/verify-frontend-upload.mjs --version=<uploaded version id> [--expect-sha=<40 hex>]
+//
+// --expect-sha: the workflow uploads with `--message "upload-only ${GITHUB_SHA::12}"`, stored as the version annotation `workers/message`.
+// With the flag, that annotation must equal `upload-only <first 12 hex of the SHA>`. This is a label written by the workflow, not a build
+// attestation: it proves which commit the dispatched run was on, not the bytes of the bundle (cross-check the run summary and run's head SHA).
 //
 // The uploaded version U must equal the P-4 version (live bindings + the four PHONE_OTP_* secrets) PLUS exactly one new binding:
 // the private service binding OTP_WORKER -> aladdin-whatsapp-otp-production. Checked by NAME and TYPE (secret values are never visible):
@@ -27,8 +31,14 @@ const names = (m, type) => [...m.values()].filter((b) => b.type === type).map((b
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /** live / p4 / up = `versions view --json` of the live version, the P-4 version and the uploaded version. */
-export function checkUpload({ live, p4, up, deployment, versionId }) {
+export const expectedMessage = (sha) => `upload-only ${sha.slice(0, 12)}`;
+export function checkUpload({ live, p4, up, deployment, versionId, expectSha }) {
   const p = [];
+  if (expectSha !== undefined) {
+    const m = up?.annotations?.["workers/message"];
+    if (typeof m !== "string") p.push("--expect-sha given but the uploaded version has no workers/message annotation (cannot prove its source commit)");
+    else if (m !== expectedMessage(expectSha)) p.push(`source commit mismatch: version message is "${m}", expected "${expectedMessage(expectSha)}"`);
+  }
   const L = byName(live), P = byName(p4), U = byName(up);
   if (!U.size) return ["the uploaded version has no bindings (wrong version id?)"];
   if (versionId === LIVE_VERSION || versionId === P4_VERSION) p.push("the version to verify is the live or the P-4 version, not a new upload");
@@ -74,15 +84,17 @@ export const parse = (r, what) => {
 
 export async function run({ argv, wrangler, out }) {
   const arg = argv.find((a) => a.startsWith("--version="));
-  const bad = argv.filter((a) => !a.startsWith("--version="));
+  const shaArg = argv.find((a) => a.startsWith("--expect-sha="));
+  const bad = argv.filter((a) => !a.startsWith("--version=") && !a.startsWith("--expect-sha="));
   const id = arg?.slice("--version=".length) ?? "";
-  if (bad.length || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) { out("usage: verify-frontend-upload.mjs --version=<uuid of the uploaded version>"); return 2; }
+  const expectSha = shaArg?.slice("--expect-sha=".length);
+  if (bad.length || argv.filter((a) => a.startsWith("--expect-sha=")).length > 1 || (expectSha !== undefined && !/^[0-9a-f]{40}$/.test(expectSha)) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) { out("usage: verify-frontend-upload.mjs --version=<uuid of the uploaded version> [--expect-sha=<40 lowercase hex>]"); return 2; }
   try {
     const view = (v) => parse(wrangler(["versions", "view", v, "--env", "production", "--json"]), `versions view ${v.slice(0, 8)}`);
     const deployment = parse(wrangler(["deployments", "status", "--env", "production", "--json"]), "deployments status");
-    const problems = checkUpload({ live: view(LIVE_VERSION), p4: view(P4_VERSION), up: view(id), deployment, versionId: id });
+    const problems = checkUpload({ live: view(LIVE_VERSION), p4: view(P4_VERSION), up: view(id), deployment, versionId: id, expectSha });
     for (const x of problems) out(`FAIL  ${x}`);
-    out(problems.length ? `\nREFUSED: ${problems.length} problem(s). Do not test or promote this version.` : `All read-only checks passed: ${id.slice(0, 8)} = the P-4 version (4 new secrets kept, no secret lost) + OTP_WORKER; live ${LIVE_VERSION.slice(0, 8)} still alone at 100%.`);
+    out(problems.length ? `\nREFUSED: ${problems.length} problem(s). Do not test or promote this version.` : `All read-only checks passed: ${id.slice(0, 8)} = the P-4 version (4 new secrets kept, no secret lost) + OTP_WORKER; live ${LIVE_VERSION.slice(0, 8)} still alone at 100%.${expectSha ? ` Source label matches ${expectSha.slice(0, 12)}.` : " Source commit NOT checked (no --expect-sha)."}`);
     return problems.length ? 1 : 0;
   } catch (e) {
     out(`FAIL  could not complete: ${e.message}`);
