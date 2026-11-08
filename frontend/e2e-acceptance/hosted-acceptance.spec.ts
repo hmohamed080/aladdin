@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test as base, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { accessHeadersFor, installAccessRouting, isAccessLogin, readAccessCredentials, scrubError } from "./access.mjs";
 
 /**
@@ -19,6 +19,29 @@ import { accessHeadersFor, installAccessRouting, isAccessLogin, readAccessCreden
  *    (docs/operations/e2e-shared-failures-triage-2026-10-22.md) as annotations. It never fails on them: they need product
  *    review, and asserting either the old or the new labels here would decide that review silently.
  */
+
+/**
+ * Manual run attached to the owner's REAL Chrome/Edge (e2e-acceptance/run-headed.mjs starts it with a debugging port and a fresh
+ * profile and passes ACCEPTANCE_E2E_CDP_URL). Without that variable the browser is launched by Playwright as before (CI).
+ * Attaching changes only which browser runs; no signal is hidden or altered and Turnstile is completed by the person.
+ */
+const test = base.extend<object, { browser: Browser }>({
+  browser: [
+    async ({ playwright, browserName, launchOptions }, use) => {
+      const cdp = process.env.ACCEPTANCE_E2E_CDP_URL;
+      if (cdp && /^http:\/\/127\.0\.0\.1:\d+$/.test(cdp)) {
+        const browser = await playwright.chromium.connectOverCDP(cdp);
+        await use(browser);
+        await browser.close(); // disconnects; the launcher closes the real browser
+        return;
+      }
+      const browser = await playwright[browserName].launch(launchOptions);
+      await use(browser);
+      await browser.close();
+    },
+    { scope: "worker" },
+  ],
+});
 
 /** Headed manual run: wait long enough for a person to complete a genuine Turnstile challenge in the visible browser. */
 const HEADED = process.env.ACCEPTANCE_E2E_HEADED === "1";

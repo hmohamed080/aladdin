@@ -1,4 +1,4 @@
-// Manual, headed Hosted Acceptance E2E (owner's PC). Visible Google Chrome; a person completes a genuine Turnstile challenge in the
+// Manual, headed Hosted Acceptance E2E (owner's PC). Your real Chrome or Edge (see real-browser.mjs); a person completes a genuine Turnstile challenge in the
 // browser window if Cloudflare shows one. NOTHING about Turnstile or Cloudflare Access is stubbed, bypassed or changed, and no hosted
 // workflow, deployment or database is touched.
 //
@@ -19,6 +19,17 @@ import { Writable } from "node:stream";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { ACCEPTANCE_PREVIEW_ORIGIN, ID_ENV, SECRET_ENV, preflight } from "./access.mjs";
+import { findBrowser, startRealBrowser } from "./real-browser.mjs";
+
+// Which browser runs the suite:  chrome (default) | edge  = your REAL installed browser, started normally with a debugging port and a
+// fresh separate profile, then attached to (Turnstile flags the Playwright-launched browser as embedded).  playwright = the old mode.
+//   pnpm --filter frontend e2e:acceptance:headed            -> Chrome
+//   pnpm --filter frontend e2e:acceptance:headed edge       -> Microsoft Edge
+const MODE = (process.argv[2] ?? "chrome").toLowerCase();
+if (!["chrome", "edge", "playwright"].includes(MODE)) {
+  console.error('Usage: e2e:acceptance:headed [chrome|edge|playwright]   (default chrome)');
+  process.exit(1);
+}
 
 const PROMPTS = [
   [ID_ENV, "Cloudflare Access service-token Client ID"],
@@ -70,9 +81,22 @@ async function main() {
   const problems = await preflight(childEnv);
   if (problems.length) throw new Error(`Preflight failed:\n- ${problems.join("\n- ")}`);
   console.log("Preflight OK: the Acceptance preview answered through Cloudflare Access (backend ok, env staging).");
-  console.log("Chrome opens next. If Cloudflare shows a verification, complete it by hand. Do not close the window.\n");
+  console.log("Your browser opens next. If Cloudflare shows a verification, complete it by hand. Do not close the window.\n");
 
-  // 2) The same suite as the hosted workflow, in visible Chrome.
+  // 2) Your real browser (never hidden or modified), then the same suite as the hosted workflow attached to it.
+  let real = null;
+  if (MODE !== "playwright") {
+    const exe = findBrowser(MODE);
+    if (!exe) throw new Error(`${MODE === "edge" ? "Microsoft Edge" : "Google Chrome"} was not found in its standard install location. Try the other one (chrome | edge).`);
+    real = await startRealBrowser(exe);
+    childEnv.ACCEPTANCE_E2E_CDP_URL = real.cdpUrl;
+    console.log(`Started your ${MODE === "edge" ? "Microsoft Edge" : "Google Chrome"} with a fresh temporary profile (no saved logins). Debugging port is local-only.`);
+  }
+  const closeReal = () => real?.stop();
+  process.on("SIGINT", () => {
+    closeReal();
+    process.exit(130);
+  });
   const frontend = fileURLToPath(new URL("..", import.meta.url));
   const code = await new Promise((resolve) => {
     const child = spawn("pnpm", ["exec", "playwright", "test", "-c", "playwright.acceptance.config.ts"], {
@@ -84,6 +108,7 @@ async function main() {
     child.on("exit", (c) => resolve(c ?? 1));
     child.on("error", () => resolve(1));
   });
+  closeReal();
   console.log(`\nJSON report (test names and scrubbed messages only): ${childEnv.ACCEPTANCE_E2E_REPORT_FILE}`);
   process.exit(code);
 }

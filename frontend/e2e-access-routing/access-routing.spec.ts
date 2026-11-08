@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { expect, test } from "@playwright/test";
+import { chromium, expect, test } from "@playwright/test";
 import { installAccessRouting } from "../e2e-acceptance/access.mjs";
+import { startRealBrowser } from "../e2e-acceptance/real-browser.mjs";
 
 /**
  * Real-Chromium regression test for the Cloudflare Access credential scoping (no network, local servers only).
@@ -200,4 +201,28 @@ test("no request anywhere ever carries the secret value outside the scope origin
   expect(JSON.stringify(other)).not.toContain(CREDS.secret);
   expect(JSON.stringify(other)).not.toContain(CREDS.id);
   await context.close();
+});
+
+test("attached to a separately started browser (connectOverCDP) the same guards hold and no automation switch is used", async () => {
+  // The owner-run mode starts the REAL Chrome/Edge normally and attaches to it. Here the stand-in is the Playwright Chromium binary,
+  // started by startRealBrowser (not by Playwright's launcher), headless/no-sandbox only because this runs in CI.
+  const real = await startRealBrowser(chromium.executablePath(), { extraArgs: ["--headless=new", "--no-sandbox", "--disable-gpu"] });
+  try {
+    expect(real.args.some((a) => /enable-automation|--disable-blink-features|--user-agent/.test(a)), "no automation or spoofing switch").toBe(false);
+    expect(real.cdpUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+    const browser = await chromium.connectOverCDP(real.cdpUrl);
+    const context = await browser.newContext();
+    const violations: string[] = [];
+    await installAccessRouting(context, CREDS, { origin: scopeOrigin, onViolation: (m) => violations.push(m) });
+    const page = await context.newPage();
+    await page.goto(`${scopeOrigin}/to-other`);
+    expect(scope.map((s) => s.id)).toEqual([CREDS.id]);
+    expect(other).toHaveLength(1);
+    expect(other[0]).toMatchObject({ id: null, secret: null });
+    await page.goto(`${scopeOrigin}/to-access-path`).catch(() => {});
+    expect(violations.join(" | ")).toMatch(/Cloudflare Access login redirect/);
+    await browser.close();
+  } finally {
+    real.stop();
+  }
 });
