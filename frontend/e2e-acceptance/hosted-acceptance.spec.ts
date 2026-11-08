@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { TURNSTILE_STUB, judgeStubbedWidget } from "./turnstile.mjs";
 import { accessHeadersFor, installAccessRouting, isAccessLogin, readAccessCredentials, scrubError } from "./access.mjs";
 
 /**
@@ -10,9 +11,11 @@ import { accessHeadersFor, installAccessRouting, isAccessLogin, readAccessCreden
  *    attached ONLY to requests to the exact preview origin (context route + per-call API headers, never global extraHTTPHeaders), is
  *    never sent to another host or on a redirect, and an Access login redirect fails the run instead of being followed.
  *  - Acceptance only. Any request to the live Supabase project or the live domain is aborted and fails the run.
- *  - Turnstile is stubbed INSIDE the test browser (the stand-in the local suites use). That is valid only because hosted
- *    CAPTCHA protection is OFF on Acceptance, so Supabase Auth does not verify the token; once it is switched on this
- *    suite must use the real widget with an always-pass test key instead.
+ *  - Hosted Supabase Auth CAPTCHA protection is ON for Acceptance (docs/frontend/auth-captcha.md; re-verified 2026-11-08: a token-less
+ *    password grant answers captcha_failed). CAPTCHA is never disabled or bypassed here. Turnstile is stubbed inside the test browser
+ *    ONLY if the preview's site key is Cloudflare's always-pass TEST key (the Acceptance project then verifies with the matching
+ *    always-pass test secret); for any other key signIn fails closed with the owner steps in
+ *    docs/operations/ACCEPTANCE_E2E_CAPTCHA.md (turnstile.mjs).
  *  - The "Showroom RC2 drift" block records what renders today for each of the 17 local spec drifts
  *    (docs/operations/e2e-shared-failures-triage-2026-10-22.md) as annotations. It never fails on them: they need product
  *    review, and asserting either the old or the new labels here would decide that review silently.
@@ -26,7 +29,6 @@ const NOT_AUTHORIZED = "You're not allowed to manage members here.";
 
 const FORBIDDEN_HOSTS = /kkpkgjrweysgvhvkhzun|aladdindecore\.com/i;
 const GENERIC_ERROR = /Application error|a server-side exception has occurred|Digest:/i;
-const TURNSTILE_STUB = `window.turnstile={render:function(el,o){setTimeout(function(){o.callback("XXXX.DUMMY.TOKEN.XXXX")},0);return "acceptance-e2e"},remove:function(){},reset:function(){}};`;
 
 function required(name: string): string {
   const value = process.env[name];
@@ -86,6 +88,10 @@ async function signIn(context: BrowserContext, email: string, password: string, 
     await page.getByLabel(/^password$/i).fill(password).catch(() => {
       throw new Error(`The ${who} password field could not be filled on /auth/sign-in.`);
     });
+    await page.waitForFunction(() => (window as unknown as { __e2eTurnstile?: { sitekey: string | null } }).__e2eTurnstile?.sitekey != null, null, { timeout: 30_000 }).catch(() => {});
+    const widget = await page.evaluate(() => (window as unknown as { __e2eTurnstile?: { sitekey: string | null } }).__e2eTurnstile ?? null);
+    const refusal = judgeStubbedWidget(widget);
+    if (refusal) throw new Error(refusal);
     await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30_000 });
     await page.getByRole("button", { name: /^log in$/i }).click();
     await page.waitForURL((url) => !/\/sign-in(\/|$)/.test(url.pathname), { timeout: 45_000 }).catch(async () => {
