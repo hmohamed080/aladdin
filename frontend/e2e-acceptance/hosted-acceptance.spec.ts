@@ -20,6 +20,11 @@ import { accessHeadersFor, installAccessRouting, isAccessLogin, readAccessCreden
  *    review, and asserting either the old or the new labels here would decide that review silently.
  */
 
+/** Headed manual run: wait long enough for a person to complete a genuine Turnstile challenge in the visible browser. */
+const HEADED = process.env.ACCEPTANCE_E2E_HEADED === "1";
+const TOKEN_WAIT_MS = HEADED ? 5 * 60_000 : 45_000;
+const SIGN_IN_WAIT_MS = HEADED ? 2 * 60_000 : 45_000;
+
 const OWNER = "test1@example.com";
 const MANAGER = "acc6-sales-manager@example.test";
 const REP = "acc6-sales-rep@example.test";
@@ -127,6 +132,7 @@ async function signIn(context: BrowserContext, email: string, password: string, 
   });
   try {
     await page.goto("/auth/sign-in", { waitUntil: "domcontentloaded" });
+    if (HEADED) console.log(`[manual] ${who}: if Cloudflare shows a verification in the Chrome window, complete it (waiting up to ${TOKEN_WAIT_MS / 60_000} min).`);
     await page.getByLabel(/^mobile number, username or email$/i).fill(email);
     // A failed fill must never echo the value into the log or the uploaded report.
     await page.getByLabel(/^password$/i).fill(password).catch(() => {
@@ -134,7 +140,7 @@ async function signIn(context: BrowserContext, email: string, password: string, 
     });
     // The real Turnstile widget fills this hidden field with a genuine single-use token; nothing here fakes it.
     await expect(page.locator('input[name="captchaToken"]'))
-      .not.toHaveValue("", { timeout: 45_000 })
+      .not.toHaveValue("", { timeout: TOKEN_WAIT_MS })
       .catch(async () => {
         const frames = page.locator('iframe[src*="challenges.cloudflare.com"]');
         const widget = await frames.count();
@@ -142,11 +148,11 @@ async function signIn(context: BrowserContext, email: string, password: string, 
         trace.push(`widget iframes=${widget}${box ? ` size=${Math.round(box.width)}x${Math.round(box.height)}` : ""}`);
         trace.push(...(await page.evaluate(() => (window as unknown as { __tsDiag?: string[] }).__tsDiag ?? []).catch(() => ["lifecycle unavailable"])));
         throw new Error(
-          `The ${who} sign-in got no Turnstile token in 45 s (${widget && trace.some((t) => t.startsWith("widget event: interactiveBefore")) ? "Cloudflare showed a challenge that needs a person" : "the widget did not produce a token"}). CAPTCHA is not bypassed. Turnstile diagnostics: ${trace.join(" | ") || "no Cloudflare challenge request was made"}.`,
+          `The ${who} sign-in got no Turnstile token in ${TOKEN_WAIT_MS / 1000} s (${widget && trace.some((t) => t.startsWith("widget event: interactiveBefore")) ? "Cloudflare showed a challenge that needs a person" : "the widget did not produce a token"}). CAPTCHA is not bypassed. Turnstile diagnostics: ${trace.join(" | ") || "no Cloudflare challenge request was made"}.`,
         );
       });
     await page.getByRole("button", { name: /^log in$/i }).click();
-    await page.waitForURL((url) => !/\/sign-in(\/|$)/.test(url.pathname), { timeout: 45_000 }).catch(async () => {
+    await page.waitForURL((url) => !/\/sign-in(\/|$)/.test(url.pathname), { timeout: SIGN_IN_WAIT_MS }).catch(async () => {
       const alert = (await page.getByRole("alert").allInnerTexts().catch(() => [])).join(" | ").slice(0, 200);
       throw new Error(`Sign-in as the ${who} did not complete (still on the sign-in page). Message: ${alert || "none"}`);
     });
