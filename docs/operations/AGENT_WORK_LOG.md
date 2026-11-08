@@ -1,3 +1,10 @@
+## 2026-11-08 - Production migrations gate for the 4 pending migrations (draft PR, nothing applied)
+
+- Added `docs/operations/PRODUCTION_MIGRATIONS_20261108_GATE.md`: pending set, review of merged PR #148, static risk review of 20261105090001 / 090004 / 090005 / 090006, backward-compatibility verdict for live frontend `a3b08a22`, apply ordering (migrations before promotion; a 0% upload is inert), owner commands for the dry run and gated push, read-only post-apply queries, rollback decision tree, abort criteria and stop points.
+- Pending set confirmed by read-only `list_migrations` on Production (203 applied, latest 20261107090003) against 207 repo files.
+- Findings on #148: the frontend rollback target is stated as `39bdf3a2` but the live version is `a3b08a22`; the OTP rollout checklist still shows 195/8; `production-post-migration-check.sh` still expects 191 and must not be used.
+- NOT done: any database connection with credentials, push, dry run, deploy, merge or comment on a PR.
+
 ## 2026-11-05 — Showroom social and website links in business onboarding (draft PR)
 
 - Scope: owner-approved design [showroom-social-links-onboarding.md](../frontend/showroom-social-links-onboarding.md). A showroom needs at least one valid Facebook, Instagram, TikTok or website link to leave step 1 of `/onboarding/business`; existing showrooms are not blocked and get one profile-completion item. Branch `feat/showroom-social-links-20261105`, not pushed, no PR, nothing applied to Acceptance or Production.
@@ -7387,6 +7394,26 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 
 - Rewrote docs/operations/ACCEPTANCE_L1_L2_READINESS.md for RC fc62c4b5: A1 redeploy and verify commands (not run), manual L1/L2 table for the three accounts, automation gaps (real CAPTCHA stays ON, #155 on hold) with proposed release-gate exception wording, failure triage. Token setup is done (see ACCEPTANCE_E2E_ACCESS_TOKEN.md).
 - Documentation only. No Production write, merge, deploy, secret, Access change or workflow dispatch. WhatsApp delivery OFF.
+## 2026-11-07 - P-6 recorded complete; P-7 prepared (agent)
+
+- Recorded P-6 (private OTP Worker version `4415c515`) with the owner's independent Cloudflare API evidence and an agent read-only re-check (config, one version at 100%, bindings, D1 switch tables empty, frontend `a3b08a22` still alone at 100%).
+- Verified `main` (`5861d879`) contains the integration branch, #143 and #144 with green CI. Found: `CLOUDFLARE_PRODUCTION_ENABLED=false`, no required reviewer on `cloudflare-production`, Acceptance preview on an older build (`47d4fe0b`).
+- Added `scripts/hosted-db/verify-frontend-upload.mjs` (+7 tests): read-only post-upload check of secrets and bindings by name and type; checklist now has the A to D execution sequence, L3/L4/P-7a tests and rollback.
+- No upload, deployment, merge, promotion, WhatsApp enablement or Production data change.
+
+## 2026-11-08 - P-7 plan pinned to release candidate 78d1b5c0 (agent, Track B)
+
+- Merged `origin/main` (`78d1b5c0`, includes Admin Backups #140) into the #145 branch. Targeted tests (verify-frontend-upload, provision-frontend-otp-secrets): 37 pass.
+- Reviewed `verify-frontend-upload.mjs`: fixed the JSON extraction (a wrangler banner line containing `[` could be taken as the JSON start; now every line start is tried and it fails closed). Test added. The real read-only run still refuses the P-4 version as "not a new upload".
+- Checklist: P-7 pinned to SHA `78d1b5c0c743ef3afb40285d01baeb8d62152692`; A1 to A3 must be redone (preview runs `5861d879`); new Gate M: the frontend depends on 4 migrations not yet in Production (`20261105090001`, `20261107090004` to `090006`), so upload/promotion is blocked until they are applied with `--include-all` (runbook in #148). Rollback stays `wrangler rollback a3b08a22...`, never delete.
+- No Production write, upload, deployment, merge, secret change or WhatsApp enablement.
+
+## 2026-11-08 - P-7 sequence finalized (Track B)
+
+- Merged `origin/main` (`a0aa2296`, #148: migration runbook and P-2 gate scripts; no application code) into the #145 branch.
+- `verify-frontend-upload.mjs`: new optional `--expect-sha=<40 hex>`; asserts the version annotation `workers/message` equals `upload-only <12 hex>` (what the workflow's `--message` writes). It is a label, not a build attestation; the run's head SHA stays a mandatory manual cross-check. 2 new tests (targeted suites: 39 pass).
+- Checklist: RC rule (`main` HEAD, application-identical to `78d1b5c0`, proven by an empty diff of the application directories), single B0-B3 sequence with stop conditions, Gate M now blocks promotion (D1) only, since `frontend-upload` has no database access (confirmed from the workflow), rollback block clarified.
+- No Production write, upload, deployment, merge, secret change or WhatsApp enablement.
 
 ## 2026-11-08 - Migration dry-run preparation (agent)
 
@@ -7402,12 +7429,45 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Code-only fix on branch fix/acceptance-e2e-access-token-20261108: exact-origin Access headers (no global extraHTTPHeaders), no redirect following, fail closed on missing credentials or an Access redirect; tests in frontend/e2e-acceptance/access.test.ts; owner setup in docs/operations/ACCEPTANCE_E2E_ACCESS_TOKEN.md.
 - No secret created or changed, no Cloudflare Access policy changed, nothing merged, deployed or re-run.
 
+## 2026-11-08 - P-7 checklist re-pinned to RC fc62c4b5 (Track 1)
+
+- Merged `origin/main` (`fc62c4b5`, #147 and #148) into the #145 branch; only `AGENT_WORK_LOG.md` conflicted (kept both sides).
+- RC rule now precise: RUNTIME path list plus the exact `git diff --stat fc62c4b5... origin/main -- <paths>` command (must print nothing, else stop and re-fix the RC). Stale facts fixed: Production is 203 applied / 4 pending, rollback target `a3b08a22-f82e-4851-9786-9442c01e43c8` (not `39bdf3a2`; also fixed in the migration runbook and release plan). `production-post-migration-check.sh` (expects 191 versions) now exits 2 and the checklist says not to use it.
+- `verify-frontend-upload.mjs`: `--expect-sha` is now required (without it an older version with identical bindings would pass); tests updated (39 pass). Checklist: B1 run lookup restricted to workflow_dispatch on main, switch-timing note, explicit "next executable step" (A1) and the gate list.
+- No Production write, upload, deployment, merge, secret change or WhatsApp enablement.
+
 ## 2026-11-08 - Acceptance apply plan and readiness gates (agent)
 
 - Owner ran the Acceptance dry-run on Scorpion: 203 applied, exactly 090003-090006 pending, no drift, permissions 731/731 vs `20261107090002`. Cross-checked read-only from the cloud session. Nothing applied.
 - Added `acceptance-apply.sh`, `acceptance-postcheck.mjs`, `table-counts.sql`, `acceptance-structure.sql` and the gate `post` mode (PR #153). Offline tests plus a stubbed-CLI exercise of the apply script. Runbook sections F-H hold the evidence, gate status and exact plan.
 - Open: backup freshness decision (4 auth rows touched since the 06:08Z snapshot), merge of #153 before the apply, owner GO. No push, merge or Production change.
 
+
+## 2026-11-08 - #154 reconciled with #153 (Track 3)
+
+- Merged `origin/main` (`7d965394`, includes #153) cleanly. Re-read Production `list_migrations` (read-only): the four pending versions are still absent, latest `20261107090003`; `supabase/` on main is identical to `fc62c4b5` (207 files). No change.
+- Gate doc: linked #153's Acceptance apply scripts and plan instead of duplicating them; corrected the claim that Acceptance carries `090003` (it is at `090002`; its pending set differs from Production's); stated the RC SHA rule lives in the #145 checklist.
+- p2-gate tests pass. No Production write, merge or deployment.
+## 2026-11-08 - #145 final review after #153 (Track 3)
+
+- Merged `origin/main` (`7d965394`, includes #153) into the #145 branch; only `AGENT_WORK_LOG.md` conflicted (kept both sides). Targeted tests pass (56).
+- Re-read `verify-frontend-upload.mjs` and the P-7 sections against the current `cloudflare-production.yml`: stage `frontend-upload`, environment `cloudflare-production`, `CLOUDFLARE_PRODUCTION_ENABLED == 'true'`, message `upload-only ${GITHUB_SHA::12}` all match what `--expect-sha` checks. No defect found.
+- Checklist state lines: A1 done (preview `d8ff501d` from `fc62c4b5`); owner-reported manual L1/L2 summary PASS (per-row evidence incomplete, PR #151); next gate Gate M / B0-B3 per the owner's approvals. Nothing beyond what the owner reported is claimed.
+- No Production write, upload, deployment, merge, secret change or WhatsApp enablement.
+
+## 2026-11-08 - Production phone sign-up secrets tooling (agent, draft PR #145, nothing run against Production)
+
+- Finding (read-only, names only, P-4 version `3fc37397`): Production lacks `PHONE_OTP_DELIVERY`, `PHONE_OTP_HMAC_KEYS`, `PHONE_VERIFICATION_ENABLED`, `PHONE_SIGNUP_VERIFICATION_ENABLED`, `PHONE_SIGNUP_COOKIE_SECRET`; the new sign-up cannot work without them. The old frontend ignores them and the database switches stay the instant gate.
+- New `scripts/hosted-db/provision-frontend-signup-secrets.mjs` (+ test): dry run by default; apply needs a typed phrase naming `aladdin-frontend-production`; values generated in memory, stdin only, never printed; refuses unless live `a3b08a22` is alone at 100% and the latest version is the P-4 version; read-only post-check by names. Shared constants (`P4_VERSION`, `SIGNUP_SECRET_NAMES`) live in `provision-frontend-otp-secrets.mjs`; its `checkNewVersionContents` gained an optional `names` parameter (P-4 behaviour unchanged).
+- `verify-frontend-upload.mjs`: expected secret set is now the P-4 set plus the five (exact names, secret_text); a missing one, an unknown extra, or the P-4-only set is refused; `--expect-sha` still required.
+- Checklist: new section "Production phone sign-up secrets (5)" with the owner commands and the order provision, 0% upload, verify, override-header check, promote.
+- Validation: `node --test` on the three hosted-db test files, 55 tests pass. No Production write, upload, deploy, secret creation, merge, dispatch or WhatsApp activation.
+
+## 2026-11-08 - WhatsApp OTP release prep re-pinned to main d0517c2f (Track 3)
+
+- Merged `origin/main` (`d0517c2f`, #152/#153/#156) into the #145 branch; clean merge, no conflicts. `node --test scripts/hosted-db/*.test.mjs`: 125/125 pass.
+- Runtime diff `fc62c4b5..d0517c2f` over the RC runtime paths is exactly one line (`frontend/package.json` script `e2e:acceptance:headed`). RC baseline in the rollout checklist re-pinned to `d0517c2f`; A1 preview `d8ff501d` was built from `fc62c4b5` (not `d0517c2f`) and is runtime-equivalent to `d0517c2f`; L1 evidence (11/11) is preserved and L2 per-row evidence stays marked incomplete. L1 row now names the headed real-browser run (11/11) instead of the headless workflow.
+- No hosted write, deploy, secret change, migration or OTP activation. Delivery stays OFF. Next owner-gated steps unchanged: B0 to B3 (0% upload + `verify-frontend-upload.mjs --expect-sha`), C, Gate M, D1.
 
 ## 2026-11-08 Track 2: Production recovery rehearsal adapted
 - `production-rehearsal.sh` now takes `--sha`, expects exactly the 4 pending Production migrations, applies them with `--include-all`, and verifies history, structure, row counts and permissions (contract 20261107090006). Old 26-migration pins/manifest/fingerprint baseline removed. `rehearsal-selftest.sh` updated to Production's 203-applied state.
