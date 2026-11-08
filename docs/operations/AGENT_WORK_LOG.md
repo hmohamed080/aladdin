@@ -7410,3 +7410,9 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Added `acceptance-apply.sh`, `acceptance-postcheck.mjs`, `table-counts.sql`, `acceptance-structure.sql` and the gate `post` mode (PR #153). Offline tests plus a stubbed-CLI exercise of the apply script. Runbook sections F-H hold the evidence, gate status and exact plan.
 - Open: backup freshness decision (4 auth rows touched since the 06:08Z snapshot), merge of #153 before the apply, owner GO. No push, merge or Production change.
 
+
+## 2026-11-08 - #154 reconciled with #153 (Track 3)
+
+- Merged `origin/main` (`7d965394`, includes #153) cleanly. Re-read Production `list_migrations` (read-only): the four pending versions are still absent, latest `20261107090003`; `supabase/` on main is identical to `fc62c4b5` (207 files). No change.
+- Gate doc: linked #153's Acceptance apply scripts and plan instead of duplicating them; corrected the claim that Acceptance carries `090003` (it is at `090002`; its pending set differs from Production's); stated the RC SHA rule lives in the #145 checklist.
+- p2-gate tests pass. No Production write, merge or deployment.

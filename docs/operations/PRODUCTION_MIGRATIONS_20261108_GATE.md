@@ -6,7 +6,7 @@ Supersedes nothing; it adds the review, the ordering proof, the owner commands a
 
 ## 1. Pending set (verified)
 
-Source: read-only Supabase `list_migrations` on Production `kkpkgjrweysgvhvkhzun`, 2026-11-08, compared with `supabase/migrations` on main `fc62c4b5` (207 files; the pending set is unchanged since `a0aa2296`).
+Source: read-only Supabase `list_migrations` on Production `kkpkgjrweysgvhvkhzun`, 2026-11-08, compared with `supabase/migrations` on main `7d965394` (207 files; `supabase/` is identical to the release candidate `fc62c4b5`, and the pending set is unchanged since `a0aa2296`; re-read after #153 merged: the four are still absent, latest applied `20261107090003`, no remote-only version). The release-candidate SHA rule (runtime-path diff against `fc62c4b5` must be empty) lives in `WHATSAPP_OTP_PRODUCTION_ROLLOUT_CHECKLIST.md` (PR #145); this gate does not redefine it.
 
 - Production: 203 applied, latest `20261107090003`, no remote-only version.
 - Pending, exactly four, in apply order: `20261105090001_admin_staff_invitations`, `20261107090004_media_id_storage_keys`, `20261107090005_request_and_verification_media`, `20261107090006_admin_backup_control`.
@@ -43,7 +43,7 @@ Verdict: compatible. Everything is additive or a widening, with no signature, gr
 - Media: the live frontend does not set `storage_key`; the trigger only assigns keys to fresh R2 reservations that are unverified, and the live Worker is still on the Supabase media provider (R2 routing is off). The two new namespaces are unused by it. `media_edge_grant` returns the same object name for NULL keys.
 - Admin: new RPCs and tables are not referenced by `a3b08a22`; `reauth_target_normalize` keeps every operation the live build uses.
 - `ck_audit_action_known` only gains values.
-- Not verified here: a live end-to-end run of `a3b08a22` against a migrated Production database (this review is static). The Acceptance apply and the post-apply smoke in section 6 are the evidence; Acceptance carries `20261107090003` and the same RC and is the rehearsal.
+- Not verified here: a live end-to-end run of `a3b08a22` against a migrated Production database (this review is static). The Acceptance apply and the post-apply smoke in section 6 are the evidence; Acceptance is the rehearsal, but note it is NOT yet at the same schema: Acceptance is at 203 / `20261107090002` and its own pending set is `20261107090003` to `090006` (it already has `20261105090001`), while Production's pending set is `20261105090001`, `090004`, `090005`, `090006`. Both end at 207, but the apply paths differ (Acceptance: `acceptance-apply.sh`, no `--include-all`; Production: `production-p2-push.sh`, `--include-all`). Acceptance proves `090004` to `090006` and the RC build, and does not exercise `20261105090001`'s out-of-order apply on a database that lacks it.
 
 Does the RC frontend require them? Yes. Code in the RC calls `admin_staff_invite` and `staff_invitation_accept`, `admin_backup_status`, and `media_storage_object`. Promoting the RC before the four are applied breaks those routes. Hence: migrations first, promotion after.
 
@@ -58,7 +58,7 @@ Explicit statement: these migrations are forward-only. There is no down migratio
 
 ## 4. Preconditions (all must hold)
 
-- Acceptance has the four applied and verified (207 applied), `supabase-rls` green on the exact main SHA, and the Acceptance restore test reported PASS. The migration-permission contract is local-only (`scripts/migration-permission-gate.mjs` against the CI Docker stack); it cannot read a hosted database.
+- Acceptance has `090003` to `090006` applied and verified (207 applied; apply and post-check commands, gates and plan are owned by #153: `scripts/hosted-db/acceptance-apply.sh`, `acceptance-postcheck.mjs`, and the "Acceptance apply" section of `MIGRATION_DRYRUN_RUNBOOK_20261108.md`; not repeated here), `supabase-rls` green on the exact main SHA, and the Acceptance restore test reported PASS. The migration-permission contract is local-only (`scripts/migration-permission-gate.mjs` against the CI Docker stack); it cannot read a hosted database.
 - Test files exist for all four: `supabase/tests/122_admin_staff_invitations_test.sql`, `104_media_id_storage_keys_test.sql`, `105_request_and_verification_media_test.sql`, `124_admin_backup_control_test.sql`, plus `admin_staff_invitation_concurrency_test.sh`. They run in CI (pgTAP on a local database), never on Production.
 - Production has had no schema change since the 203 snapshot (history re-read shows 203 / `20261107090003`).
 - Checkout clean and equal to `origin/main`.
