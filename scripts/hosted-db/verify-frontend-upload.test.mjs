@@ -68,16 +68,16 @@ function wr(over = {}) {
 const go = async (f, argv) => { const lines = []; const code = await run({ argv, wrangler: f.wrangler, out: (s) => lines.push(s) }); return { code, text: lines.join("\n") }; };
 
 test("the run reads only versions view and deployments status, and reports pass/refuse", async () => {
-  const f = wr();
-  const ok = await go(f, [`--version=${UP}`]);
+  const f = wr({ up: withMsg("upload-only a0aa22962851") });
+  const ok = await go(f, [`--version=${UP}`, `--expect-sha=${SHA}`]);
   assert.equal(ok.code, 0, ok.text);
   assert.match(ok.text, /All read-only checks passed/);
   for (const c of f.calls) assert.ok((c[0] === "versions" && c[1] === "view") || (c[0] === "deployments" && c[1] === "status"), `not read-only: ${c.join(" ")}`);
-  assert.equal((await go(wr({ up: mod((b) => b.filter((x) => x.name !== "OTP_WORKER")) }), [`--version=${UP}`])).code, 1);
+  assert.equal((await go(wr({ up: mod((b) => b.filter((x) => x.name !== "OTP_WORKER")) }), [`--version=${UP}`, `--expect-sha=${SHA}`])).code, 1);
 });
 
 test("a missing or malformed version id, or any other argument, is a usage error and calls nothing", async () => {
-  for (const argv of [[], ["--version=abc"], [`--version=${UP}`, "--deploy"]]) {
+  for (const argv of [[], ["--version=abc"], [`--version=${UP}`], [`--version=${UP}`, "--deploy"]]) {
     const f = wr();
     assert.equal((await go(f, argv)).code, 2);
     assert.equal(f.calls.length, 0);
@@ -103,12 +103,11 @@ test("--expect-sha: the version message must carry the first 12 hex of the expec
   assert.equal(check(withMsg("anything")), "", "without the flag the message is not checked");
 });
 
-test("run: --expect-sha is validated, optional, and reported", async () => {
+test("run: --expect-sha is validated, required, and reported", async () => {
   for (const argv of [[`--version=${UP}`, "--expect-sha=abc"], [`--version=${UP}`, `--expect-sha=${SHA.toUpperCase()}`], [`--version=${UP}`, `--expect-sha=${SHA}`, `--expect-sha=${SHA}`]]) {
     const f = wr(); assert.equal((await go(f, argv)).code, 2); assert.equal(f.calls.length, 0);
   }
   const ok = await go(wr({ up: withMsg("upload-only a0aa22962851") }), [`--version=${UP}`, `--expect-sha=${SHA}`]);
   assert.equal(ok.code, 0, ok.text); assert.match(ok.text, /Source label matches a0aa22962851/);
   assert.equal((await go(wr({ up: withMsg("upload-only 000000000000") }), [`--version=${UP}`, `--expect-sha=${SHA}`])).code, 1);
-  assert.match((await go(wr(), [`--version=${UP}`])).text, /Source commit NOT checked/);
 });

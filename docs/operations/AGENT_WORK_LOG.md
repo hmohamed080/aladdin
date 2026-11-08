@@ -7409,3 +7409,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - L1 run 42450831535 stopped at its preflight: the preview is behind Cloudflare Access and the workflow had no token (0 tests ran).
 - Code-only fix on branch fix/acceptance-e2e-access-token-20261108: exact-origin Access headers (no global extraHTTPHeaders), no redirect following, fail closed on missing credentials or an Access redirect; tests in frontend/e2e-acceptance/access.test.ts; owner setup in docs/operations/ACCEPTANCE_E2E_ACCESS_TOKEN.md.
 - No secret created or changed, no Cloudflare Access policy changed, nothing merged, deployed or re-run.
+
+## 2026-11-08 - P-7 checklist re-pinned to RC fc62c4b5 (Track 1)
+
+- Merged `origin/main` (`fc62c4b5`, #147 and #148) into the #145 branch; only `AGENT_WORK_LOG.md` conflicted (kept both sides).
+- RC rule now precise: RUNTIME path list plus the exact `git diff --stat fc62c4b5... origin/main -- <paths>` command (must print nothing, else stop and re-fix the RC). Stale facts fixed: Production is 203 applied / 4 pending, rollback target `a3b08a22-f82e-4851-9786-9442c01e43c8` (not `39bdf3a2`; also fixed in the migration runbook and release plan). `production-post-migration-check.sh` (expects 191 versions) now exits 2 and the checklist says not to use it.
+- `verify-frontend-upload.mjs`: `--expect-sha` is now required (without it an older version with identical bindings would pass); tests updated (39 pass). Checklist: B1 run lookup restricted to workflow_dispatch on main, switch-timing note, explicit "next executable step" (A1) and the gate list.
+- No Production write, upload, deployment, merge, secret change or WhatsApp enablement.

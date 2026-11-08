@@ -2,9 +2,9 @@
 // READ-ONLY verification of the Production frontend version uploaded by `cloudflare-production` stage=frontend-upload (checklist P-7).
 // It never uploads, deploys, rolls back, writes a secret or sends anything: only `deployments status` and `versions view`.
 //
-//   node scripts/hosted-db/verify-frontend-upload.mjs --version=<uploaded version id> [--expect-sha=<40 hex>]
+//   node scripts/hosted-db/verify-frontend-upload.mjs --version=<uploaded version id> --expect-sha=<40 hex>
 //
-// --expect-sha: the workflow uploads with `--message "upload-only ${GITHUB_SHA::12}"`, stored as the version annotation `workers/message`.
+// --expect-sha (REQUIRED: without it any older version with the same bindings would pass): the workflow uploads with `--message "upload-only ${GITHUB_SHA::12}"`, stored as the version annotation `workers/message`.
 // With the flag, that annotation must equal `upload-only <first 12 hex of the SHA>`. This is a label written by the workflow, not a build
 // attestation: it proves which commit the dispatched run was on, not the bytes of the bundle (cross-check the run summary and run's head SHA).
 //
@@ -88,13 +88,13 @@ export async function run({ argv, wrangler, out }) {
   const bad = argv.filter((a) => !a.startsWith("--version=") && !a.startsWith("--expect-sha="));
   const id = arg?.slice("--version=".length) ?? "";
   const expectSha = shaArg?.slice("--expect-sha=".length);
-  if (bad.length || argv.filter((a) => a.startsWith("--expect-sha=")).length > 1 || (expectSha !== undefined && !/^[0-9a-f]{40}$/.test(expectSha)) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) { out("usage: verify-frontend-upload.mjs --version=<uuid of the uploaded version> [--expect-sha=<40 lowercase hex>]"); return 2; }
+  if (bad.length || argv.filter((a) => a.startsWith("--expect-sha=")).length > 1 || expectSha === undefined || !/^[0-9a-f]{40}$/.test(expectSha) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) { out("usage: verify-frontend-upload.mjs --version=<uuid of the uploaded version> --expect-sha=<40 lowercase hex, REQUIRED>"); return 2; }
   try {
     const view = (v) => parse(wrangler(["versions", "view", v, "--env", "production", "--json"]), `versions view ${v.slice(0, 8)}`);
     const deployment = parse(wrangler(["deployments", "status", "--env", "production", "--json"]), "deployments status");
     const problems = checkUpload({ live: view(LIVE_VERSION), p4: view(P4_VERSION), up: view(id), deployment, versionId: id, expectSha });
     for (const x of problems) out(`FAIL  ${x}`);
-    out(problems.length ? `\nREFUSED: ${problems.length} problem(s). Do not test or promote this version.` : `All read-only checks passed: ${id.slice(0, 8)} = the P-4 version (4 new secrets kept, no secret lost) + OTP_WORKER; live ${LIVE_VERSION.slice(0, 8)} still alone at 100%.${expectSha ? ` Source label matches ${expectSha.slice(0, 12)}.` : " Source commit NOT checked (no --expect-sha)."}`);
+    out(problems.length ? `\nREFUSED: ${problems.length} problem(s). Do not test or promote this version.` : `All read-only checks passed: ${id.slice(0, 8)} = the P-4 version (4 new secrets kept, no secret lost) + OTP_WORKER; live ${LIVE_VERSION.slice(0, 8)} still alone at 100%. Source label matches ${expectSha.slice(0, 12)} (a label, not a bundle attestation).`);
     return problems.length ? 1 : 0;
   } catch (e) {
     out(`FAIL  could not complete: ${e.message}`);
