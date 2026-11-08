@@ -127,6 +127,10 @@ describe("production single-recipient allowlist (first live test)", () => {
   test("a plain variable is never honoured in production (only the Secrets Store binding)", async () => {
     assert.deepEqual(await send(prod(undefined, { OTP_ALLOWED_RECIPIENTS: PHONE })), { status: 403, calls: 0 });
   });
+  test("a stray OTP_RECIPIENT_MODE=open cannot override a bound allow-list in production", async () => {
+    assert.deepEqual(await send(prod(OTHER_PHONE, { OTP_RECIPIENT_MODE: "open" })), { status: 403, calls: 0 });
+    assert.deepEqual(await send(prod(async () => { throw new Error("down"); }, { OTP_RECIPIENT_MODE: "open" })), { status: 403, calls: 0 });
+  });
   test("outside production the allowlist (variable or binding, several entries) behaves as before; open mode is unchanged", async () => {
     assert.deepEqual(await send(baseEnv({ OTP_ALLOWED_RECIPIENTS: `${OTHER_PHONE},${PHONE}` })), { status: 200, calls: 1 });
     assert.deepEqual(await send(baseEnv({ OTP_ALLOWED_RECIPIENTS: bound(`${OTHER_PHONE},${PHONE}`) })), { status: 200, calls: 1 });

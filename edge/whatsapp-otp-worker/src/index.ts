@@ -204,8 +204,12 @@ async function allowedRecipients(env: Env): Promise<string[]> {
   return parts.filter((x) => MOBILE.test(x));
 }
 /** An isolated allow-list is the default and mandatory outside production: no list means no send. "open" only counts in production. */
+/** "open" needs production AND no allow-list binding: a bound OTP_ALLOWED_RECIPIENTS wins over a stray OTP_RECIPIENT_MODE=open (e.g. a dashboard edit). */
+function openMode(env: Env): boolean {
+  return env.OTP_RECIPIENT_MODE === "open" && env.OTP_ENVIRONMENT === "production" && typeof env.OTP_ALLOWED_RECIPIENTS !== "object";
+}
 export async function recipientAllowed(phone: string, env: Env): Promise<boolean> {
-  if (env.OTP_RECIPIENT_MODE === "open" && env.OTP_ENVIRONMENT === "production") return true;
+  if (openMode(env)) return true;
   return (await allowedRecipients(env)).includes(phone);
 }
 
@@ -402,7 +406,7 @@ async function preflightReport(env: Env): Promise<Record<string, string | number
     delivery_attestation_age: attested.delivery_attestation_age,
     delivery_enabled: permitted && switchOn, // effective: both the permit and the audited Super Admin switch
     environment: env.OTP_ENVIRONMENT ?? "unset",
-    recipient_mode: env.OTP_RECIPIENT_MODE === "open" && env.OTP_ENVIRONMENT === "production" ? "open" : "allowlist",
+    recipient_mode: openMode(env) ? "open" : "allowlist",
     allowlist_entries: (await allowedRecipients(env)).length,
     settings_initialized: settings !== null,
     daily_send_limit: settings?.dailyLimit ?? 0, // 0 = missing/invalid, which makes the Worker send nothing
