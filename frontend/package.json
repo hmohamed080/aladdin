@@ -17,6 +17,7 @@
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:access-routing": "playwright test -c playwright.access-routing.config.ts",
+    "e2e:acceptance:headed": "node e2e-acceptance/run-headed.mjs",
     "e2e:staging-smoke": "playwright test -c playwright.staging-smoke.config.ts",
     "e2e:install": "playwright install chromium"
   },
