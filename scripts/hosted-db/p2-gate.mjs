@@ -13,13 +13,12 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const PRODUCTION_REF = "kkpkgjrweysgvhvkhzun";
-export const EXPECT_APPLIED = 195;
-export const EXPECT_LATEST = "20261107090002";
+export const EXPECT_APPLIED = 203;
+export const EXPECT_LATEST = "20261107090003";
 export const MAX_SNAPSHOT_AGE_MINUTES = 60;
 /** The only migrations P-2 may apply, in apply order. */
 export const EXPECT_PENDING = [
-  "20261028090001", "20261028090003", "20261029090001", "20261029090002",
-  "20261030090001", "20261030090002", "20261103090001", "20261107090003",
+  "20261105090001", "20261107090004", "20261107090005", "20261107090006",
 ];
 
 export function parseKv(text) {
