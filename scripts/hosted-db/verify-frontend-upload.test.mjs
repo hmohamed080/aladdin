@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { checkUpload, run, parse, P4_VERSION, OTP_WORKER_TARGET } from "./verify-frontend-upload.mjs";
-import { LIVE_VERSION } from "./provision-frontend-otp-secrets.mjs";
+import { LIVE_VERSION, SIGNUP_SECRET_NAMES } from "./provision-frontend-otp-secrets.mjs";
 
 const UP = "11111111-2222-4333-8444-555555555555";
 const plain = (name, text) => ({ name, type: "plain_text", text });
@@ -16,14 +16,34 @@ const base = () => [
 ];
 const otpSecrets = () => ["PHONE_OTP_ADMIN_SECRET", "PHONE_OTP_NOTIFY_SECRET", "PHONE_OTP_WORKER_SECRET", "PHONE_OTP_WORKER_URL"].map(secret);
 const view = (b) => ({ resources: { bindings: b } });
+const signup = () => SIGNUP_SECRET_NAMES.map(secret);
 const live = () => view(base());
 const p4 = () => view([...base(), ...otpSecrets()]);
-const good = () => view([...base(), ...otpSecrets(), svc("OTP_WORKER", OTP_WORKER_TARGET)]);
+const good = () => view([...base(), ...otpSecrets(), ...signup(), svc("OTP_WORKER", OTP_WORKER_TARGET)]);
 const dep = { versions: [{ version_id: LIVE_VERSION, percentage: 100 }] };
 const check = (up, over = {}) => checkUpload({ live: live(), p4: p4(), up, deployment: dep, versionId: UP, ...over }).join(" | ");
 const mod = (fn) => view(fn(good().resources.bindings));
 
-test("a version equal to the P-4 version plus OTP_WORKER passes", () => assert.equal(check(good()), ""));
+test("a version equal to the P-4 version plus the 5 sign-up secrets plus OTP_WORKER passes", () => assert.equal(check(good()), ""));
+
+test("the 5 sign-up secrets are exactly the expected names", () => {
+  assert.deepEqual([...SIGNUP_SECRET_NAMES].sort(), ["PHONE_OTP_DELIVERY", "PHONE_OTP_HMAC_KEYS", "PHONE_SIGNUP_COOKIE_SECRET", "PHONE_SIGNUP_VERIFICATION_ENABLED", "PHONE_VERIFICATION_ENABLED"]);
+});
+
+test("the P-4-only set (no sign-up secrets) is refused for the sign-up cutover", () => {
+  const p4Only = view([...base(), ...otpSecrets(), svc("OTP_WORKER", OTP_WORKER_TARGET)]);
+  const r = check(p4Only);
+  for (const n of SIGNUP_SECRET_NAMES) assert.match(r, new RegExp(`secret ${n} is MISSING`));
+});
+
+test("a version lacking any single one of the 5 sign-up secrets is refused", () => {
+  for (const n of SIGNUP_SECRET_NAMES) assert.match(check(mod((b) => b.filter((x) => x.name !== n))), new RegExp(`secret ${n} is MISSING`));
+});
+
+test("a sign-up secret that is not secret_text is refused, and an unknown extra secret is refused", () => {
+  for (const n of SIGNUP_SECRET_NAMES) assert.match(check(mod((b) => b.map((x) => (x.name === n ? plain(n, "worker") : x)))), new RegExp(`${n} must be a secret_text`));
+  assert.match(check(mod((b) => [...b, secret("PHONE_SIGNUP_EXTRA_SECRET")])), /unexpected secret PHONE_SIGNUP_EXTRA_SECRET/);
+});
 
 test("lost, extra or retyped secrets are refused", () => {
   assert.match(check(mod((b) => b.filter((x) => x.name !== "PHONE_OTP_ADMIN_SECRET"))), /PHONE_OTP_ADMIN_SECRET.*MISSING/);

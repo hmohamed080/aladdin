@@ -7438,3 +7438,11 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Re-read `verify-frontend-upload.mjs` and the P-7 sections against the current `cloudflare-production.yml`: stage `frontend-upload`, environment `cloudflare-production`, `CLOUDFLARE_PRODUCTION_ENABLED == 'true'`, message `upload-only ${GITHUB_SHA::12}` all match what `--expect-sha` checks. No defect found.
 - Checklist state lines: A1 done (preview `d8ff501d` from `fc62c4b5`); owner-reported manual L1/L2 summary PASS (per-row evidence incomplete, PR #151); next gate Gate M / B0-B3 per the owner's approvals. Nothing beyond what the owner reported is claimed.
 - No Production write, upload, deployment, merge, secret change or WhatsApp enablement.
+
+## 2026-11-08 - Production phone sign-up secrets tooling (agent, draft PR #145, nothing run against Production)
+
+- Finding (read-only, names only, P-4 version `3fc37397`): Production lacks `PHONE_OTP_DELIVERY`, `PHONE_OTP_HMAC_KEYS`, `PHONE_VERIFICATION_ENABLED`, `PHONE_SIGNUP_VERIFICATION_ENABLED`, `PHONE_SIGNUP_COOKIE_SECRET`; the new sign-up cannot work without them. The old frontend ignores them and the database switches stay the instant gate.
+- New `scripts/hosted-db/provision-frontend-signup-secrets.mjs` (+ test): dry run by default; apply needs a typed phrase naming `aladdin-frontend-production`; values generated in memory, stdin only, never printed; refuses unless live `a3b08a22` is alone at 100% and the latest version is the P-4 version; read-only post-check by names. Shared constants (`P4_VERSION`, `SIGNUP_SECRET_NAMES`) live in `provision-frontend-otp-secrets.mjs`; its `checkNewVersionContents` gained an optional `names` parameter (P-4 behaviour unchanged).
+- `verify-frontend-upload.mjs`: expected secret set is now the P-4 set plus the five (exact names, secret_text); a missing one, an unknown extra, or the P-4-only set is refused; `--expect-sha` still required.
+- Checklist: new section "Production phone sign-up secrets (5)" with the owner commands and the order provision, 0% upload, verify, override-header check, promote.
+- Validation: `node --test` on the three hosted-db test files, 55 tests pass. No Production write, upload, deploy, secret creation, merge, dispatch or WhatsApp activation.

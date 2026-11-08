@@ -8,9 +8,10 @@
 // With the flag, that annotation must equal `upload-only <first 12 hex of the SHA>`. This is a label written by the workflow, not a build
 // attestation: it proves which commit the dispatched run was on, not the bytes of the bundle (cross-check the run summary and run's head SHA).
 //
-// The uploaded version U must equal the P-4 version (live bindings + the four PHONE_OTP_* secrets) PLUS exactly one new binding:
+// The uploaded version U must equal the P-4 version (live bindings + the four PHONE_OTP_* secrets) PLUS the five phone SIGN-UP secrets
+// (SIGNUP_SECRET_NAMES, all secret_text; created by provision-frontend-signup-secrets.mjs) PLUS exactly one new binding:
 // the private service binding OTP_WORKER -> aladdin-whatsapp-otp-production. Checked by NAME and TYPE (secret values are never visible):
-//   - secret_text names of U == those of the P-4 version (nothing lost, nothing extra, the 4 new ones present)
+//   - secret_text names of U == those of the P-4 version + the 5 sign-up secrets (nothing lost, nothing extra, none missing)
 //   - plain_text names of U == those of the live version, with identical public values (values are never printed)
 //   - service / assets / images / version_metadata bindings of the live version unchanged; OTP_WORKER added, targeting production
 //   - no PHONE_* or WHATSAPP_* switch among the plain variables (the feature stays OFF)
@@ -19,9 +20,9 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-import { LIVE_VERSION, NEW_NAMES, safeWranglerEnv } from "./provision-frontend-otp-secrets.mjs";
+import { LIVE_VERSION, NEW_NAMES, P4_VERSION, SIGNUP_SECRET_NAMES, safeWranglerEnv } from "./provision-frontend-otp-secrets.mjs";
 
-export const P4_VERSION = "3fc37397-9157-4fa6-8fce-d32dffe0a194";
+export { P4_VERSION };
 export const OTP_WORKER_TARGET = "aladdin-whatsapp-otp-production";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND = path.join(HERE, "..", "..", "frontend");
@@ -44,11 +45,12 @@ export function checkUpload({ live, p4, up, deployment, versionId, expectSha }) 
   if (versionId === LIVE_VERSION || versionId === P4_VERSION) p.push("the version to verify is the live or the P-4 version, not a new upload");
 
   const upSecrets = names(U, "secret_text"), p4Secrets = names(P, "secret_text");
-  for (const n of p4Secrets) if (!U.has(n)) p.push(`secret ${n} is MISSING on the uploaded version`);
-  for (const n of upSecrets) if (!P.has(n)) p.push(`unexpected secret ${n} on the uploaded version`);
-  for (const n of NEW_NAMES) if (U.get(n)?.type !== "secret_text") p.push(`${n} must be a secret_text binding on the uploaded version`);
+  const expectedSecrets = [...new Set([...p4Secrets, ...SIGNUP_SECRET_NAMES])].sort();
+  for (const n of expectedSecrets) if (!U.has(n)) p.push(`secret ${n} is MISSING on the uploaded version`);
+  for (const n of upSecrets) if (!expectedSecrets.includes(n)) p.push(`unexpected secret ${n} on the uploaded version`);
+  for (const n of [...NEW_NAMES, ...SIGNUP_SECRET_NAMES]) if (U.get(n)?.type !== "secret_text") p.push(`${n} must be a secret_text binding on the uploaded version`);
   for (const n of ["AUTH_PASSWORD_PREVIEW_GRANT_SECRET", "SUPABASE_SERVICE_ROLE_KEY", "TURNSTILE_SECRET_KEY", "RESEND_API_KEY"]) if (U.get(n)?.type !== "secret_text") p.push(`existing secret ${n} must still be secret_text`);
-  if (!same(upSecrets, p4Secrets)) p.push(`secret names differ from the P-4 version (uploaded: ${upSecrets.length}, P-4: ${p4Secrets.length})`);
+  if (!same(upSecrets, expectedSecrets)) p.push(`secret names differ from the expected set P-4 + 5 sign-up secrets (uploaded: ${upSecrets.length}, expected: ${expectedSecrets.length})`);
 
   const upPlain = names(U, "plain_text"), livePlain = names(L, "plain_text");
   if (!same(upPlain, livePlain)) p.push(`plain variable names differ from the live version (added: [${upPlain.filter((n) => !L.has(n)).join(", ")}], removed: [${livePlain.filter((n) => !U.has(n)).join(", ")}])`);
@@ -63,7 +65,7 @@ export function checkUpload({ live, p4, up, deployment, versionId, expectSha }) 
   }
   const o = U.get("OTP_WORKER");
   if (!o || o.type !== "service" || o.service !== OTP_WORKER_TARGET || (o.environment !== undefined && o.environment !== "production")) p.push(`OTP_WORKER must be a service binding to ${OTP_WORKER_TARGET} (production)`);
-  const added = [...U.keys()].filter((n) => !L.has(n) && !P.has(n)).sort();
+  const added = [...U.keys()].filter((n) => !L.has(n) && !P.has(n) && !SIGNUP_SECRET_NAMES.includes(n)).sort();
   if (!same(added, ["OTP_WORKER"])) p.push(`new bindings beyond the live and P-4 versions are [${added.join(", ")}], expected exactly [OTP_WORKER]`);
 
   const dep = deployment?.versions ?? [];
@@ -94,7 +96,7 @@ export async function run({ argv, wrangler, out }) {
     const deployment = parse(wrangler(["deployments", "status", "--env", "production", "--json"]), "deployments status");
     const problems = checkUpload({ live: view(LIVE_VERSION), p4: view(P4_VERSION), up: view(id), deployment, versionId: id, expectSha });
     for (const x of problems) out(`FAIL  ${x}`);
-    out(problems.length ? `\nREFUSED: ${problems.length} problem(s). Do not test or promote this version.` : `All read-only checks passed: ${id.slice(0, 8)} = the P-4 version (4 new secrets kept, no secret lost) + OTP_WORKER; live ${LIVE_VERSION.slice(0, 8)} still alone at 100%. Source label matches ${expectSha.slice(0, 12)} (a label, not a bundle attestation).`);
+    out(problems.length ? `\nREFUSED: ${problems.length} problem(s). Do not test or promote this version.` : `All read-only checks passed: ${id.slice(0, 8)} = the P-4 version (4 OTP secrets kept) + the 5 sign-up secrets + OTP_WORKER, no secret lost or extra; live ${LIVE_VERSION.slice(0, 8)} still alone at 100%. Source label matches ${expectSha.slice(0, 12)} (a label, not a bundle attestation).`);
     return problems.length ? 1 : 0;
   } catch (e) {
     out(`FAIL  could not complete: ${e.message}`);

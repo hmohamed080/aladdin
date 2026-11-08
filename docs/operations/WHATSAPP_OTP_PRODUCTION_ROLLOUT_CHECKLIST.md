@@ -188,6 +188,23 @@ git diff --stat fc62c4b5a3f9284fb2fc7d9b52df8193d558a13a origin/main   # review 
 
 Other gating items: `LIVE_VERSION` in `provision-frontend-otp-secrets.mjs` is pinned to `a3b08a22`, so the verifier fails closed (REFUSED) if the live version changes in between. What the verifier can prove about the source commit is described under B3.
 
+### Production phone sign-up secrets (5)
+
+The Production frontend (P-4 version `3fc37397`, checked read-only 2026-11-08, names only) has the four `PHONE_OTP_*` secrets but **lacks the five the new phone sign-up needs**: `PHONE_OTP_DELIVERY` (`worker`; absent means off), `PHONE_VERIFICATION_ENABLED` (`true`), `PHONE_SIGNUP_VERIFICATION_ENABLED` (`true`), `PHONE_OTP_HMAC_KEYS` (keyring JSON, fresh kid plus 32 random bytes) and `PHONE_SIGNUP_COOKIE_SECRET` (random, at least 32 characters). Rules: `frontend/src/lib/env/phone-verification.ts`. Without them the new sign-up (`frontend/src/server/phone-verification/*`) cannot work in Production.
+
+The live frontend (`a3b08a22`) serves the legacy OTP-less phone registration and ignores these five, so setting them to their enabled values is safe before promotion. **The real control is the database**: `app.phone_verification_config.enabled` / `signup_enabled` (default `false`) are the instant gate. There is no sign-up allowlist step in this cutover.
+
+**Owner commands** (Git Bash, repository root; no `pnpm install` needed beyond the existing one). The script `scripts/hosted-db/provision-frontend-signup-secrets.mjs` generates the values in its own memory (`crypto.randomBytes`), pipes them to `wrangler versions secret bulk --env production --tag p4b-signup-secrets` on stdin, and never prints, logs or writes them (only names are shown; wrangler runs with `WRANGLER_LOG_SANITIZE=true`). It creates ONE undeployed version on top of the P-4 version (the latest upload, which `versions secret bulk` patches).
+
+```bash
+node scripts/hosted-db/provision-frontend-signup-secrets.mjs            # DRY RUN (default): read-only checks, lists the five NAMES it would set, writes nothing
+node scripts/hosted-db/provision-frontend-signup-secrets.mjs --apply    # owner only, own approval: asks you to type  SET 5 PHONE SIGNUP SECRETS ON aladdin-frontend-production
+```
+
+It refuses unless: production env (hard-coded), not CI, interactive terminal, the live deployment is exactly `a3b08a22` alone at 100%, the latest uploaded version is the P-4 version with its four names, none of the five exist yet, and the typed phrase matches; it re-checks immediately before the write. Post-check (read-only, names only): deployment unchanged, exactly one new version, not deployed, bindings equal the P-4 version plus exactly the five `secret_text` names. Do not promote that version. **Run it once, and before B1** (the 0% upload carries secrets from the latest version).
+
+**Order (matches the release sequence in PR #158):** 1. provision the five secrets (above) → 2. 0% upload (B0 to B2) → 3. verify (B3: expects P-4 secrets + these five + `OTP_WORKER`, refuses a version lacking any of them, an unknown extra secret, or the P-4-only set) → 4. minimal live delivery check through the version-override header (step C; the database switches are what permit a send) → 5. promote (D1, after Gate M). Nothing is promoted by steps 1 to 4. Recovery if step 1 goes wrong: the new version serves no traffic; inspect with `versions view` and leave it, or remove names with `wrangler versions secret delete` after review.
+
 ### P-7 owner-approved execution sequence (Git Bash, repository root; every step needs its own approval)
 
 Build everything below from `RC` (see the RC rule above: empty runtime diff against `fc62c4b5`, else STOP). Every step needs its own approval; stop at the first failed check. Gate M is required only before step D1.
@@ -215,12 +232,12 @@ gh variable set CLOUDFLARE_PRODUCTION_ENABLED --env cloudflare-production --body
 node scripts/hosted-db/verify-frontend-upload.mjs --version=<UPLOADED_VERSION_ID> --expect-sha="$RC"   # B3: read-only; stop if it says REFUSED
 ```
 
-**B3 proves** (by name and type; values cannot be read): all P-4 secrets kept and nothing lost, the four `PHONE_OTP_*` secrets present, plain variables equal to live, `BACKEND`/`WORKER_SELF_REFERENCE`/assets/images unchanged, exactly one new binding (`OTP_WORKER` to `aladdin-whatsapp-otp-production`), no `PHONE_`/`WHATSAPP_`/`OTP_` plain switch, the live version still alone at 100% and the upload at 0%. **With `--expect-sha`** it also proves the version's `workers/message` annotation equals `upload-only <first 12 hex of RC>` (the workflow passes `--message "upload-only ${GITHUB_SHA::12}"`; read-only `versions view --json` exposes it under `annotations`; the P-4 version shows `workers/message` and `workers/tag` the same way). **It cannot prove** that the bundle bytes were built from that commit: the message is a label written by the workflow, only 12 hex characters long, and the workflow sets no `--tag`. Manual cross-check (mandatory): the run's `headSha` equals `$RC`, and the run summary's version id equals the id given to the verifier. `--expect-sha` is **required** (the verifier exits 2 without it): otherwise an older version with identical bindings would pass.
+**B3 proves** (by name and type; values cannot be read): all P-4 secrets kept and nothing lost, the four `PHONE_OTP_*` secrets present, **plus exactly the five sign-up secrets (all `secret_text`; a missing one, an unknown extra secret, or the P-4-only set is REFUSED)**, plain variables equal to live, `BACKEND`/`WORKER_SELF_REFERENCE`/assets/images unchanged, exactly one new binding (`OTP_WORKER` to `aladdin-whatsapp-otp-production`), no `PHONE_`/`WHATSAPP_`/`OTP_` plain switch, the live version still alone at 100% and the upload at 0%. **With `--expect-sha`** it also proves the version's `workers/message` annotation equals `upload-only <first 12 hex of RC>` (the workflow passes `--message "upload-only ${GITHUB_SHA::12}"`; read-only `versions view --json` exposes it under `annotations`; the P-4 version shows `workers/message` and `workers/tag` the same way). **It cannot prove** that the bundle bytes were built from that commit: the message is a label written by the workflow, only 12 hex characters long, and the workflow sets no `--tag`. Manual cross-check (mandatory): the run's `headSha` equals `$RC`, and the run summary's version id equals the id given to the verifier. `--expect-sha` is **required** (the verifier exits 2 without it): otherwise an older version with identical bindings would pass.
 
 - **Switch timing:** the workflow reads `CLOUDFLARE_PRODUCTION_ENABLED` when the job starts, which is after the environment reviewer approves, so keep the switch open until the run has finished (`gh run watch`), then close it in B2 whatever the outcome. Approving the review with the switch closed only builds (no upload).
 - **Stop conditions for B:** the run's head SHA is not `$RC`; the runtime diff against `fc62c4b5` was not empty at B0 or B1; the run summary shows no `Version ID` or says `upload: false`; B3 prints REFUSED or cannot complete; the upload shows any traffic percentage; the switch could not be closed (close it, then investigate). Nothing is deployed in B, so there is nothing to roll back; the unused version may stay at 0%.
 
-**C. Production tests of the uploaded version (override header; delivery stays OFF; no sign-up, no data change)**
+**C. Production tests of the uploaded version (override header; no data change beyond the minimal live delivery check owned by PR #158)**
 
 ```bash
 V=<UPLOADED_VERSION_ID>; H="Cloudflare-Workers-Version-Overrides: aladdin-frontend-production=\"$V\""
