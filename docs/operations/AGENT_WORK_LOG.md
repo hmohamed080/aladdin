@@ -7413,3 +7413,9 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 
 - Rewrote docs/operations/PRODUCTION_RELEASE_SEQUENCE_20261108.md around the owner decisions: allowlist pilot removed (#157 closed), open mode in both environments, Acceptance first with a manual E2E, Production straight to GA with smoke plus one live delivery check, and requirement 9 (database switches enabled last; sign-up delivery gate code PR marked a GA blocker; interim rule: delivery OFF together with signup_enabled=false).
 - Document only. No merge, deployment, dispatch, Production or Acceptance write, secret change or activation.
+
+
+## 2026-11-08 - Release sequence cutover correction (agent)
+
+- Corrected docs/operations/PRODUCTION_RELEASE_SEQUENCE_20261108.md (PR #158, draft): live Production still serves the legacy OTP-less phone sign-up, so the order is now verify-then-promote: Gate M, five missing Production frontend secrets, Worker delivery readiness, 0% upload and verify, DB switches on plus ONE real owner sign-up through the override header, then promotion; rollback to a3b08a22 restores legacy registration. Added the #160 gate semantics (eventual, about 5 s, per isolate), blockers, PR list.
+- Document only. No merge, deployment, dispatch, Production or Acceptance write, secret change or activation. Not verified here: the facts A-E were supplied from read-only checks, not re-run.
