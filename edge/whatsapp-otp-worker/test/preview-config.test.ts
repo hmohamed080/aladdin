@@ -54,9 +54,16 @@ test("preview config refuses unexpected Meta token binding", () => {
 test("preview config refuses re-binding the Supabase Send-SMS-hook secret", () => {
   assertBlocked("SMS hook secret", o => { o.secrets_store_secrets.push({ binding: "SUPABASE_SEND_SMS_HOOK_SECRET", store_id: "acfaa67f391e499db6fde398022f50ce", secret_name: "SUPABASE_SEND_SMS_HOOK_SECRET" }); });
 });
-test("preview config refuses an open recipient mode or a production environment marker", () => {
-  assertBlocked("open mode", o => { o.vars.OTP_RECIPIENT_MODE = "open"; });
+test("preview config requires recipient mode open and environment acceptance, with no allowlist anywhere", () => {
+  assert.equal(baseline.vars.OTP_RECIPIENT_MODE, "open");
+  assert.equal(baseline.vars.WHATSAPP_DELIVERY_ENABLED, "false");
+  assertBlocked("allowlist mode", o => { o.vars.OTP_RECIPIENT_MODE = "allowlist"; });
+  assertBlocked("missing mode", o => { delete o.vars.OTP_RECIPIENT_MODE; });
   assertBlocked("production marker", o => { o.vars.OTP_ENVIRONMENT = "production"; });
+  assertBlocked("local marker", o => { o.vars.OTP_ENVIRONMENT = "local"; });
+  assertBlocked("missing environment", o => { delete o.vars.OTP_ENVIRONMENT; });
+  assertBlocked("allowlist var (empty)", o => { o.vars.OTP_ALLOWED_RECIPIENTS = ""; });
+  assertBlocked("allowlist secret binding", o => { o.secrets_store_secrets.push({ binding: "OTP_ALLOWED_RECIPIENTS", store_id: "acfaa67f391e499db6fde398022f50ce", secret_name: "OTP_ALLOWED_RECIPIENTS" }); });
 });
 test("preview config refuses phone numbers in the repository and a Graph URL override", () => {
   assertBlocked("numbers in repo", o => { o.vars.OTP_ALLOWED_RECIPIENTS = "+201012345678"; });
