@@ -7,7 +7,7 @@ const sha = (b) => createHash("sha256").update(b).digest("hex");
 const NOW = Date.parse("2026-11-07T20:00:00Z");
 const files = { "roles.sql": Buffer.from("r"), "schema.sql": Buffer.from("s"), "data.sql": Buffer.from("d"), "security-tail.out.sql": Buffer.from("t") };
 const enc = Buffer.from("encrypted-bytes");
-const meta = (o = {}) => Object.entries({ taken_utc: "2026-11-07T19:30:00Z", project: PRODUCTION_REF, history_count: 195, history_latest: "20261107090002", row_counts_validated: "copy-vs-select", ...o }).map(([k, v]) => `${k}=${v}`).join("\n");
+const meta = (o = {}) => Object.entries({ taken_utc: "2026-11-07T19:30:00Z", project: PRODUCTION_REF, history_count: 203, history_latest: "20261107090003", row_counts_validated: "copy-vs-select", ...o }).map(([k, v]) => `${k}=${v}`).join("\n");
 const base = (o = {}) => ({
   meta: meta(), sums: Object.entries(files).map(([n, b]) => `${sha(b)}  ${n}`).join("\n"), readBackup: (f) => files[f],
   encSha: `${sha(enc)}  x.tar.gpg`, encryptedBytes: enc,
@@ -42,15 +42,15 @@ test("a recovery check from another snapshot is refused", () => {
 
 const list = (o = {}) => ({
   migrations: [
-    ...Array.from({ length: 194 }, (_, i) => ({ local: `2025${String(1000 + i)}000000`, remote: `2025${String(1000 + i)}000000` })),
-    { local: "20261107090002", remote: "20261107090002" },
+    ...Array.from({ length: 202 }, (_, i) => ({ local: `2025${String(1000 + i)}000000`, remote: `2025${String(1000 + i)}000000` })),
+    { local: "20261107090003", remote: "20261107090003" },
     ...EXPECT_PENDING.map((v) => ({ local: v, remote: null })),
   ].concat(o.extra ?? []),
 });
 const dry = (v = EXPECT_PENDING) => ({ dryRun: true, migrations: v.map((x) => `${x}_x.sql`) });
 const local = [...EXPECT_PENDING];
 
-test("exactly the expected 8 pending migrations pass", () => assert.deepEqual(checkPending({ list: list(), dry: dry(), localVersions: local }), []));
+test("exactly the expected 4 pending migrations pass", () => assert.deepEqual(checkPending({ list: list(), dry: dry(), localVersions: local }), []));
 test("a ninth pending migration is refused", () => {
   const out = checkPending({ list: list({ extra: [{ local: "20261108090001", remote: null }] }), dry: dry([...EXPECT_PENDING, "20261108090001"]), localVersions: local });
   has(out, /pending migrations are/); has(out, /dry run would push/);
@@ -59,7 +59,7 @@ test("a missing pending migration is refused", () => has(checkPending({ list: li
 test("a remote-only migration or changed applied count is refused", () => {
   const l = list(); l.migrations.push({ local: null, remote: "20261201000000" });
   has(checkPending({ list: l, dry: dry(), localVersions: local }), /lacks/);
-  has(checkPending({ list: l, dry: dry(), localVersions: local }), /196 applied/);
+  has(checkPending({ list: l, dry: dry(), localVersions: local }), /204 applied/);
 });
 test("a dry run that is not a dry run is refused", () => has(checkPending({ list: list(), dry: { ...dry(), dryRun: false }, localVersions: local }), /dryRun:true/));
 test("a missing local migration file is refused", () => has(checkPending({ list: list(), dry: dry(), localVersions: local.slice(1) }), /not in this checkout/));

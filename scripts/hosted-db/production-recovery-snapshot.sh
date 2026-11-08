@@ -9,12 +9,12 @@
 # The database password is read at a hidden prompt, never echoed, never written to disk. The snapshot folder is
 # created with owner-only permissions and its backup/ files are made read-only after their checksums are taken.
 # P-2 is only started through production-p2-push.sh, which refuses unless snapshot-meta.txt shows project=Production,
-# history 195 / 20261107090002, row_counts_validated, taken_utc at most 60 minutes old, and the encrypted copy has passed
+# history 203 / 20261107090003, row_counts_validated, taken_utc at most 60 minutes old, and the encrypted copy has passed
 # encrypt-backup.sh's recovery check. This script prints its own verdict too.
 # Test mode (local only): SNAPSHOT_DB_URL=postgresql://...@127.0.0.1:PORT/postgres
 set -euo pipefail
 export LC_ALL=C
-PROD="kkpkgjrweysgvhvkhzun"; EXPECT_COUNT=195; EXPECT_LATEST="20261107090002"
+PROD="kkpkgjrweysgvhvkhzun"; EXPECT_COUNT=203; EXPECT_LATEST="20261107090003"
 HERE="$(cd "$(dirname "$0")" && pwd)"; cd "$HERE/../.."
 KIT="$HERE"
 sb() { pnpm exec supabase "$@"; }
