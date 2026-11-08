@@ -7382,3 +7382,8 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - P-4 run assessed from Wrangler's local debug log (counts and masked structure only): request/response bodies omitted, no secret strings, sanitize unset; exposure ruled out, no rotation recommended.
 - D1 binding validated by `database_id` (API-shaped fixtures); zone/route/domain discovery paginated and refuses partial results; owner commands given for Git Bash.
 - No Production writes, deployment, merge, rotation or P-4 rerun. Delivery OFF.
+
+## 2026-11-08 - Acceptance L1/L2 readiness runbook (agent)
+
+- Added docs/operations/ACCEPTANCE_L1_L2_READINESS.md: owner steps for a dedicated Access service token, gate order (merge #147, A1 redeploy from RC 78d1b5c0, L1, L2), L2 manual checklist with now/after-A1 split, L1 triage.
+- Documentation only. No Production write, merge, deploy, secret, Access change or workflow dispatch. WhatsApp delivery OFF.
