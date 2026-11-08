@@ -10,7 +10,9 @@
 //   stalePending   pending/ upload older than the lifecycle window (default 48 h)        -> lifecycle not applied?
 //   pendingFresh / video / other   informational
 //
-//   node scripts/r2-reconcile.mjs --project <ref|local> [--max-age-hours 48] [--json] [--allow-orphans]
+//   node scripts/r2-reconcile.mjs --project <ref|local> [--max-age-hours 48] [--since <ISO>] [--json] [--allow-orphans]
+//
+// --since <ISO time>: E2E window check. Every row created since then must be R2 + ids-only, and all 7 namespaces must appear.
 //
 // Needs SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
 // R2_PRIVATE_BUCKET (read access is enough). Output is counts and short key fingerprints only: never keys, owners or
@@ -84,17 +86,46 @@ export function reconcile(rows, objects, { now = Date.now(), maxAgeHours = 48, s
   return { counts, perNamespace, samples, blockers, ok: blockers === 0 };
 }
 
+const NAMESPACES = ["avatar", "portfolio", "certificate", "product", "organization", "request", "verification"];
+const IDS_ONLY_KEY = /^(u|o)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[a-z0-9/-]+\/original\.[a-z0-9]+$/;
+
+/**
+ * E2E window check: everything created since `since` must be R2-only and ids-only. `rows` are ALL media_storage_locations rows
+ * (any provider). Blockers: a new Supabase-provider row, a new R2 row without a storage_key, or a key outside the ids-only shape.
+ * `uncovered` lists namespaces with no new row, so "all 7 flows ran" is checkable. Counts only.
+ */
+export function windowReport(rows, since) {
+  const t = new Date(since).getTime();
+  if (!Number.isFinite(t)) throw new ReconcileOperatorError("--since must be an ISO timestamp");
+  const fresh = rows.filter((r) => new Date(r.created_at).getTime() >= t);
+  const perNamespace = Object.fromEntries(NAMESPACES.map((ns) => [ns, { r2: 0, supabase: 0 }]));
+  let supabaseCreated = 0, missingStorageKey = 0, badKeyShape = 0;
+  for (const r of fresh) {
+    const bucket = perNamespace[r.namespace] ?? (perNamespace[r.namespace] = { r2: 0, supabase: 0 });
+    if (r.provider === "supabase") { bucket.supabase++; supabaseCreated++; continue; }
+    bucket.r2++;
+    if (!r.storage_key) missingStorageKey++;
+    else if (!IDS_ONLY_KEY.test(r.storage_key)) badKeyShape++;
+  }
+  const uncovered = NAMESPACES.filter((ns) => perNamespace[ns].r2 === 0);
+  return { since, newRows: fresh.length, perNamespace, supabaseCreated, missingStorageKey, badKeyShape, uncovered,
+    ok: supabaseCreated + missingStorageKey + badKeyShape === 0, allFlowsCovered: uncovered.length === 0 };
+}
+
 export function parseArgs(argv) {
-  const out = { project: null, maxAgeHours: 48, json: false, allowOrphans: false };
+  const out = { project: null, maxAgeHours: 48, json: false, allowOrphans: false, since: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--json") out.json = true;
     else if (arg === "--allow-orphans") out.allowOrphans = true;
-    else if (arg === "--project" || arg === "--max-age-hours") {
+    else if (arg === "--project" || arg === "--max-age-hours" || arg === "--since") {
       const value = argv[++i];
       if (value === undefined || value.startsWith("--")) throw new ReconcileOperatorError(`${arg} needs a value`);
       if (arg === "--project") out.project = value;
-      else {
+      else if (arg === "--since") {
+        if (!Number.isFinite(new Date(value).getTime())) throw new ReconcileOperatorError("--since must be an ISO timestamp");
+        out.since = value;
+      } else {
         out.maxAgeHours = Number(value);
         if (!Number.isFinite(out.maxAgeHours) || out.maxAgeHours < 1 || out.maxAgeHours > 720) throw new ReconcileOperatorError("--max-age-hours must be 1..720");
       }
@@ -108,7 +139,7 @@ async function fetchRows(supabase) {
   const rows = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase.from("media_storage_locations")
-      .select("namespace,object_key,storage_key,size_bytes,verified_at,cleaned_at").eq("provider", "r2")
+      .select("namespace,object_key,provider,created_at,storage_key,size_bytes,verified_at,cleaned_at")
       .order("namespace").order("object_key").range(from, from + 999);
     if (error) throw new ReconcileOperatorError("Row query failed; confirm the storage_key migration (20261107090004) is applied in this environment");
     rows.push(...data);
@@ -143,10 +174,11 @@ export async function main(argv = process.argv.slice(2)) {
   const require = createRequire(new URL("../frontend/package.json", import.meta.url));
   const supabase = require("@supabase/supabase-js").createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const [rows, objects] = await Promise.all([fetchRows(supabase), listBucket(env)]);
-  const result = reconcile(rows, objects, { maxAgeHours: options.maxAgeHours });
-  console.log(JSON.stringify({ project, readOnly: true, bucket: env.R2_PRIVATE_BUCKET, ...result }, null, options.json ? 0 : 2));
+  const result = reconcile(rows.filter((r) => r.provider === "r2"), objects, { maxAgeHours: options.maxAgeHours });
+  const window = options.since ? windowReport(rows, options.since) : undefined;
+  console.log(JSON.stringify({ project, readOnly: true, bucket: env.R2_PRIVATE_BUCKET, ...result, ...(window ? { window } : {}) }, null, options.json ? 0 : 2));
   const orphans = result.counts.orphan + result.counts.orphanVariant;
-  if (!result.ok || (!options.allowOrphans && orphans > 0)) process.exitCode = 1;
+  if (!result.ok || (!options.allowOrphans && orphans > 0) || (window && !(window.ok && window.allFlowsCovered))) process.exitCode = 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

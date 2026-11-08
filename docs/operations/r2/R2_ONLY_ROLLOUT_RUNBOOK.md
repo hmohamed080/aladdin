@@ -171,3 +171,33 @@ pnpm exec wrangler r2 bucket info aladdin-r2-acceptance-20261011-private   # unc
 ```
 Then delete the admin token. Not part of this GO: CORS, any change to the private bucket, S3 keys, Worker variables or secrets, Production.
 Rollback: `pnpm exec wrangler r2 bucket delete aladdin-acceptance-site-media` (valid only while empty).
+
+## 10. Acceptance seven-flow E2E: evidence matrix (prepared, not run)
+
+Preconditions: Acceptance at 207/207 migrations (done 2026-11-08), site bucket decision (section 9) is independent of this E2E, the Preview Worker runs with `R2_STORAGE_ENABLED=true` and `MEDIA_LEGACY_STORAGE_WRITES=false` (already in `wrangler.jsonc`), and the R2 app credential is scoped to the private bucket only. Use two real Acceptance test accounts (A owns, B is an unrelated user; for organization flows B is a non-member), with genuine Turnstile and Access (no bypass).
+
+**Before:** record `T0` (UTC ISO), then
+`node scripts/media-reset.mjs snapshot --project nxossqhdfltcqdwvbewi > before.json` (Supabase Storage object counts).
+
+| # | Flow (namespace) | Physical key to see in R2 | A does | B must fail to |
+|---|---|---|---|---|
+| 1 | Avatar (`avatar`) | `u/<A>/profile/<id>/original.<ext>` + `v/{thumb,card,full}.webp` | upload, replace, remove | read, replace, delete A's avatar object |
+| 2 | Portfolio (`portfolio`) | `u/<A>/portfolio/<id>/original.<ext>` | upload, publish, unpublish, delete | read while unpublished, delete |
+| 3 | Certificate (`certificate`, PDF) | `u/<A>/certificates/<id>/original.pdf` | upload, delete | read, upload into A's slot, delete |
+| 4 | Product image (`product`) | `o/<org>/products/<product>/<id>/original.<ext>` (or `u/<A>/products/...` for an independent publisher) | upload, replace, delete | write to A's product |
+| 5 | Organization image (`organization`) | `o/<org>/profile/<id>/original.<ext>` | upload logo, replace, delete | change another organization's logo |
+| 6 | Purchase-request photo (`request`) | `u/<A>/requests/<request>/<id>/original.<ext>` or `o/<org>/requests/...` | attach to a draft, remove | read a request it cannot see, attach to a submitted request |
+| 7 | Verification document (`verification`) | `o/<org>/verification/<id>/original.<ext>` | upload to a draft, submit | read before ready, delete after submission |
+
+For every flow: the object appears only under `u/` or `o/` with ids, never a name; B's attempts return the same 404/denied as a missing object (no existence oracle); replace and delete leave no original, `pending/` copy or variant (checked by reconcile); a deleted object's URL stops working on the next request.
+
+**Negative/guard checks (once):** with the Preview Worker pointed at a private bucket whose name lacks "acceptance", uploads are refused; with `R2_ACCESS_KEY_ID` disabled, uploads pause and create no Supabase object; Production Supabase URL is refused (covered by `environment-guard.test.ts`; the hosted run proves the deployed variables).
+
+**After (all read-only):**
+1. `node scripts/r2-reconcile.mjs --project nxossqhdfltcqdwvbewi --since <T0>` must exit 0: `missing = 0`, `sizeMismatch = 0`, no orphans (or each orphan explained by a test the operator aborted), and the `window` block shows `supabaseCreated = 0`, `missingStorageKey = 0`, `badKeyShape = 0`, `allFlowsCovered = true`. Needs read-only R2 keys and `SUPABASE_SERVICE_ROLE_KEY` in the operator shell only.
+2. `node scripts/media-reset.mjs snapshot ... > after.json` then `node scripts/media-reset.mjs compare --before before.json --after after.json` (no Supabase Storage bucket grew).
+3. `node scripts/media-storage.mjs cleanup --project nxossqhdfltcqdwvbewi` (dry run) lists no candidate that still has bytes.
+
+**Rollback / abort:** the E2E writes only test-account media. To undo: delete the test objects through the app (preferred, which retires rows and removes bytes), then `media-storage.mjs cleanup --execute` on Acceptance for anything left; reconcile again. Setting `R2_STORAGE_ENABLED=false` on the Preview Worker version pauses new uploads without data change. Nothing in this E2E touches Production or legacy Supabase Storage objects.
+
+**Evidence:** save the three command outputs under `docs/operations/evidence/` with the run date and the Worker version id.

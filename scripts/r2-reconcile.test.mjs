@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseArgs, physicalKey, reconcile, variantKeys } from "./r2-reconcile.mjs";
+import { parseArgs, physicalKey, reconcile, variantKeys, windowReport } from "./r2-reconcile.mjs";
 
 const U = "11111111-1111-1111-1111-111111111111";
 const M = "22222222-2222-2222-2222-222222222222";
@@ -67,5 +67,28 @@ test("arguments: explicit project, bounded age, unknown options refused", () => 
   assert.throws(() => parseArgs([]), /--project/);
   assert.throws(() => parseArgs(["--project", "x", "--max-age-hours", "0"]), /1\.\.720/);
   assert.throws(() => parseArgs(["--project", "x", "--delete"]), /Unknown option/);
-  assert.deepEqual(parseArgs(["--project", "abc", "--allow-orphans"]), { project: "abc", maxAgeHours: 48, json: false, allowOrphans: true });
+  assert.deepEqual(parseArgs(["--project", "abc", "--allow-orphans"]), { project: "abc", maxAgeHours: 48, json: false, allowOrphans: true, since: null });
+  assert.equal(parseArgs(["--project", "abc", "--since", "2026-11-08T10:00:00Z"]).since, "2026-11-08T10:00:00Z");
+  assert.throws(() => parseArgs(["--project", "abc", "--since", "yesterday"]), /ISO/);
+});
+
+const NS = ["avatar", "portfolio", "certificate", "product", "organization", "request", "verification"];
+const fresh = (namespace, over = {}) => ({ namespace, provider: "r2", created_at: hoursAgo(1), storage_key: `u/${U}/${namespace}/${M}/original.png`, ...over });
+
+test("window check: seven R2 ids-only flows pass and cover every namespace", () => {
+  const r = windowReport(NS.map((n) => fresh(n)), hoursAgo(2));
+  assert.deepEqual([r.ok, r.allFlowsCovered, r.newRows], [true, true, 7]);
+});
+
+test("window check: a Supabase-provider row, a missing key or a legacy-shaped key is a blocker; old rows are ignored", () => {
+  const rows = [...NS.map((n) => fresh(n)), fresh("avatar", { provider: "supabase", storage_key: null }), fresh("product", { storage_key: null }),
+    fresh("request", { storage_key: "request/legacy.png" }), fresh("avatar", { created_at: hoursAgo(50), provider: "supabase" })];
+  const r = windowReport(rows, hoursAgo(2));
+  assert.deepEqual([r.ok, r.supabaseCreated, r.missingStorageKey, r.badKeyShape], [false, 1, 1, 1]);
+});
+
+test("window check: reports namespaces whose flow did not run", () => {
+  const r = windowReport(NS.slice(0, 5).map((n) => fresh(n)), hoursAgo(2));
+  assert.deepEqual(r.uncovered, ["request", "verification"]);
+  assert.equal(r.allFlowsCovered, false);
 });
