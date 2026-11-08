@@ -40,6 +40,9 @@ export const SECRET_NAMES = ["PHONE_OTP_ADMIN_SECRET", "PHONE_OTP_NOTIFY_SECRET"
 export const URL_NAME = "PHONE_OTP_WORKER_URL";
 export const NEW_NAMES = [...SECRET_NAMES, URL_NAME];
 export const TAG = "p4-otp-secrets";
+// Single source for the sign-up cutover (provision-frontend-signup-secrets.mjs, verify-frontend-upload.mjs).
+export const P4_VERSION = "3fc37397-9157-4fa6-8fce-d32dffe0a194"; // live + the four names above; the latest uploaded version
+export const SIGNUP_SECRET_NAMES = ["PHONE_OTP_DELIVERY", "PHONE_OTP_HMAC_KEYS", "PHONE_SIGNUP_COOKIE_SECRET", "PHONE_SIGNUP_VERIFICATION_ENABLED", "PHONE_VERIFICATION_ENABLED"];
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND = path.resolve(HERE, "..", "..", "frontend");
 
@@ -104,7 +107,7 @@ export function normalizeRuntime(rt) {
 }
 
 /** Contents of a candidate version against the live baseline: bindings, runtime settings, script identity. */
-export function checkNewVersionContents({ baseline, nv }) {
+export function checkNewVersionContents({ baseline, nv, names = NEW_NAMES }) {
   const p = [];
   const oldB = new Map((baseline.resources?.bindings ?? []).map((b) => [b.name, b]));
   const newB = new Map((nv.resources?.bindings ?? []).map((b) => [b.name, b]));
@@ -113,8 +116,8 @@ export function checkNewVersionContents({ baseline, nv }) {
     else if (!same(b, newB.get(n))) p.push(`binding ${n} CHANGED`);
   }
   const extra = [...newB.keys()].filter((n) => !oldB.has(n)).sort();
-  if (!same(extra, [...NEW_NAMES].sort())) p.push(`new bindings are [${extra.join(", ")}], expected exactly [${[...NEW_NAMES].sort().join(", ")}]`);
-  for (const n of NEW_NAMES) if (newB.has(n) && newB.get(n).type !== "secret_text") p.push(`${n} is not a secret_text binding`);
+  if (!same(extra, [...names].sort())) p.push(`new bindings are [${extra.join(", ")}], expected exactly [${[...names].sort().join(", ")}]`);
+  for (const n of names) if (newB.has(n) && newB.get(n).type !== "secret_text") p.push(`${n} is not a secret_text binding`);
   if (!same(normalizeRuntime(nv.resources?.script_runtime), normalizeRuntime(baseline.resources?.script_runtime))) p.push("the runtime settings (script_runtime) changed");
   const id = (v) => ({ etag: v.resources?.script?.etag, handlers: v.resources?.script?.handlers });
   if (!same(id(nv), id(baseline))) p.push("the script code identity (etag or handlers) differs from the live version");

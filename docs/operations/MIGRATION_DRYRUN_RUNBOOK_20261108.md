@@ -43,7 +43,7 @@ Known reviewed risk: 20261105090001 applies out of order. The 2026-11-07 review 
 - If a file fails: each file is its own transaction, so history stops at the first failure; fix forward and re-run the same push.
 - Data loss or bad state, Acceptance: `scripts/hosted-db/restore-acceptance.sh` restores ONLY `nxossqhdfltcqdwvbewi`, resets that database, and needs a `rebuild-acceptance.sh`-style backup folder (fingerprint-before.txt etc.). Use it only with owner approval and a backup in that layout, or the backup-kit restore path in the backup runbook (track 1).
 - Data loss or bad state, Production: there is NO scripted restore into a new project. `production-recovery-snapshot.sh` plus `encrypt-backup.sh` produce a verified, recoverable dump, and `production-rehearsal.sh` proved a local restore on 2026-10-25. Restoring into a new hosted project would be a new procedure needing its own design and approval; do not improvise it. `db reset --linked` is not a rollback.
-- Frontend: keep the previous Worker version; instant frontend rollback target for Production is the live version a3b08a22 (39bdf3a2 is the one before it). The old frontend works with the new schema because the migrations are additive.
+- Frontend: keep the previous Worker version; frontend rollback target for Production is a3b08a22-f82e-4851-9786-9442c01e43c8 (the live version; 39bdf3a2 is the older 2026-10-28 version and is not the target). The old frontend works with the new schema because the migrations are additive.
 - Never run repair, SQL Editor DDL or `migration repair` without separate approval.
 
 ## D. Read-only tooling added 2026-11-08 (all tested offline; none has been run against a hosted project)
