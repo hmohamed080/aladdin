@@ -24,7 +24,7 @@ Owner decisions applied (2026-11-08): (1) the single-recipient allowlist pilot i
 | Item | Value |
 |---|---|
 | `origin/main` when written | `7d9653949a9020e3abad12b87e1f27842a9d81e2` |
-| Release candidate (RC) | `fc62c4b5a3f9284fb2fc7d9b52df8193d558a13a` (runtime paths identical on main `7d965394`) |
+| Release candidate (RC) | `b44061a1e4d3daf5b50b260af8495fbbd5bcea03` (`main` after #161 and #160, 2026-11-08; the runtime-path diff against the earlier pin `fc62c4b5` is exactly their 11 files plus the #156 launcher script) |
 | Production frontend live, 100%, rollback target | `a3b08a22-f82e-4851-9786-9442c01e43c8` (created 2026-11-07T14:25Z, workflow run 42381298937, headSha `b957ebeb`, merge of PR #139) |
 | OTP Worker production `aladdin-whatsapp-otp-production` | `4415c515-cfe9-4e85-b2e5-1e5852ad8cc0`, `WHATSAPP_DELIVERY_ENABLED="false"`, `OTP_RECIPIENT_MODE` open (committed config) |
 | Production database `kkpkgjrweysgvhvkhzun` | 203 applied (latest `20261107090003`), 4 pending: `20261105090001`, `20261107090004`, `090005`, `090006`; 207 after push |
@@ -100,10 +100,10 @@ Resolved: the open question "which flow is the single live code" is decided. The
 
 ```bash
 git fetch origin main && RC=$(git rev-parse origin/main) && echo "RC=$RC"
-git diff --stat fc62c4b5a3f9284fb2fc7d9b52df8193d558a13a origin/main -- frontend/src frontend/public frontend/cloudflare frontend/scripts frontend/wrangler.jsonc frontend/next.config.ts frontend/open-next.config.ts frontend/tailwind.config.ts frontend/postcss.config.mjs frontend/tsconfig.json frontend/package.json package.json pnpm-workspace.yaml pnpm-lock.yaml backend edge supabase .github/workflows/cloudflare-production.yml
+git diff --stat b44061a1e4d3daf5b50b260af8495fbbd5bcea03 origin/main -- frontend/src frontend/public frontend/cloudflare frontend/scripts frontend/wrangler.jsonc frontend/next.config.ts frontend/open-next.config.ts frontend/tailwind.config.ts frontend/postcss.config.mjs frontend/tsconfig.json frontend/package.json package.json pnpm-workspace.yaml pnpm-lock.yaml backend edge supabase .github/workflows/cloudflare-production.yml
 ```
 
-After G0.2 the expected output is the two code PRs only; the owner then pins a NEW RC and replaces `fc62c4b5` in this file. STOP: any output not explained by approved PRs. Rollback: none (read-only). Approval needed: yes.
+The RC is now `b44061a1` (#160 and #161 are in it), so the expected output is EMPTY unless main moved; if it moved, pin the new SHA here. STOP: any output not explained by approved PRs. Rollback: none (read-only). Approval needed: yes.
 
 ## ACCEPTANCE
 
