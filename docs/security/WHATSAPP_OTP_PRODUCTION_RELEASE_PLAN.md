@@ -65,7 +65,7 @@ The configuration guard for Production (`check-production-config.mjs`, with test
 | Delivery misbehaves | Worker `WHATSAPP_DELIVERY_ENABLED=false` (version flip, about 14 s, dead-man timer) | **tested** on Acceptance |
 | Budget misconfigured or exhausted | fix in the dashboard (audited); delivery switch untouched | designed, tested in the Admin PR |
 | App problem | app `PHONE_OTP_DELIVERY=off`; DB `signup_enabled=false` | tested |
-| New build must go | reactivate the previous Production version (`39bdf3a2`, 2026-10-28) | **not yet rehearsed** (blocker B5: Acceptance build-swap drill) |
+| New build must go | reactivate the previous Production version (`a3b08a22-f82e-4851-9786-9442c01e43c8`, the live one as of 2026-11-08; `39bdf3a2` of 2026-10-28 is older) | **not yet rehearsed** (blocker B5: Acceptance build-swap drill) |
 | After `enforce` | set `alias_guard_mode='observe'` first, then redeploy | documented in the R2 plan |
 | Migrations | not rolled back: all additive; the legacy table is removed later by RF-001 | by design |
 
