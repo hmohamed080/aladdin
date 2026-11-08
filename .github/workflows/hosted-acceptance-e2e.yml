@@ -6,7 +6,11 @@
 # the database directly. See frontend/playwright.acceptance.config.ts and frontend/e2e-acceptance/.
 #
 # GitHub Environment `acceptance-e2e` (separate from `cloudflare-preview`, so this job never sees a deploy token):
-#   secrets: ACCEPTANCE_E2E_OWNER_PASSWORD, ACCEPTANCE_E2E_MANAGER_PASSWORD, ACCEPTANCE_E2E_REP_PASSWORD
+#   secrets: ACCEPTANCE_E2E_OWNER_PASSWORD, ACCEPTANCE_E2E_MANAGER_PASSWORD, ACCEPTANCE_E2E_REP_PASSWORD,
+#            CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET (a DEDICATED Cloudflare Access service token for this job only,
+#            with a Service Auth policy on the preview application; the preview is behind Access and answers 302 without it)
+# CAPTCHA: Supabase Auth CAPTCHA (Turnstile) is ON for Acceptance and stays ON. The tests use the real widget and its real
+# token; nothing is stubbed. The Turnstile widget's hostname allowlist must include the preview host.
 # Without all three the run stops at the first step and tests nothing.
 #
 # Runs on pushes to its branch: GitHub only offers the manual button for workflows on the default branch.
@@ -37,6 +41,8 @@ jobs:
       ACCEPTANCE_E2E_OWNER_PASSWORD: ${{ secrets.ACCEPTANCE_E2E_OWNER_PASSWORD }}
       ACCEPTANCE_E2E_MANAGER_PASSWORD: ${{ secrets.ACCEPTANCE_E2E_MANAGER_PASSWORD }}
       ACCEPTANCE_E2E_REP_PASSWORD: ${{ secrets.ACCEPTANCE_E2E_REP_PASSWORD }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
     steps:
       - name: Require the three test-account secrets
         run: |
@@ -57,9 +63,19 @@ jobs:
           pnpm --filter frontend exec playwright install --with-deps chromium
       - name: Confirm the preview serves Acceptance
         run: |
-          body=$(curl -fsS "$ACCEPTANCE_BASE_URL/api/backend/health")
-          echo "$body"
-          echo "$body" | grep -q '"env":"staging"' || { echo "::error::the preview backend is not the acceptance service"; exit 1; }
+          access=()
+          if [ -n "$CF_ACCESS_CLIENT_ID" ] && [ -n "$CF_ACCESS_CLIENT_SECRET" ]; then
+            access=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          fi
+          # Never follow redirects and never print headers: Access answers 302 to its login page without a valid token.
+          code=$(curl -sS -o "$RUNNER_TEMP/health.json" -w '%{http_code}' --max-time 30 "${access[@]}" "$ACCEPTANCE_BASE_URL/api/backend/health")
+          if [ "$code" = "302" ] || [ "$code" = "401" ] || [ "$code" = "403" ]; then
+            echo "::error::HTTP $code from Cloudflare Access: the preview is protected and the CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET service token is missing, expired or not allowed by the Access policy"
+            exit 1
+          fi
+          [ "$code" = "200" ] || { echo "::error::the preview backend health answered HTTP $code"; exit 1; }
+          cat "$RUNNER_TEMP/health.json"; echo
+          grep -q '"env":"staging"' "$RUNNER_TEMP/health.json" || { echo "::error::the preview backend is not the acceptance service"; exit 1; }
       - name: Hosted read-only E2E
         run: |
           set -o pipefail

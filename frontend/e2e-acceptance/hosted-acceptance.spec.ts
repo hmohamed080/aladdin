@@ -6,9 +6,12 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
  * Rules:
  *  - READ-ONLY. Navigation and sign-in only: nothing is created, edited, deleted or submitted beyond the sign-in form.
  *  - Acceptance only. Any request to the live Supabase project or the live domain is aborted and fails the run.
- *  - Turnstile is stubbed INSIDE the test browser (the stand-in the local suites use). That is valid only because hosted
- *    CAPTCHA protection is OFF on Acceptance, so Supabase Auth does not verify the token; once it is switched on this
- *    suite must use the real widget with an always-pass test key instead.
+ *  - CAPTCHA stays ON and untouched. Hosted Acceptance has Supabase Auth CAPTCHA protection ON (Turnstile, since
+ *    2026-10-28), so a made-up token is refused. The suite therefore uses the REAL Turnstile widget on the preview and
+ *    waits for the genuine token it produces (sign-in is an interaction-only challenge, so a normal browser gets it with
+ *    no click). Nothing is stubbed, bypassed or switched off. If Cloudflare shows a challenge that needs a person, the
+ *    run fails with a clear message instead of working around it. Requirements (owner side, see the PR): the Turnstile
+ *    widget's hostname allowlist includes the preview host.
  *  - The "Showroom RC2 drift" block records what renders today for each of the 17 local spec drifts
  *    (docs/operations/e2e-shared-failures-triage-2026-10-22.md) as annotations. It never fails on them: they need product
  *    review, and asserting either the old or the new labels here would decide that review silently.
@@ -22,7 +25,6 @@ const NOT_AUTHORIZED = "You're not allowed to manage members here.";
 
 const FORBIDDEN_HOSTS = /kkpkgjrweysgvhvkhzun|aladdindecore\.com/i;
 const GENERIC_ERROR = /Application error|a server-side exception has occurred|Digest:/i;
-const TURNSTILE_STUB = `window.turnstile={render:function(el,o){setTimeout(function(){o.callback("XXXX.DUMMY.TOKEN.XXXX")},0);return "acceptance-e2e"},remove:function(){},reset:function(){}};`;
 
 function required(name: string): string {
   const value = process.env[name];
@@ -32,15 +34,29 @@ function required(name: string): string {
 
 const violations: string[] = [];
 
+/** The Cloudflare Access service-token headers (empty when no token is configured). Never logged. */
+function accessHeaders(): Record<string, string> {
+  const id = process.env.CF_ACCESS_CLIENT_ID?.trim();
+  const secret = process.env.CF_ACCESS_CLIENT_SECRET?.trim();
+  return id && secret ? { "CF-Access-Client-Id": id, "CF-Access-Client-Secret": secret } : {};
+}
+
 async function guardedContext(context: BrowserContext): Promise<BrowserContext> {
   await context.route(FORBIDDEN_HOSTS, (route) => {
     violations.push(new URL(route.request().url()).host);
     return route.abort();
   });
-  await context.route("https://challenges.cloudflare.com/turnstile/v0/api.js*", (route) =>
-    route.fulfill({ contentType: "application/javascript", body: TURNSTILE_STUB }),
-  );
-  const host = new URL(required("ACCEPTANCE_BASE_URL")).hostname;
+  // The preview sits behind Cloudflare Access: answer it with a service token, on the preview origin ONLY (never to
+  // Turnstile, Supabase or any other host). Without a token Access redirects every request (HTTP 302) to its login page.
+  const origin = new URL(required("ACCEPTANCE_BASE_URL")).origin;
+  const access = accessHeaders();
+  if (Object.keys(access).length) {
+    await context.route(
+      (url) => url.origin === origin,
+      (route) => route.fallback({ headers: { ...route.request().headers(), ...access } }),
+    );
+  }
+  const host = new URL(origin).hostname;
   await context.addCookies([{ name: "NEXT_LOCALE", value: "en", domain: host, path: "/", secure: true, sameSite: "Lax" }]);
   return context;
 }
@@ -59,7 +75,15 @@ async function signIn(context: BrowserContext, email: string, password: string, 
     await page.getByLabel(/^password$/i).fill(password).catch(() => {
       throw new Error(`The ${who} password field could not be filled on /auth/sign-in.`);
     });
-    await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30_000 });
+    // The real Turnstile widget fills this hidden field with a genuine single-use token; nothing here fakes it.
+    await expect(page.locator('input[name="captchaToken"]'))
+      .not.toHaveValue("", { timeout: 45_000 })
+      .catch(async () => {
+        const widget = await page.locator('iframe[src*="challenges.cloudflare.com"]').count();
+        throw new Error(
+          `The ${who} sign-in got no Turnstile token in 45 s (${widget ? "Cloudflare showed a challenge that needs a person" : "the widget did not load; check its hostname allowlist includes the preview host"}). CAPTCHA is not bypassed.`,
+        );
+      });
     await page.getByRole("button", { name: /^log in$/i }).click();
     await page.waitForURL((url) => !/\/sign-in(\/|$)/.test(url.pathname), { timeout: 45_000 }).catch(async () => {
       const alert = (await page.getByRole("alert").allInnerTexts().catch(() => [])).join(" | ").slice(0, 200);
@@ -109,14 +133,14 @@ test.describe("public smoke", () => {
   test("health, sign-in and backend binding answer on the preview", async ({ browser }) => {
     const context = await newPersonaContext(browser);
     try {
-      const health = await context.request.get("/api/health");
+      const health = await context.request.get("/api/health", { headers: accessHeaders() });
       expect(health.status(), "/api/health").toBe(200);
-      const backend = await context.request.get("/api/backend/health");
+      const backend = await context.request.get("/api/backend/health", { headers: accessHeaders() });
       expect(backend.status(), "/api/backend/health").toBe(200);
       const body = await backend.json();
       expect(body, "the backend must be the staging/acceptance service").toMatchObject({ status: "ok", service: "backend", env: "staging" });
       for (const path of ["/", "/auth/sign-in", "/installer/sign-in", "/legal/terms"]) {
-        expect((await context.request.get(path)).status(), path).toBe(200);
+        expect((await context.request.get(path, { headers: accessHeaders() })).status(), path).toBe(200);
       }
       const page = await context.newPage();
       await page.goto("/showroom", { waitUntil: "domcontentloaded" });
