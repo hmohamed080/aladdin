@@ -7416,3 +7416,6 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Merged `origin/main` (`7d965394`, includes #153) cleanly. Re-read Production `list_migrations` (read-only): the four pending versions are still absent, latest `20261107090003`; `supabase/` on main is identical to `fc62c4b5` (207 files). No change.
 - Gate doc: linked #153's Acceptance apply scripts and plan instead of duplicating them; corrected the claim that Acceptance carries `090003` (it is at `090002`; its pending set differs from Production's); stated the RC SHA rule lives in the #145 checklist.
 - p2-gate tests pass. No Production write, merge or deployment.
+## 2026-11-08 Track 2: Production recovery rehearsal adapted
+- `production-rehearsal.sh` now takes `--sha`, expects exactly the 4 pending Production migrations, applies them with `--include-all`, and verifies history, structure, row counts and permissions (contract 20261107090006). Old 26-migration pins/manifest/fingerprint baseline removed. `rehearsal-selftest.sh` updated to Production's 203-applied state.
+- Not yet executed with Docker (cloud container has none). Next: Scorpion self-test, then the real rehearsal against a fresh Production snapshot; Production push still needs a separate owner GO.

@@ -36,3 +36,9 @@ test("missing input or an insecure URL calls nothing", async () => {
   assert.equal(await run("https://w.example.invalid", { PHONE_OTP_WORKER_SECRET: "nope" }, f, () => {}), 2);
   assert.equal(n, 0);
 });
+test("an open-mode Acceptance Worker passes preflight without an allowlist; local-style open mode is reported as the allowlist and fails", async () => {
+  const out: string[] = [];
+  assert.equal(await run("https://w.example.invalid", { PHONE_OTP_WORKER_SECRET: SECRET }, through(baseEnv({ WHATSAPP_DELIVERY_ENABLED: "false", OTP_RECIPIENT_MODE: "open", OTP_ALLOWED_RECIPIENTS: "" })), (l: string) => out.push(l)), 0);
+  assert.equal(JSON.parse(out.join("")).allowlist_entries, 0);
+  assert.equal(await run("https://w.example.invalid", { PHONE_OTP_WORKER_SECRET: SECRET }, through(baseEnv({ OTP_ENVIRONMENT: "local", OTP_RECIPIENT_MODE: "open", OTP_ALLOWED_RECIPIENTS: "" })), () => {}), 1);
+});
