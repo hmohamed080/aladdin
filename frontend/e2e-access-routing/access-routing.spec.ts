@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { expect, test } from "@playwright/test";
+import { chromium, expect, test } from "@playwright/test";
 import { installAccessRouting } from "../e2e-acceptance/access.mjs";
+import { startRealBrowser } from "../e2e-acceptance/real-browser.mjs";
 
 /**
  * Real-Chromium regression test for the Cloudflare Access credential scoping (no network, local servers only).
@@ -59,6 +60,14 @@ test.beforeAll(async () => {
     }
     if (path === "/to-access") {
       res.writeHead(302, { location: `http://team.cloudflareaccess.com:${otherPort}/cdn-cgi/access/login` });
+      return res.end();
+    }
+    if (path === "/reset") {
+      req.socket.destroy(); // the connection dies mid-request: route.fetch throws
+      return;
+    }
+    if (path === "/to-access-path") {
+      res.writeHead(302, { location: "/cdn-cgi/access/login/preview?kid=x" });
       return res.end();
     }
     if (path === "/same-1") {
@@ -146,6 +155,45 @@ test("a redirect to an Access login host is a violation and never reaches that h
   await context.close();
 });
 
+test("same-origin Access login endpoints never get the token (blocker takes precedence over the preview route)", async ({ browser }) => {
+  // /cdn-cgi/access/* on the PREVIEW origin matches both routes; the blocker must win, so the server never sees the request.
+  const { context, violations } = await routedContext(browser);
+  const page = await context.newPage();
+  await page.goto(`${scopeOrigin}/cdn-cgi/access/login/preview?kid=x`).catch(() => {});
+  const page2 = await context.newPage();
+  await page2.goto(`${scopeOrigin}/plain`);
+  await page2.evaluate((u) => fetch(u, { credentials: "include" }).catch(() => {}), `${scopeOrigin}/cdn-cgi/access/get-identity`);
+  expect(violations.join(" | ")).toMatch(/Cloudflare Access login request \(127\.0\.0\.1:\d+\)/);
+  expect(scope.filter((s) => s.url.startsWith("/cdn-cgi/access/") && (s.id !== null || s.secret !== null))).toEqual([]);
+  expect(scope.filter((s) => s.url.startsWith("/cdn-cgi/access/login"))).toEqual([]); // the browser request never left the browser
+  await context.close();
+});
+
+test("a same-origin redirect to /cdn-cgi/access/login is a violation and the token never follows it", async ({ browser }) => {
+  const { context, violations } = await routedContext(browser);
+  const page = await context.newPage();
+  await page.goto(`${scopeOrigin}/to-access-path`).catch(() => {});
+  expect(violations.join(" | ")).toMatch(/Cloudflare Access login redirect/);
+  expect(scope.filter((s) => s.url.startsWith("/cdn-cgi/access/"))).toEqual([]);
+  await context.close();
+});
+
+test("a failed in-scope request never exposes the token in an error or a violation", async ({ browser }) => {
+  // route.fetch's own error text includes a call log with the request headers (the token). It must be scrubbed, not thrown.
+  const { context, violations } = await routedContext(browser);
+  const page = await context.newPage();
+  const seen: string[] = [];
+  page.on("pageerror", (e) => seen.push(String(e.message)));
+  page.on("console", (m) => seen.push(m.text()));
+  const navError = await page.goto(`${scopeOrigin}/reset`).then(() => "", (e: Error) => String(e.message));
+  await page.waitForTimeout(300);
+  const everything = JSON.stringify([navError, seen, violations]);
+  expect(everything).not.toContain(CREDS.secret);
+  expect(everything).not.toContain(CREDS.id);
+  expect(violations.join(" | ")).toMatch(/request failed/i);
+  await context.close();
+});
+
 test("no request anywhere ever carries the secret value outside the scope origin", async ({ browser }) => {
   const { context } = await routedContext(browser);
   const page = await context.newPage();
@@ -153,4 +201,28 @@ test("no request anywhere ever carries the secret value outside the scope origin
   expect(JSON.stringify(other)).not.toContain(CREDS.secret);
   expect(JSON.stringify(other)).not.toContain(CREDS.id);
   await context.close();
+});
+
+test("attached to a separately started browser (connectOverCDP) the same guards hold and no automation switch is used", async () => {
+  // The owner-run mode starts the REAL Chrome/Edge normally and attaches to it. Here the stand-in is the Playwright Chromium binary,
+  // started by startRealBrowser (not by Playwright's launcher), headless/no-sandbox only because this runs in CI.
+  const real = await startRealBrowser(chromium.executablePath(), { extraArgs: ["--headless=new", "--no-sandbox", "--disable-gpu"] });
+  try {
+    expect(real.args.some((a) => /enable-automation|--disable-blink-features|--user-agent/.test(a)), "no automation or spoofing switch").toBe(false);
+    expect(real.cdpUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+    const browser = await chromium.connectOverCDP(real.cdpUrl);
+    const context = await browser.newContext();
+    const violations: string[] = [];
+    await installAccessRouting(context, CREDS, { origin: scopeOrigin, onViolation: (m) => violations.push(m) });
+    const page = await context.newPage();
+    await page.goto(`${scopeOrigin}/to-other`);
+    expect(scope.map((s) => s.id)).toEqual([CREDS.id]);
+    expect(other).toHaveLength(1);
+    expect(other[0]).toMatchObject({ id: null, secret: null });
+    await page.goto(`${scopeOrigin}/to-access-path`).catch(() => {});
+    expect(violations.join(" | ")).toMatch(/Cloudflare Access login redirect/);
+    await browser.close();
+  } finally {
+    real.stop();
+  }
 });
