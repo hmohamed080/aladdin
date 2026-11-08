@@ -204,3 +204,23 @@ For every flow: the object appears only under `u/` or `o/` with ids, never a nam
 **Rollback / abort:** the E2E writes only test-account media. To undo: delete the test objects through the app (preferred, which retires rows and removes bytes), then `media-storage.mjs cleanup --execute` on Acceptance for anything left; reconcile again. Setting `R2_STORAGE_ENABLED=false` on the Preview Worker version pauses new uploads without data change. Nothing in this E2E touches Production or legacy Supabase Storage objects.
 
 **Evidence:** save the command outputs and the evidence file under `docs/operations/evidence/` with the run date and the Worker version id.
+
+## 11. Gate status
+
+| Gate | Status |
+|---|---|
+| Acceptance site bucket `aladdin-acceptance-site-media` | **PASS, 2026-11-08.** Created and verified by the owner (not by an agent). Read-backs: WEUR, Standard, default jurisdiction; r2.dev disabled; no custom domains; multipart abort lifecycle 604800 s (7 days); no CORS policy; existing private bucket unchanged. The Scorpion provisioning session was stopped without creating anything. |
+| Worker binding / `R2_SITE_BUCKET` / site-media credential | Not done; separate GO when site media is first used. |
+| Acceptance seven-flow E2E (section 10) | **Next approval gate. Prepared, not executed.** |
+| Production buckets and everything in section 3 P-1..P-7 | Deferred. |
+
+### Acceptance seven-flow E2E: what the owner approves (checklist for the GO)
+
+1. Accounts: two Acceptance test accounts (A, B; B is not a member of A's organization) and one organization owned by A. No real customer data.
+2. Credentials: the existing Preview Worker R2 credential (private bucket only; no change); read-only R2 keys and the Supabase service role in the operator shell for `r2-reconcile.mjs`; no new secret in any Worker.
+3. Writes this gate permits: test uploads, replaces and deletes by A on Acceptance only, plus retiring/removing those objects afterwards (`media-storage.mjs cleanup --execute` for leftovers). Nothing else.
+4. Before: record `T0`; `media-reset.mjs snapshot > before.json`.
+5. Run the matrix in section 10 and fill `evidence.json` (A, B and anonymous results per flow).
+6. After: `r2-reconcile.mjs --project nxossqhdfltcqdwvbewi --since <T0>` exit 0; `media-reset.mjs compare`; `r2-e2e-evidence.mjs evidence.json` exit 0; cleanup dry run clean.
+7. Stop conditions: any B or anonymous request that is allowed, any Supabase-provider row created since `T0`, any `missing`/`sizeMismatch`, or a bucket other than the Acceptance private bucket receiving objects.
+8. Rollback: delete test media through the app, `cleanup --execute`, reconcile again; `R2_STORAGE_ENABLED=false` on a Preview Worker version pauses uploads.
