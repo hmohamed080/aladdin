@@ -272,10 +272,15 @@ if(!f.delivery_requests_table)bad.push("delivery requests table missing"); if(f.
 process.stdout.write(bad.length?"FAILED: "+bad.join("; "):"ok")' "$OUT/structure-after.json" "$(tail -1 "$OUT/pending.txt")" 2>&1 || echo "FAILED: unreadable structure output")"
 # Existing tables must keep their rows (schema_migrations grows by the pending count and is excluded).
 CHANGED="$(join -t'|' <(sed 's/:\([0-9]*\)$/|\1/' "$OUT/rowcounts-restored.txt" | sort -t'|' -k1,1) <(sed 's/:\([0-9]*\)$/|\1/' "$OUT/rowcounts-after.txt" | sort -t'|' -k1,1) \
-  | awk -F'|' '$2!=$3 && $1 !~ /schema_migrations/ {print "  "$1": "$2" -> "$3}')"
+  | awk -F'|' '
+    $2==$3 || $1 ~ /schema_migrations/ {next}
+    # Reviewed seed rows of 20261107090006: four admin_permissions rows (exactly) and the role assignments for them (growth only).
+    $1 ~ /(^|[."])admin_permissions"?$/ && $3-$2==4 {next}
+    $1 ~ /(^|[."])admin_role_permissions"?$/ && $3>$2 {next}
+    {print "  "$1": "$2" -> "$3}')"
 DISAPPEARED="$(comm -23 <(cut -d: -f1 "$OUT/rowcounts-restored.txt" | sort) <(cut -d: -f1 "$OUT/rowcounts-after.txt" | sort))"
 dk cp "$(hp "$HERE/../function-permissions.sql")" "$C:/tmp/fp.sql"
-{ printf '[{"permissions":'; dk exec "$C" psql -U postgres -d postgres -At -q -v ON_ERROR_STOP=1 -f /tmp/fp.sql | grep -v '^SET$'; printf '}]\n'; } > "$OUT/permissions-after.json"
+{ printf '[{"permissions":'; dk exec "$C" psql -U postgres -d postgres -At -q -1 -v ON_ERROR_STOP=1 -f /tmp/fp.sql | grep -v '^SET$'; printf '}]\n'; } > "$OUT/permissions-after.json"
 set +e
 PERMS="$(node "$HERE/verify-permissions-readonly.mjs" "$OUT/permissions-after.json" "$CONTRACT" 2>&1)"; PERMS_RC=$?
 ( cd "$B" && shasum -a 256 -c --quiet "$OUT/backup.SHA256SUMS" >/dev/null 2>&1 ) && cmp -s <(tr -d '\r' < "$B/SHA256SUMS") <(tr -d '\r' < "$OUT/backup.SHA256SUMS") \
@@ -294,7 +299,7 @@ set -e
   echo "migration up --include-all exit code: $UP (log: migration-up.log)"
   echo "History after the apply: $HISTORY ($(wc -l < "$OUT/history-after.txt") versions)"
   echo "Structure after the apply: $STRUCT"
-  echo "Existing tables whose row count changed (must be none):"; [ -z "$CHANGED" ] || echo "$CHANGED"
+  echo "Existing tables whose row count changed, apart from the reviewed 20261107090006 permission seeds (must be none):"; [ -z "$CHANGED" ] || echo "$CHANGED"
   echo "Tables that disappeared (must be none):"; [ -z "$DISAPPEARED" ] || echo "$DISAPPEARED" | sed 's/^/  /'
   echo "Function permissions versus contract $CONTRACT: $PERMS"
   echo "Production backup files: $BACKUP since the checksum was taken (checked again after the rehearsal)"
