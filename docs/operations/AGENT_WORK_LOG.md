@@ -7403,3 +7403,9 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Added `acceptance-apply.sh`, `acceptance-postcheck.mjs`, `table-counts.sql`, `acceptance-structure.sql` and the gate `post` mode (PR #153). Offline tests plus a stubbed-CLI exercise of the apply script. Runbook sections F-H hold the evidence, gate status and exact plan.
 - Open: backup freshness decision (4 auth rows touched since the 06:08Z snapshot), merge of #153 before the apply, owner GO. No push, merge or Production change.
 
+
+## 2026-11-08 - Hosted Acceptance E2E: smoke-only scope (agent)
+
+- Real CAPTCHA stays ON on hosted Acceptance, so the persona sign-in tests (dummy Turnstile token) cannot pass; the owner runs L1 persona checks manually.
+- `workflow_dispatch` gets `scope` (smoke default, full). Smoke needs only the two Access credentials, exports no persona password, runs `--grep` on the anchored public smoke describe and fails on zero or non-smoke matches. Pushes stay `full`.
+- Pinned by frontend/e2e-acceptance/smoke-scope.test.ts. No CAPTCHA, secret, Access or Production change; workflow not dispatched.

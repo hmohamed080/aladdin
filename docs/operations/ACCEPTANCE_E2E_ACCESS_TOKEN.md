@@ -45,6 +45,15 @@ Recommended Cloudflare setup (owner-run, in Zero Trust):
 `gh workflow run hosted-acceptance-e2e.yml --ref main` once this change is on `main`. The first step must say
 "Preview answered through Cloudflare Access: backend ok, env staging."
 
+## Scopes
+
+`workflow_dispatch` has a `scope` input:
+
+- `smoke` (default): only the `public smoke` test (health, backend staging, sign-in, legal, installer redirect, `/showroom` signed-out redirect). Needs only the two Access secrets; the persona passwords are neither required nor exported to the job. The run fails if the selection matches zero tests or any other test.
+- `full`: also the three persona sign-in tests. These stub Turnstile with a dummy token, so they cannot pass while real CAPTCHA is ON on hosted Acceptance; run L1 persona checks manually instead.
+
+Runs triggered by `push` keep the previous behaviour (`full`). The artifact is named `hosted-acceptance-e2e-<scope>-<sha>`.
+
 ## Log hygiene
 
 Only a scrubbed first line of any failed Access-authenticated API call reaches `run.log` and the JSON report (Playwright's call log lists request headers); both credential values are removed from it.
