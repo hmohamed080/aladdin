@@ -77,6 +77,22 @@ async function newPersonaContext(browser: import("@playwright/test").Browser): P
 
 async function signIn(context: BrowserContext, email: string, password: string, who: string): Promise<void> {
   const page = await context.newPage();
+  // Turnstile diagnostics only: host + path + status of Cloudflare challenge requests and the first console errors that
+  // mention Turnstile/CAPTCHA. No query strings, headers, bodies or tokens are ever recorded.
+  const trace: string[] = [];
+  const short = (u: string) => {
+    const x = new URL(u);
+    return `${x.host}${x.pathname.slice(0, 60)}`;
+  };
+  page.on("response", (r) => {
+    if (/challenges\.cloudflare\.com/.test(r.url()) && trace.length < 12) trace.push(`${r.status()} ${short(r.url())}`);
+  });
+  page.on("requestfailed", (r) => {
+    if (/challenges\.cloudflare\.com/.test(r.url()) && trace.length < 12) trace.push(`FAILED ${short(r.url())}: ${(r.failure()?.errorText ?? "").slice(0, 60)}`);
+  });
+  page.on("console", (m) => {
+    if (m.type() === "error" && /turnstile|captcha|challenge|content security policy/i.test(m.text()) && trace.length < 12) trace.push(`console: ${m.text().replace(/[?#]\S*/g, "").slice(0, 160)}`);
+  });
   try {
     await page.goto("/auth/sign-in", { waitUntil: "domcontentloaded" });
     await page.getByLabel(/^mobile number, username or email$/i).fill(email);
@@ -90,7 +106,7 @@ async function signIn(context: BrowserContext, email: string, password: string, 
       .catch(async () => {
         const widget = await page.locator('iframe[src*="challenges.cloudflare.com"]').count();
         throw new Error(
-          `The ${who} sign-in got no Turnstile token in 45 s (${widget ? "Cloudflare showed a challenge that needs a person" : "the widget did not load; check its hostname allowlist includes the preview host"}). CAPTCHA is not bypassed.`,
+          `The ${who} sign-in got no Turnstile token in 45 s (${widget ? "Cloudflare showed a challenge that needs a person" : "the widget did not load; check its hostname allowlist includes the preview host"}). CAPTCHA is not bypassed. Turnstile diagnostics: ${trace.join(" | ") || "no Cloudflare challenge request was made"}.`,
         );
       });
     await page.getByRole("button", { name: /^log in$/i }).click();
