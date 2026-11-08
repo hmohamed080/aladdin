@@ -27,7 +27,8 @@ const raw = JSON.stringify(config);
 
 must(config.name === "aladdin-whatsapp-otp-production", "unexpected Worker name (must be aladdin-whatsapp-otp-production)");
 must(config.main === "src/index.ts", "unexpected entry point");
-must(vars.WHATSAPP_DELIVERY_ENABLED === "false", "WhatsApp delivery must stay disabled until the approved cutover");
+// The permit is ONE of four send conditions (permit AND audited D1 switch ON AND configured limits AND fresh signed attestation); anything but the literals fails.
+must(vars.WHATSAPP_DELIVERY_ENABLED === "true" || vars.WHATSAPP_DELIVERY_ENABLED === "false", "WHATSAPP_DELIVERY_ENABLED must be the literal string \"true\" or \"false\"");
 must(vars.OTP_ENVIRONMENT === "production", "OTP_ENVIRONMENT must be production");
 must(vars.OTP_RECIPIENT_MODE === "open", "Production recipient mode must be open");
 must(config.workers_dev === false && config.preview_urls === false && Array.isArray(config.routes) && config.routes.length === 0 && !config.route && !config.site, "the Worker must be PRIVATE: workers_dev off, preview_urls off, no routes (reached only through the frontend service binding)");
@@ -71,4 +72,4 @@ if (errors.length) {
   console.error("OTP Production configuration BLOCKED:\n" + errors.map((s) => "- " + s).join("\n"));
   process.exit(1);
 }
-console.log("OTP Production configuration PASS: private Production Worker + isolated D1, five *_PRODUCTION secrets, recipient mode open without an allowlist, delivery disabled");
+console.log("OTP Production configuration PASS: private Production Worker + isolated D1, five *_PRODUCTION secrets, recipient mode open without an allowlist, delivery permit as configured (true or false literal)");
