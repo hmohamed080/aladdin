@@ -7446,3 +7446,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - `verify-frontend-upload.mjs`: expected secret set is now the P-4 set plus the five (exact names, secret_text); a missing one, an unknown extra, or the P-4-only set is refused; `--expect-sha` still required.
 - Checklist: new section "Production phone sign-up secrets (5)" with the owner commands and the order provision, 0% upload, verify, override-header check, promote.
 - Validation: `node --test` on the three hosted-db test files, 55 tests pass. No Production write, upload, deploy, secret creation, merge, dispatch or WhatsApp activation.
+
+## 2026-11-08 - WhatsApp OTP release prep re-pinned to main d0517c2f (Track 3)
+
+- Merged `origin/main` (`d0517c2f`, #152/#153/#156) into the #145 branch; clean merge, no conflicts. `node --test scripts/hosted-db/*.test.mjs`: 125/125 pass.
+- Runtime diff `fc62c4b5..d0517c2f` over the RC runtime paths is exactly one line (`frontend/package.json` script `e2e:acceptance:headed`). RC baseline in the rollout checklist re-pinned to `d0517c2f`; A1 preview `d8ff501d` and L1/L2 remain valid (same application bytes). L1 row now names the headed real-browser run (11/11) instead of the headless workflow.
+- No hosted write, deploy, secret change, migration or OTP activation. Delivery stays OFF. Next owner-gated steps unchanged: B0 to B3 (0% upload + `verify-frontend-upload.mjs --expect-sha`), C, Gate M, D1.
+
