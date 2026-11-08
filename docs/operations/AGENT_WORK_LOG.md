@@ -7408,3 +7408,8 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 
 - Added docs/operations/PRODUCTION_RELEASE_SEQUENCE_20261108.md: ordered gates G0 to G7 (merges and RC check, Gate M, 0% upload, override-header tests, single-recipient WhatsApp path, promotion, limits, first live message), parallel-vs-blocked table, shortest safe path, and 13 contradictions or gaps between sources.
 - Document only. No merge, deployment, dispatch, Production or database write, secret change or WhatsApp activation. Commands are owner-run and each step needs its own approval.
+
+## 2026-11-08 - Release sequence rewrite (agent)
+
+- Rewrote docs/operations/PRODUCTION_RELEASE_SEQUENCE_20261108.md around the owner decisions: allowlist pilot removed (#157 closed), open mode in both environments, Acceptance first with a manual E2E, Production straight to GA with smoke plus one live delivery check, and requirement 9 (database switches enabled last; sign-up delivery gate code PR marked a GA blocker; interim rule: delivery OFF together with signup_enabled=false).
+- Document only. No merge, deployment, dispatch, Production or Acceptance write, secret change or activation.
