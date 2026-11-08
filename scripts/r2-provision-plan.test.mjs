@@ -40,3 +40,12 @@ test("credentials are least privilege: reconcile credential is read-only and no 
   assert.ok(p.credentials.some((c) => /Object Read on/.test(c.scope) && !/Write/.test(c.scope)));
   assert.ok(!JSON.stringify(p.credentials).includes("acceptance"));
 });
+
+test("site-only plan writes nothing but the site bucket and its lifecycle, and leaves the private bucket read-only", () => {
+  const plan = buildPlan("acceptance", { siteOnly: true });
+  const writes = plan.steps.filter((s) => s.kind === "write").map((s) => s.command);
+  assert.equal(writes.length, 2);
+  assert.ok(writes.every((c) => c.includes("aladdin-acceptance-site-media")));
+  assert.ok(plan.steps.some((s) => s.kind === "read" && s.command.includes("aladdin-r2-acceptance-20261011-private")));
+  assert.ok(!JSON.stringify(plan.credentials).includes("Secret"));
+});

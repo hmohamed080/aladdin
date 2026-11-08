@@ -136,3 +136,11 @@ bucket grew; after P-6 the Storage policy closure is the backstop.
 - Read the remaining Supabase egress for the cycle before any `migrate --execute` (about 193 MB of media; the tool refuses without `--remaining-egress-bytes`).
 - Production GO-by-GO as in section 3. The legacy deletion path is intentionally not built until a manifest is approved.
 - Video (HLS) stays off; its keys are already ids-only.
+
+## 8. Cloudflare read-back, 2026-11-08 (read-only, Cloudflare MCP)
+
+- Buckets on the account: `aladdin-acceptance-backups-weur`, `aladdin-production-db-backups`, `aladdin-r2-acceptance-20261011-private` (WEUR, Standard, default jurisdiction), `aladdin-r2-acceptance-20261011-public`. **No** site bucket and **no** Production media bucket exist yet, so nothing for Production is created.
+- Workers: `aladdin-frontend-preview` / `-production`, `aladdin-backend-preview` / `-production`, `aladdin-media-edge-preview`, `aladdin-whatsapp-otp-preview` / `-production`. The preview frontend config already sets `R2_STORAGE_ENABLED=true`, `MEDIA_LEGACY_STORAGE_WRITES=false` and the private bucket; it sets no `R2_SITE_BUCKET`.
+- **Not verifiable with the available tools** (the MCP returns names and dates only; the API credential is OAuth and gets an authentication error on bucket settings): CORS, lifecycle, r2.dev public URL, custom domains, Worker bindings, token permissions. The `--site-only` plan prints the read-only `wrangler` checks for these; the operator's output is the evidence.
+- Acceptance site bucket only: `node scripts/r2-provision-plan.mjs --env acceptance --site-only` (2 writes: create the bucket, apply `lifecycle-public.json`; the private bucket is only read). Minimum credential: a 1-day R2 admin token (Workers R2 Storage Edit). No S3 key, Worker secret or variable changes are needed to create it; adding the bucket to a Worker credential and `R2_SITE_BUCKET` is a later GO when site media is first used.
+- Rollback of the site bucket: it is empty at creation; `wrangler r2 bucket delete aladdin-acceptance-site-media` removes it. Nothing references it until the Worker variable is set.

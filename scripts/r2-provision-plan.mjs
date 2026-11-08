@@ -2,7 +2,7 @@
 // Prints the exact, ordered operator commands to provision (or verify) the R2 buckets of one environment.
 // It RUNS NOTHING and needs no credentials: the output is a script the owner reviews and runs by hand, one GO at a time.
 //
-//   node scripts/r2-provision-plan.mjs --env acceptance|production [--verify-only]
+//   node scripts/r2-provision-plan.mjs --env acceptance|production [--verify-only] [--site-only]
 //
 // Names are checked against the same rules the application enforces at runtime (environment-guard.ts): Production
 // names carry no non-Production marker, Acceptance names carry one, the buckets are distinct and none is a backup bucket.
@@ -51,20 +51,24 @@ export function validate(env, target = TARGETS[env]) {
 
 const W = "pnpm exec wrangler"; // run from frontend/, with an R2 admin token that lives one day
 
-export function buildPlan(env, { verifyOnly = false } = {}) {
+export function buildPlan(env, { verifyOnly = false, siteOnly = false } = {}) {
   const t = TARGETS[env];
   const problems = validate(env);
   if (problems.length) throw new PlanError(problems.join("; "));
   const steps = [];
   const add = (kind, title, command) => steps.push({ kind, title, command });
+  // siteOnly: create/configure only the site bucket; the private bucket is verified read-only and never written.
   const buckets = [["private", t.private], ["site", t.site]];
+  const writable = siteOnly ? [["site", t.site]] : buckets;
 
-  for (const [role, name] of buckets) {
+  for (const [role, name] of writable) {
     if (!verifyOnly && !t.exists.includes(role)) add("write", `Create the ${role} bucket (Western Europe, Standard)`, `${W} r2 bucket create ${name} --location weur`);
   }
-  if (!verifyOnly) {
+  if (!verifyOnly && !siteOnly) {
     add("write", "CORS on the private bucket (PUT only, exact origins)", `${W} r2 bucket cors set ${t.private} --file ../${t.cors}`);
     add("write", "Lifecycle on the private bucket (pending/ 2 days, multipart abort 7 days)", `${W} r2 bucket lifecycle set ${t.private} --file ../docs/operations/r2/lifecycle-private.json`);
+  }
+  if (!verifyOnly) {
     add("write", "Lifecycle on the site bucket (multipart abort only)", `${W} r2 bucket lifecycle set ${t.site} --file ../docs/operations/r2/lifecycle-public.json`);
   }
   for (const [role, name] of buckets) {
@@ -76,7 +80,11 @@ export function buildPlan(env, { verifyOnly = false } = {}) {
   add("read", "private: lifecycle equals the reviewed file", `${W} r2 bucket lifecycle list ${t.private}`);
   return {
     env, supabaseRef: t.supabaseRef, buckets: { private: t.private, site: t.site }, steps,
-    credentials: [
+    credentials: siteOnly ? [
+      { name: "R2 admin token (bucket rules)", scope: "Account: Workers R2 Storage Edit", holder: "operator, expires in 1 day, deleted after the stage" },
+      { name: "Nothing else to create the bucket", scope: "No S3 key, Worker secret or variable changes", holder: "-" },
+      { name: "Later, only when site media is first used", scope: `Object Read & Write on ${t.site} added to a credential for ${t.worker}; the private-bucket credential stays unchanged`, holder: "separate GO" },
+    ] : [
       { name: "R2 admin token (bucket rules)", scope: "Account: Workers R2 Storage Edit", holder: "operator, expires in 1 day, deleted after the stage" },
       { name: `R2 S3 credential: ${t.worker}`, scope: `Object Read & Write on ${t.private} and ${t.site} only`, holder: `Worker secrets R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY` },
       { name: "R2 S3 credential: reconcile and media tools", scope: `Object Read on ${t.private} only`, holder: "operator shell, never CI" },
@@ -92,8 +100,8 @@ export function buildPlan(env, { verifyOnly = false } = {}) {
 export function main(argv = process.argv.slice(2)) {
   const i = argv.indexOf("--env");
   const env = i >= 0 ? argv[i + 1] : null;
-  if (!env || !TARGETS[env]) throw new PlanError("Usage: r2-provision-plan.mjs --env acceptance|production [--verify-only]");
-  const plan = buildPlan(env, { verifyOnly: argv.includes("--verify-only") });
+  if (!env || !TARGETS[env]) throw new PlanError("Usage: r2-provision-plan.mjs --env acceptance|production [--verify-only] [--site-only]");
+  const plan = buildPlan(env, { verifyOnly: argv.includes("--verify-only"), siteOnly: argv.includes("--site-only") });
   const lines = [`# R2 provisioning plan for ${env} (Supabase ${plan.supabaseRef}). Prints only; nothing was run.`, "# Run from frontend/. Each 'write' step is a hosted change and needs the owner's GO.", ""];
   plan.steps.forEach((s, n) => lines.push(`# ${n + 1}. [${s.kind}] ${s.title}`, s.command, ""));
   lines.push("# Credentials", ...plan.credentials.map((c) => `#  - ${c.name}: ${c.scope} -> ${c.holder}`), "", "# After creation", ...plan.afterCreation.map((a) => `#  - ${a}`));
