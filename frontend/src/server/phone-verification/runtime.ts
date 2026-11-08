@@ -7,6 +7,8 @@ import { readPhoneVerificationEnv } from "@/lib/env/phone-verification";
 import { parseDeliveryMode, selectTransport } from "./delivery";
 import { parseKeyring } from "./otp";
 import { createPhoneVerificationService, type PhoneVerificationDb, type PhoneVerificationService } from "./service";
+import { createDeliveryGate, createDeliveryGateCache, type DeliveryAvailability } from "./delivery-gate";
+import { fetchUsage } from "@/server/whatsapp-otp/worker-admin";
 import { createPhoneSignupService, type PhoneSignupService } from "./signup-service";
 
 /**
@@ -32,7 +34,19 @@ function build() {
   const route = mode === "worker" ? resolveWorkerTransport() : null;
   if (route && !route.ok) throw new Error("the WhatsApp delivery Worker is not reachable through its service binding");
   const transport = selectTransport({ mode, outboxDir: env.outboxDir, nodeEnv: process.env.NODE_ENV, workerUrl: env.workerUrl, workerSecret: env.workerSecret, fetchImpl: route?.ok ? route.fetchImpl : undefined });
-  return { env, keyring, db, transport };
+  return { env, keyring, db, transport, mode, route };
+}
+
+// Per-isolate and PLAIN DATA ONLY: this cache keeps Worker calls to a few per minute whatever the sign-up traffic. The gate itself, with the
+// service binding and config it calls through, is built inside each request: on Workers a binding or promise kept in module scope can be
+// bound to the request that created it ("Cannot perform I/O on behalf of a different request") or go stale when bindings change.
+const gateCache = createDeliveryGateCache();
+function signupDeliveryGate(env: ReturnType<typeof readPhoneVerificationEnv>, mode: string, route: ReturnType<typeof resolveWorkerTransport> | null): DeliveryAvailability {
+  // Only a real Worker needs asking. "off" can deliver nothing; "outbox" is the local rig (refused by delivery.ts in production).
+  if (mode === "off") return async () => false;
+  if (mode !== "worker") return async () => true;
+  if (!route?.ok) return async () => false;
+  return createDeliveryGate({ cache: gateCache, fetchUsage: () => fetchUsage({ workerUrl: env.workerUrl, adminSecret: env.adminSecret, fetchImpl: route.fetchImpl, timeoutMs: 3000 }) });
 }
 
 export function getPhoneVerificationService(): PhoneVerificationService | null {
@@ -43,7 +57,7 @@ export function getPhoneVerificationService(): PhoneVerificationService | null {
 
 export function getPhoneSignupService(): PhoneSignupService | null {
   if (!readPhoneVerificationEnv().signupEnabled) return null;
-  const { env, keyring, db, transport } = build();
+  const { env, keyring, db, transport, mode, route } = build();
   // Delivery runs after the response (Next `after` -> waitUntil on Workers), so the reply cannot reveal whether a number is already registered.
   // If the hook is unavailable (called outside a request), the task still runs, but on Workers an un-registered task is cancelled when the
   // response ends and the person would never get a code. Say so, once per occurrence, with nothing that identifies a number or a code.
@@ -55,5 +69,5 @@ export function getPhoneSignupService(): PhoneSignupService | null {
       void task;
     }
   };
-  return createPhoneSignupService({ db, transport, keyring, enabled: env.signupEnabled, defer });
+  return createPhoneSignupService({ db, transport, keyring, enabled: env.signupEnabled, defer, deliveryAvailable: signupDeliveryGate(env, mode, route) });
 }
