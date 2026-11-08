@@ -4,7 +4,7 @@
 //
 //   PHONE_OTP_WORKER_SECRET=whsec_... node edge/whatsapp-otp-worker/scripts/worker-preflight.mjs https://<worker>.workers.dev
 //
-// Exit 0 only when: signing secret bound, Meta token bound, D1 reachable, allowlist has entries, recipient mode is allowlist. It also prints
+// Exit 0 only when: signing secret bound, Meta token bound, D1 reachable, recipients are configured (recipient mode open, or an allowlist with entries). It also prints
 // delivery_enabled so you can see whether the master switch is OFF (expected before the pilot) or ON.
 import { createHmac, randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
@@ -27,13 +27,13 @@ export async function run(base, env, fetchImpl = fetch, log = console.log) {
     signing_secret_bound: out.signing_secret_bound === true,
     meta_token_bound: out.meta_token_bound === true,
     d1_reachable: out.d1_reachable === true,
-    allowlist_has_entries: Number(out.allowlist_entries) > 0,
+    recipients_configured: out.recipient_mode === "open" || Number(out.allowlist_entries) > 0,
     settings_initialized: out.settings_initialized === true,
     daily_send_limit_configured: Number.isInteger(out.daily_send_limit) && out.daily_send_limit > 0 && out.daily_send_limit <= out.hard_ceiling,
     admin_secret_bound: out.admin_secret_bound === true,
     admin_grant_secret_bound: out.admin_grant_secret_bound === true,
     notify_configured: out.notify_configured === true,
-    recipient_mode_is_allowlist: out.recipient_mode === "allowlist",
+    recipient_mode_valid: out.recipient_mode === "open" || out.recipient_mode === "allowlist",
   };
   const ok = Object.values(checks).every(Boolean);
   log(JSON.stringify({ ok, checks, delivery_enabled: out.delivery_enabled === true, environment: out.environment, allowlist_entries: out.allowlist_entries, template: out.template, languages: out.languages, graph_version: out.graph_version, sender_id_suffix: out.sender_id_suffix }, null, 2));
