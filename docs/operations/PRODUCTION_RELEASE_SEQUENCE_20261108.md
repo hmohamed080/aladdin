@@ -173,6 +173,8 @@ Commands: CHECKLIST step B (in #145). Owner action in order: B0 `gh variable set
 
 ### P-5 Minimal live delivery verification on the 0% version (version-override header)
 
+**Prerequisite P-4b (added 2026-11-08, verified on Production):** the uploaded version must first be put into the deployment at 0% (`wrangler versions deploy <LIVE>@100% <UPLOADED>@0% --env production`, separate owner approval, no user impact; checklist step B4). Without it the override header is silently ignored. Confirm with `/installer/sign-up`: `200` without the header, `308` to `/auth/sign-up?type=installer_technician` with it.
+
 This is the step that proves the mobile path works BEFORE any user sees the new frontend, and it answers the open question "which flow is the single live code": a real phone sign-up that creates the owner's own account on the owner's own number, through the override header.
 
 Owner action in order (all requests carry the override header for the uploaded version; live users stay on `a3b08a22`):
