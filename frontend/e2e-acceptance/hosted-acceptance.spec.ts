@@ -1,10 +1,14 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { accessHeadersFor, installAccessRouting, isAccessLogin, readAccessCredentials, scrubError } from "./access.mjs";
 
 /**
  * Hosted, READ-ONLY acceptance E2E for the Cloudflare Acceptance preview (playwright.acceptance.config.ts).
  *
  * Rules:
  *  - READ-ONLY. Navigation and sign-in only: nothing is created, edited, deleted or submitted beyond the sign-in form.
+ *  - The preview sits behind Cloudflare Access. The service token (ACCEPTANCE_E2E_ACCESS_CLIENT_ID/SECRET, same GitHub Environment) is
+ *    attached ONLY to requests to the exact preview origin (context route + per-call API headers, never global extraHTTPHeaders), is
+ *    never sent to another host or on a redirect, and an Access login redirect fails the run instead of being followed.
  *  - Acceptance only. Any request to the live Supabase project or the live domain is aborted and fails the run.
  *  - Turnstile is stubbed INSIDE the test browser (the stand-in the local suites use). That is valid only because hosted
  *    CAPTCHA protection is OFF on Acceptance, so Supabase Auth does not verify the token; once it is switched on this
@@ -32,7 +36,30 @@ function required(name: string): string {
 
 const violations: string[] = [];
 
+// Both credentials are required before anything runs: fail closed, never fall back to unauthenticated requests.
+const accessCreds = () => readAccessCredentials(process.env);
+
+/** GET on the preview with the Access headers, without following redirects (a redirect could carry them elsewhere). */
+async function apiGet(context: BrowserContext, path: string) {
+  const url = new URL(path, required("ACCEPTANCE_BASE_URL")).href;
+  const creds = accessCreds();
+  // A failed API call's message carries Playwright's call log, which lists request headers: keep only a scrubbed first line,
+  // because run.log and the JSON report are uploaded as an artifact.
+  const res = await context.request.get(url, { headers: accessHeadersFor(url, creds), maxRedirects: 0 }).catch((e: unknown) => {
+    throw new Error(`GET ${path} failed: ${scrubError(e, creds)}`);
+  });
+  const location = res.headers()["location"] ?? "";
+  if (res.status() >= 300 && res.status() < 400 && (isAccessLogin(location) || !location)) {
+    throw new Error(`Cloudflare Access answered ${res.status()} for ${path}: the Access service token is wrong, expired or not authorised for the preview.`);
+  }
+  return res;
+}
+
 async function guardedContext(context: BrowserContext): Promise<BrowserContext> {
+  // Service token for the exact preview origin only, never carried across a redirect; an Access login redirect is a violation.
+  // (route.continue({headers}) is NOT used: in real Chromium it forwards the headers to a cross-origin redirect target,
+  // see e2e-access-routing/access-routing.spec.ts.)
+  await installAccessRouting(context, accessCreds(), { onViolation: (m) => violations.push(m) });
   await context.route(FORBIDDEN_HOSTS, (route) => {
     violations.push(new URL(route.request().url()).host);
     return route.abort();
@@ -109,15 +136,23 @@ test.describe("public smoke", () => {
   test("health, sign-in and backend binding answer on the preview", async ({ browser }) => {
     const context = await newPersonaContext(browser);
     try {
-      const health = await context.request.get("/api/health");
+      const health = await apiGet(context, "/api/health");
       expect(health.status(), "/api/health").toBe(200);
-      const backend = await context.request.get("/api/backend/health");
+      const backend = await apiGet(context, "/api/backend/health");
       expect(backend.status(), "/api/backend/health").toBe(200);
       const body = await backend.json();
       expect(body, "the backend must be the staging/acceptance service").toMatchObject({ status: "ok", service: "backend", env: "staging" });
-      for (const path of ["/", "/auth/sign-in", "/installer/sign-in", "/legal/terms"]) {
-        expect((await context.request.get(path)).status(), path).toBe(200);
+      for (const path of ["/", "/auth/sign-in", "/legal/terms"]) {
+        expect((await apiGet(context, path)).status(), path).toBe(200);
       }
+      // The retired /installer/sign-in is a permanent redirect (next.config.ts). Check it WITHOUT following it: the status and
+      // that the destination is the same-origin /auth/sign-in (a redirect anywhere else, or a temporary one, is a failure).
+      const installer = await apiGet(context, "/installer/sign-in");
+      expect(installer.status(), "/installer/sign-in must be a permanent redirect").toBe(308);
+      const target = new URL(installer.headers()["location"] ?? "", required("ACCEPTANCE_BASE_URL"));
+      expect(`${target.origin}${target.pathname}`, "/installer/sign-in must redirect to /auth/sign-in on the same origin").toBe(
+        `${new URL(required("ACCEPTANCE_BASE_URL")).origin}/auth/sign-in`,
+      );
       const page = await context.newPage();
       await page.goto("/showroom", { waitUntil: "domcontentloaded" });
       expect(new URL(page.url()).pathname, "/showroom must ask a signed-out visitor to sign in").toMatch(/sign-in/);
