@@ -7,7 +7,7 @@ import { readPhoneVerificationEnv } from "@/lib/env/phone-verification";
 import { parseDeliveryMode, selectTransport } from "./delivery";
 import { parseKeyring } from "./otp";
 import { createPhoneVerificationService, type PhoneVerificationDb, type PhoneVerificationService } from "./service";
-import { createDeliveryGate, type DeliveryAvailability } from "./delivery-gate";
+import { createDeliveryGate, createDeliveryGateCache, type DeliveryAvailability } from "./delivery-gate";
 import { fetchUsage } from "@/server/whatsapp-otp/worker-admin";
 import { createPhoneSignupService, type PhoneSignupService } from "./signup-service";
 
@@ -37,15 +37,16 @@ function build() {
   return { env, keyring, db, transport, mode, route };
 }
 
-// Per-isolate: the cache inside the gate is what keeps this to a few Worker calls per minute, whatever the sign-up traffic.
-let gate: DeliveryAvailability | null = null;
+// Per-isolate and PLAIN DATA ONLY: this cache keeps Worker calls to a few per minute whatever the sign-up traffic. The gate itself, with the
+// service binding and config it calls through, is built inside each request: on Workers a binding or promise kept in module scope can be
+// bound to the request that created it ("Cannot perform I/O on behalf of a different request") or go stale when bindings change.
+const gateCache = createDeliveryGateCache();
 function signupDeliveryGate(env: ReturnType<typeof readPhoneVerificationEnv>, mode: string, route: ReturnType<typeof resolveWorkerTransport> | null): DeliveryAvailability {
   // Only a real Worker needs asking. "off" can deliver nothing; "outbox" is the local rig (refused by delivery.ts in production).
   if (mode === "off") return async () => false;
   if (mode !== "worker") return async () => true;
   if (!route?.ok) return async () => false;
-  gate ??= createDeliveryGate({ fetchUsage: () => fetchUsage({ workerUrl: env.workerUrl, adminSecret: env.adminSecret, fetchImpl: route.fetchImpl, timeoutMs: 3000 }) });
-  return gate;
+  return createDeliveryGate({ cache: gateCache, fetchUsage: () => fetchUsage({ workerUrl: env.workerUrl, adminSecret: env.adminSecret, fetchImpl: route.fetchImpl, timeoutMs: 3000 }) });
 }
 
 export function getPhoneVerificationService(): PhoneVerificationService | null {

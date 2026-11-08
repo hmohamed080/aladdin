@@ -37,8 +37,17 @@ export function usageAllowsDelivery(usage: WorkerUsage): boolean {
   return usage.remaining > 0;
 }
 
+/** Plain data only (never a promise, binding or I/O object): the one thing a caller may keep at module level across requests. */
+export type DeliveryGateCache = { entry: { value: boolean; until: number } | null };
+export function createDeliveryGateCache(): DeliveryGateCache {
+  return { entry: null };
+}
+
 export type DeliveryGateOptions = {
+  /** Resolved by the CURRENT request (its own service binding and config). Do not build the gate once and keep it across requests. */
   fetchUsage: () => Promise<UsageResult>;
+  /** Shared plain-data cache. Omit for an isolated one (tests). */
+  cache?: DeliveryGateCache;
   /** How long an answer is reused. Default 5 s: a kill switch takes effect for sign-up within seconds. */
   ttlMs?: number;
   /** Hard cap on one status call, so a hung Worker answers UNAVAILABLE. Default 3 s. */
@@ -52,7 +61,7 @@ export function createDeliveryGate(options: DeliveryGateOptions): DeliveryAvaila
   const now = options.now ?? Date.now;
   // The ONLY thing shared across requests: plain data. Never a promise or an I/O object (on Workers those are bound to the request that
   // created them and can be cancelled when it ends). Only a definitive answer from the Worker is stored, never an error or a timeout.
-  let cached: { value: boolean; until: number } | null = null;
+  const store = options.cache ?? createDeliveryGateCache();
 
   /** One probe, entirely owned by the calling request: its own timer, its own call. definitive=false means error or timeout. */
   async function probe(): Promise<{ value: boolean; definitive: boolean }> {
@@ -72,10 +81,10 @@ export function createDeliveryGate(options: DeliveryGateOptions): DeliveryAvaila
   }
 
   return async function available(): Promise<boolean> {
-    const hit = cached;
+    const hit = store.entry;
     if (hit && hit.until > now()) return hit.value;
     const { value, definitive } = await probe();
-    if (definitive) cached = { value, until: now() + ttl };
+    if (definitive) store.entry = { value, until: now() + ttl };
     return value;
   };
 }

@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import type { UsageResult, WorkerUsage } from "@/server/whatsapp-otp/worker-admin";
-import { createDeliveryGate, usageAllowsDelivery } from "./delivery-gate";
+import { createDeliveryGate, createDeliveryGateCache, usageAllowsDelivery } from "./delivery-gate";
 import { parseKeyring } from "./otp";
 import type { PhoneVerificationDb } from "./service";
 import { createPhoneSignupService } from "./signup-service";
@@ -89,6 +90,54 @@ describe("delivery gate cache and failure behaviour", () => {
     mode = "ok";
     expect(await gate()).toBe(true);
     expect(fetchUsage).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("across requests (Workers isolates are reused; bindings and promises are request-scoped)", () => {
+  /** A stand-in for one request's service binding: usable only until that request ends, like an I/O object on Workers. */
+  function requestScopedUsage(answer: () => UsageResult) {
+    let ended = false;
+    const fetchUsage = vi.fn(async (): Promise<UsageResult> => {
+      if (ended) throw new Error("Cannot perform I/O on behalf of a different request");
+      return answer();
+    });
+    return { fetchUsage, end: () => { ended = true; } };
+  }
+
+  it("a later request never calls the binding of an earlier, finished request; only the plain cached answer is shared", async () => {
+    let t = 0;
+    const cache = createDeliveryGateCache();
+    const first = requestScopedUsage(() => usage());
+    expect(await createDeliveryGate({ cache, fetchUsage: first.fetchUsage, ttlMs: 5000, now: () => t })()).toBe(true);
+    first.end();
+
+    // Within the ttl: answered from plain data, no binding touched at all.
+    t += 3000;
+    const second = requestScopedUsage(() => usage());
+    expect(await createDeliveryGate({ cache, fetchUsage: second.fetchUsage, ttlMs: 5000, now: () => t })()).toBe(true);
+    expect(second.fetchUsage).not.toHaveBeenCalled();
+
+    // After the ttl: the CURRENT request probes through its OWN binding (a gate that kept the first request's binding would be false here).
+    t += 3000;
+    expect(await createDeliveryGate({ cache, fetchUsage: second.fetchUsage, ttlMs: 5000, now: () => t })()).toBe(true);
+    expect(second.fetchUsage).toHaveBeenCalledTimes(1);
+    expect(first.fetchUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it("the shared cache holds plain data only and carries a switch-off to the next request after the ttl", async () => {
+    let t = 0;
+    const cache = createDeliveryGateCache();
+    await createDeliveryGate({ cache, fetchUsage: async () => usage(), ttlMs: 5000, now: () => t })();
+    expect(JSON.parse(JSON.stringify(cache))).toEqual({ entry: { value: true, until: 5000 } });
+    t = 5001;
+    expect(await createDeliveryGate({ cache, fetchUsage: async () => usage({ delivery_enabled: false }), ttlMs: 5000, now: () => t })()).toBe(false);
+  });
+
+  it("the composition root keeps no gate, promise or binding at module level", () => {
+    const src = readFileSync(new URL("./runtime.ts", import.meta.url), "utf8");
+    expect(src).not.toMatch(/^let\s+gate\b/m);
+    expect(src).not.toMatch(/\bgate\s*\?\?=/);
+    expect(src).toMatch(/^const gateCache = createDeliveryGateCache\(\);/m);
   });
 });
 
