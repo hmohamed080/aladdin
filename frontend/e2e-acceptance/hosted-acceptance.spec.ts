@@ -84,14 +84,47 @@ async function signIn(context: BrowserContext, email: string, password: string, 
     const x = new URL(u);
     return `${x.host}${x.pathname.slice(0, 60)}`;
   };
+  // Observe (never alter) the real widget: wrap turnstile.render only to record lifecycle events and Cloudflare's error CODE
+  // (a short code such as "300030"; never a token, which is not recorded). The widget still runs exactly as in production.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __tsDiag: string[]; turnstile?: { render: (...a: unknown[]) => unknown } };
+    w.__tsDiag = [];
+    let real: { render: (...a: unknown[]) => unknown } | undefined;
+    Object.defineProperty(window, "turnstile", {
+      configurable: true,
+      get: () => real,
+      set: (v) => {
+        real = v;
+        if (!v || typeof v.render !== "function") return;
+        const render = v.render.bind(v);
+        v.render = (el: unknown, opts: Record<string, unknown>) => {
+          w.__tsDiag.push(`render appearance=${String(opts.appearance)} action=${String(opts.action)}`);
+          const wrap = (name: string, label: (a: unknown[]) => string) => {
+            const orig = opts[name] as ((...a: unknown[]) => unknown) | undefined;
+            opts[name] = (...a: unknown[]) => {
+              w.__tsDiag.push(label(a));
+              return orig?.(...a);
+            };
+          };
+          wrap("callback", () => "token received");
+          wrap("error-callback", (a) => `error-callback code=${String(a[0]).slice(0, 12)}`);
+          wrap("timeout-callback", () => "timeout-callback");
+          wrap("expired-callback", () => "expired-callback");
+          wrap("unsupported-callback", () => "unsupported-callback");
+          wrap("before-interactive-callback", () => "before-interactive (a visible challenge is about to show)");
+          return render(el, opts);
+        };
+      },
+    });
+  });
   page.on("response", (r) => {
-    if (/challenges\.cloudflare\.com/.test(r.url()) && trace.length < 12) trace.push(`${r.status()} ${short(r.url())}`);
+    if (/challenges\.cloudflare\.com/.test(r.url()) && trace.length < 16) trace.push(`${r.status()} ${short(r.url())}`);
   });
   page.on("requestfailed", (r) => {
-    if (/challenges\.cloudflare\.com/.test(r.url()) && trace.length < 12) trace.push(`FAILED ${short(r.url())}: ${(r.failure()?.errorText ?? "").slice(0, 60)}`);
+    if (/challenges\.cloudflare\.com/.test(r.url()) && trace.length < 16) trace.push(`FAILED ${short(r.url())}: ${(r.failure()?.errorText ?? "").slice(0, 60)}`);
   });
   page.on("console", (m) => {
-    if (m.type() === "error" && /turnstile|captcha|challenge|content security policy/i.test(m.text()) && trace.length < 12) trace.push(`console: ${m.text().replace(/[?#]\S*/g, "").slice(0, 160)}`);
+    if (m.type() === "error" && /turnstile|captcha|challenge|content security policy/i.test(m.text()) && trace.length < 16) trace.push(`console: ${m.text().replace(/[?#]\S*/g, "").slice(0, 160)}`);
   });
   try {
     await page.goto("/auth/sign-in", { waitUntil: "domcontentloaded" });
@@ -104,9 +137,13 @@ async function signIn(context: BrowserContext, email: string, password: string, 
     await expect(page.locator('input[name="captchaToken"]'))
       .not.toHaveValue("", { timeout: 45_000 })
       .catch(async () => {
-        const widget = await page.locator('iframe[src*="challenges.cloudflare.com"]').count();
+        const frames = page.locator('iframe[src*="challenges.cloudflare.com"]');
+        const widget = await frames.count();
+        const box = widget ? await frames.first().boundingBox().catch(() => null) : null;
+        trace.push(`widget iframes=${widget}${box ? ` size=${Math.round(box.width)}x${Math.round(box.height)}` : ""}`);
+        trace.push(...(await page.evaluate(() => (window as unknown as { __tsDiag?: string[] }).__tsDiag ?? []).catch(() => ["lifecycle unavailable"])));
         throw new Error(
-          `The ${who} sign-in got no Turnstile token in 45 s (${widget ? "Cloudflare showed a challenge that needs a person" : "the widget did not load; check its hostname allowlist includes the preview host"}). CAPTCHA is not bypassed. Turnstile diagnostics: ${trace.join(" | ") || "no Cloudflare challenge request was made"}.`,
+          `The ${who} sign-in got no Turnstile token in 45 s (${widget && trace.some((t) => t.startsWith("before-interactive")) ? "Cloudflare showed a challenge that needs a person" : "the widget did not produce a token"}). CAPTCHA is not bypassed. Turnstile diagnostics: ${trace.join(" | ") || "no Cloudflare challenge request was made"}.`,
         );
       });
     await page.getByRole("button", { name: /^log in$/i }).click();
