@@ -7408,3 +7408,7 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Added `acceptance-apply.sh`, `acceptance-postcheck.mjs`, `table-counts.sql`, `acceptance-structure.sql` and the gate `post` mode (PR #153). Offline tests plus a stubbed-CLI exercise of the apply script. Runbook sections F-H hold the evidence, gate status and exact plan.
 - Open: backup freshness decision (4 auth rows touched since the 06:08Z snapshot), merge of #153 before the apply, owner GO. No push, merge or Production change.
 
+
+## 2026-11-08 Track 2: Production recovery rehearsal adapted
+- `production-rehearsal.sh` now takes `--sha`, expects exactly the 4 pending Production migrations, applies them with `--include-all`, and verifies history, structure, row counts and permissions (contract 20261107090006). Old 26-migration pins/manifest/fingerprint baseline removed. `rehearsal-selftest.sh` updated to Production's 203-applied state.
+- Not yet executed with Docker (cloud container has none). Next: Scorpion self-test, then the real rehearsal against a fresh Production snapshot; Production push still needs a separate owner GO.

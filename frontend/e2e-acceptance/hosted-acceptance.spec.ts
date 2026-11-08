@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test as base, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { accessHeadersFor, installAccessRouting, isAccessLogin, readAccessCredentials, scrubError } from "./access.mjs";
 
 /**
@@ -10,13 +10,43 @@ import { accessHeadersFor, installAccessRouting, isAccessLogin, readAccessCreden
  *    attached ONLY to requests to the exact preview origin (context route + per-call API headers, never global extraHTTPHeaders), is
  *    never sent to another host or on a redirect, and an Access login redirect fails the run instead of being followed.
  *  - Acceptance only. Any request to the live Supabase project or the live domain is aborted and fails the run.
- *  - Turnstile is stubbed INSIDE the test browser (the stand-in the local suites use). That is valid only because hosted
- *    CAPTCHA protection is OFF on Acceptance, so Supabase Auth does not verify the token; once it is switched on this
- *    suite must use the real widget with an always-pass test key instead.
+ *  - CAPTCHA stays ON and untouched. Acceptance has Supabase Auth CAPTCHA protection ON (Turnstile, since 2026-10-28), which
+ *    refuses a made-up token ("That verification challenge didn't pass"). The suite therefore uses the REAL Turnstile widget
+ *    and waits for the genuine token it produces (sign-in is an interaction-only challenge, so a normal browser gets it with
+ *    no click). Nothing is stubbed, bypassed or switched off. If Cloudflare shows a challenge that needs a person, the run
+ *    fails with a clear message. The widget's hostname allowlist must include the preview host (the owner confirmed it does).
  *  - The "Showroom RC2 drift" block records what renders today for each of the 17 local spec drifts
  *    (docs/operations/e2e-shared-failures-triage-2026-10-22.md) as annotations. It never fails on them: they need product
  *    review, and asserting either the old or the new labels here would decide that review silently.
  */
+
+/**
+ * Manual run attached to the owner's REAL Chrome/Edge (e2e-acceptance/run-headed.mjs starts it with a debugging port and a fresh
+ * profile and passes ACCEPTANCE_E2E_CDP_URL). Without that variable the browser is launched by Playwright as before (CI).
+ * Attaching changes only which browser runs; no signal is hidden or altered and Turnstile is completed by the person.
+ */
+const test = base.extend<object, { browser: Browser }>({
+  browser: [
+    async ({ playwright, browserName, launchOptions }, use) => {
+      const cdp = process.env.ACCEPTANCE_E2E_CDP_URL;
+      if (cdp && /^http:\/\/127\.0\.0\.1:\d+$/.test(cdp)) {
+        const browser = await playwright.chromium.connectOverCDP(cdp);
+        await use(browser);
+        await browser.close(); // disconnects; the launcher closes the real browser
+        return;
+      }
+      const browser = await playwright[browserName].launch(launchOptions);
+      await use(browser);
+      await browser.close();
+    },
+    { scope: "worker" },
+  ],
+});
+
+/** Headed manual run: wait long enough for a person to complete a genuine Turnstile challenge in the visible browser. */
+const HEADED = process.env.ACCEPTANCE_E2E_HEADED === "1";
+const TOKEN_WAIT_MS = HEADED ? 5 * 60_000 : 45_000;
+const SIGN_IN_WAIT_MS = HEADED ? 2 * 60_000 : 45_000;
 
 const OWNER = "test1@example.com";
 const MANAGER = "acc6-sales-manager@example.test";
@@ -26,7 +56,6 @@ const NOT_AUTHORIZED = "You're not allowed to manage members here.";
 
 const FORBIDDEN_HOSTS = /kkpkgjrweysgvhvkhzun|aladdindecore\.com/i;
 const GENERIC_ERROR = /Application error|a server-side exception has occurred|Digest:/i;
-const TURNSTILE_STUB = `window.turnstile={render:function(el,o){setTimeout(function(){o.callback("XXXX.DUMMY.TOKEN.XXXX")},0);return "acceptance-e2e"},remove:function(){},reset:function(){}};`;
 
 function required(name: string): string {
   const value = process.env[name];
@@ -49,7 +78,7 @@ async function apiGet(context: BrowserContext, path: string) {
     throw new Error(`GET ${path} failed: ${scrubError(e, creds)}`);
   });
   const location = res.headers()["location"] ?? "";
-  if (res.status() >= 300 && res.status() < 400 && (isAccessLogin(location) || !location)) {
+  if (res.status() >= 300 && res.status() < 400 && (!location || isAccessLogin(new URL(location, url).href))) {
     throw new Error(`Cloudflare Access answered ${res.status()} for ${path}: the Access service token is wrong, expired or not authorised for the preview.`);
   }
   return res;
@@ -64,9 +93,6 @@ async function guardedContext(context: BrowserContext): Promise<BrowserContext> 
     violations.push(new URL(route.request().url()).host);
     return route.abort();
   });
-  await context.route("https://challenges.cloudflare.com/turnstile/v0/api.js*", (route) =>
-    route.fulfill({ contentType: "application/javascript", body: TURNSTILE_STUB }),
-  );
   const host = new URL(required("ACCEPTANCE_BASE_URL")).hostname;
   await context.addCookies([{ name: "NEXT_LOCALE", value: "en", domain: host, path: "/", secure: true, sameSite: "Lax" }]);
   return context;
@@ -79,16 +105,77 @@ async function newPersonaContext(browser: import("@playwright/test").Browser): P
 
 async function signIn(context: BrowserContext, email: string, password: string, who: string): Promise<void> {
   const page = await context.newPage();
+  // Turnstile diagnostics only. Everything recorded is a FIXED category word, an HTTP status, an allowlisted network error
+  // name, or a purely numeric Turnstile error code. No URL (not even its path), query string, header, console text, token or
+  // credential is ever copied into the log or the uploaded report.
+  const trace: string[] = [];
+  const add = (line: string) => {
+    if (trace.length < 20) trace.push(line);
+  };
+  const category = (u: string): string => {
+    try {
+      const x = new URL(u);
+      if (x.hostname !== "challenges.cloudflare.com" && !x.hostname.endsWith(".challenges.cloudflare.com")) return "";
+      const sub = x.hostname === "challenges.cloudflare.com" ? "" : "subdomain ";
+      if (/\/turnstile\/v0\/(b\/[^/]+\/)?api\.js$/.test(x.pathname)) return `${sub}api.js`;
+      if (x.pathname.startsWith("/cdn-cgi/challenge-platform/")) return `${sub}challenge-platform`;
+      return `${sub}other`;
+    } catch {
+      return "";
+    }
+  };
+  // PASSIVE observation only: a window "message" listener (no wrapping, no property override, nothing that touches the widget or
+  // window.turnstile). The Turnstile iframe reports its lifecycle to the page by postMessage; we record only the event NAME
+  // (letters only, max 24) and, for failures, a purely numeric code. Nothing else from the message is read or stored.
+  // (A previous version wrapped turnstile.render; that changed the widget's behaviour in the hosted run, so it was removed.)
+  await page.addInitScript(() => {
+    const w = window as unknown as { __tsDiag: string[] };
+    w.__tsDiag = [];
+    window.addEventListener("message", (e: MessageEvent) => {
+      if (e.origin !== "https://challenges.cloudflare.com" || w.__tsDiag.length >= 14) return;
+      const d = e.data as { source?: unknown; event?: unknown; code?: unknown } | null;
+      if (!d || typeof d !== "object" || d.source !== "cloudflare-challenge") return;
+      const event = typeof d.event === "string" && /^[A-Za-z]{2,24}$/.test(d.event) ? d.event : "other";
+      const code = d.code !== undefined && /^\d{3,6}$/.test(String(d.code)) ? ` code=${String(d.code)}` : "";
+      w.__tsDiag.push(`widget event: ${event}${code}`);
+    });
+  });
+  page.on("response", (r) => {
+    const c = category(r.url());
+    if (c) add(`${r.status()} ${c}`);
+  });
+  page.on("requestfailed", (r) => {
+    const c = category(r.url());
+    const err = r.failure()?.errorText ?? "";
+    if (c) add(`FAILED ${c}: ${/^net::ERR_[A-Z_]{3,40}$/.test(err) ? err : "other"}`);
+  });
+  page.on("console", (m) => {
+    if (m.type() === "error" && /content security policy/i.test(m.text())) add("console: csp-violation");
+    else if (m.type() === "error" && /turnstile|captcha|challenge/i.test(m.text())) add("console: turnstile-related error");
+  });
   try {
     await page.goto("/auth/sign-in", { waitUntil: "domcontentloaded" });
+    if (HEADED) console.log(`[manual] ${who}: if Cloudflare shows a verification in the Chrome window, complete it (waiting up to ${TOKEN_WAIT_MS / 60_000} min).`);
     await page.getByLabel(/^mobile number, username or email$/i).fill(email);
     // A failed fill must never echo the value into the log or the uploaded report.
     await page.getByLabel(/^password$/i).fill(password).catch(() => {
       throw new Error(`The ${who} password field could not be filled on /auth/sign-in.`);
     });
-    await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30_000 });
+    // The real Turnstile widget fills this hidden field with a genuine single-use token; nothing here fakes it.
+    await expect(page.locator('input[name="captchaToken"]'))
+      .not.toHaveValue("", { timeout: TOKEN_WAIT_MS })
+      .catch(async () => {
+        const frames = page.locator('iframe[src*="challenges.cloudflare.com"]');
+        const widget = await frames.count();
+        const box = widget ? await frames.first().boundingBox().catch(() => null) : null;
+        trace.push(`widget iframes=${widget}${box ? ` size=${Math.round(box.width)}x${Math.round(box.height)}` : ""}`);
+        trace.push(...(await page.evaluate(() => (window as unknown as { __tsDiag?: string[] }).__tsDiag ?? []).catch(() => ["lifecycle unavailable"])));
+        throw new Error(
+          `The ${who} sign-in got no Turnstile token in ${TOKEN_WAIT_MS / 1000} s (${widget && trace.some((t) => t.startsWith("widget event: interactiveBefore")) ? "Cloudflare showed a challenge that needs a person" : "the widget did not produce a token"}). CAPTCHA is not bypassed. Turnstile diagnostics: ${trace.join(" | ") || "no Cloudflare challenge request was made"}.`,
+        );
+      });
     await page.getByRole("button", { name: /^log in$/i }).click();
-    await page.waitForURL((url) => !/\/sign-in(\/|$)/.test(url.pathname), { timeout: 45_000 }).catch(async () => {
+    await page.waitForURL((url) => !/\/sign-in(\/|$)/.test(url.pathname), { timeout: SIGN_IN_WAIT_MS }).catch(async () => {
       const alert = (await page.getByRole("alert").allInnerTexts().catch(() => [])).join(" | ").slice(0, 200);
       throw new Error(`Sign-in as the ${who} did not complete (still on the sign-in page). Message: ${alert || "none"}`);
     });
@@ -108,6 +195,7 @@ async function openHealthy(page: Page, path: string, who: string): Promise<strin
   // next goto on this page is aborted mid-redirect (net::ERR_ABORTED). Realtime websockets do not hold networkidle.
   await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
   const finalPath = new URL(page.url()).pathname;
+  expect(isAccessLogin(page.url()), `${who}: ${path} ended on a Cloudflare Access login page (the service token did not reach a redirect hop)`).toBe(false);
   expect(finalPath, `${who}: ${path} sent the account to ${finalPath} (signed out?)`).not.toMatch(/\/sign-in(\/|$)/);
   await expect(page.locator("main").first(), `${who}: no authenticated shell on ${path}`).toBeVisible();
   await expect(page.getByTestId("aladdin-error-boundary"), `${who}: ${path} rendered the Aladdin error screen`).toHaveCount(0);
@@ -153,9 +241,15 @@ test.describe("public smoke", () => {
       expect(`${target.origin}${target.pathname}`, "/installer/sign-in must redirect to /auth/sign-in on the same origin").toBe(
         `${new URL(required("ACCEPTANCE_BASE_URL")).origin}/auth/sign-in`,
       );
-      const page = await context.newPage();
-      await page.goto("/showroom", { waitUntil: "domcontentloaded" });
-      expect(new URL(page.url()).pathname, "/showroom must ask a signed-out visitor to sign in").toMatch(/sign-in/);
+      // A signed-out visitor to /showroom must be sent to the APP's sign-in page. Checked on the first hop, without following
+      // it, so a Cloudflare Access login (a different, infrastructure redirect) can never be mistaken for the app's answer:
+      // apiGet already fails on a cloudflareaccess.com / /cdn-cgi/access/ redirect.
+      const showroom = await apiGet(context, "/showroom");
+      expect([301, 302, 303, 307, 308], `/showroom answered HTTP ${showroom.status()}`).toContain(showroom.status());
+      const dest = new URL(showroom.headers()["location"] ?? "", required("ACCEPTANCE_BASE_URL"));
+      expect(`${dest.origin}${dest.pathname}`, "/showroom must ask a signed-out visitor to sign in (same origin)").toBe(
+        `${new URL(required("ACCEPTANCE_BASE_URL")).origin}/auth/sign-in`,
+      );
     } finally {
       await context.close();
     }

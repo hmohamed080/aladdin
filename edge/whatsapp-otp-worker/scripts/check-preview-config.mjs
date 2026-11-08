@@ -51,8 +51,8 @@ must(Array.isArray(config.triggers?.crons) && config.triggers.crons.length >= 1,
 must(!("OTP_DAILY_SEND_LIMIT" in (config.vars ?? {})), "the send budget is a Super Admin setting in D1, not an environment variable");
 must(/^https:\/\/[a-z0-9.-]+\/api\/internal\/whatsapp-otp\/notify$/.test(String(config.vars?.OTP_NOTIFY_URL ?? "")), "OTP_NOTIFY_URL must be the https URL of the app's notification endpoint");
 must(!JSON.stringify(config).includes("SUPABASE_SEND_SMS_HOOK_SECRET"), "the Supabase Send-SMS-hook secret must not be bound: Supabase Phone Auth is never activated for this flow");
-must(config.vars?.OTP_ENVIRONMENT === "acceptance" && config.vars?.OTP_RECIPIENT_MODE === "allowlist", "the Acceptance Worker must be environment=acceptance with the recipient allowlist enforced");
-must(!("OTP_ALLOWED_RECIPIENTS" in (config.vars ?? {})) && !JSON.stringify(config.vars ?? {}).includes("+20"), "the recipient allowlist (phone numbers) must be set in the Worker dashboard, never in the repository");
+must(config.vars?.OTP_ENVIRONMENT === "acceptance" && config.vars?.OTP_RECIPIENT_MODE === "open", "the Acceptance Worker must be environment=acceptance with recipient mode open (owner decision: no allowlist, no dedicated test number)");
+must(!("OTP_ALLOWED_RECIPIENTS" in (config.vars ?? {})) && !JSON.stringify(config).includes("OTP_ALLOWED_RECIPIENTS") && !JSON.stringify(config.vars ?? {}).includes("+20"), "no recipient allowlist variable, binding or phone number may be in the repository (recipient mode is open)");
 must(!("WHATSAPP_GRAPH_BASE_URL" in (config.vars ?? {})), "the Graph URL override is for local rigs only");
 must(!config.secrets?.required?.length, "do not require an unprovisioned per-Worker signing secret");
 must(config.vars?.WHATSAPP_PHONE_NUMBER_ID === "1458603463983505", "unexpected WhatsApp sender");
@@ -62,4 +62,4 @@ if (errors.length) {
   console.error("OTP Preview configuration BLOCKED:\n" + errors.map(s => "- " + s).join("\n"));
   process.exit(1);
 }
-console.log("OTP Preview configuration PASS: isolated Worker, Acceptance D1, Secrets Store bindings (Meta token + R2 signing secret), allowlist mode, delivery disabled");
+console.log("OTP Preview configuration PASS: isolated Worker, Acceptance D1, Secrets Store bindings (Meta token + R2 signing secret), recipient mode open, delivery disabled");
