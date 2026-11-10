@@ -111,8 +111,8 @@ select is((select primary_account_type::text from public.users where id='4444444
 -- now only remaining) gate is the mandatory username step — the persona/
 -- consumer/organization-setup handoff sub-states no longer exist as return
 -- values of my_registration_state().
-select is((select public.my_registration_state()), 'username_pending',
-  'a professional selection with no username yet lands on username_pending');
+select is((select public.my_registration_state()), 'access_ready',
+  'a professional selection with no username yet lands on access_ready (P1 M1: username_pending is gone)');
 -- handoff is audited (audit_log is admin-read-only under RLS, so read as superuser)
 reset role;
 select is(
@@ -133,14 +133,14 @@ select lives_ok(
   're-selecting the consumer track is allowed (account type not silently locked)');
 select is((select selected_persona from public.onboarding_progress where user_id='44444444-4444-4444-8444-444444444444'),
   null, 'the consumer track stores a null concrete account type');
-select is((select public.my_registration_state()), 'username_pending',
-  'a consumer selection with no username yet also lands on username_pending');
+select is((select public.my_registration_state()), 'access_ready',
+  'a consumer selection with no username yet also lands on access_ready');
 -- business track -> still gated on the mandatory username step, same as every track
 select lives_ok(
   $$ select public.onboarding_select_account_type('business','supplier') $$,
   'a business selection is recorded');
-select is((select public.my_registration_state()), 'username_pending',
-  'a business selection with no username yet also lands on username_pending');
+select is((select public.my_registration_state()), 'access_ready',
+  'a business selection with no username yet also lands on access_ready');
 
 -- ===== authorization: caller-scoped writes =====
 -- direct client writes to the progress table are denied (RPC-only)

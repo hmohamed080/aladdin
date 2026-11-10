@@ -12,7 +12,7 @@ select no_plan();
 -- ---------------------------------------------------------------------------
 -- 0. Previous definitions (verbatim bodies) and an error-capture helper
 -- ---------------------------------------------------------------------------
--- app.profile_completion as of 20261024090011_installer_profile_completion.sql.
+-- app.profile_completion as of 20261024090011_installer_profile_completion.sql, minus the username criterion (P1 M1).
 create function pg_temp.profile_completion_before(p_user_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -39,8 +39,9 @@ begin
   v_persona := coalesce(app.effective_persona(v_uid), v_op.selected_persona);
   v_org_type := v_op.selected_org_type;
 
-  v_total := v_total + 4;
-  if v_profile.username is not null then v_done := v_done + 1; else v_missing := array_append(v_missing, 'username'); end if;
+  -- P1 M1 (20261110090001): the 'username' criterion is retired, so this reference copy drops it too and keeps
+  -- comparing only what 20261107090002 changed (organization_links).
+  v_total := v_total + 3;
   if v_profile.avatar_media_id is not null then v_done := v_done + 1; else v_missing := array_append(v_missing, 'avatar'); end if;
   if v_profile.phone_e164 is not null then v_done := v_done + 1; else v_missing := array_append(v_missing, 'phone'); end if;
   if v_profile.display_name_confirmed_at is not null then v_done := v_done + 1; else v_missing := array_append(v_missing, 'display_name'); end if;
