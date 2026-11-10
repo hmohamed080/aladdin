@@ -1,3 +1,11 @@
+## 2026-11-10 - Account identity Phase 1 PR-0: master plan v1.1, impact inventory, migration design, PR matrix (docs only, draft PR)
+
+- Scope: documentation only. Added [master plan v1.1](../architecture/ACCOUNT_IDENTITY_LIFECYCLE_MASTER_PLAN.md) (decisions D-18..D-23, corrected 2026-11-10 baseline, stranding / audit_log / age-gate findings, open-PR matrix, M1-M3 plan, risks, blockers; no checkbox ticked), [account-identity/](account-identity/README.md) with the impact inventory, migration design and PR conflict matrix.
+- Facts come from read-only subagent audits of `main` `1b00ff4` and the hosted Production and Acceptance projects (both 207 migrations ending `20261107090006`); this session touched no hosted resource, ran no SQL, changed no code or migration, deployed and merged nothing.
+- Follow-ups not done here: `CLAUDE.md` lines 46-47 and `PRODUCT.md` 65-66 change with the app work; ADR-0025/0026, DECISION_LOG and frontend/admin docs get annotations then.
+- Validation: `python scripts/check_doc_links.py`, tracked-file, `.pen` and conflict-marker checks (the CI `docs` job steps) run locally; results in the PR description.
+- **Unfinished / unverified:** audit findings are subagent-reported and need reviewer verification; owner decisions pending (audit_log redaction, #128/#129 fate and relabel, legal sign-off on age attestation, `identities.identity_data` cleanup); PR-1 (M1) and PR-2..PR-5 not started.
+
 ## 2026-11-05 — Showroom social and website links in business onboarding (draft PR)
 
 - Scope: owner-approved design [showroom-social-links-onboarding.md](../frontend/showroom-social-links-onboarding.md). A showroom needs at least one valid Facebook, Instagram, TikTok or website link to leave step 1 of `/onboarding/business`; existing showrooms are not blocked and get one profile-completion item. Branch `feat/showroom-social-links-20261105`, not pushed, no PR, nothing applied to Acceptance or Production.

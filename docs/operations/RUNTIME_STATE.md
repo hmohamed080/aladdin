@@ -1,3 +1,7 @@
+## Account identity Phase 1 planning (draft PR-0, docs only) - 2026-11-10
+- Branch `docs/p1-username-dob-plan-20261110` from `main` `1b00ff4`: plan v1.1, impact inventory, migration design, PR matrix under `docs/operations/account-identity/`. No code, SQL or migration; nothing applied or deployed.
+- Hosted state read-only (subagent-reported): Production and Acceptance both 207 migrations ending `20261107090006` (the "4 pending" note in the migration rollout section below is stale). Planned migrations M1 `20261110090001`, M2 `20261111090001`, M3 `20261111090002` are design only.
+
 # Runtime State
 
 ## Migration rollout preparation (PRs #148 merged, #153 open) — 2026-11-08
