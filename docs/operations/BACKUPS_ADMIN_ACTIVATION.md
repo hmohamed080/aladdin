@@ -29,7 +29,7 @@ Verified locally on 2026-11-10 (no hosted access): `plan-test.sh` 86/86, `restor
 
 ## Owner GO list: Production (separate GO per step; after Track C/D prerequisites)
 
-P1. Production at 207 migrations (090006 present) and a fresh backup per the rehearsal runbook (other tracks).
+P1. Production already has `20261107090006` applied (read-only `list_migrations` on 2026-11-10: latest entry `admin_backup_control`). No migration step remains for this track.
 P2. `backup-control-production`, `backup-production`, `backup-check-production`, `restore-test-production` environments with a different restore-test key.
 P3. `admin-initialize.sh` for `production` (same preflight/`--apply`).
 P4. `BACKUP_GITHUB_TOKEN` on `aladdin-frontend-production` plus Promote version.
