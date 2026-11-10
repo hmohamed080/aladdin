@@ -7485,3 +7485,7 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 
 - Owner temporarily disabled Turnstile on Acceptance only. Plan updated: read-only before/after verification (Acceptance widget absent, Production widget present, owner confirms the Auth CAPTCHA switches), Playwright registration through the existing headed-CDP runner after the account-creation GO, Email OTP stays a real step, no Admin approval bypass, no Turnstile coverage claimed while disabled, re-enable and re-verify before the security E2E. Runbook section 12 updated.
 - NOT done: account creation, any hosted change.
+
+## 2026-11-10 - Reconcile baseline comparison (agent, nothing hosted)
+
+- `scripts/r2-reconcile.mjs` gained `--full-fingerprints` and `--baseline <file>` (pure `diffBaseline`, tested): known defects stay counted, only new ones fail the run, repaired ones are reported as resolved, truncated/malformed baselines are refused. 14 node tests pass. Runbook section 12 documents it. Nothing deleted, retired or suppressed.

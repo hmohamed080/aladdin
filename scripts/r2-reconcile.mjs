@@ -120,16 +120,41 @@ export function windowReport(rows, since) {
     ok: supabaseCreated + missingStorageKey + badKeyShape + ownerMismatch === 0, allFlowsCovered: uncovered.length === 0 };
 }
 
+const BASELINE_KINDS = ["missing", "sizeMismatch", "orphan", "orphanVariant", "retiredLeft", "stalePending"];
+
+/**
+ * Separates defects that were already known (an earlier run's fingerprints) from new ones. Nothing is hidden: counts stay as
+ * reported and the known ones are listed as a number, so a baseline never makes a defect disappear. Needs complete
+ * fingerprint lists (`--full-fingerprints`) on both sides; a truncated list cannot be compared and is refused.
+ */
+export function diffBaseline(result, baseline) {
+  const out = { known: 0, newDefects: 0, resolved: 0, perKind: {} };
+  for (const kind of BASELINE_KINDS) {
+    const now = result.samples[kind] ?? [];
+    if (now.length < (result.counts[kind] ?? 0)) throw new ReconcileOperatorError(`${kind} fingerprints are truncated; rerun with --full-fingerprints`);
+    const before = baseline[kind] ?? [];
+    if (!Array.isArray(before) || before.some((f) => !/^[0-9a-f]{10}$/.test(f))) throw new ReconcileOperatorError(`baseline ${kind} must be a list of 10-hex fingerprints`);
+    const known = new Set(before), current = new Set(now);
+    const added = now.filter((f) => !known.has(f)).length;
+    const resolved = before.filter((f) => !current.has(f)).length;
+    out.perKind[kind] = { known: now.length - added, newDefects: added, resolved };
+    out.known += now.length - added; out.newDefects += added; out.resolved += resolved;
+  }
+  return out;
+}
+
 export function parseArgs(argv) {
-  const out = { project: null, maxAgeHours: 48, json: false, allowOrphans: false, since: null };
+  const out = { project: null, maxAgeHours: 48, json: false, allowOrphans: false, since: null, baseline: null, fullFingerprints: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--json") out.json = true;
     else if (arg === "--allow-orphans") out.allowOrphans = true;
-    else if (arg === "--project" || arg === "--max-age-hours" || arg === "--since") {
+    else if (arg === "--full-fingerprints") out.fullFingerprints = true;
+    else if (arg === "--project" || arg === "--max-age-hours" || arg === "--since" || arg === "--baseline") {
       const value = argv[++i];
       if (value === undefined || value.startsWith("--")) throw new ReconcileOperatorError(`${arg} needs a value`);
       if (arg === "--project") out.project = value;
+      else if (arg === "--baseline") out.baseline = value;
       else if (arg === "--since") {
         if (!Number.isFinite(new Date(value).getTime())) throw new ReconcileOperatorError("--since must be an ISO timestamp");
         out.since = value;
@@ -140,6 +165,7 @@ export function parseArgs(argv) {
     } else throw new ReconcileOperatorError(`Unknown option ${arg}`);
   }
   if (!out.project) throw new ReconcileOperatorError("Explicit --project is required");
+  if (out.baseline) out.fullFingerprints = true;
   return out;
 }
 
@@ -182,11 +208,15 @@ export async function main(argv = process.argv.slice(2)) {
   const require = createRequire(new URL("../frontend/package.json", import.meta.url));
   const supabase = require("@supabase/supabase-js").createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const [rows, objects] = await Promise.all([fetchRows(supabase), listBucket(env)]);
-  const result = reconcile(rows.filter((r) => r.provider === "r2"), objects, { maxAgeHours: options.maxAgeHours });
+  const result = reconcile(rows.filter((r) => r.provider === "r2"), objects,
+    { maxAgeHours: options.maxAgeHours, sampleLimit: options.fullFingerprints ? Infinity : 10 });
   const window = options.since ? windowReport(rows, options.since) : undefined;
-  console.log(JSON.stringify({ project, readOnly: true, bucket: env.R2_PRIVATE_BUCKET, ...result, ...(window ? { window } : {}) }, null, options.json ? 0 : 2));
+  const baseline = options.baseline ? diffBaseline(result, JSON.parse((await import("node:fs")).readFileSync(options.baseline, "utf8")).samples ?? {}) : undefined;
+  console.log(JSON.stringify({ project, readOnly: true, bucket: env.R2_PRIVATE_BUCKET, ...result, ...(baseline ? { baseline } : {}), ...(window ? { window } : {}) }, null, options.json ? 0 : 2));
   const orphans = result.counts.orphan + result.counts.orphanVariant;
-  if (!result.ok || (!options.allowOrphans && orphans > 0) || (window && !(window.ok && window.allFlowsCovered))) process.exitCode = 1;
+  // With a baseline the run fails only on defects the baseline did not already list; without one, every defect fails as before.
+  const defectsFail = baseline ? baseline.newDefects > 0 : (!result.ok || (!options.allowOrphans && orphans > 0));
+  if (defectsFail || (window && !(window.ok && window.allFlowsCovered))) process.exitCode = 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

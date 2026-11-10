@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseArgs, physicalKey, reconcile, variantKeys, windowReport } from "./r2-reconcile.mjs";
+import { diffBaseline, parseArgs, physicalKey, reconcile, variantKeys, windowReport } from "./r2-reconcile.mjs";
 
 const U = "11111111-1111-1111-1111-111111111111";
 const M = "22222222-2222-2222-2222-222222222222";
@@ -67,7 +67,7 @@ test("arguments: explicit project, bounded age, unknown options refused", () => 
   assert.throws(() => parseArgs([]), /--project/);
   assert.throws(() => parseArgs(["--project", "x", "--max-age-hours", "0"]), /1\.\.720/);
   assert.throws(() => parseArgs(["--project", "x", "--delete"]), /Unknown option/);
-  assert.deepEqual(parseArgs(["--project", "abc", "--allow-orphans"]), { project: "abc", maxAgeHours: 48, json: false, allowOrphans: true, since: null });
+  assert.deepEqual(parseArgs(["--project", "abc", "--allow-orphans"]), { project: "abc", maxAgeHours: 48, json: false, allowOrphans: true, since: null, baseline: null, fullFingerprints: false });
   assert.equal(parseArgs(["--project", "abc", "--since", "2026-11-08T10:00:00Z"]).since, "2026-11-08T10:00:00Z");
   assert.throws(() => parseArgs(["--project", "abc", "--since", "yesterday"]), /ISO/);
 });
@@ -100,4 +100,27 @@ test("window check: the id inside the key must be the record's own owner or orga
   const wrong = windowReport([fresh("avatar", { owner_user_id: "55555555-5555-5555-5555-555555555555" }), fresh("product", { organization_id: null, storage_key: `o/${O}/products/${M}/${M}/original.png` })], hoursAgo(2));
   assert.equal(wrong.ownerMismatch, 2);
   assert.equal(wrong.ok, false);
+});
+
+test("baseline: known defects stay counted but only new ones are new; truncated lists are refused", () => {
+  const rows = [idsRow, legacyRow];
+  const before = reconcile(rows, [], { now: NOW, sampleLimit: Infinity });
+  assert.equal(before.counts.missing, 2);
+  const same = diffBaseline(before, before.samples);
+  assert.deepEqual([same.known, same.newDefects, same.resolved], [2, 0, 0]);
+  // a fresh missing row appears later; the earlier two are still reported by count, but only one is new
+  const extra = { ...idsRow, object_key: "b.jpg", storage_key: `u/${U}/profile/33333333-3333-3333-3333-333333333333/original.jpg` };
+  const after = reconcile([...rows, extra], [], { now: NOW, sampleLimit: Infinity });
+  const diff = diffBaseline(after, before.samples);
+  assert.deepEqual([after.counts.missing, diff.known, diff.newDefects], [3, 2, 1]);
+  // a repaired defect is reported as resolved, never silently dropped
+  const fixed = reconcile([idsRow], [obj(idsKey)], { now: NOW, sampleLimit: Infinity });
+  assert.deepEqual([diffBaseline(fixed, before.samples).resolved, diffBaseline(fixed, before.samples).newDefects], [2, 0]);
+  const truncated = reconcile([idsRow, legacyRow, extra], [], { now: NOW, sampleLimit: 1 });
+  assert.throws(() => diffBaseline(truncated, before.samples), /truncated/);
+  assert.throws(() => diffBaseline(after, { missing: ["not-a-fingerprint"] }), /10-hex/);
+});
+
+test("arguments: --baseline implies complete fingerprints", () => {
+  assert.deepEqual([parseArgs(["--project", "p", "--baseline", "b.json"]).fullFingerprints, parseArgs(["--project", "p"]).fullFingerprints], [true, false]);
 });
