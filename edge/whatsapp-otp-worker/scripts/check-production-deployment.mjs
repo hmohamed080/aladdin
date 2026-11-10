@@ -9,9 +9,10 @@
 //   1. DEPLOYMENT      `wrangler deployments status --name aladdin-whatsapp-otp-production --json`: exactly one version at 100%.
 //   2. CONFIGURATION   `wrangler versions view <that version> --json`: the deployed bindings are EXACTLY what wrangler.production.jsonc declares
 //                      (D1, the five Secrets Store secrets, the APP_NOTIFY service binding, the plain variables, nothing extra), and the
-//                      safety variables read WHATSAPP_DELIVERY_ENABLED="false", OTP_RECIPIENT_MODE="open", OTP_ENVIRONMENT="production".
+//                      safety variables read WHATSAPP_DELIVERY_ENABLED="true" or "false" (the permit; equal to the declared value above), OTP_RECIPIENT_MODE="open", OTP_ENVIRONMENT="production".
 //                      The config file itself must have workers_dev=false and no routes.
-//   3. D1 SWITCH       one SELECT: otp_delivery_switch, otp_delivery_audit and otp_delivery_attestation are EMPTY (delivery has never been
+//   3. D1 SWITCH       one SELECT: otp_delivery_switch, otp_delivery_audit are EMPTY and no attestation says ON (the app's signed OFF
+//                      attestation is expected once the promoted frontend is live; delivery has never been
 //                      switched on, so nothing can send) and otp_alert_state has its single seed row.
 //   4. PRIVATE ROUTING two unauthenticated GETs that must NOT reach the Worker (the Worker answers any GET with a JSON 404 whose body is {}):
 //                      its workers.dev address and a path on the Production site. A response with that fingerprint, or any 2xx, fails.
@@ -33,7 +34,7 @@ const CONFIG = path.join(HERE, "..", "wrangler.production.jsonc");
 
 export const SWITCH_SQL =
   "select (select count(*) from otp_delivery_switch) as sw, (select count(*) from otp_delivery_audit) as au, " +
-  "(select count(*) from otp_delivery_attestation) as att, (select count(*) from otp_alert_state) as al";
+  "(select count(*) from otp_delivery_attestation where enabled = 1) as att, (select count(*) from otp_alert_state) as al";
 
 export function parseJsonc(text) {
   let out = "";
@@ -63,7 +64,7 @@ export function checkConfigFile(config) {
   const p = [];
   if (config.workers_dev !== false) p.push("wrangler.production.jsonc: workers_dev must be false (the Worker must have no public address)");
   if ((config.routes ?? []).length) p.push("wrangler.production.jsonc: routes must be empty");
-  if (config.vars?.WHATSAPP_DELIVERY_ENABLED !== "false") p.push('wrangler.production.jsonc: WHATSAPP_DELIVERY_ENABLED must be "false"');
+  if (!["true", "false"].includes(config.vars?.WHATSAPP_DELIVERY_ENABLED)) p.push('wrangler.production.jsonc: WHATSAPP_DELIVERY_ENABLED must be the literal "true" or "false"');
   return p;
 }
 
@@ -101,7 +102,7 @@ export function checkBindings(view, expected) {
   }
   for (const name of got.keys()) if (!(name in expected)) p.push(`unexpected binding ${name} on the deployed version`);
   const v = (n) => got.get(n)?.text;
-  if (v("WHATSAPP_DELIVERY_ENABLED") !== "false") p.push('WHATSAPP_DELIVERY_ENABLED is not "false" on the deployed version');
+  if (!["true", "false"].includes(v("WHATSAPP_DELIVERY_ENABLED"))) p.push('WHATSAPP_DELIVERY_ENABLED is not the literal "true" or "false" on the deployed version');
   if (v("OTP_RECIPIENT_MODE") !== "open") p.push('OTP_RECIPIENT_MODE is not "open" on the deployed version');
   if (v("OTP_ENVIRONMENT") !== "production") p.push('OTP_ENVIRONMENT is not "production" on the deployed version');
   return p;
@@ -112,7 +113,7 @@ export function checkSwitch(d1) {
   const row = d1?.[0]?.results?.[0];
   if (!row) return ["the D1 query returned no row"];
   const p = [];
-  for (const [k, label] of [["sw", "otp_delivery_switch"], ["au", "otp_delivery_audit"], ["att", "otp_delivery_attestation"]]) {
+  for (const [k, label] of [["sw", "otp_delivery_switch"], ["au", "otp_delivery_audit"], ["att", "otp_delivery_attestation (enabled=1)"]]) {
     if (Number(row[k]) !== 0) p.push(`${label} has ${row[k]} row(s): delivery has been switched or tampered with; it must be empty before activation`);
   }
   if (Number(row.al) !== 1) p.push(`otp_alert_state has ${row.al} row(s), expected the single seed row`);
