@@ -1,7 +1,7 @@
 # Track C: Production R2 provisioning and legacy-media migration preparation
 
 Date: 2026-11-10. Read-only work only. No hosted write, deploy, migration, copy, deletion or configuration change was made.
-Builds on [R2_ONLY_ROLLOUT_RUNBOOK.md](R2_ONLY_ROLLOUT_RUNBOOK.md) (PR #149, owned by Track B; not edited here).
+Builds on `R2_ONLY_ROLLOUT_RUNBOOK.md` (PR #149, owned by Track B; not edited here).
 No seven-night trial, soak period or passive-monitoring gate is introduced: every gate below is a concrete check.
 
 ## 1. Live Production facts (read-only SQL, 2026-11-10, project `kkpkgjrweysgvhvkhzun`)
