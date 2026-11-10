@@ -1,5 +1,6 @@
 ## Account identity Phase 1 planning (draft PR-0, docs only) - 2026-11-10
 - Branch `docs/p1-username-dob-plan-20261110` from `main` `1b00ff4`: plan v1.1, impact inventory, migration design, PR matrix under `docs/operations/account-identity/`. No code, SQL or migration; nothing applied or deployed.
+- 2026-11-10 follow-up (W2, docs only): PR-1 is #171 (`20261110090001`, CI green on `b30ad71d`, run `42848064753`); #128/#129 are on HOLD; the audit_log redaction design is approved but not executed anywhere (draft SQL and tests under `docs/operations/account-identity/drafts/`, local proof 39 of 39); Auth `identity_data` copy of `birth_date` cannot be cleaned by a supported API (owner decision); the 13 local permission-gate deviations are a CLI 3.0.0 image artifact (the pinned CLI 2.110.0 passes). Evidence: `docs/operations/account-identity/P1-EVIDENCE.md`. Nothing applied or deployed.
 - Hosted state read-only (subagent-reported): Production and Acceptance both 207 migrations ending `20261107090006` (the "4 pending" note in the migration rollout section below is stale). Planned migrations M1 `20261110090001`, M2 `20261111090001`, M3 `20261111090002` are design only.
 
 # Runtime State
