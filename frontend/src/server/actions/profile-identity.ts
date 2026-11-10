@@ -7,7 +7,6 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 import { SECURITY_CODES, defaultSecurityDeps, performPhoneChange } from "@/server/auth/installer-security";
 import { resolveSecuritySession } from "@/server/auth/security-session";
-import { changeUsername, type UsernameResult } from "@/server/identity/username-change";
 
 /**
  * The identity fields every audience shares — display name, phone, avatar —
@@ -41,17 +40,6 @@ export async function setDisplayNameAction(
   }
   revalidateIdentity();
   return { ok: true };
-}
-
-/** The caller's own username, through `profile_set_username` (see `server/identity/username-change.ts`). Returns the stored value. */
-export type UsernameFieldState = { ok: boolean; code?: string; username?: string };
-
-export async function setUsernameAction(_prev: UsernameFieldState, fd: FormData): Promise<UsernameFieldState> {
-  const supabase = await getServerSupabase();
-  const result: UsernameResult = await changeUsername(supabase, fd.get("username"));
-  if (!result.ok) return { ok: false, code: result.code };
-  revalidateIdentity();
-  return { ok: true, username: result.username };
 }
 
 export async function setPhoneAction(

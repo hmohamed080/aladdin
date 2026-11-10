@@ -143,10 +143,7 @@ describe("legacy /preview/auth-password/* URLs are server-side redirects to /aut
     await expect(LegacySignIn(params({}))).rejects.toThrow(/^REDIRECT:\/auth\/sign-in$/);
   });
 
-  it("finish-registration forwards only the allow-listed reason", async () => {
-    await expect(LegacyFinish(params({ reason: "username_unavailable" }))).rejects.toThrow(
-      "REDIRECT:/auth/finish-registration?reason=username_unavailable",
-    );
-    await expect(LegacyFinish(params({ reason: "<script>" }))).rejects.toThrow(/^REDIRECT:\/auth\/finish-registration$/);
+  it("finish-registration drops every query parameter, including the retired username reason", () => {
+    expect(() => LegacyFinish()).toThrow(/^REDIRECT:\/auth\/finish-registration$/);
   });
 });

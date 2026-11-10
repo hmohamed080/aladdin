@@ -36,7 +36,6 @@ function profile(overrides: Record<string, unknown> = {}) {
   return {
     display_name: "Fixture User",
     display_name_confirmed_at: "2026-10-01T10:00:00.000Z",
-    username: "fixtureuser",
     phone_country_iso2: "EG",
     phone_national: "1011112222",
     phone_e164: NUMBER,

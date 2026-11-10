@@ -3,7 +3,7 @@ import { randomInt } from "node:crypto";
 import { resolve } from "node:path";
 import { expect, type Page } from "@playwright/test";
 import { latestOutboxEntry } from "../../src/server/phone-verification/outbox-reader";
-import { E2E_PASSWORD, fillBirthDate, reachLanding, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline, waitForCaptchaToken } from "./auth";
+import { E2E_PASSWORD, confirmAge, reachLanding, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline, waitForCaptchaToken } from "./auth";
 
 /**
  * Mobile-number sign-up (ADR-0025) through the REAL `/auth/sign-up` and server actions, proven by the ONE phone verification authority.
@@ -59,10 +59,6 @@ export function uniquePhone(): string {
   return `010${String(Date.now()).slice(-5)}${String(randomInt(1000)).padStart(3, "0")}`;
 }
 
-export function uniquePhoneUsername(): string {
-  return `ph${Date.now().toString(36)}${randomInt(36 ** 3).toString(36)}`.slice(0, 24);
-}
-
 export function e164Of(nationalPhone: string): string {
   return `+20${nationalPhone.slice(1)}`;
 }
@@ -90,15 +86,14 @@ export async function readSignUpCode(e164: string, since: number, waitMs = 15_00
 /** Submits the sign-up form with a mobile number and waits for the WhatsApp code step. Returns when the code was requested (ms epoch). */
 export async function requestPhoneSignUp(
   page: Page,
-  { phone, name, username, password = E2E_PASSWORD, type = "installer_technician" }: { phone: string; name: string; username: string; password?: string; type?: string },
+  { phone, name, password = E2E_PASSWORD, type = "installer_technician" }: { phone: string; name: string; password?: string; type?: string },
 ): Promise<number> {
   await stubTurnstileWhenOffline(page);
   await page.goto(`/auth/sign-up?type=${type}`);
   await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(phone);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
-  await fillBirthDate(page);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill(name);
-  await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
+  await confirmAge(page);
   await waitForCaptchaToken(page);
   const since = Date.now() - 1_000;
   if (deliveryViaRig) await rigAllow(e164Of(phone));
@@ -129,8 +124,8 @@ export async function verifyPhoneSignUp(page: Page, e164: string, since: number,
 /** Full mobile-number registration; leaves the browser signed in. */
 export async function registerWithPhone(
   page: Page,
-  options: { phone: string; name: string; username?: string; password?: string; type?: string },
+  options: { phone: string; name: string; password?: string; type?: string },
 ): Promise<void> {
-  const since = await requestPhoneSignUp(page, { username: uniquePhoneUsername(), ...options });
+  const since = await requestPhoneSignUp(page, options);
   await verifyPhoneSignUp(page, e164Of(options.phone), since);
 }

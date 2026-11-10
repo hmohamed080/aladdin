@@ -58,7 +58,6 @@ function detail(id: string, over: Partial<AdminUserDetail> = {}): AdminUserDetai
   return {
     id,
     displayName: { name: "Some Person", nameAr: null, nameEn: null },
-    username: null,
     email: "person@example.test",
     phone: null,
     accountType: null,

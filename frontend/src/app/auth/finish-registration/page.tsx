@@ -7,21 +7,14 @@ import { FinishRegistrationScreen } from "@/features/auth-password-preview/finis
 export const dynamic = "force-dynamic";
 
 /**
- * Canonical password auth's own minimal finish-registration screen —
- * correction #2 of the (historical) staging-prep plan: "A refresh or direct navigation must NOT allow a
- * verified user with no username to bypass this requirement. Do not send
- * this user into the legacy six-step onboarding wizard." Reached from
- * `verifyPasswordSignUp`'s `postSessionRedirect` whenever the caller is
- * verified + consented but the pending-registration state (Increment 6)
- * either never landed or lost a username-collision race — covers BOTH
- * possible gaps (account_type_pending, username_pending), re-derived fresh
- * from `my_registration_state()` on every load, never from client state.
+ * Canonical password auth's own minimal finish-registration screen. Reached from
+ * `verifyPasswordSignUp`'s `postSessionRedirect` whenever the caller is verified
+ * + consented but the pending-registration state either never landed or the
+ * account type is still missing. The state is re-derived fresh from
+ * `my_registration_state()` on every load, never from client state. (The username
+ * gap no longer exists: Phase 1 of the account-identity plan removed the username.)
  */
-export default async function FinishRegistrationPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ reason?: string | string[] }>;
-}) {
+export default async function FinishRegistrationPage() {
   const supabase = await getServerSupabase();
   const {
     data: { user },
@@ -30,17 +23,8 @@ export default async function FinishRegistrationPage({
 
   const state = await getRegistrationState();
   if (state === "active_personal" || state === "access_ready") redirect(await activeLandingPath());
-  if (state !== "account_type_pending" && state !== "username_pending") redirect("/onboarding");
+  // Anything but the missing account type (including a legacy "username_pending" from a pre-M1 database) goes to /onboarding.
+  if (state !== "account_type_pending") redirect("/onboarding");
 
-  // `reason` only chooses explanatory copy (allow-listed literal); it never
-  // grants or skips anything — the state above is re-derived from the DB.
-  const reason = (await searchParams)?.reason;
-  const usernameUnavailable = state === "username_pending" && reason === "username_unavailable";
-
-  return (
-    <FinishRegistrationScreen
-      needsAccountType={state === "account_type_pending"}
-      usernameUnavailable={usernameUnavailable}
-    />
-  );
+  return <FinishRegistrationScreen />;
 }

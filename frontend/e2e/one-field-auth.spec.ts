@@ -1,7 +1,6 @@
 import { randomInt } from "node:crypto";
 import { test, expect, type Page } from "@playwright/test";
 import {
-  E2E_BIRTH_DATE,
   E2E_PASSWORD,
   reachLanding,
   SIGN_IN_BUTTON,
@@ -10,7 +9,7 @@ import {
   stubTurnstileWhenOffline,
   waitForCaptchaToken,
 } from "./helpers/auth";
-import { deliveryViaRig, e164Of, readSignUpCode, rigClaims, rigFailNext, rigMessages, requestPhoneSignUp, sqlValue as sql, submitPhoneCode, uniquePhone, uniquePhoneUsername as uniqueUsername, verifyPhoneSignUp } from "./helpers/phone-sign-up";
+import { deliveryViaRig, e164Of, readSignUpCode, rigClaims, rigFailNext, rigMessages, requestPhoneSignUp, sqlValue as sql, submitPhoneCode, uniquePhone, verifyPhoneSignUp } from "./helpers/phone-sign-up";
 
 /**
  * One-field sign in and mobile-number sign up (ADR-0025), end to end against
@@ -63,7 +62,7 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     }
   });
 
-  test("sign in is one identifier field; sign up asks for mobile number or email and a birthday", async ({ page }) => {
+  test("sign in is one identifier field; sign up asks for mobile number or email and an 18+ confirmation", async ({ page }) => {
     await page.goto("/auth/sign-in");
     await expect(page.getByLabel(SIGN_IN_IDENTIFIER_LABEL)).toHaveCount(1);
     await expect(page.locator('input[type="tel"], input[type="email"]')).toHaveCount(0);
@@ -71,20 +70,21 @@ test.describe("one-field sign in and mobile-number sign up", () => {
 
     await page.goto("/auth/sign-up");
     await expect(page.getByLabel(SIGN_UP_CONTACT_LABEL)).toHaveCount(1);
-    await expect(page.locator('input[name="birthDate"]')).toHaveCount(1);
-    await expect(page.locator('input[name="confirmPassword"], input[type="checkbox"]')).toHaveCount(0);
+    await expect(page.locator('input[name="birthDate"], input[name="username"]')).toHaveCount(0); // neither is collected any more
+    await expect(page.locator('input[type="checkbox"]')).toHaveCount(1);
+    await expect(page.locator('input[name="ageConfirmed"]')).toHaveCount(1);
+    await expect(page.locator('input[name="confirmPassword"]')).toHaveCount(0);
   });
 
   const outbox = process.env.PHONE_OTP_DELIVERY === "outbox" || deliveryViaRig;
 
-  test("a mobile number signs up with a WhatsApp code, then signs in by number or username", async ({ page }) => {
+  test("a mobile number signs up with a WhatsApp code, then signs in by number", async ({ page }) => {
     test.skip(!outbox, "needs PHONE_OTP_DELIVERY=outbox and E2E_NEXT_MODE=dev (see helpers/phone-sign-up.ts)");
     const phone = uniquePhone();
     const e164 = e164Of(phone);
-    const username = uniqueUsername();
     const name = `Phone Tester ${phone.slice(-4)}`;
 
-    const since = await requestPhoneSignUp(page, { phone, name, username });
+    const since = await requestPhoneSignUp(page, { phone, name });
     // Nothing exists yet but the pending challenge: no Auth user and no profile before the code is verified.
     expect(sql(`select count(*) from public.profiles where phone_e164 = '${e164}';`)).toBe("0");
     expect(sql(`select count(*) from auth.users where email like 'p${e164.slice(1)}@%';`)).toBe("0");
@@ -95,8 +95,8 @@ test.describe("one-field sign in and mobile-number sign up", () => {
       select a.raw_app_meta_data->>'registration_source',
              a.phone is null,
              p.display_name,
-             p.username,
-             u.birth_date,
+             p.username is null,
+             u.birth_date is null,
              (select count(distinct consent_type) from public.consent_receipts c where c.user_id = a.id),
              p.phone_verified_at is not null,
              (select count(*) from app.phone_signup_grants g where g.consumed_user_id = a.id and g.attached_at is not null and g.phone_e164 = p.phone_e164),
@@ -105,12 +105,13 @@ test.describe("one-field sign in and mobile-number sign up", () => {
       join auth.users a on a.id = p.user_id
       join public.users u on u.id = a.id
       where p.phone_e164 = '${e164}';`);
-    const [source, noAuthPhone, displayName, storedUsername, birthDate, consents, verified, attachedGrants, aliasUsers] = row.split("|");
+    const [source, noAuthPhone, displayName, noUsername, noBirthDate, consents, verified, attachedGrants, aliasUsers] = row.split("|");
     expect(source).toBe("phone_whatsapp_sign_up");
     expect(noAuthPhone).toBe("t");
     expect(displayName).toBe(name);
-    expect(storedUsername).toBe(username);
-    expect(birthDate).toBe(E2E_BIRTH_DATE);
+    // Neither the username nor the birth date is stored any more.
+    expect(noUsername).toBe("t");
+    expect(noBirthDate).toBe("t");
     expect(consents).toBe("3");
     // The proof is attached to exactly the proven number, and exactly one Auth user holds the alias.
     expect(verified).toBe("t");
@@ -125,17 +126,13 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
     await expectNoAlias(page);
 
-    // ...and by username.
-    await page.context().clearCookies();
-    await signInWith(page, username.toUpperCase(), E2E_PASSWORD);
-    await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
   });
 
   test("a wrong code creates no account, and the right code is still accepted afterwards", async ({ page }) => {
     test.skip(!outbox, "needs PHONE_OTP_DELIVERY=outbox and E2E_NEXT_MODE=dev");
     const phone = uniquePhone();
     const e164 = e164Of(phone);
-    const since = await requestPhoneSignUp(page, { phone, name: "Wrong Code", username: uniqueUsername() });
+    const since = await requestPhoneSignUp(page, { phone, name: "Wrong Code" });
     const code = (await readSignUpCode(e164, since))!;
     const wrong = code === "000000" ? "111111" : "000000";
     await submitPhoneCode(page, wrong);
@@ -151,7 +148,7 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     test.skip(!outbox, "needs PHONE_OTP_DELIVERY=outbox and E2E_NEXT_MODE=dev");
     const phone = uniquePhone();
     const e164 = e164Of(phone);
-    const first = await requestPhoneSignUp(page, { phone, name: "First Owner", username: uniqueUsername() });
+    const first = await requestPhoneSignUp(page, { phone, name: "First Owner" });
     await verifyPhoneSignUp(page, e164, first);
     const accountsBefore = sql(`select count(*) from auth.users where lower(email) like 'p${e164.slice(1)}@%';`);
     expect(accountsBefore).toBe("1");
@@ -161,7 +158,7 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     const other = await ctx.newPage();
     const ip = `10.${randomInt(256)}.${randomInt(256)}.${randomInt(1, 255)}`;
     await other.route("**/*", (route) => route.continue({ headers: { ...route.request().headers(), "x-forwarded-for": ip } }));
-    const since = await requestPhoneSignUp(other, { phone, name: "Someone Else", username: uniqueUsername() });
+    const since = await requestPhoneSignUp(other, { phone, name: "Someone Else" });
     expect(await readSignUpCode(e164, since, 4_000), "a registered number must receive no code").toBeNull();
     // The code step always offers the way out for people who already have an account - for every number, so it reveals nothing.
     await expect(other.locator('[data-sign-up-step="phone-code"]').locator('xpath=ancestor::main').getByRole("link", { name: /^(sign in|تسجيل الدخول)$/i }).first()).toHaveAttribute("href", "/auth/sign-in");
@@ -210,7 +207,7 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     test.skip(!deliveryViaRig, "needs the local Worker rig (E2E_WORKER_RIG_URL, PHONE_OTP_DELIVERY=worker)");
     const phone = uniquePhone(); const e164 = e164Of(phone);
     const claimsBefore = Object.values(await rigClaims()).reduce((a, b) => a + b, 0);
-    const since = await requestPhoneSignUp(page, { phone, name: "Worker Path", username: uniqueUsername() });
+    const since = await requestPhoneSignUp(page, { phone, name: "Worker Path" });
     const code = (await readSignUpCode(e164, since))!;
     const received = await rigMessages(e164);
     expect(received).toHaveLength(1);
@@ -227,7 +224,7 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     test.setTimeout(240_000); // the Resend button is on a cooldown (about a minute) before the person may ask again
     const phone = uniquePhone(); const e164 = e164Of(phone);
     await rigFailNext();
-    const since = await requestPhoneSignUp(page, { phone, name: "Meta Failure", username: uniqueUsername() });
+    const since = await requestPhoneSignUp(page, { phone, name: "Meta Failure" });
     expect(await readSignUpCode(e164, since, 4_000), "the failed delivery produced no message").toBeNull();
     expect(sql(`select count(*) from app.phone_verification_challenges where phone_e164 = '${e164}' and invalidated_why = 'delivery_failed';`)).toBe("1");
     // the person uses Resend: a NEW challenge, a new delivery id, delivered once
@@ -245,8 +242,8 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     expect(sql(`select count(*) from public.profiles where phone_e164 = '${e164}' and phone_verified_at is not null;`)).toBe("1");
   });
 
-  test("an unknown username or number gets the same generic sign-in error", async ({ page }) => {
-    for (const identifier of [uniqueUsername(), uniquePhone()]) {
+  test("an unknown number, or a handle-shaped input (usernames no longer sign in), gets the same generic sign-in error", async ({ page }) => {
+    for (const identifier of [`handle.${Date.now().toString(36)}`, uniquePhone()]) {
       await page.context().clearCookies();
       await signInWith(page, identifier, E2E_PASSWORD);
       await expect(page.getByText(/don't match|غير متطابقة/i)).toBeVisible();

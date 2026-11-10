@@ -58,7 +58,6 @@ export default async function PersonalSettingsPage() {
       <InstallerSettings
         data={{
           displayName: identity.displayName,
-          username: identity.username,
           phoneE164: identity.phoneE164,
           phoneNational: identity.phoneNational,
           phoneVerified: identity.phoneVerified,

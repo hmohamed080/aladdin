@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { resendPasswordSignUpCode, verifyPasswordSignUp, type PasswordAuthState } from "@/server/actions/auth-password-preview";
 import { requestSignUp, resendPhoneSignUpCode, verifyPhoneSignUp } from "@/server/actions/sign-up";
-import { useUsernameCheck, UsernameStatus } from "./username-check";
 import type { PhoneSignUpState } from "@/server/auth/phone-sign-up";
 import type { OAuthAvailability } from "@/server/auth/entry-oauth";
 import { AuthCard } from "@/features/auth/auth-card";
@@ -15,7 +14,7 @@ import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "./password-input";
 import { TurnstileWidget } from "./turnstile-widget";
 import { DISPLAY_NAME_MAX_LENGTH } from "./password-policy";
-import { BirthDateSelect } from "./birth-date-select";
+import { useAgeConfirmation } from "./age-confirm-checkbox";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
 
 const initial: PhoneSignUpState = { ok: false };
@@ -27,17 +26,16 @@ const PHONE_RESEND_COOLDOWN_SECONDS = 60;
 const NO_PROVIDERS: OAuthAvailability = { google: false, facebook: false };
 const CONSENT_TYPES = ["terms", "privacy", "pilot"] as const;
 
-type Field = "contact" | "password" | "birthDate" | "displayName" | "username" | "accountType" | "form";
+type Field = "contact" | "password" | "displayName" | "accountType" | "age" | "form";
 
 /** Which field a server code belongs to, so the message renders under it. */
 function fieldFor(code: string | undefined): Field | null {
   if (!code) return null;
   if (/error\.(contactInvalid|invalidEmail|phoneExists|whatsappNumberInvalid|whatsappUnavailable)$/.test(code)) return "contact";
   if (/error\.password/.test(code)) return "password";
-  if (/error\.birthDate/.test(code)) return "birthDate";
   if (/error\.fullName/.test(code)) return "displayName";
-  if (/registration\.error\.username/.test(code)) return "username";
   if (/error\.accountTypeRequired$/.test(code)) return "accountType";
+  if (/error\.ageNotConfirmed$/.test(code)) return "age";
   return "form";
 }
 
@@ -45,7 +43,6 @@ function fieldFor(code: string | undefined): Field | null {
 const PHONE_RESTART_CODES = new Set([
   "authPasswordPreview.error.phoneCodeExpired",
   "authPasswordPreview.error.phoneExists",
-  "registration.error.usernameUnavailable",
 ]);
 
 function FieldError({ code }: { code?: string }) {
@@ -55,9 +52,9 @@ function FieldError({ code }: { code?: string }) {
 
 /**
  * Registration, Instagram style: Google / Facebook first, then ONE "Mobile
- * number or email" field, password, birthday, full name, username and (unless
- * the landing page already chose it) the account type, with a single
- * agreement line instead of checkboxes. Every account type may use either:
+ * number or email" field, password, full name and (unless the landing
+ * page already chose it) the account type, a required "I am 18 or older"
+ * confirmation, and a single agreement line for the three consents. Every account type may use either:
  *
  *   * email → the canonical signUp() + 6-digit EMAIL code (Architecture B,
  *     docs/frontend/auth-password-preview.md); the password goes to signUp()
@@ -92,7 +89,7 @@ export function PasswordSignUpForm({
 
   const [editing, setEditing] = useState(false);
   const [cooldown, setCooldown] = useState(0);
-  const [values, setValues] = useState({ contact: "", displayName: "", username: "", accountType: initialAccountType });
+  const [values, setValues] = useState({ contact: "", displayName: "", accountType: initialAccountType });
   const [password, setPassword] = useState("");
   const [restartCode, setRestartCode] = useState<string | undefined>();
 
@@ -101,8 +98,8 @@ export function PasswordSignUpForm({
   const contact = sendState.email ?? "";
   const errorField = fieldFor(sendState.ok ? undefined : sendState.code);
   const errorFor = (field: Field) => (errorField === field ? sendState.code : undefined);
+  const age = useAgeConfirmation(sendState.ok ? undefined : sendState.code);
   const set = (key: keyof typeof values) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: e.target.value }));
-  const usernameCheck = useUsernameCheck(values.username);
 
   useEffect(() => {
     if (sendState.ok) {
@@ -114,7 +111,7 @@ export function PasswordSignUpForm({
     }
   }, [sendState]);
 
-  // The pending phone sign-up is gone (expired, or the number / username was
+  // The pending phone sign-up is gone (expired, or the number was
   // taken meanwhile): back to the filled-in form, with the reason on top.
   useEffect(() => {
     if (phoneVerifyState.code && PHONE_RESTART_CODES.has(phoneVerifyState.code)) {
@@ -243,7 +240,7 @@ export function PasswordSignUpForm({
         </>
       ) : null}
 
-      <form action={dispatchSend} className="flex flex-col gap-sm" noValidate data-sign-up-step="details">
+      <form action={dispatchSend} onSubmit={age.guardSubmit} className="flex flex-col gap-sm" noValidate data-sign-up-step="details">
         <FieldError code={restartCode} />
 
         <label htmlFor="contact" className="sr-only">{t("authPasswordPreview.signUp.contactLabel")}</label>
@@ -277,13 +274,6 @@ export function PasswordSignUpForm({
         />
         <FieldError code={errorFor("password")} />
 
-        <p id="birthDateLabel" className="mt-xs text-label font-medium text-fg-secondary">
-          {t("authPasswordPreview.signUp.birthDateLabel")}
-        </p>
-        <BirthDateSelect invalid={errorField === "birthDate"} describedBy="birthDateHint" />
-        <p id="birthDateHint" className="text-label text-fg-muted">{t("authPasswordPreview.signUp.birthDateHint")}</p>
-        <FieldError code={errorFor("birthDate")} />
-
         <label htmlFor="displayName" className="sr-only">{t("authPasswordPreview.fullNameLabel")}</label>
         <Input
           id="displayName"
@@ -298,28 +288,6 @@ export function PasswordSignUpForm({
           aria-invalid={errorField === "displayName" || undefined}
         />
         <FieldError code={errorFor("displayName")} />
-
-        <label htmlFor="username" className="sr-only">{t("authPasswordPreview.signUp.usernameLabel")}</label>
-        <Input
-          id="username"
-          name="username"
-          type="text"
-          autoComplete="off"
-          autoCapitalize="none"
-          spellCheck={false}
-          required
-          dir="ltr"
-          value={values.username}
-          onChange={set("username")}
-          placeholder={t("authPasswordPreview.signUp.usernameLabel")}
-          aria-invalid={errorField === "username" || usernameCheck.status === "taken" || usernameCheck.status === "invalid" || undefined}
-          aria-describedby="usernameStatus"
-        />
-        {errorFor("username") ? (
-          <FieldError code={errorFor("username")} />
-        ) : (
-          <UsernameStatus id="usernameStatus" check={usernameCheck} onPick={(name) => setValues((v) => ({ ...v, username: name }))} />
-        )}
 
         {initialAccountType ? (
           /* Type chosen on the landing page: no selector (the badge names it);
@@ -354,6 +322,9 @@ export function PasswordSignUpForm({
             <FieldError code={errorFor("accountType")} />
           </>
         )}
+
+        {/* PROPOSED INTERIM, pending legal approval: replaces the retired birth-date fields. */}
+        {age.field}
 
         {CONSENT_TYPES.map((type) => (
           <input key={type} type="hidden" name={`consent_${type}`} value="on" />

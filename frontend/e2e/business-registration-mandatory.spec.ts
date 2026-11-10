@@ -53,8 +53,7 @@ async function register(
     if (f === page.mainFrame()) visited.push(new URL(f.url()).pathname);
   });
   const email = `mb-${tag}-${uniq()}@example.test`;
-  const username = `mb${tag}${uniq()}`.slice(0, 24);
-  await registerWithPassword(page, request, { email, username, accountType: choice, displayName: `E2E ${tag}`, landing });
+  await registerWithPassword(page, request, { email, accountType: choice, displayName: `E2E ${tag}`, landing });
   return { email, visited };
 }
 

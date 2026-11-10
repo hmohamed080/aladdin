@@ -29,8 +29,8 @@ const OAUTH_ERRORS: Record<string, string> = {
 };
 
 /**
- * Canonical sign in, Instagram style: ONE field that takes a mobile number, a
- * username or an email, then the password. The server works out which it is
+ * Canonical sign in, Instagram style: ONE field that takes a mobile number or an
+ * email, then the password. The server works out which it is
  * (lib/auth/sign-in-identifier.ts) and every failure that isn't a rate limit
  * renders the SAME generic message — `passwordSignIn` never distinguishes "no
  * such account" from "wrong password" from "unconfirmed"/"disabled". Google /

@@ -109,18 +109,18 @@ export async function readNewOtp(
  * through `/auth/sign-up` choose it themselves. Never a production credential.
  */
 export const E2E_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
-/** Sign-up requires an 18+ birthday (ADR-0025). */
-export const E2E_BIRTH_DATE = "1990-01-15";
+/**
+ * Every registration asks for an "I confirm I am 18 or older" checkbox (Phase 1 of the account-identity plan: no birth
+ * date and no username are collected). PROPOSED INTERIM wording, pending legal approval.
+ */
+export const AGE_CONFIRM_LABEL = /^i confirm i am 18 or older$|^أقرّ بأن عمري ١٨ عامًا أو أكثر$/i;
 
-/** Picks E2E_BIRTH_DATE in the sign-up Month / Day / Year dropdowns. */
-export async function fillBirthDate(page: Page): Promise<void> {
-  const [year, month, day] = E2E_BIRTH_DATE.split("-").map(Number);
-  await page.locator("#birthMonth").selectOption(String(month));
-  await page.locator("#birthDay").selectOption(String(day));
-  await page.locator("#birthYear").selectOption(String(year));
+/** Ticks the 18+ confirmation on a sign-up form. */
+export async function confirmAge(page: Page): Promise<void> {
+  await page.getByLabel(AGE_CONFIRM_LABEL).check();
 }
 /** The one sign-in field and the sign-up contact field (ADR-0025), EN and AR. */
-export const SIGN_IN_IDENTIFIER_LABEL = /^mobile number, username or email$|^رقم الموبايل أو اسم المستخدم أو البريد الإلكتروني$/i;
+export const SIGN_IN_IDENTIFIER_LABEL = /^mobile number or email$|^رقم الموبايل أو البريد الإلكتروني$/i;
 export const SIGN_UP_CONTACT_LABEL = /^mobile number or email$|^رقم الموبايل أو البريد الإلكتروني$/i;
 export const SIGN_IN_BUTTON = /^log in$|^تسجيل الدخول$/i;
 export const SIGN_UP_BUTTON = /^sign up$|^تسجيل$/i;
@@ -271,7 +271,7 @@ export async function accountTypeOptions(page: Page): Promise<Array<{ text: stri
 
 /**
  * Register a brand-new account through the REAL canonical `/auth/sign-up`
- * (email, password, birthday, Full Name, username, account type, Turnstile)
+ * (email, password, Full Name, account type, 18+ confirmation, Turnstile)
  * and its OTP confirmation, then wait for the app landing. Leaves the browser
  * signed in; the account's password is `E2E_PASSWORD`.
  */
@@ -280,20 +280,18 @@ export async function registerWithPassword(
   request: APIRequestContext,
   {
     email,
-    username,
     displayName = "E2E Tester",
     accountType = /craftsmen|الصنايعية/i,
     landing = /\/(home|b2b)(\/|$|\?)/,
-  }: { email: string; username: string; displayName?: string; accountType?: RegExp; landing?: RegExp },
+  }: { email: string; displayName?: string; accountType?: RegExp; landing?: RegExp },
 ): Promise<void> {
   await stubTurnstileWhenOffline(page);
   await page.goto("/auth/sign-up");
   await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(email);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(E2E_PASSWORD);
-  await fillBirthDate(page);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill(displayName);
-  await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
   await selectAccountType(page, accountType);
+  await confirmAge(page);
   const seen = await messageIdsFor(request, email);
   await waitForCaptchaToken(page);
   await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();

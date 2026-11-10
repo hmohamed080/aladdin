@@ -11,14 +11,15 @@ vi.mock("@/server/actions/auth-password-preview", () => ({
 vi.mock("@/server/actions/entry-oauth", () => ({ startEntryOAuth: vi.fn() }));
 
 describe("PasswordSignInForm", () => {
-  it("renders ONE mobile / username / email field and the password, password-manager friendly", () => {
+  it("renders ONE mobile / email field and the password, password-manager friendly", () => {
     renderWithI18n(<PasswordSignInForm next="/b2b" />, "en");
     const identifier = screen.getByLabelText(en.authPasswordPreview.signIn.identifierLabel) as HTMLInputElement;
     const password = screen.getByLabelText(en.authPasswordPreview.passwordLabel) as HTMLInputElement;
     expect(identifier.name).toBe("identifier");
     expect(identifier.type).toBe("text");
     expect(identifier.autocomplete).toBe("username");
-    expect(identifier.placeholder).toBe("Mobile number, username or email");
+    expect(identifier.placeholder).toBe("Mobile number or email");
+    expect(screen.queryByText(/username/i)).toBeNull();
     expect(password.autocomplete).toBe("current-password");
   });
 

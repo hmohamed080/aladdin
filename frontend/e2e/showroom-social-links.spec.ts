@@ -32,7 +32,6 @@ async function noOverflow(page: Page) {
 async function registerShowroom(page: Page, request: APIRequestContext, tag: string): Promise<void> {
   await registerWithPassword(page, request, {
     email: `links-${tag}-${uniq()}@example.test`,
-    username: `links${tag}${uniq()}`.slice(0, 24),
     displayName: `E2E links ${tag}`,
     accountType: /^showroom$/i,
     landing: BUSINESS_SETUP,

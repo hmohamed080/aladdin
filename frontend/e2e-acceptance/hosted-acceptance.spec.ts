@@ -156,7 +156,7 @@ async function signIn(context: BrowserContext, email: string, password: string, 
   try {
     await page.goto("/auth/sign-in", { waitUntil: "domcontentloaded" });
     if (HEADED) console.log(`[manual] ${who}: if Cloudflare shows a verification in the Chrome window, complete it (waiting up to ${TOKEN_WAIT_MS / 60_000} min).`);
-    await page.getByLabel(/^mobile number, username or email$/i).fill(email);
+    await page.getByLabel(/^mobile number or email$/i).fill(email);
     // A failed fill must never echo the value into the log or the uploaded report.
     await page.getByLabel(/^password$/i).fill(password).catch(() => {
       throw new Error(`The ${who} password field could not be filled on /auth/sign-in.`);

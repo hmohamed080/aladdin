@@ -5,14 +5,14 @@ import { createConfirmedAccount } from "./helpers/fixtures";
 /**
  * Shared onboarding, CURRENT contract (staging-prep Increment 7 + 11): a
  * verified, consented account with no account type goes to the account-type
- * step, then the one-field username step, then INTO THE APP — the legacy profile →
+ * step, then INTO THE APP (Phase 1 removed the username step) — the legacy profile →
  * contact → persona wizard is no longer on the path (its pages survive only
  * for direct navigation). Resume, deep-link guards, the business-intent
  * terminal and the active-member skip are asserted against persisted state.
  * Rewritten from the Sprint 7.3 wizard assertions, which the base branch's
  * Increment 7 made permanently stale (they waited for /onboarding/profile).
  *
- * The canonical `/auth/sign-up` now takes the account type and username on
+ * The canonical `/auth/sign-up` now takes the account type and the 18+ confirmation on
  * Step 1, so it never produces an account_type_pending account. These steps
  * still serve accounts in that state (e.g. pre-password registrations), so
  * the state is seeded as a local-DB fixture and entered through the real
@@ -50,7 +50,7 @@ async function registerFreshUser(page: Page, request: APIRequestContext): Promis
 const LEGACY_STEP = /\/onboarding\/(profile|contact|professional|consumer|business)(\/|$)/;
 
 test.describe("shared onboarding", () => {
-  test("full flow (individual): account type → username → personal home, no legacy wizard", async ({ page, request }) => {
+  test("full flow (individual): account type → personal home, no username step and no legacy wizard", async ({ page, request }) => {
     await prefs(page, "en", "light");
     const visited: string[] = [];
     page.on("framenavigated", (f) => {
@@ -64,25 +64,22 @@ test.describe("shared onboarding", () => {
     await page.getByRole("button", { name: /craftsmen/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
 
-    await page.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
-    await page.getByLabel(/^username$/i).fill(`onb${Date.now()}`.slice(0, 20));
-    await page.getByRole("button", { name: /^continue$/i }).click();
     await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
-    expect(visited.filter((p) => LEGACY_STEP.test(p))).toEqual([]);
+    expect(visited.filter((p) => LEGACY_STEP.test(p) || /\/onboarding\/username$/.test(p))).toEqual([]);
   });
 
-  test("refresh after choosing an account type resumes at the username step", async ({ page, request }) => {
+  test("after choosing an account type the account is in the app; the account-type step cannot be re-entered", async ({ page, request }) => {
     await prefs(page, "en", "light");
     await registerFreshUser(page, request);
     await page.getByRole("button", { name: /sales team/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
-    await page.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
+    await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
 
     await page.reload();
-    await expect(page).toHaveURL(/\/onboarding\/username$/);
+    await expect(page).toHaveURL(/\/home(\/|$|\?)/);
     // The account type is persisted; its step cannot be re-entered.
     await page.goto("/onboarding/account-type");
-    await expect(page).toHaveURL(/\/onboarding\/username$/);
+    await expect(page).toHaveURL(/\/home(\/|$|\?)/);
   });
 
   test("deep-linking a later step redirects back to the next incomplete step", async ({ page, request }) => {
@@ -102,9 +99,6 @@ test.describe("shared onboarding", () => {
 
     await page.getByRole("button", { name: /المورد/ }).click();
     await page.getByRole("button", { name: /متابعة/ }).click();
-    await page.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
-    await page.getByLabel(/اسم المستخدم/).fill(`biz${Date.now()}`.slice(0, 20));
-    await page.getByRole("button", { name: /متابعة/ }).click();
 
     // access_ready with ZERO organizations: no organization was created for
     // them, so they get the account-safe terminal and its create-business CTA.
@@ -117,18 +111,17 @@ test.describe("shared onboarding", () => {
   test("sign-out then sign-in resumes the next incomplete step", async ({ page, request }) => {
     await prefs(page, "en", "light");
     const email = await registerFreshUser(page, request);
-    await page.getByRole("button", { name: /craftsmen/i }).click();
-    await page.getByRole("button", { name: /^continue$/i }).click();
-    await page.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
+    await expect(page).toHaveURL(/\/onboarding\/account-type$/);
 
     // Sign out from the onboarding chrome, then sign back in with the password.
     await page.getByRole("button", { name: /sign out|تسجيل الخروج/i }).click();
     await page.waitForURL(/\/auth\/sign-in$/, { waitUntil: "commit" });
 
     // An incomplete account signing in resumes exactly where it stopped: the
-    // password flow's recovery screen asks for the missing username only.
+    // password flow's recovery screen asks for the missing account type (and the 18+ confirmation), never a username.
     await signIn(page, request, email, /\/auth\/finish-registration$/);
-    await expect(page.getByLabel(/^username$/i)).toBeVisible();
+    await expect(page.getByLabel(/^username$/i)).toHaveCount(0);
+    await expect(page.getByLabel(/^i confirm i am 18 or older$/i)).toBeVisible();
     await expect(page.getByLabel(/^password$/i)).toHaveCount(0);
   });
 

@@ -9,7 +9,7 @@ const userRow = {
   display_name: "Hana Mansour",
   display_name_ar: "هناء منصور",
   display_name_en: "Hana Mansour",
-  username: "hana",
+  username: "legacy-handle", // legacy key still emitted until M3: must be ignored
   email: "hana@example.test",
   phone: "+201001234567",
   account_type: "engineer",
@@ -92,7 +92,8 @@ describe("mapUserDetail", () => {
       ],
       verifications: [{ id: "v1", submitted_at: "2026-09-01T00:00:00Z", status: "rejected", reason: "blurry" }],
     });
-    expect(d?.completion).toEqual({ percent: 50, missing: ["username", "avatar"] });
+    expect(d?.completion).toEqual({ percent: 50, missing: ["avatar"] }); // legacy "username" item dropped
+    expect(d).not.toHaveProperty("username");
     expect(d?.memberships).toHaveLength(1);
     expect(d?.memberships[0]?.capabilities).toEqual(["org.manage"]);
     expect(d?.verifications[0]).toMatchObject({ id: "v1", status: "rejected", reason: "blurry" });
