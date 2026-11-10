@@ -7383,6 +7383,12 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - D1 binding validated by `database_id` (API-shaped fixtures); zone/route/domain discovery paginated and refuses partial results; owner commands given for Git Bash.
 - No Production writes, deployment, merge, rotation or P-4 rerun. Delivery OFF.
 
+## 2026-11-08 - R2 Acceptance and Production rollout preparation (agent, nothing hosted)
+
+- Added [`R2_ONLY_ROLLOUT_RUNBOOK.md`](r2/R2_ONLY_ROLLOUT_RUNBOOK.md): owner decisions, resources, credential matrix, Acceptance A-1..A-7 and Production P-1..P-7 GO gates, delta handling under the preserve-then-copy decision, rollback, reconcile readings.
+- Added `scripts/r2-provision-plan.mjs` (prints bucket/CORS/lifecycle/verify commands, runs nothing, validates names with the runtime isolation rules) and `scripts/r2-reconcile.mjs` (read-only database vs bucket reconciliation, counts and fingerprints only), 14 node tests.
+- NOT done: any hosted write, bucket, token, secret, migration, deployment or deletion. Site bucket names and the R2 account id are proposals awaiting the owner; the Production manifest stays null (fails closed) until then. The P-7 deletion path is deliberately not built.
+- Update 2026-11-08 (owner): deleting legacy user media is NOT assumed. Runbook now preserves everything active users need via verified copy (`media-storage.mjs`), reconcile and delta before cutover; deletion needs a separate manifest and approval. Cloudflare account id and both site bucket names confirmed by the owner; pinning them in `environment-manifest.ts` was tried and reverted (guard tests assume an unpinned account); it happens in the commit after bucket creation. Still nothing hosted.
 ## 2026-11-07 - P-6 recorded complete; P-7 prepared (agent)
 
 - Recorded P-6 (private OTP Worker version `4415c515`) with the owner's independent Cloudflare API evidence and an agent read-only re-check (config, one version at 100%, bindings, D1 switch tables empty, frontend `a3b08a22` still alone at 100%).
@@ -7467,3 +7473,19 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 ## 2026-11-08 - A2 gate uses the headed run (Track 3)
 
 - Codex finding on #145 (P2): the A2 command and gate list still dispatched the headless workflow, which cannot pass real Turnstile. A2 is now `pnpm --filter frontend e2e:acceptance:headed` (owner-run, real browser) everywhere in the P-7 sequence. Docs only; no hosted change.
+
+## 2026-11-10 - R2 E2E review: matrix, verifier and account preflight (agent, nothing hosted)
+
+- Merged `origin/main` (1b00ff4) into the R2 branch; only the work log conflicted (kept both sides).
+- Evidence verifier rewritten to the owner-approved matrix: avatar owner-private via `/api/media/avatar`; public cover via `/p/cover`; published portfolio via `/p/media`; withdrawal after unpublish/unlist/delete; replaced bytes not served; the other user's replace/delete run as real application actions (denied result plus unchanged rows and R2 object, no HTTP 4xx required); a denial counts only with a proven active session. 15 node tests pass.
+- Runbook section 10 and new section 12 (preflight): public delivery needs a listed profile, which only an Admin-applied professional verification grants, so a new P1 needs a separate approval GO (or a reused listed profile); flow 6 does not need a published catalog product.
+- NOT done: account creation, approval changes, hosted writes, deployments, deletion. Baseline investigation of 2 missing objects and 1 orphan is read-only and pending.
+
+## 2026-11-10 - Acceptance Turnstile exception recorded for P1/P2 registration (agent, nothing hosted)
+
+- Owner temporarily disabled Turnstile on Acceptance only. Plan updated: read-only before/after verification (Acceptance widget absent, Production widget present, owner confirms the Auth CAPTCHA switches), Playwright registration through the existing headed-CDP runner after the account-creation GO, Email OTP stays a real step, no Admin approval bypass, no Turnstile coverage claimed while disabled, re-enable and re-verify before the security E2E. Runbook section 12 updated.
+- NOT done: account creation, any hosted change.
+
+## 2026-11-10 - Reconcile baseline comparison (agent, nothing hosted)
+
+- `scripts/r2-reconcile.mjs` gained `--full-fingerprints` and `--baseline <file>` (pure `diffBaseline`, tested): known defects stay counted, only new ones fail the run, repaired ones are reported as resolved, truncated/malformed baselines are refused. 14 node tests pass. Runbook section 12 documents it. Nothing deleted, retired or suppressed.

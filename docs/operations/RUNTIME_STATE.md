@@ -1,5 +1,9 @@
 # Runtime State
 
+## R2 rollout preparation — 2026-11-08 (docs and read-only tooling, nothing hosted)
+
+- Runbook [`r2/R2_ONLY_ROLLOUT_RUNBOOK.md`](r2/R2_ONLY_ROLLOUT_RUNBOOK.md); tools `scripts/r2-provision-plan.mjs` (prints only) and `scripts/r2-reconcile.mjs` (read-only). No Acceptance or Production R2 bucket, token, secret, migration or deployment changed. Production manifest buckets stay `null` (fail closed) until the owner confirms names.
+
 ## Migration rollout preparation (PRs #148 merged, #153 open) — 2026-11-08
 - Live history read-only at 07:50Z: Acceptance (`nxossqhdfltcqdwvbewi`) 203 applied, latest `20261107090002`, pending `090003-090006` (plain push). Production (`kkpkgjrweysgvhvkhzun`) 203 applied, latest `20261107090003`, pending `20261105090001` (older than latest, needs `--include-all`) plus `090004-090006`. End state on both: 207, none pending. Nothing applied by this work.
 - Acceptance pre-migration snapshot `aladdin-acceptance-20261108T060819Z`: restore test PASS (aladdin-backups run 42461215127). The Acceptance push still needs its own owner GO; a read-only dry-run needs one too.

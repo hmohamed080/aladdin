@@ -1,6 +1,6 @@
 # Production Supabase-to-R2 media migration plan
 
-Status: **prepared, nothing executed.** No bucket, migration, copy, switch, deployment or deletion has been done.
+Status: **prepared, nothing executed.** Superseded in part on 2026-11-08 by [`R2_ONLY_ROLLOUT_RUNBOOK.md`](R2_ONLY_ROLLOUT_RUNBOOK.md) (copy, verify and reconcile first; deletion only by a separate approved manifest). No bucket, migration, copy, switch, deployment or deletion has been done.
 Read-only measurements below were taken on 2026-11-07 against Production (`kkpkgjrweysgvhvkhzun`).
 
 ## 1. Inventory (read-only)
