@@ -7480,3 +7480,8 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Evidence verifier rewritten to the owner-approved matrix: avatar owner-private via `/api/media/avatar`; public cover via `/p/cover`; published portfolio via `/p/media`; withdrawal after unpublish/unlist/delete; replaced bytes not served; the other user's replace/delete run as real application actions (denied result plus unchanged rows and R2 object, no HTTP 4xx required); a denial counts only with a proven active session. 15 node tests pass.
 - Runbook section 10 and new section 12 (preflight): public delivery needs a listed profile, which only an Admin-applied professional verification grants, so a new P1 needs a separate approval GO (or a reused listed profile); flow 6 does not need a published catalog product.
 - NOT done: account creation, approval changes, hosted writes, deployments, deletion. Baseline investigation of 2 missing objects and 1 orphan is read-only and pending.
+
+## 2026-11-10 - Acceptance Turnstile exception recorded for P1/P2 registration (agent, nothing hosted)
+
+- Owner temporarily disabled Turnstile on Acceptance only. Plan updated: read-only before/after verification (Acceptance widget absent, Production widget present, owner confirms the Auth CAPTCHA switches), Playwright registration through the existing headed-CDP runner after the account-creation GO, Email OTP stays a real step, no Admin approval bypass, no Turnstile coverage claimed while disabled, re-enable and re-verify before the security E2E. Runbook section 12 updated.
+- NOT done: account creation, any hosted change.
