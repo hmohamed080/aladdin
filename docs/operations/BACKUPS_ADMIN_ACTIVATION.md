@@ -21,7 +21,7 @@ Verified locally on 2026-11-10 (no hosted access): `plan-test.sh` 86/86, `restor
 
 ## Owner GO list: Acceptance (in order)
 
-1. **GO-A1 aladdin-backups repo ready.** `aladdin-backups` PR #1 re-synced from aladdin main (CLI 3.0.0 pin) and merged; environments `backup-control-acceptance` (`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` only), `backup-acceptance`, `backup-check`, `restore-test` exist per `ops/backups/README.md`. Hosted GitHub settings.
+1. **GO-A1 aladdin-backups repo ready.** `aladdin-backups` PR #1 re-synced from aladdin main (CLI 3.0.0 pin) and merged; environments `backup-control-acceptance` (`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` only), `backup-acceptance`, `backup-check-acceptance`, `restore-test-acceptance` exist per `ops/backups/README.md`. Hosted GitHub settings.
 2. **GO-A2 initialize Acceptance.** Preflight first (read-only, no GO needed beyond holding the key): `BACKUP_LABEL=acceptance SUPABASE_URL=https://nxossqhdfltcqdwvbewi.supabase.co SUPABASE_SERVICE_ROLE_KEY=… bash ops/backups/admin-initialize.sh`. Then, on GO: same plus `ACTOR_USER_ID=<super admin uuid> CONFIRM="initialize acceptance" … --apply`. One write; the audit event `backup.environment_initialized` is recorded for that actor. Schedule stays `off`.
 3. **GO-A3 console token.** Set Worker secret `BACKUP_GITHUB_TOKEN` on the Acceptance Worker (dashboard edits need *Promote version*). Without it dispatch refuses with `not_configured`.
 4. **GO-A4 first real run through the console.** Super admin starts *Backup*, then *Restore test* on `/admin/backups`. Pass criteria: ledger status `succeeded` for both, and the GitHub run's `backup` / `restore` job is `success`. A `plan`-only green, a skipped data job or an unresolved dispatch is a FAIL.
