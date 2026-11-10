@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * `verifyPasswordSignUp`'s `postSessionRedirect` whenever the caller is
  * verified + consented but the pending-registration state (Increment 6)
  * either never landed or lost a username-collision race — covers BOTH
- * possible gaps (account_type_pending, username_pending), re-derived fresh
+ * possible gaps (account_type_pending), re-derived fresh
  * from `my_registration_state()` on every load, never from client state.
  */
 export default async function FinishRegistrationPage({
@@ -30,17 +30,10 @@ export default async function FinishRegistrationPage({
 
   const state = await getRegistrationState();
   if (state === "active_personal" || state === "access_ready") redirect(await activeLandingPath());
-  if (state !== "account_type_pending" && state !== "username_pending") redirect("/onboarding");
+  if (state !== "account_type_pending") redirect("/onboarding");
 
-  // `reason` only chooses explanatory copy (allow-listed literal); it never
-  // grants or skips anything — the state above is re-derived from the DB.
-  const reason = (await searchParams)?.reason;
-  const usernameUnavailable = state === "username_pending" && reason === "username_unavailable";
+  // Username recovery no longer exists (P1 PR-2): the legacy `?reason=` hint is accepted and ignored.
+  void searchParams;
 
-  return (
-    <FinishRegistrationScreen
-      needsAccountType={state === "account_type_pending"}
-      usernameUnavailable={usernameUnavailable}
-    />
-  );
+  return <FinishRegistrationScreen needsAccountType usernameUnavailable={false} />;
 }

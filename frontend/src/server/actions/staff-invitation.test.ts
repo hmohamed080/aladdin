@@ -21,11 +21,10 @@ const verifyOtp = vi.fn();
 const rpc = vi.fn();
 const supabase = { auth: { signUp, verifyOtp }, rpc };
 vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: vi.fn(async () => supabase) }));
-const { markPasswordAttachedAuthoritatively, saveVerifiedBirthDate } = vi.hoisted(() => ({
+const { markPasswordAttachedAuthoritatively } = vi.hoisted(() => ({
   markPasswordAttachedAuthoritatively: vi.fn(async (id: string) => void id),
-  saveVerifiedBirthDate: vi.fn(async (id: string, date: string) => void [id, date]),
 }));
-vi.mock("@/lib/supabase/admin-server", () => ({ markPasswordAttachedAuthoritatively, saveVerifiedBirthDate }));
+vi.mock("@/lib/supabase/admin-server", () => ({ markPasswordAttachedAuthoritatively }));
 
 import {
   acceptStaffInvitationAction,
@@ -52,7 +51,7 @@ const registration = (over: Record<string, string> = {}) =>
     email: "invited.person@example.com",
     password: PASSWORD,
     displayName: "Invited Person",
-    birthDate: "1990-01-15",
+    ageConfirmed: "on",
     consent_terms: "on",
     consent_privacy: "on",
     consent_pilot: "on",
@@ -147,18 +146,35 @@ describe("requestStaffSignUp (invited person, no persona)", () => {
     expect(result).toMatchObject({ ok: true, email: "invited.person@example.com" });
     const call = signUp.mock.calls[0]![0];
     expect(call.email).toBe("invited.person@example.com");
-    expect(Object.keys(call.options.data).sort()).toEqual(["birth_date", "display_name", "locale"]);
+    expect(Object.keys(call.options.data).sort()).toEqual(["display_name", "locale"]);
     expect(call.options.captchaToken).toBe("captcha-ok");
     expect(JSON.stringify(rpc.mock.calls)).not.toContain("pending_registration");
     expect(JSON.stringify(result)).not.toContain(PASSWORD);
   });
 
-  it("applies the marketplace password, birth-date and consent rules", async () => {
+  it("applies the marketplace password, age-attestation and consent rules", async () => {
     expect((await requestStaffSignUp(init, registration({ password: "short" }))).ok).toBe(false);
-    expect((await requestStaffSignUp(init, registration({ birthDate: "2015-01-01" }))).ok).toBe(false);
+    expect(signUp).not.toHaveBeenCalled();
     expect((await requestStaffSignUp(init, registration({ consent_terms: "" }))).code).toBe("authPasswordPreview.error.consentRequired");
     expect((await requestStaffSignUp(init, registration({ captchaToken: "" }))).code).toBe("authPasswordPreview.error.captchaRequired");
     expect(signUp).not.toHaveBeenCalled();
+  });
+
+  it("staff invitation registration REQUIRES ageConfirmed: a missing or false attestation never reaches signUp()", async () => {
+    const missing = registration();
+    missing.delete("ageConfirmed");
+    for (const f of [missing, registration({ ageConfirmed: "false" }), registration({ ageConfirmed: "" })]) {
+      expect((await requestStaffSignUp(init, f)).code).toBe("authPasswordPreview.error.ageNotConfirmed");
+    }
+    expect(signUp).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("ignores a submitted birth date: nothing about it reaches signUp()", async () => {
+    rpc.mockResolvedValueOnce({ data: true, error: null });
+    signUp.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
+    await requestStaffSignUp(init, registration({ birthDate: "2015-01-01" }));
+    expect(JSON.stringify(signUp.mock.calls[0]![0])).not.toMatch(/birth|2015/);
   });
 
   it("answers an already-registered address exactly like a new one (no enumeration)", async () => {
@@ -189,7 +205,7 @@ describe("verifyStaffSignUp", () => {
     expect(called).toEqual(expect.arrayContaining(["record_consent", "profile_set_display_name"]));
     for (const forbidden of ["onboarding_select_account_type", "pending_registration_consume", "profile_set_username"]) expect(called).not.toContain(forbidden);
     expect(markPasswordAttachedAuthoritatively).toHaveBeenCalledWith("u1");
-    expect(saveVerifiedBirthDate).toHaveBeenCalledWith("u1", "1990-01-15");
+    expect(JSON.stringify(rpc.mock.calls)).not.toMatch(/birth|1990/);
   });
 
   it("checks the consent write, retries once, and a persistent failure never undoes the session: the invitation page asks again", async () => {

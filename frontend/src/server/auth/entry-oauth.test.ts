@@ -20,7 +20,7 @@ function database(start: string) {
   mocks.rpc.mockImplementation(async (name: string) => {
     if (name === "my_registration_state") return { data: state, error: null };
     if (name === "record_consent") state = "account_type_pending";
-    if (name === "onboarding_select_account_type") state = "username_pending";
+    if (name === "onboarding_select_account_type") state = "access_ready";
     return { data: null, error: null };
   });
 }
@@ -45,10 +45,21 @@ describe("completeEntryOAuth", () => {
     expect(mocks.rpc.mock.calls.map(([name]) => name)).not.toContain("onboarding_select_account_type");
   });
 
-  it("applies an open account type picked on the landing page", async () => {
+  it("applies an open account type picked on the landing page, only together with the 18+ attestation", async () => {
     database("consent_pending");
-    expect((await call({ accountType: "showroom_dealer" })).path).toBe("/auth/finish-registration");
+    expect((await call({ accountType: "showroom_dealer", ageConfirmed: true })).path).toBe("/home");
     expect(mocks.rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "business", p_account_type: "showroom_dealer" });
+  });
+
+  it("OAuth first-time registration REQUIRES ageConfirmed: without it the account type is never applied and the person must finish registration", async () => {
+    for (const ageConfirmed of [undefined, false]) {
+      vi.clearAllMocks();
+      mocks.exchange.mockResolvedValue({ data: { user }, error: null });
+      mocks.landing.mockResolvedValue("/home");
+      database("consent_pending");
+      expect((await call({ accountType: "showroom_dealer", ageConfirmed })).path).toBe("/auth/finish-registration");
+      expect(mocks.rpc.mock.calls.map(([name]) => name)).not.toContain("onboarding_select_account_type");
+    }
   });
 
   it("ignores a Coming Soon or unknown account type", async () => {
@@ -95,6 +106,12 @@ describe("completeEntryOAuth", () => {
 });
 
 describe("entryCallbackUrl", () => {
+  it("carries the attestation only when it was given, as a flag and never a date", () => {
+    expect(entryCallbackUrl("https://aladdindecore.com", null, "supplier", true)).toBe("https://aladdindecore.com/auth/callback?type=supplier&ageConfirmed=1");
+    expect(entryCallbackUrl("https://aladdindecore.com", null, "supplier", false)).not.toContain("ageConfirmed");
+    expect(entryCallbackUrl("https://aladdindecore.com", null, "supplier")).not.toContain("ageConfirmed");
+  });
+
   it("carries only an allow-listed next and an open account type", () => {
     expect(entryCallbackUrl("https://aladdindecore.com", "/b2b/products", "supplier")).toBe("https://aladdindecore.com/auth/callback?next=%2Fb2b%2Fproducts&type=supplier");
     expect(entryCallbackUrl("https://aladdindecore.com", "https://evil.test", "admin")).toBe("https://aladdindecore.com/auth/callback");

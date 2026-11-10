@@ -20,9 +20,6 @@ export default async function OnboardingAccountTypePage() {
   if (state === "consent_pending" || state === "manually_blocked") {
     redirect("/onboarding");
   }
-  // An account type is already recorded once state has advanced past this
-  // step — re-showing the picker here would be confusing/wrong.
-  if (state === "username_pending") redirect("/onboarding/username");
 
   const data = await getOnboardingData();
   // Recover the previously-chosen key from the stored track + concrete type so the

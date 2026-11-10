@@ -81,7 +81,6 @@ describe("/settings/profile — workspace-independent identity settings", () => 
     ["unverified", "/auth/sign-in"],
     ["consent_pending", "/onboarding"],
     ["account_type_pending", "/onboarding"],
-    ["username_pending", "/onboarding"],
     ["manually_blocked", "/onboarding"],
   ] as const)("%s is sent to %s", async (state, to) => {
     vi.mocked(getRegistrationState).mockResolvedValue(state);

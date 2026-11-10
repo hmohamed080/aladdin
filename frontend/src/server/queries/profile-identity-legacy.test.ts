@@ -167,7 +167,7 @@ describe("legacy phone identity — no OTP, no writes", () => {
     expect(hasAppAccess("access_ready")).toBe(true);
     for (const state of [
       "unverified", "consent_pending", "account_type_pending",
-      "username_pending", "manually_blocked",
+      "manually_blocked",
     ] as const) expect(hasAppAccess(state)).toBe(false);
   });
 });

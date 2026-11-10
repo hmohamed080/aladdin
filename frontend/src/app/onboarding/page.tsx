@@ -32,13 +32,6 @@ export default async function OnboardingPage() {
       redirect(await activeLandingPath());
     case "account_type_pending":
       redirect("/onboarding/account-type");
-    case "username_pending":
-      // A minimal "choose a username" screen — NEVER the legacy wizard. See
-      // that page's own doc comment and correction #2 of the staging-prep
-      // plan: a verified user with no username may not bypass this via
-      // refresh or direct navigation, since the state is re-derived from the
-      // database on every call.
-      redirect("/onboarding/username");
     default:
       // consent_pending, manually_blocked
       return <OnboardingPanel state={state} />;
