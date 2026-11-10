@@ -7473,3 +7473,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 ## 2026-11-08 - A2 gate uses the headed run (Track 3)
 
 - Codex finding on #145 (P2): the A2 command and gate list still dispatched the headless workflow, which cannot pass real Turnstile. A2 is now `pnpm --filter frontend e2e:acceptance:headed` (owner-run, real browser) everywhere in the P-7 sequence. Docs only; no hosted change.
+
+## 2026-11-10 - R2 E2E review: matrix, verifier and account preflight (agent, nothing hosted)
+
+- Merged `origin/main` (1b00ff4) into the R2 branch; only the work log conflicted (kept both sides).
+- Evidence verifier rewritten to the owner-approved matrix: avatar owner-private via `/api/media/avatar`; public cover via `/p/cover`; published portfolio via `/p/media`; withdrawal after unpublish/unlist/delete; replaced bytes not served; the other user's replace/delete run as real application actions (denied result plus unchanged rows and R2 object, no HTTP 4xx required); a denial counts only with a proven active session. 15 node tests pass.
+- Runbook section 10 and new section 12 (preflight): public delivery needs a listed profile, which only an Admin-applied professional verification grants, so a new P1 needs a separate approval GO (or a reused listed profile); flow 6 does not need a published catalog product.
+- NOT done: account creation, approval changes, hosted writes, deployments, deletion. Baseline investigation of 2 missing objects and 1 orphan is read-only and pending.
