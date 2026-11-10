@@ -70,3 +70,10 @@ Credential isolation is not weakened: S-0 and the copy use read-only Production 
 - Done: live inventory, baseline definition, certificate inspection, migration-count check, circular-dependency-free gate order.
 - Next local (no GO): L-1, the Option A migration and tool change with local proof, as a draft PR separate from #149.
 - Blocked: A-ACC and later wait on L-1 and on Track B's Acceptance state; B-SRC wait on Track D's backup design.
+
+## 6. Reconciliation with the owner execution board (2026-11-10 15:13Z)
+- Matches: bucket names, Option A, 317 rows untouched, no C-1, source backup before copy, R2 backup after copy, C-9 closed.
+- Board wording adopted: B-SRC must cover **all 1,080** physically present Supabase objects (1,046 copyable plus 34 pending/deleted/orphan and the 3 zero-byte certificate objects), with the 317 pointer defects logged in its manifest. The old Track C "C-5 before copy" wording is superseded.
+- Zero-byte certificates: metadata level done (size 0, `application/octet-stream`, 2026-10-25, no record refers to them). **Bytes level not done**: it needs a read of the objects from the operator shell (HEAD/GET, count bytes, sha256 of the empty body); to be run inside S-0. Records and files are preserved.
+- Option A migration and tool change: **not written yet.** The local Docker daemon is not running in this session, so I cannot prove the SQL (including the rollback and `storage_key` check interaction). It is the next local task (L-1) and will be a new version, never an edit of an applied migration; it must be rehearsed on Acceptance before any Production GO.
+- Authorization stays database-decided: the prefix only locates bytes.
