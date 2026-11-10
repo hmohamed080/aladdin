@@ -22,15 +22,16 @@ function goodView() {
 }
 const withBinding = (fn: (b: Record<string, any>[]) => Record<string, any>[]) => ({ resources: { bindings: fn(goodView().resources.bindings as any) } });
 
-test("the declared configuration is what the check expects: private, delivery false, no routes", () => {
+test("the declared configuration is what the check expects: private, the delivery permit a true/false literal, no routes", () => {
   assert.deepEqual(checkConfigFile(config), []);
-  assert.equal(expected.WHATSAPP_DELIVERY_ENABLED.text, "false");
+  assert.equal(expected.WHATSAPP_DELIVERY_ENABLED.text, "true");
   assert.equal(expected.OTP_RECIPIENT_MODE.text, "open");
   assert.equal(expected.APP_NOTIFY.service, "aladdin-frontend-production");
   assert.equal(Object.values(expected).filter((e: any) => e.kind === "secret").length, 5);
   assert.match(checkConfigFile({ ...config, workers_dev: true }).join(), /workers_dev/);
   assert.match(checkConfigFile({ ...config, routes: [{ pattern: "x/*" }] }).join(), /routes/);
-  assert.match(checkConfigFile({ ...config, vars: { ...config.vars, WHATSAPP_DELIVERY_ENABLED: "true" } }).join(), /must be "false"/);
+  for (const bad of ["TRUE", "1", ""]) assert.match(checkConfigFile({ ...config, vars: { ...config.vars, WHATSAPP_DELIVERY_ENABLED: bad } }).join(), /literal "true" or "false"/);
+  assert.deepEqual(checkConfigFile({ ...config, vars: { ...config.vars, WHATSAPP_DELIVERY_ENABLED: "false" } }), [], "the rollback value stays deployable");
 });
 
 test("deployment: exactly one version at 100%", () => {
@@ -46,7 +47,8 @@ test("a deployed configuration identical to the declared one passes", () => {
 test("missing, extra and changed bindings and safety variables are refused", () => {
   assert.match(checkBindings(withBinding((b) => b.filter((x) => x.name !== "APP_NOTIFY")), expected).join(), /APP_NOTIFY is MISSING/);
   assert.match(checkBindings(withBinding((b) => [...b, { name: "OTP_ADMIN_GRANT_SECRET_EXTRA", type: "secret_text" }]), expected).join(), /unexpected binding/);
-  assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "WHATSAPP_DELIVERY_ENABLED" ? { ...x, text: "true" } : x))), expected).join(), /WHATSAPP_DELIVERY_ENABLED/);
+  assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "WHATSAPP_DELIVERY_ENABLED" ? { ...x, text: "false" } : x))), expected).join(), /WHATSAPP_DELIVERY_ENABLED/); // deployed differs from the declared permit
+  assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "WHATSAPP_DELIVERY_ENABLED" ? { ...x, text: "TRUE" } : x))), expected).join(), /WHATSAPP_DELIVERY_ENABLED/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "OTP_RECIPIENT_MODE" ? { ...x, text: "allowlist" } : x))), expected).join(), /OTP_RECIPIENT_MODE/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "APP_NOTIFY" ? { ...x, service: "somewhere-else" } : x))), expected).join(), /must be type=service to aladdin-frontend-production[^]*service=somewhere-else/);
   assert.match(checkBindings(withBinding((b) => b.map((x) => (x.name === "OTP_SIGNING_SECRET" ? { ...x, secret_name: "OTHER" } : x))), expected).join(), /must be type=secrets_store_secret/);
@@ -59,7 +61,8 @@ test("D1 switch tables must be empty and the alert seed row present", () => {
   assert.deepEqual(checkSwitch(rows({ sw: 0, au: 0, att: 0, al: 1 })), []);
   assert.match(checkSwitch(rows({ sw: 1, au: 0, att: 0, al: 1 })).join(), /otp_delivery_switch has 1/);
   assert.match(checkSwitch(rows({ sw: 0, au: 2, att: 0, al: 1 })).join(), /otp_delivery_audit/);
-  assert.match(checkSwitch(rows({ sw: 0, au: 0, att: 1, al: 1 })).join(), /otp_delivery_attestation/);
+  assert.match(checkSwitch(rows({ sw: 0, au: 0, att: 1, al: 1 })).join(), /otp_delivery_attestation \(enabled=1\)/);
+  assert.match(SWITCH_SQL, /otp_delivery_attestation where enabled = 1/, "the app's signed OFF attestation row is expected and must not fail the check");
   assert.match(checkSwitch(rows({ sw: 0, au: 0, att: 0, al: 0 })).join(), /seed row/);
   assert.equal(checkSwitch([]).length, 1);
 });
@@ -141,7 +144,7 @@ test("a Worker that answers on its workers.dev address or the site is refused", 
 
 test("a switched-on database, a changed variable or a split deployment is refused", async () => {
   assert.equal((await exec(fakes({ d1: [{ results: [{ sw: 1, au: 1, att: 1, al: 1 }] }] }))).code, 1);
-  assert.equal((await exec(fakes({ view: withBinding((b) => b.map((x) => (x.name === "WHATSAPP_DELIVERY_ENABLED" ? { ...x, text: "true" } : x))) }))).code, 1);
+  assert.equal((await exec(fakes({ view: withBinding((b) => b.map((x) => (x.name === "WHATSAPP_DELIVERY_ENABLED" ? { ...x, text: "false" } : x))) }))).code, 1);
   assert.equal((await exec(fakes({ status: { versions: [{ version_id: "a", percentage: 60 }, { version_id: "b", percentage: 40 }] } }))).code, 1);
 });
 
