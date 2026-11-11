@@ -20,6 +20,9 @@ while IFS=$'\t' read -r b k size sum cls name; do
 done < "$W/m.tsv"
 on_disk=$(find "$D/objects" -type f | wc -l | tr -d ' ')
 [ "$on_disk" = "$files" ] || { echo "FAIL: $on_disk encrypted files on disk, $files in the manifest"; fail=1; }
+# the run's own count (taken when the copy finished) must equal the manifest; uploads after that are a later delta
+sumobj="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["objects"])' "$D/summary.json" 2>/dev/null || echo)"
+[ "$sumobj" = "$total" ] || { echo "FAIL: summary.json says $sumobj objects, manifest has $total"; fail=1; }
 if [ -n "${EXPECT_OBJECTS:-}" ] && [ "$total" != "$EXPECT_OBJECTS" ]; then echo "FAIL: $total objects, expected $EXPECT_OBJECTS"; fail=1; fi
 echo "objects $total (files $files, empty $empty)"
 [ "$fail" = 0 ] && echo "RESULT: PASS" || { echo "RESULT: FAIL"; exit 1; }
