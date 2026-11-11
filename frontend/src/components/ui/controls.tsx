@@ -190,7 +190,7 @@ export function Checkbox({
   checked: boolean;
   onChange: (checked: boolean) => void;
   children: ReactNode;
-} & Pick<InputHTMLAttributes<HTMLInputElement>, "aria-invalid" | "aria-describedby">) {
+} & Pick<InputHTMLAttributes<HTMLInputElement>, "aria-invalid" | "aria-describedby" | "aria-required" | "value">) {
   return (
     <label htmlFor={id} className="flex cursor-pointer items-start gap-2.5 text-body text-fg">
       <input

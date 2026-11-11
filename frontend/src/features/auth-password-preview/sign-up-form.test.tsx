@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { screen, fireEvent } from "@testing-library/react";
+import { act, screen, fireEvent } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
 import { PasswordSignUpForm } from "./sign-up-form";
 import { ar } from "@/lib/i18n/messages/ar";
@@ -13,24 +13,27 @@ vi.mock("@/server/actions/auth-password-preview", () => ({
 vi.mock("@/server/actions/sign-up", () => ({ requestSignUp: vi.fn(), resendPhoneSignUpCode: vi.fn(), verifyPhoneSignUp: vi.fn() }));
 vi.mock("@/server/actions/entry-oauth", () => ({ startEntryOAuth: vi.fn() }));
 
+import { requestSignUp } from "@/server/actions/sign-up";
+
 describe("PasswordSignUpForm (Instagram style)", () => {
-  it("asks for mobile number or email, password, birthday, full name, username and account type, in that order", () => {
+  it("asks for mobile number or email, password, full name, account type and the 18+ confirmation, in that order", () => {
     renderWithI18n(<PasswordSignUpForm />, "en");
     const contact = screen.getByLabelText(en.authPasswordPreview.signUp.contactLabel) as HTMLInputElement;
     expect(contact.placeholder).toBe("Mobile number or email");
     expect(contact.autocomplete).toBe("username");
     const form = contact.closest("form")!;
     const order = Array.from(form.querySelectorAll("input:not([type=hidden]), select")).map((el) => (el as HTMLInputElement).name);
-    expect(order).toEqual(["contact", "password", "", "", "", "displayName", "username", "accountType"]);
-    expect(form.querySelector('input[type=hidden][name="birthDate"]')).not.toBeNull();
+    expect(order).toEqual(["contact", "password", "displayName", "accountType", "ageConfirmed"]);
+    // No birth date and no username are collected any more.
+    expect(form.querySelector('[name="birthDate"], [name="username"]')).toBeNull();
     expect((screen.getByLabelText(en.authPasswordPreview.passwordLabel) as HTMLInputElement).autocomplete).toBe("new-password");
     expect(form.querySelector('input[type=hidden][name="captchaToken"]')).not.toBeNull();
   });
 
-  it("has no confirm-password, password-rule list or consent checkboxes, only the agreement line", () => {
+  it("has no confirm-password, password-rule list or consent checkboxes (only the 18+ confirmation), only the agreement line", () => {
     renderWithI18n(<PasswordSignUpForm />, "en");
     expect(document.querySelector("input[name='confirmPassword']")).toBeNull();
-    expect(document.querySelector("input[type='checkbox']")).toBeNull();
+    expect([...document.querySelectorAll("input[type='checkbox']")].map((el) => (el as HTMLInputElement).name)).toEqual(["ageConfirmed"]);
     expect(document.body.textContent).not.toContain(en.authPasswordPreview.consent.note);
     const agreement = document.querySelector("[data-sign-up-agreement]")!;
     expect(agreement.textContent).toContain(en.authPasswordPreview.signUp.agreementPrefix);
@@ -42,23 +45,32 @@ describe("PasswordSignUpForm (Instagram style)", () => {
     }
   });
 
-  it("takes the birthday as Month / Day / Year dropdowns, 18+ years only, and submits one YYYY-MM-DD value", () => {
+  it("asks for a required 18+ confirmation (ageConfirmed=true) with an accessible error instead of a birthday", async () => {
     renderWithI18n(<PasswordSignUpForm />, "en");
-    const month = screen.getByLabelText(en.authPasswordPreview.signUp.birthMonth) as HTMLSelectElement;
-    const day = screen.getByLabelText(en.authPasswordPreview.signUp.birthDay) as HTMLSelectElement;
-    const year = screen.getByLabelText(en.authPasswordPreview.signUp.birthYear) as HTMLSelectElement;
-    for (const select of [month, day, year]) expect(select.required).toBe(true);
-    expect(month.options[1]!.textContent).toBe("January");
-    expect(Number(year.options[1]!.value)).toBe(new Date().getFullYear() - 18);
-    const hidden = document.querySelector('input[type=hidden][name="birthDate"]') as HTMLInputElement;
-    expect(hidden.value).toBe("");
-    fireEvent.change(month, { target: { value: "2" } });
-    expect(day.options).toHaveLength(1 + 29);
-    fireEvent.change(day, { target: { value: "9" } });
-    fireEvent.change(year, { target: { value: "1990" } });
-    expect(hidden.value).toBe("1990-02-09");
-    expect(day.options).toHaveLength(1 + 28);
-    expect(screen.getByText(en.authPasswordPreview.signUp.birthDateHint)).toBeInTheDocument();
+    const box = screen.getByRole("checkbox", { name: en.authPasswordPreview.signUp.ageConfirmLabel }) as HTMLInputElement;
+    expect(box.name).toBe("ageConfirmed");
+    expect(box.value).toBe("on");
+    expect(box.checked).toBe(false);
+    expect(box).toHaveAttribute("aria-required", "true");
+    expect(box).not.toHaveAttribute("aria-invalid");
+    // Submitting while unchecked is blocked locally and announces the error, linked to the checkbox.
+    await act(async () => { fireEvent.submit(box.closest("form")!); });
+    const alert = await screen.findByText(en.authPasswordPreview.error.ageNotConfirmed);
+    expect(alert).toHaveAttribute("role", "alert");
+    expect(requestSignUp).not.toHaveBeenCalled(); // the server action never ran
+    expect(box).toHaveAttribute("aria-invalid", "true");
+    expect(box.getAttribute("aria-describedby")).toBe(alert.id);
+    // Ticking clears it.
+    fireEvent.click(box);
+    expect(screen.queryByText(en.authPasswordPreview.error.ageNotConfirmed)).toBeNull();
+    expect(box.checked).toBe(true);
+  });
+
+  it("shows the 18+ confirmation and its error in Arabic", async () => {
+    renderWithI18n(<PasswordSignUpForm />, "ar");
+    const box = screen.getByRole("checkbox", { name: ar.authPasswordPreview.signUp.ageConfirmLabel });
+    await act(async () => { fireEvent.submit(box.closest("form")!); });
+    expect(await screen.findByText(ar.authPasswordPreview.error.ageNotConfirmed)).toHaveAttribute("role", "alert");
   });
 
   it("enables submit without ticking anything", () => {

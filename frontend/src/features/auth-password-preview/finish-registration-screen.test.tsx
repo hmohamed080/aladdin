@@ -4,43 +4,27 @@ import { renderWithI18n } from "@/test/render";
 
 vi.mock("@/server/actions/registration", () => ({
   chooseAccountTypeAction: vi.fn(async () => ({ ok: false })),
-  chooseUsernameAction: vi.fn(async () => ({ ok: false })),
 }));
 
 import { FinishRegistrationScreen } from "./finish-registration-screen";
 
-const LATIN = /[A-Za-z]{3,}/;
-const ARABIC = /[؀-ۿ]/;
-
-describe("FinishRegistrationScreen — username recovery copy", () => {
-  it("explains a lost username claim in English, with no Arabic", () => {
-    const { container } = renderWithI18n(<FinishRegistrationScreen needsAccountType={false} usernameUnavailable />, "en");
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("The username you selected is no longer available.");
-    expect(screen.getByText("Choose another username to continue.")).toBeTruthy();
-    expect(container.textContent).not.toMatch(ARABIC);
-    // Never says why (reserved vs taken).
-    expect(container.textContent).not.toMatch(/reserved|taken/i);
-  });
-
-  it("explains it in Arabic with no English in the new copy", () => {
-    renderWithI18n(<FinishRegistrationScreen needsAccountType={false} usernameUnavailable />, "ar");
-    const heading = screen.getByRole("heading", { level: 1 }).textContent ?? "";
-    expect(heading).toBe("اسم المستخدم الذي اخترته لم يعد متاحًا");
-    expect(heading).not.toMatch(LATIN);
-    const subtitle = screen.getByText("اختر اسمًا آخر للمتابعة.");
-    expect(subtitle.textContent).not.toMatch(LATIN);
-  });
-
-  it("keeps the generic copy when no collision was reported (e.g. a lost pending write)", () => {
-    renderWithI18n(<FinishRegistrationScreen needsAccountType={false} />, "en");
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Choose a username");
-  });
-
-  it("still asks for the account type — not the username — when that is what is missing", () => {
-    renderWithI18n(<FinishRegistrationScreen needsAccountType usernameUnavailable />, "en");
-    expect(screen.queryByText("The username you selected is no longer available.")).toBeNull();
-    // The account type is a dropdown: the shared Select — a listbox button over a hidden native select named accountType.
+describe("FinishRegistrationScreen", () => {
+  it("asks for the account type (shared Select over a hidden native select named accountType)", () => {
+    renderWithI18n(<FinishRegistrationScreen />, "en");
     expect(screen.getByRole("button", { name: /account type/i })).toHaveAttribute("aria-haspopup", "listbox");
     expect(document.querySelector('select[name="accountType"]')).not.toBeNull();
+  });
+
+  it("asks for the 18+ confirmation (ageConfirmed) and has no username or birth-date field", () => {
+    const { container } = renderWithI18n(<FinishRegistrationScreen />, "en");
+    const box = screen.getByRole("checkbox", { name: "I confirm I am 18 or older" });
+    expect(box).toHaveAttribute("name", "ageConfirmed");
+    expect(box).toHaveAttribute("aria-required", "true");
+    expect(container.querySelector('input[name="username"], select[name="birthYear"]')).toBeNull();
+  });
+
+  it("renders the 18+ confirmation in Arabic", () => {
+    renderWithI18n(<FinishRegistrationScreen />, "ar");
+    expect(screen.getByRole("checkbox", { name: "أقرّ بأن عمري ١٨ عامًا أو أكثر" })).toBeTruthy();
   });
 });

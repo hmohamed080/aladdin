@@ -13,8 +13,6 @@ import type { ProfileCompletion, ProfileCompletionItem } from "@/server/queries/
  *   * identity items → `/settings/profile`, the workspace-independent route
  *     (a business-intent account with zero organizations has neither `/home`
  *     nor `/b2b` settings);
- *   * username → `/onboarding/username`, the only state it is ever missing in
- *     (`username_pending`);
  *   * professional items → `/home/profile/edit` — only returned for a
  *     professional persona, which always has a Personal workspace;
  *   * organization_setup → `/business/new` (any caller with app access);
@@ -25,7 +23,6 @@ import type { ProfileCompletion, ProfileCompletionItem } from "@/server/queries/
  * returned today (no locality write path exists yet).
  */
 export const ITEM_HREF: Record<ProfileCompletionItem, string> = {
-  username: "/onboarding/username",
   avatar: "/settings/profile#identity",
   phone: "/settings/profile#phone",
   display_name: "/settings/profile#display-name",

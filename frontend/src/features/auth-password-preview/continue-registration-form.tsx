@@ -24,7 +24,7 @@ const initial: PasswordAuthState = { ok: false };
  *   1. Email + CAPTCHA → `resendPasswordSignUpCode` (GoTrue `resend`, never a
  *      second `signUp`: no password is asked for again or re-sent).
  *   2. The 6-digit code → the same `verifyPasswordSignUp` sign-up uses, which
- *      restores the staged username/account type or falls through to
+ *      restores the staged account type or falls through to
  *      finish-registration for whatever is missing.
  * `pendingEmail` comes from the server-side httpOnly routing cookie, never the
  * URL; when it is present the page opens directly on step 2. Every answer is

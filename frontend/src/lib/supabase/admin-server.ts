@@ -216,28 +216,26 @@ export function whatsappOtpNotificationRecord(a: { eventKey: string; kind: strin
 }
 
 /**
- * Stages a pending-registration row (username + chosen top-level account
- * type) for a just-`signUp()`'d, still-unconfirmed user, via
- * `public.pending_registration_save` — granted to `service_role` ONLY (see
- * `supabase/migrations/20260924090006_pending_registrations.sql`), so this
- * admin client is the only caller that can ever exercise it. Never stores a
- * password. Best-effort by design: a failure here does not fail
- * registration — `verifyPasswordSignUp` falls back to the
- * `username_pending`/`account_type_pending` recovery screen
- * (`finish-registration/page.tsx`) if nothing was staged, or staging was
- * lost to a slow/failed write, exactly as it does for a genuinely expired
- * pending row.
+ * Stages a pending-registration row (the chosen top-level account type only) for a just-`signUp()`'d, still-unconfirmed user, via
+ * `public.pending_registration_save` - granted to `service_role` ONLY (see
+ * `supabase/migrations/20260924090006_pending_registrations.sql`), so this admin client is the only caller that can ever exercise it.
+ * Never stores a password. Best-effort by design: a failure here does not fail registration; `verifyPasswordSignUp` falls back to the
+ * finish-registration recovery screen if nothing was staged.
+ *
+ * P1 PR-2: there is no username any more, so `p_username` is passed EXPLICITLY as null (only `p_ttl_minutes` has a database default; omitting
+ * `p_username` would be a missing-argument error). Pre-M1 databases still declare the column NOT NULL and refuse this call (the failure is
+ * logged and ignored, as for any lost staging write); post-M1 databases accept it, stage the audience only and take no lease.
  */
 export async function savePendingRegistration(params: {
   userId: string;
-  username: string;
   audienceKind: "organization_type" | "persona_type";
   audienceValue: string;
 }): Promise<boolean> {
   const admin = getAdminClient();
-  const { data, error } = await admin.rpc("pending_registration_save", {
+  const { error } = await admin.rpc("pending_registration_save", {
     p_user_id: params.userId,
-    p_username: params.username,
+    // The generated types (pre-M1) still say `string`; regenerate after M3. The explicit null is the contract.
+    p_username: null as unknown as string,
     p_audience_kind: params.audienceKind,
     p_audience_value: params.audienceValue,
   });
@@ -245,9 +243,7 @@ export async function savePendingRegistration(params: {
     console.error(`Failed to stage pending registration for ${params.userId}: ${error.message}`);
     return false;
   }
-  // true = the 30-minute username lease is held (20261028090003). false never
-  // changes the caller's response: the name is re-asked after verification.
-  return data === true;
+  return true;
 }
 
 /**
@@ -361,33 +357,17 @@ export async function consumePhoneAuthLimit(action: "sign-in" | "sign-up" | "ema
 }
 
 /**
- * The auth email behind a username or mobile number typed on the sign-in page,
- * so the password grant can run against it. For a phone-registered account
- * this is its internal login alias. Null when nothing matches; the caller
- * answers exactly as for a wrong password, so this never reveals which
- * usernames or numbers exist. Throws on a lookup failure (never guesses).
+ * The auth email behind a mobile number typed on the sign-in page, so the password grant can run against it. For a phone-registered
+ * account this is its internal login alias. Null when nothing matches; the caller answers exactly as for a wrong password, so this never
+ * reveals which numbers exist. Throws on a lookup failure (never guesses). (The username lookup was removed in P1 PR-2.)
  */
-export async function resolveSignInEmail(lookup: { username: string } | { phoneE164: string }): Promise<string | null> {
+export async function resolveSignInEmail(lookup: { phoneE164: string }): Promise<string | null> {
   const admin = getAdminClient();
-  const query = admin.from("profiles").select("user_id").is("deleted_at", null).limit(1);
-  const { data, error } = await ("username" in lookup
-    ? query.eq("username_normalized", lookup.username.trim().toLowerCase())
-    : query.eq("phone_e164", lookup.phoneE164));
+  const { data, error } = await admin.from("profiles").select("user_id").is("deleted_at", null).eq("phone_e164", lookup.phoneE164).limit(1);
   if (error) throw new Error(`sign-in identifier lookup failed (code ${error.code ?? "unknown"})`);
   const userId = data?.[0]?.user_id;
   if (!userId) return null;
   const { data: user, error: userError } = await admin.auth.admin.getUserById(userId);
   if (userError) throw new Error(`sign-in identifier lookup failed (code ${(userError as { code?: string }).code ?? "unknown"})`);
   return user.user?.email ?? null;
-}
-
-/**
- * Stores the birthday collected at sign-up on `public.users.birth_date` — the
- * self-only row (RLS `users_select_self`), never the public profile. Called
- * only right after the account proved its email or mobile number, with a value
- * the caller has already validated (parseBirthDate). Throws on failure.
- */
-export async function saveVerifiedBirthDate(userId: string, birthDate: string): Promise<void> {
-  const { error } = await getAdminClient().from("users").update({ birth_date: birthDate }).eq("id", userId);
-  if (error) throw new Error(`birth date save failed (code ${error.code ?? "unknown"})`);
 }

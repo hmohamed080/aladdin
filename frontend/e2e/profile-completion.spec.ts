@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { test, expect, type Page, type APIRequestContext, type BrowserContext } from "@playwright/test";
-import { fillBirthDate, IDENTITIES, reachLanding, messageIdsFor, readNewOtp, selectAccountType, signIn, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline } from "./helpers/auth";
+import { confirmAge, IDENTITIES, reachLanding, messageIdsFor, readNewOtp, selectAccountType, signIn, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline } from "./helpers/auth";
 
 // Offline sandboxes only (E2E_STUB_TURNSTILE=1); a no-op in CI, where the real widget runs.
 test.beforeEach(async ({ page }) => {
@@ -10,8 +10,7 @@ test.beforeEach(async ({ page }) => {
 /**
  * Staging-prep registration + profile completion, end to end against the REAL
  * local Supabase + Mailpit (no auth bypass): the 9-card account-type step,
- * direct post-OTP entry (no six-step wizard), the username_pending recovery
- * screen, and the persistent "Complete your profile" card driven by
+ * direct post-OTP entry (no six-step wizard), and the persistent "Complete your profile" card driven by
  * my_profile_completion() — display name confirmation, phone (country picker,
  * reload persistence, neutral duplicate), avatar crop/upload/replace/cancel.
  */
@@ -39,31 +38,18 @@ function uniq(): string {
 function uniqueEmail(tag: string): string {
   return `pc-e2e-${tag}-${uniq()}@example.test`;
 }
-/**
- * A syntactically valid, almost-certainly-unused username per call. The
- * descriptive TEST tag is sanitized for test-data generation only (letters and
- * digits, starts with a letter) — production validation is never relaxed, it
- * would correctly refuse a tag like "enum-existing". A base-36 timestamp plus
- * randomness keeps it unique within 3-24 characters.
- */
-function uniqueUsername(tag: string): string {
-  const safe = tag.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/^[0-9]+/, "").slice(0, 10) || "user";
-  const suffix = `${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 4).toString(36)}`;
-  return `${safe}${suffix}`.slice(0, 24);
-}
 /** An Egyptian mobile national number unlikely to collide across runs. */
 function uniqueEgMobile(): string {
   return `10${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
 }
 
-async function fillSignUp(page: Page, email: string, username: string, accountType: RegExp = SALES): Promise<void> {
+async function fillSignUp(page: Page, email: string, accountType: RegExp = SALES): Promise<void> {
   await page.goto("/auth/sign-up");
   await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(email);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-  await fillBirthDate(page);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-  await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
   await selectAccountType(page, accountType);
+  await confirmAge(page);
   await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30000 });
 }
 
@@ -83,14 +69,13 @@ async function verify(page: Page, request: APIRequestContext, email: string, see
 }
 
 /** Registers and verifies a fresh account; returns once it has landed in the app. */
-async function register(page: Page, request: APIRequestContext, tag: string, accountType: RegExp = SALES): Promise<{ email: string; username: string }> {
+async function register(page: Page, request: APIRequestContext, tag: string, accountType: RegExp = SALES): Promise<{ email: string }> {
   const email = uniqueEmail(tag);
-  const username = uniqueUsername(tag);
-  await fillSignUp(page, email, username, accountType);
+  await fillSignUp(page, email, accountType);
   const seen = await submitSignUp(page, request, email);
   await verify(page, request, email, seen);
   await reachLanding(page, /\/home(\/|$|\?)/);
-  return { email, username };
+  return { email };
 }
 
 /** A small real PNG, drawn by the browser itself (no binary fixture on disk). */
@@ -206,61 +191,6 @@ test.describe("Direct entry after registration", () => {
     await page.reload();
     await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
   });
-
-  test("a username lost during the OTP window goes to the explicit recovery screen, then into the app", async ({ browser, request }) => {
-    const shared = uniqueUsername("race");
-    const a = await browser.newContext();
-    const b = await browser.newContext();
-    const pageA = await a.newPage();
-    const pageB = await b.newPage();
-
-    const emailA = uniqueEmail("racea");
-    const emailB = uniqueEmail("raceb");
-    await fillSignUp(pageA, emailA, shared, TRADESPEOPLE);
-    const seenA = await submitSignUp(pageA, request, emailA);
-
-    // A's unconfirmed registration holds a lease on the name (20261028090003):
-    // while it is active, B is told the name is taken and gets no account.
-    await fillSignUp(pageB, emailB, shared, TRADESPEOPLE);
-    await expect(pageB.getByText(/this username is taken|اسم المستخدم هذا مستخدم بالفعل/i)).toBeVisible({ timeout: 10_000 });
-    expect(sql(`select count(*) from auth.users where email = '${emailB}'`)).toBe("0");
-
-    // A lease lasts 30 minutes. Stand in for that wait by backdating A's lease
-    // (test fixture only); the name is then free for B.
-    expect(sql(`update app.pending_registrations set username_reserved_at = now() - interval '31 minutes'
-                 where user_id = (select id from auth.users where email = '${emailA}') returning 1`)).toBe("1");
-    await fillSignUp(pageB, emailB, shared, TRADESPEOPLE);
-    const seenB = await submitSignUp(pageB, request, emailB);
-
-    // B verifies first and claims the name; A's claim now collides.
-    await verify(pageB, request, emailB, seenB);
-    await reachLanding(pageB, /\/home(\/|$|\?)/);
-    // A's lease has expired, so the post-OTP claim decides: B claimed the
-    // name first, so A — verifying second — collides.
-    await verify(pageA, request, emailA, seenA);
-    await pageA.waitForURL(/\/auth\/finish-registration\?reason=username_unavailable/, { waitUntil: "commit" });
-    const noLongerAvailable = /no longer available|لم يعد متاحًا/;
-    await expect(pageA.getByRole("heading", { level: 1 })).toHaveText(noLongerAvailable);
-
-    // Refresh keeps the recovery screen; direct navigation cannot skip it.
-    await pageA.reload();
-    await expect(pageA.getByRole("heading", { level: 1 })).toHaveText(noLongerAvailable);
-    await pageA.goto("/home");
-    await pageA.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
-    await pageA.goto("/auth/finish-registration?reason=username_unavailable");
-
-    // Only the username is asked for — never email, password or account type.
-    await expect(pageA.getByLabel(/^password$|^كلمة المرور$/i)).toHaveCount(0);
-    await expect(pageA.getByLabel(/email address|البريد الإلكتروني/i)).toHaveCount(0);
-    await pageA.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("racefix"));
-    await pageA.getByRole("button", { name: /continue|متابعة/i }).click();
-    await reachLanding(pageA, /\/home(\/|$|\?)/);
-    // Recovery keeps the registration choice: A is still a Tradesperson, so it gets the approved Installer profile page.
-    await pageA.goto("/home/profile");
-    await expect(pageA.getByTestId("profile-hero")).toBeVisible();
-    await a.close();
-    await b.close();
-  });
 });
 
 test.describe("Complete your profile", () => {
@@ -270,9 +200,9 @@ test.describe("Complete your profile", () => {
     await register(page, request, "complete");
     await page.goto("/home/settings");
     const percent = page.getByTestId("complete-profile-percent");
-    // A fresh Sales Team member: 4 shared items + the 4 professional ones — headline, years, about,
+    // A fresh Sales Team member: 3 shared items + the 4 professional ones — headline, years, about,
     // and an activity (supabase/migrations/20260924090003 seeds sales_rep and sales_manager, so activities
-    // count for this persona) — = 8. The username AND the Full Name entered at sign-up (confirmed through
+    // count for this persona) — = 7. The Full Name entered at sign-up (confirmed through
     // profile_set_display_name after the OTP) are done, and since ADR-0026 the phone and an activity are given on the
     // "Complete your account" screen right after sign-up — so editing them here moves nothing, and the photo adds one item.
     await expect(percent).toHaveText(/^\d+% complete$/);

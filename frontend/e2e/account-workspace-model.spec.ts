@@ -43,7 +43,6 @@ async function registerAs(
   const email = `awm-${uniq()}@example.test`;
   await registerWithPassword(page, request, {
     email,
-    username: `awm${uniq()}`.slice(0, 24),
     displayName,
     accountType,
     landing,

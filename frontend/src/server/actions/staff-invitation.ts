@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { authFormWithinLimit } from "@/lib/auth/form-limits";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { markPasswordAttachedAuthoritatively, saveVerifiedBirthDate } from "@/lib/supabase/admin-server";
+import { markPasswordAttachedAuthoritatively } from "@/lib/supabase/admin-server";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { captchaTokenFrom, isCaptchaFailure } from "@/server/auth/captcha";
 import { type GoTrueError, isAccountExistsError, isRateLimitError, padToRegistrationFloor } from "@/server/auth/signup-guards";
@@ -13,9 +13,9 @@ import { staffInvitationErrorCode } from "@/server/auth/staff-invitation-errors"
 import { clearStaffInvitationToken, readStaffInvitationToken } from "@/server/auth/staff-invitation-token";
 import { lookupStaffInvitation } from "@/server/queries/staff-invitations";
 import {
+  ageConfirmedFromForm,
   displayNameSchema,
   emailSchema,
-  parseBirthDate,
   registrationIssueCode,
   staffRegistrationSchema,
 } from "@/features/auth-password-preview/password-policy";
@@ -28,7 +28,7 @@ import {
  * is read from the httpOnly handoff cookie, the actor is the session, and identity is the Auth-confirmed e-mail. Nothing here logs a token,
  * an address, a password or a response body.
  *
- * Registration reuses the marketplace flow's building blocks: the same Turnstile token judged by GoTrue, the same password / name / birth-date
+ * Registration reuses the marketplace flow's building blocks: the same Turnstile token judged by GoTrue, the same password / name / 18+ attestation
  * rules (staffRegistrationSchema), the same consent types, signUp() with the password set atomically, the same 6-digit e-mail code, and the same
  * enumeration and timing normalization (server/auth/signup-guards.ts). It deliberately has NO account type and NO username: staff are never
  * given a marketplace persona.
@@ -93,7 +93,8 @@ export async function requestStaffSignUp(_prev: StaffInvitationState, formData: 
     displayName: field("displayName"),
     email: field("email"),
     password: field("password"),
-    birthDate: field("birthDate"),
+    // Server-enforced 18+ self-attestation (proposed interim policy; replaces the date of birth). Not stored.
+    ageConfirmed: ageConfirmedFromForm(formData),
   });
   if (!parsed.success) return { ok: false, code: registrationIssueCode(parsed.error.issues[0]) };
   if (!CONSENT_TYPES.every((type) => formData.get(`consent_${type}`) === "on")) {
@@ -117,7 +118,7 @@ export async function requestStaffSignUp(_prev: StaffInvitationState, formData: 
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { data: { display_name: parsed.data.displayName, birth_date: parsed.data.birthDate, locale }, captchaToken },
+    options: { data: { display_name: parsed.data.displayName, locale }, captchaToken },
   });
   if (error) {
     if (isCaptchaFailure(error as GoTrueError)) return { ok: false, code: CAPTCHA_REJECTED, email: parsed.data.email };
@@ -158,14 +159,6 @@ export async function verifyStaffSignUp(_prev: StaffInvitationState, formData: F
   if (!(await recordConsentReceipts(supabase, locale))) console.error("staff registration: consent receipts not recorded; the invitation page will ask again");
   const name = displayNameSchema.safeParse(data.user.user_metadata?.display_name);
   if (name.success) await supabase.rpc("profile_set_display_name", { p_display_name: name.data });
-  const birth = parseBirthDate(data.user.user_metadata?.birth_date);
-  if (birth.ok) {
-    try {
-      await saveVerifiedBirthDate(data.user.id, birth.value);
-    } catch {
-      console.error("staff registration: birth_date step failed");
-    }
-  }
   // No account type, no username, no pending registration, no onboarding: straight to the invitation, where the person explicitly accepts.
   redirect(ENTRY_PATH);
 }

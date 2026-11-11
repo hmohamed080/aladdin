@@ -41,7 +41,7 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       // The separate craftsman and showroom phone pages were retired (2026-10-28): one sign-in
-      // takes a mobile number, username or email, and one sign-up takes a mobile number or email.
+      // takes a mobile number or email, and one sign-up takes a mobile number or email.
       { source: "/temporary/craftsman/sign-up", destination: "/auth/sign-up?type=installer_technician", permanent: true },
       { source: "/temporary/craftsman/sign-in", destination: "/auth/sign-in", permanent: true },
       { source: "/installer/sign-up", destination: "/auth/sign-up?type=installer_technician", permanent: true },

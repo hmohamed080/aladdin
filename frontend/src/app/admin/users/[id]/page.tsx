@@ -246,7 +246,6 @@ export default async function PreviewUserDetailPage({
           <Card>
             <dl className="grid gap-md tablet:grid-cols-2">
               <Field label={m.admin.users.name}>{name}</Field>
-              <Field label={d.username}>{user.username ? <span dir="ltr">@{user.username}</span> : d.notProvided}</Field>
               <Field label={d.email}>{user.email ? <span dir="ltr">{user.email}</span> : d.notProvided}</Field>
               <Field label={d.phone}>{user.phone ? <span dir="ltr">{user.phone}</span> : d.notProvided}</Field>
               <Field label={d.location}>{location ?? d.notProvided}</Field>

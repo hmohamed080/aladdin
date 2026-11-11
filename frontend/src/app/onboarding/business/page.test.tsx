@@ -139,7 +139,7 @@ describe("/onboarding/business", () => {
   it("keeps its existing guards: signed out -> sign in; not yet access_ready -> /onboarding; no business intent -> /onboarding", async () => {
     state.registration = "unverified";
     await expect(BusinessOnboardingPage()).rejects.toThrow("REDIRECT:/auth/sign-in");
-    state.registration = "username_pending";
+    state.registration = "account_type_pending";
     await expect(BusinessOnboardingPage()).rejects.toThrow("REDIRECT:/onboarding");
     state.registration = "access_ready";
     state.data = data({ selectedTrack: "professional" });

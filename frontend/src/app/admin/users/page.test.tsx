@@ -43,7 +43,6 @@ function user(over: Partial<AdminDirectoryUser> = {}): AdminDirectoryUser {
   return {
     id: USER_ID,
     displayName: { name: "Hana Mansour", nameAr: null, nameEn: null },
-    username: null,
     email: "hana@example.test",
     phone: null,
     accountType: null,

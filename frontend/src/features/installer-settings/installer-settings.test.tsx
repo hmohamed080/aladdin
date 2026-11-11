@@ -6,10 +6,9 @@ import { InstallerSettings, type InstallerSettingsData } from "./installer-setti
 const changePhone = vi.hoisted(() => vi.fn());
 const changePassword = vi.hoisted(() => vi.fn());
 const setDisplayName = vi.hoisted(() => vi.fn());
-const setUsername = vi.hoisted(() => vi.fn());
 
 vi.mock("@/server/actions/installer-security", () => ({ changeInstallerPhone: changePhone, changeInstallerPassword: changePassword }));
-vi.mock("@/server/actions/profile-identity", () => ({ setDisplayNameAction: setDisplayName, setUsernameAction: setUsername }));
+vi.mock("@/server/actions/profile-identity", () => ({ setDisplayNameAction: setDisplayName }));
 vi.mock("@/server/actions/contact-email", () => ({ startContactEmailAction: vi.fn(async () => ({ ok: true, code: "contactEmail.sent" })), removeContactEmailAction: vi.fn(async () => ({ ok: true })) }));
 vi.mock("@/server/actions/secondary-phone", () => ({
   saveSecondaryPhoneAction: vi.fn(), renewSecondaryPhoneAction: vi.fn(),
@@ -24,7 +23,6 @@ vi.mock("next/dynamic", async () => {
 
 const DATA: InstallerSettingsData = {
   displayName: "Ahmed Mahmoud",
-  username: "ahmed123",
   phoneE164: "+201012345678",
   phoneNational: "1012345678",
   phoneVerified: false,
@@ -43,7 +41,6 @@ beforeEach(() => {
   changePhone.mockReset();
   changePassword.mockReset();
   setDisplayName.mockReset();
-  setUsername.mockReset();
 });
 
 describe("installer settings (production)", () => {
@@ -54,7 +51,6 @@ describe("installer settings (production)", () => {
       expect(screen.getByRole("heading", { name })).toBeInTheDocument();
     }
     expect(screen.getByLabelText(/Display name/)).toHaveValue("Ahmed Mahmoud");
-    expect(screen.getByLabelText("Username")).toHaveValue("ahmed123");
     expect(within(screen.getByTestId("settings-current-phone")).getByText("+201012345678")).toBeInTheDocument();
     expect(screen.getByTestId("settings-phone-status")).toHaveTextContent("Not verified");
     expect(document.body).not.toHaveTextContent(/preview/i);
@@ -86,7 +82,6 @@ describe("installer settings (production)", () => {
     // The contact email is connected: it shows the database state (none yet) and an Add control, never a fake value.
     expect(screen.getByTestId("contact-email-status")).toHaveTextContent("Not added");
     expect(screen.getByRole("button", { name: "Add email" })).toBeEnabled();
-    expect(screen.getByLabelText("Username")).toBeEnabled(); // username editing is connected
     // The secondary phone (PR #88) is connected too.
     expect(screen.getByTestId("settings-secondary-phone")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Active sessions/ })).toBeDisabled();
@@ -293,193 +288,15 @@ describe("installer settings (production)", () => {
     });
   });
 
-  describe("username", () => {
-    const username = () => screen.getByLabelText("Username") as HTMLInputElement;
-    const save = () => screen.getByRole("button", { name: /Save changes|Saving/ });
-    const type = (value: string) => fireEvent.change(username(), { target: { value } });
-    const TAKEN = "That username isn't available. Try another.";
-
-    it("loads the real username, keeps Save off until something changes, and sends nothing for an unchanged value", () => {
-      renderWithI18n(<InstallerSettings data={DATA} />, "en");
-      expect(username()).toHaveValue("ahmed123");
-      expect(save()).toBeDisabled();
-      type("ahmed123 ");
-      expect(save()).toBeDisabled(); // only whitespace differs
-      expect(setUsername).not.toHaveBeenCalled();
-    });
-
-    it("saves through the real action (trimmed, display name untouched) and shows the value the SERVER stored", async () => {
-      setUsername.mockResolvedValueOnce({ ok: true, username: "Ahmed.M" }); // the stored spelling is what is displayed
-      renderWithI18n(<InstallerSettings data={DATA} />, "en");
-      type("  ahmed.m ");
-      await act(async () => { fireEvent.click(save()); });
-      await waitFor(() => expect(setUsername).toHaveBeenCalledTimes(1));
-      expect(fields(setUsername.mock.calls[0]![1] as FormData)).toEqual({ username: "ahmed.m" });
-      expect(setDisplayName).not.toHaveBeenCalled();
-      expect(await screen.findByTestId("username-saved")).toHaveTextContent("Username saved: Ahmed.M");
-      expect(username()).toHaveValue("Ahmed.M");
-      expect(save()).toBeDisabled();
-    });
-
-    it.each([["ab"], ["9lives"], ["a b c"], ["a..b"], ["   "]])(
-      "validates %j locally with the existing rules and never calls the server",
-      async (value) => {
-        renderWithI18n(<InstallerSettings data={DATA} />, "en");
-        type(value);
-        if (value.trim() === "") {
-          expect(save()).toBeEnabled(); // differs from the saved value, so the required message can be shown
-        }
-        await act(async () => { fireEvent.click(save()); });
-        expect(await screen.findByRole("alert")).toBeInTheDocument();
-        expect(setUsername).not.toHaveBeenCalled();
-        expect(screen.queryByTestId("username-saved")).not.toBeInTheDocument();
-      },
-    );
-
-    it("shows a taken / reserved username as 'not available' (one message for both) and claims no success", async () => {
-      setUsername.mockResolvedValueOnce({ ok: false, code: "registration.error.usernameUnavailable" });
-      renderWithI18n(<InstallerSettings data={DATA} />, "en");
-      type("admin");
-      await act(async () => { fireEvent.click(save()); });
-      expect(await screen.findByText(TAKEN)).toBeInTheDocument();
-      expect(screen.queryByTestId("username-saved")).not.toBeInTheDocument();
-      expect(username()).toHaveValue("admin"); // kept for the user to correct
-      type("admin2");
-      expect(screen.queryByText(TAKEN)).not.toBeInTheDocument();
-    });
-
-    it("shows a server failure without claiming success", async () => {
-      setUsername.mockResolvedValueOnce({ ok: false, code: "profileIdentity.username.error" });
-      renderWithI18n(<InstallerSettings data={DATA} />, "en");
-      type("newname");
-      await act(async () => { fireEvent.click(save()); });
-      expect(await screen.findByText("Your username wasn't saved. Try again.")).toBeInTheDocument();
-      expect(screen.queryByTestId("username-saved")).not.toBeInTheDocument();
-    });
-
-    it("shows a loading state and ignores a second submit while saving", async () => {
-      let resolve!: (value: unknown) => void;
-      setUsername.mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
-      renderWithI18n(<InstallerSettings data={DATA} />, "en");
-      type("newname");
-      await act(async () => { fireEvent.click(save()); });
-      expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
-      await act(async () => { fireEvent.submit(document.getElementById("settings-profile-form")!); });
-      expect(setUsername).toHaveBeenCalledTimes(1);
-      expect(screen.queryByTestId("username-saved")).not.toBeInTheDocument();
-      await act(async () => { resolve({ ok: true, username: "newname" }); });
-      expect(await screen.findByTestId("username-saved")).toBeInTheDocument();
-    });
-
-    describe("combined save: partial success is reported honestly", () => {
-      const name = () => screen.getByLabelText(/Display name/) as HTMLInputElement;
-      const editBoth = () => {
-        fireEvent.change(name(), { target: { value: "Ahmed M." } });
-        type("newhandle");
-      };
-
-      it("name saved, username refused: names BOTH fields, keeps the unsaved username, and a retry sends ONLY the username", async () => {
-        setDisplayName.mockResolvedValueOnce({ ok: true });
-        setUsername.mockResolvedValueOnce({ ok: false, code: "registration.error.usernameUnavailable" });
-        renderWithI18n(<InstallerSettings data={DATA} />, "en");
-        editBoth();
-        await act(async () => { fireEvent.click(save()); });
-        expect(await screen.findByTestId("partial-save")).toHaveTextContent("Saved: Display name. Not saved: Username.");
-        expect(screen.getByTestId("name-saved")).toBeInTheDocument();
-        expect(screen.getByText(TAKEN)).toBeInTheDocument();
-        expect(screen.queryByTestId("username-saved")).not.toBeInTheDocument();
-        expect(username()).toHaveValue("newhandle"); // unsaved input preserved
-        expect(name()).toHaveValue("Ahmed M.");
-        expect(save()).toBeEnabled(); // the username is still unsaved
-        // Retry with a different username: the already-saved name is NOT sent again.
-        setUsername.mockResolvedValueOnce({ ok: true, username: "otherhandle" });
-        type("otherhandle");
-        await act(async () => { fireEvent.click(save()); });
-        expect(await screen.findByTestId("username-saved")).toHaveTextContent("otherhandle");
-        expect(setDisplayName).toHaveBeenCalledTimes(1);
-        expect(setUsername).toHaveBeenCalledTimes(2);
-        expect(screen.queryByTestId("partial-save")).not.toBeInTheDocument(); // single-field save: no partial banner
-      });
-
-      it("username saved, name refused: names BOTH fields, keeps the unsaved name, and a retry sends ONLY the name", async () => {
-        setDisplayName.mockResolvedValueOnce({ ok: false, code: "profileIdentity.displayName.error" });
-        setUsername.mockResolvedValueOnce({ ok: true, username: "newhandle" });
-        renderWithI18n(<InstallerSettings data={DATA} />, "en");
-        editBoth();
-        await act(async () => { fireEvent.click(save()); });
-        expect(await screen.findByTestId("partial-save")).toHaveTextContent("Saved: Username. Not saved: Display name.");
-        expect(screen.getByTestId("username-saved")).toHaveTextContent("newhandle");
-        expect(screen.getByText("Enter a display name (1-80 characters).")).toBeInTheDocument();
-        expect(screen.queryByTestId("name-saved")).not.toBeInTheDocument();
-        expect(name()).toHaveValue("Ahmed M."); // unsaved input preserved
-        expect(save()).toBeEnabled();
-        setDisplayName.mockResolvedValueOnce({ ok: true });
-        await act(async () => { fireEvent.click(save()); });
-        expect(await screen.findByTestId("name-saved")).toBeInTheDocument();
-        expect(setUsername).toHaveBeenCalledTimes(1); // the saved username is not resent
-        expect(setDisplayName).toHaveBeenCalledTimes(2);
-      });
-
-      it("both saved: both confirmations, no partial banner", async () => {
-        setDisplayName.mockResolvedValueOnce({ ok: true });
-        setUsername.mockResolvedValueOnce({ ok: true, username: "newhandle" });
-        renderWithI18n(<InstallerSettings data={DATA} />, "en");
-        editBoth();
-        await act(async () => { fireEvent.click(save()); });
-        expect(await screen.findByTestId("name-saved")).toBeInTheDocument();
-        expect(await screen.findByTestId("username-saved")).toBeInTheDocument();
-        expect(screen.queryByTestId("partial-save")).not.toBeInTheDocument();
-        expect(save()).toBeDisabled();
-      });
-
-      it("both refused: both errors, no success text and no partial banner", async () => {
-        setDisplayName.mockResolvedValueOnce({ ok: false, code: "profileIdentity.displayName.error" });
-        setUsername.mockResolvedValueOnce({ ok: false, code: "registration.error.usernameUnavailable" });
-        renderWithI18n(<InstallerSettings data={DATA} />, "en");
-        editBoth();
-        await act(async () => { fireEvent.click(save()); });
-        expect(await screen.findByText(TAKEN)).toBeInTheDocument();
-        expect(screen.getByText("Enter a display name (1-80 characters).")).toBeInTheDocument();
-        for (const id of ["name-saved", "username-saved", "partial-save"]) expect(screen.queryByTestId(id)).not.toBeInTheDocument();
-        expect(name()).toHaveValue("Ahmed M.");
-        expect(username()).toHaveValue("newhandle");
-      });
-
-      it("a thrown network error in one save is a failure of THAT field only; the other still saves and the page survives", async () => {
-        setDisplayName.mockRejectedValueOnce(new Error("network down"));
-        setUsername.mockResolvedValueOnce({ ok: true, username: "newhandle" });
-        renderWithI18n(<InstallerSettings data={DATA} />, "en");
-        editBoth();
-        await act(async () => { fireEvent.click(save()); });
-        expect(await screen.findByTestId("partial-save")).toHaveTextContent("Saved: Username. Not saved: Display name.");
-        expect(name()).toHaveValue("Ahmed M.");
-      });
-
-      it("text typed while a save is in flight is neither lost nor marked saved", async () => {
-        let resolve!: (value: unknown) => void;
-        setUsername.mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
-        renderWithI18n(<InstallerSettings data={DATA} />, "en");
-        type("firsthandle");
-        await act(async () => { fireEvent.click(save()); });
-        type("secondhandle"); // typed during the save
-        await act(async () => { resolve({ ok: true, username: "firsthandle" }); });
-        expect(username()).toHaveValue("secondhandle");
-        expect(save()).toBeEnabled(); // still unsaved
-      });
-    });
-
-    it("describes the username truthfully (it is not part of any profile link)", () => {
-      renderWithI18n(<InstallerSettings data={DATA} />, "en");
-      expect(document.body).not.toHaveTextContent(/profile link/i);
-      expect(screen.getByText(/Your unique handle on Aladdin/)).toBeInTheDocument();
-    });
-
-    it("works in Arabic", async () => {
-      setUsername.mockResolvedValueOnce({ ok: false, code: "registration.error.usernameUnavailable" });
+  describe("no application username (Phase 1)", () => {
+    it("shows no username field or copy, in either language", () => {
+      const { unmount } = renderWithI18n(<InstallerSettings data={DATA} />, "en");
+      expect(screen.queryByLabelText(/username/i)).not.toBeInTheDocument();
+      expect(document.body).not.toHaveTextContent(/username/i);
+      unmount();
       renderWithI18n(<InstallerSettings data={DATA} />, "ar");
-      fireEvent.change(screen.getByLabelText("اسم المستخدم"), { target: { value: "admin" } });
-      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "حفظ التغييرات" })); });
-      expect(await screen.findByRole("alert")).toBeInTheDocument();
+      expect(screen.queryByLabelText("اسم المستخدم")).not.toBeInTheDocument();
+      expect(document.body).not.toHaveTextContent("اسم المستخدم");
     });
   });
 

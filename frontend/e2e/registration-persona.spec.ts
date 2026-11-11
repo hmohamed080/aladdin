@@ -4,9 +4,9 @@ import { registerWithPassword } from "./helpers/auth";
 /**
  * Registration account type → AUTHORITATIVE persona (staging-prep Increment
  * 11), end to end against the REAL local Supabase + Mailpit, through the
- * CANONICAL `/auth/sign-up` (Full Name, username and the account-type
- * dropdown on Step 1; `onboarding_select_account_type` +
- * `profile_set_username` applied after the OTP). Turnstile-gated like every
+ * CANONICAL `/auth/sign-up` (Full Name, the account-type
+ * dropdown and the 18+ confirmation on Step 1; `onboarding_select_account_type`
+ * applied after the OTP). Turnstile-gated like every
  * Create Account: run where challenges.cloudflare.com loads.
  */
 
@@ -31,16 +31,15 @@ async function registerAs(
   request: APIRequestContext,
   choice: RegExp,
   tag: string,
-): Promise<{ visited: string[]; username: string }> {
+): Promise<{ visited: string[] }> {
   const visited: string[] = [];
   page.on("framenavigated", (f) => {
     if (f === page.mainFrame()) visited.push(new URL(f.url()).pathname);
   });
 
   const email = `rp-${tag}-${uniq()}@example.test`;
-  const username = `rp${tag}${uniq()}`.slice(0, 24);
-  await registerWithPassword(page, request, { email, username, accountType: choice, displayName: `E2E ${tag}` });
-  return { visited, username };
+  await registerWithPassword(page, request, { email, accountType: choice, displayName: `E2E ${tag}` });
+  return { visited };
 }
 
 function noLegacyWizard(visited: string[]): void {

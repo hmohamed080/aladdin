@@ -15,7 +15,6 @@ test.describe.configure({ mode: "serial" });
 const q = (s: string) => psql(s).trim();
 const RUN = Date.now().toString(36);
 const EMAIL = `reg-first-${RUN}@example.test`;
-const USERNAME = `regfirst${RUN}`;
 const SHOWROOM = `Nile Tiles ${RUN}`;
 const SUITE = "/showroom";
 const uid = () => q(`select id from auth.users where email = '${EMAIL}'`);
@@ -42,7 +41,6 @@ test("N1 the sign-up form: Showroom is selectable, Coming Soon types are disable
   // client validation: nothing is submitted for a mismatched/weak password or missing consents
   await page.getByLabel(/^full name$/i).fill("Validation Tester");
   await page.getByLabel(/^email address$/i).fill("not-an-email");
-  await page.getByLabel(/^username$/i).fill("ab");
   await selectAccountType(page, /showroom/i);
   await page.getByLabel(/^password$/i).fill("short");
   await page.getByLabel(/confirm password/i).fill("different");
@@ -57,7 +55,6 @@ test("N2 first registration as a Showroom: Email OTP verifies the account, and t
   await prefs(page, { locale: "en" });
   await registerWithPassword(page, request, {
     email: EMAIL,
-    username: USERNAME,
     displayName: `First ${RUN}`,
     accountType: /showroom/i,
     landing: /\/(home|b2b|onboarding|business)(\/|$|\?)/,
@@ -74,13 +71,12 @@ test("N2 first registration as a Showroom: Email OTP verifies the account, and t
   await page.waitForLoadState("networkidle");
   await expect(page.getByTestId("showroom-quotes")).toHaveCount(0);
   await expect(page).not.toHaveURL(new RegExp(`${SUITE}/home`));
-  // a duplicate registration with the same email or username is refused
+  // a duplicate registration with the same email is refused
   await page.context().clearCookies();
   await prefs(page, { locale: "en" });
   await open(page, "/auth/sign-up");
   await page.getByLabel(/^full name$/i).fill("Duplicate");
   await page.getByLabel(/^email address$/i).fill(EMAIL);
-  await page.getByLabel(/^username$/i).fill(`${USERNAME}x`);
   await selectAccountType(page, /showroom/i);
   await page.getByLabel(/^password$/i).fill(E2E_PASSWORD);
   await page.getByLabel(/confirm password/i).fill(E2E_PASSWORD);

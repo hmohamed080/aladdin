@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const rpc = vi.fn();
@@ -8,29 +8,11 @@ vi.mock("@/server/auth/phone-sign-up", () => ({ requestPhoneSignUp: vi.fn(), res
 
 import { checkUsername } from "./sign-up";
 
-beforeEach(() => rpc.mockReset());
-
-describe("checkUsername", () => {
-  it("rejects a malformed name without a lookup", async () => {
-    expect(await checkUsername("_x")).toEqual({ status: "invalid" });
+describe("checkUsername (inert since P1 PR-2)", () => {
+  it("makes no database call and always answers the neutral unknown state", async () => {
+    for (const raw of ["ahmed", "_x", " ", undefined, 42]) {
+      expect(await checkUsername(raw)).toEqual({ status: "unknown" });
+    }
     expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("answers available from the username_available RPC", async () => {
-    rpc.mockResolvedValue({ data: true, error: null });
-    expect(await checkUsername(" ahmed ")).toEqual({ status: "available" });
-    expect(rpc).toHaveBeenCalledWith("username_available", { p_username: "ahmed" });
-  });
-
-  it("offers a free variant when taken", async () => {
-    rpc.mockImplementation(async (_name: string, args?: { p_username: string }) => ({ data: args?.p_username !== "ahmed", error: null }));
-    const result = await checkUsername("ahmed");
-    expect(result.status).toBe("taken");
-    expect(result.suggestion).toMatch(/^ahmed\d{2,3}$/);
-  });
-
-  it("never reports taken on a lookup failure", async () => {
-    rpc.mockResolvedValue({ data: null, error: { code: "500" } });
-    expect(await checkUsername("ahmed")).toEqual({ status: "unknown" });
   });
 });

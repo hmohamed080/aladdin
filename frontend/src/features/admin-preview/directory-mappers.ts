@@ -72,7 +72,6 @@ export type UserFlag = "verification_issue";
 export type AdminDirectoryUser = {
   id: string;
   displayName: LocalizedName;
-  username: string | null;
   /** The account email, already stripped of the Installer login alias by the database. */
   email: string | null;
   /** Canonical E.164 phone. */
@@ -105,6 +104,11 @@ function displayNameOf(o: Obj): LocalizedName {
   return { name: str(o.display_name) ?? "", nameAr: str(o.display_name_ar), nameEn: str(o.display_name_en) };
 }
 
+/**
+ * Phase 1 (account identity): the application username is no longer shown or
+ * searchable. Until migration M3 the directory RPCs may still emit a legacy
+ * `username` key (and `username` in `completion.missing`); both are ignored here.
+ */
 export function mapDirectoryUser(raw: unknown): AdminDirectoryUser | null {
   const o = obj(raw);
   const id = str(o?.id);
@@ -116,7 +120,6 @@ export function mapDirectoryUser(raw: unknown): AdminDirectoryUser | null {
   return {
     id,
     displayName: displayNameOf(o),
-    username: str(o.username),
     email: str(o.email),
     phone: str(o.phone),
     accountType: str(o.account_type),
@@ -191,7 +194,7 @@ export function mapUserDetail(raw: unknown): AdminUserDetail | null {
   const completion = obj(o.completion);
   return {
     ...pick(base, [
-      "id", "displayName", "username", "email", "phone", "accountType", "registeredAccount", "status", "isVerified", "createdAt",
+      "id", "displayName", "email", "phone", "accountType", "registeredAccount", "status", "isVerified", "createdAt",
       "verificationState", "governorate", "city", "profileId", "publicProfileAvailable",
     ] as const),
     headline: str(o.headline),
@@ -199,7 +202,7 @@ export function mapUserDetail(raw: unknown): AdminUserDetail | null {
     lastSignInAt: str(o.last_sign_in_at),
     completion: {
       percent: Math.min(100, Math.max(0, num(completion?.percent) ?? 0)),
-      missing: strings(completion?.missing),
+      missing: strings(completion?.missing).filter((key) => key !== "username"),
     },
     memberships: mapAll(o.memberships, (r) => {
       const m = obj(r);

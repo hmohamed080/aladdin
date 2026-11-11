@@ -58,7 +58,7 @@ const tokenFields = () => [...document.querySelectorAll<HTMLInputElement>("input
 const actions = () => renders.map((r) => r.action);
 
 describe("which Turnstile token each auth form submits", () => {
-  it("sign-in (mobile, username or email): one interaction-only token (GoTrue judges the password grant)", async () => {
+  it("sign-in (mobile or email): one interaction-only token (GoTrue judges the password grant)", async () => {
     await mount(<PasswordSignInForm next="/b2b" />);
     expect(tokenFields()).toEqual(["captchaToken"]);
     expect(renders).toEqual([expect.objectContaining({ action: "sign-in", appearance: "interaction-only" })]);

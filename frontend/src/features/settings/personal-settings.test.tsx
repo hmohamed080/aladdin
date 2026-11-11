@@ -146,7 +146,6 @@ describe("PersonalSettings", () => {
   const identity = {
     displayName: "Member",
     displayNameConfirmed: false,
-    username: "sayed",
     phoneCountryIso2: null,
     phoneNational: null,
     phoneE164: null,

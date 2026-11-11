@@ -2,6 +2,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { ageConfirmedFromForm } from "@/features/auth-password-preview/password-policy";
 import { entryCallbackUrl, isOAuthProvider, OAUTH_SIGN_IN_PATH } from "@/server/auth/entry-oauth";
 
 /**
@@ -24,7 +25,7 @@ export async function startEntryOAuth(formData: FormData): Promise<void> {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: entryCallbackUrl(`${proto}://${host}`, formData.get("next"), formData.get("accountType")),
+        redirectTo: entryCallbackUrl(`${proto}://${host}`, formData.get("next"), formData.get("accountType"), ageConfirmedFromForm(formData)),
         skipBrowserRedirect: true,
         ...(provider === "google" ? { queryParams: { prompt: "select_account" } } : {}),
       },
