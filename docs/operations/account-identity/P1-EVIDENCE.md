@@ -75,8 +75,8 @@ Heads were stable from 08:42 to 09:00 UTC (the integrator pushed #171 at 08:34, 
 | PR | Branch | Head SHA (full) | CI per check at 09:00 UTC |
 |---|---|---|---|
 | #171 M1 `20261110090002` | `feat/p1-username-dob-db-compat-20261110` | `b8c06ccfcc740f7000d9578a5c9e177bdd5a44c2` | backend, backup-kit, docs, frontend, frontend-cloudflare, migration-policy, supabase-rls: all pass |
-| #172 PR-2 auth | `feat/p1-username-dob-auth-20261110` | `5cd0cbc65ae07d1e2dcbd53e6c7f09321d918b8a` | backend, backup-kit, docs, frontend, frontend-cloudflare, gotrue-direct (fail), gotrue-direct (spent), migration-policy, supabase-rls: pass; **auth-captcha-e2e: still pending at the read** (not verified; its e2e fixes depend on #173) |
+| #172 PR-2 auth | `feat/p1-username-dob-auth-20261110` | `5cd0cbc65ae07d1e2dcbd53e6c7f09321d918b8a` | backend, backup-kit, docs, frontend, frontend-cloudflare, gotrue-direct (fail), gotrue-direct (spent), migration-policy, supabase-rls: pass; **auth-captcha-e2e: FAIL** (run 42988297027, finished after the 09:00 read; the e2e fixes of #172 and #173 depend on each other, and #173 passes the same check, so the stack is only proven green with both merged; the cause of the #172 failure was not investigated by the docs agent) |
 | #173 PR-3 frontend/admin | `feat/p1-username-dob-frontend-admin-20261110` | `ccdd3a4609c1459fbc6bdaf07acd5701d9047331` | auth-captcha-e2e, backend, backup-kit, docs, frontend, frontend-cloudflare, gotrue-direct (fail), gotrue-direct (spent), migration-policy, showroom-rc2-e2e, supabase-rls: all pass |
 | #170 docs | `docs/p1-username-dob-plan-20261110` | see the PR (this file cannot contain its own head SHA) | see the PR |
 
-Reading: green CI is not release approval; no hosted environment was touched for any row, and nothing is merged. #172 is not proven green until its auth-captcha-e2e finishes.
+Reading: green CI is not release approval; no hosted environment was touched for any row, and nothing is merged. #172 alone is red on auth-captcha-e2e; it is not proven green on its own.
