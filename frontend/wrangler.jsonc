@@ -83,6 +83,11 @@
         // is turned on later by its own approval.
         "R2_STORAGE_ENABLED": "false",
         "R2_PRODUCTION_WRITES_APPROVED": "false",
+        // Production R2 resources (owner-approved names; pinned in environment-manifest.ts, which a test keeps equal).
+        // The buckets must exist before R2 is switched on; the switches above stay false until their own approvals.
+        "R2_ACCOUNT_ID": "a4c2b7ac45e58a81691b9165492ce6a2",
+        "R2_PRIVATE_BUCKET": "aladdin-media-private",
+        "R2_SITE_BUCKET": "aladdin-site-media",
         "REDIS_CACHE_ENABLED": "false"
       },
       // Checked by `wrangler deploy`: the deploy fails if one is not set. The owner
