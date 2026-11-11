@@ -18,7 +18,7 @@ Before C-2, C-4, A-ACC and any Preview or Production deployment, verify the acco
 ```
 CLOUDFLARE_ACCOUNT_ID=<the value the step will use> node scripts/r2-account-preflight.mjs   # exit 0 only if equal to a4c2b7ac45e58a81691b9165492ce6a2
 ```
-It compares against the account pinned in `environment-manifest.ts`, character for character, and fails closed on unset, padded, differently cased or different values (`scripts/r2-account-preflight.test.mjs`). It is a manual preflight; it deploys and changes nothing.
+It compares against the account pinned in `environment-manifest.ts`, character for character, and fails closed on unset, padded, differently cased or different values (`scripts/r2-account-preflight.test.mjs`). It also runs automatically as an unconditional step, right after Node setup and before any build, dry run or Cloudflare step, in all three deployment workflows (`cloudflare-frontend-preview.yml`, `cloudflare-backend-preview.yml`, `cloudflare-production.yml`), using the real `vars.CLOUDFLARE_ACCOUNT_ID`; a missing or different value fails the job before anything is deployed (tests assert the order). It deploys and changes nothing itself.
 
 ## C-2: bucket provisioning commands (one GO)
 Run from `frontend/` by the owner with only a 1-day R2 admin token in the environment (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID=a4c2b7ac45e58a81691b9165492ce6a2`). Stop at the first unexpected output.
