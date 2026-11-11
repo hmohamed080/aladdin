@@ -43,7 +43,7 @@ const privacyEn: LegalDocument = {
       blocks: [
         p("Data you give us when you create and use an account:"),
         list(
-          "Account details: full name, email address and/or mobile phone number, the account type you choose (for example Showroom or Installer), your password and your confirmation that you are 18 or older. We do not collect or store your date of birth or a username. Passwords are stored only as a secure hash by our authentication provider; we never see or store them in plain text.",
+          "Account details: full name, email address and/or mobile phone number, the account type you choose (for example Showroom or Installer), your password and your confirmation that you are 18 or older. We no longer collect a date of birth or a username. Any values stored earlier are being removed as part of a scheduled clean-up. Passwords are stored only as a secure hash by our authentication provider; we never see or store them in plain text.",
           "Profile details you add: display name, profile photo, trade and specialties, service areas, availability, portfolio images and certificates.",
           "Business details if you register a business: business name and legal name, business type, branches and their addresses and phone numbers, business photo and description, and verification information you submit.",
           "Content you create: products, prices, offers, purchase requests, quotations, job posts and applications, reviews, saved items and searches, and messages you send to other users.",
@@ -184,7 +184,7 @@ const privacyAr: LegalDocument = {
       blocks: [
         p("بيانات تقدّمها لنا عند إنشاء حسابك واستخدامه:"),
         list(
-          "بيانات الحساب: الاسم الكامل، والبريد الإلكتروني و/أو رقم الموبايل، ونوع الحساب الذي تختاره (مثل معرض أو صنايعي)، وكلمة المرور، وإقرارك بأن عمرك ١٨ عامًا أو أكثر. لا نجمع تاريخ ميلادك ولا اسم مستخدم ولا نحفظهما. تُحفظ كلمات المرور مشفّرة تشفيرًا أحادي الاتجاه لدى مزوّد خدمة الدخول، ولا نراها أو نحفظها كنص واضح أبدًا.",
+          "بيانات الحساب: الاسم الكامل، والبريد الإلكتروني و/أو رقم الموبايل، ونوع الحساب الذي تختاره (مثل معرض أو صنايعي)، وكلمة المرور، وإقرارك بأن عمرك ١٨ عامًا أو أكثر. لم نعد نجمع تاريخ الميلاد أو اسم المستخدم. وأي قيم سبق حفظها تُحذف ضمن عملية تنظيف مجدولة. تُحفظ كلمات المرور مشفّرة تشفيرًا أحادي الاتجاه لدى مزوّد خدمة الدخول، ولا نراها أو نحفظها كنص واضح أبدًا.",
           "بيانات الملف الشخصي التي تضيفها: الاسم الظاهر، وصورة الملف، والحرفة والتخصصات، ومناطق الخدمة، وأوقات التوفر، وصور الأعمال والشهادات.",
           "بيانات النشاط التجاري إذا سجّلت نشاطًا: الاسم التجاري والاسم القانوني، ونوع النشاط، والفروع وعناوينها وأرقام هواتفها، وصورة النشاط ووصفه، وبيانات التوثيق التي ترسلها.",
           "المحتوى الذي تنشئه: المنتجات والأسعار والعروض وطلبات الشراء وعروض الأسعار وإعلانات الوظائف والتقديمات والتقييمات والعناصر وعمليات البحث المحفوظة والرسائل التي ترسلها للمستخدمين الآخرين.",
