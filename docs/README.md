@@ -64,6 +64,7 @@ The five files above are **persistent project memory and part of the core archit
 - [`architecture/data-flow.md`](architecture/data-flow.md)
 - [`architecture/realtime-and-background-jobs.md`](architecture/realtime-and-background-jobs.md)
 - [`architecture/scaling-strategy.md`](architecture/scaling-strategy.md)
+- [`architecture/ACCOUNT_IDENTITY_LIFECYCLE_MASTER_PLAN.md`](architecture/ACCOUNT_IDENTITY_LIFECYCLE_MASTER_PLAN.md) — account identity and lifecycle master plan (Phase 1: retire username and date of birth); working documents in [`operations/account-identity/`](operations/account-identity/README.md)
 
 ## Decisions (ADRs)
 
