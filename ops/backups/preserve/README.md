@@ -26,4 +26,6 @@ Gate S of the Production R2 plan: one encrypted, read-back-verified copy of ever
 5. Reconcile against the database inventory (`production-media-inventory.sql`): the 317 known missing records are baseline, not failures of this run.
 6. Upload the folder to the Production backup bucket under its own non-expiring prefix (separate script and token, not built yet).
 
+`upload-preserved.sh` (step 6) pushes the verified encrypted folder to the Production backup bucket under `source-preservation/<date>/`, holding only a temporary R2 write token, with conditional puts and a read-back check; `upload-preserved-test.sh` covers it offline (15 checks).
+
 `storage-preserve-test.sh` proves the guards, the empty-object entries, the read-back and tamper detection offline (10 checks).
