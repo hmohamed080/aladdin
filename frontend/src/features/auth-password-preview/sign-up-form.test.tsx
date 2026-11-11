@@ -49,7 +49,7 @@ describe("PasswordSignUpForm (Instagram style)", () => {
     renderWithI18n(<PasswordSignUpForm />, "en");
     const box = screen.getByRole("checkbox", { name: en.authPasswordPreview.signUp.ageConfirmLabel }) as HTMLInputElement;
     expect(box.name).toBe("ageConfirmed");
-    expect(box.value).toBe("true");
+    expect(box.value).toBe("on");
     expect(box.checked).toBe(false);
     expect(box).toHaveAttribute("aria-required", "true");
     expect(box).not.toHaveAttribute("aria-invalid");

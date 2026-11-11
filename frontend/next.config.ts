@@ -48,8 +48,6 @@ const nextConfig: NextConfig = {
       { source: "/installer/sign-in", destination: "/auth/sign-in", permanent: true },
       { source: "/showroom/sign-up", destination: "/auth/sign-up?type=showroom_dealer", permanent: true },
       { source: "/showroom/sign-in", destination: "/auth/sign-in", permanent: true },
-      // The username step was removed (Phase 1, account identity); /onboarding picks the next valid step.
-      { source: "/onboarding/username", destination: "/onboarding", permanent: false },
       // Showroom V2 was reviewed under /preview/showroom-suite-v2; it now lives at /showroom (links stay valid).
       { source: "/preview/showroom-suite-v2", destination: "/showroom", permanent: true },
       { source: "/preview/showroom-suite-v2/:path*", destination: "/showroom/:path*", permanent: true },

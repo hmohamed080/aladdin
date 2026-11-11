@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     code: params.get("code"),
     next: params.get("next"),
     accountType: params.get("type"),
+    ageConfirmed: params.get("ageConfirmed") === "1",
     locale: resolveLocale(request.cookies.get(LOCALE_COOKIE)?.value) as "en" | "ar",
     providerError: params.get("error"),
   });

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { evaluatePasswordStrength } from "./password-strength";
-import { isUsernameWellFormed } from "@/lib/identity/username";
 
 /**
  * Length-first password policy (NIST SP 800-63B-aligned) PLUS weak-password
@@ -56,16 +55,6 @@ function addWeakPasswordIssues(password: string, context: readonly string[], pat
 }
 
 /**
- * Username + account-type shape validation only — this schema exists purely
- * for immediate client-side feedback before a round-trip. Both are
- * REVALIDATED, from scratch, server-side against the live database
- * (`username_available`, the account-type enums) at the moment they are
- * actually applied (`verifyPasswordSignUp`, after `verifyOtp` succeeds) —
- * this schema's job is only to keep an obviously-invalid submission from
- * ever reaching `signUp()` in the first place, never to be trusted as the
- * final word on availability.
- */
-/**
  * The registrant's Full Name — PROFILE data, never authorization. Trimmed,
  * 1..80 characters: the same bounds `profile_set_display_name` enforces and
  * `app.handle_new_user()` truncates to. The server action is authoritative;
@@ -78,50 +67,50 @@ export const displayNameSchema = z
   .min(1, { message: "authPasswordPreview.error.fullNameRequired" })
   .max(DISPLAY_NAME_MAX_LENGTH, { message: "authPasswordPreview.error.fullNameTooLong" });
 
-/** Minimum age to hold an account. */
-export const MINIMUM_SIGN_UP_AGE = 18;
-
 /**
- * The registrant's birthday: a real calendar date (YYYY-MM-DD, the value a
- * date input submits), at least MINIMUM_SIGN_UP_AGE years ago and not before
- * 1900. Private account data, never shown on a public profile. `today` is
- * injectable for tests.
+ * AGE POLICY (PROPOSED INTERIM, pending legal approval; P1 PR-2). The application no longer collects or stores a date of birth. Eligibility
+ * protection is kept as a server-enforced self-attestation: "I confirm I am 18 or older".
+ *
+ * CONTRACT (shared by every registration path and by the UI):
+ *   * form field name  : `ageConfirmed` (AGE_CONFIRMATION_FIELD); a checkbox, submitted as "on" (or "true"/"1" from a script)
+ *   * parsed value     : boolean, must be literally `true` (ageConfirmationSchema)
+ *   * failure          : error code `authPasswordPreview.error.ageNotConfirmed` (AGE_NOT_CONFIRMED_CODE)
+ * The attestation is checked at request time and is NOT persisted anywhere (no column, no metadata). Whether it must be recorded to prove
+ * enforcement is an open legal question.
  */
-export function parseBirthDate(input: unknown, today: Date = new Date()): { ok: true; value: string } | { ok: false; code: string } {
-  const raw = typeof input === "string" ? input.trim() : "";
-  if (!raw) return { ok: false, code: "authPasswordPreview.error.birthDateRequired" };
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
-  if (!match) return { ok: false, code: "authPasswordPreview.error.birthDateInvalid" };
-  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day || year < 1900) {
-    return { ok: false, code: "authPasswordPreview.error.birthDateInvalid" };
-  }
-  const adult = new Date(Date.UTC(today.getUTCFullYear() - MINIMUM_SIGN_UP_AGE, today.getUTCMonth(), today.getUTCDate()));
-  if (date > adult) return { ok: false, code: "authPasswordPreview.error.birthDateTooYoung" };
-  return { ok: true, value: raw };
+export const AGE_CONFIRMATION_FIELD = "ageConfirmed";
+export const MINIMUM_SIGN_UP_AGE = 18;
+export const AGE_NOT_CONFIRMED_CODE = "authPasswordPreview.error.ageNotConfirmed";
+
+/** Must be exactly boolean `true`; anything else (false, missing, "yes", 1) fails with AGE_NOT_CONFIRMED_CODE. */
+export const ageConfirmationSchema = z.literal(true, { errorMap: () => ({ message: AGE_NOT_CONFIRMED_CODE }) });
+export type AgeConfirmation = z.infer<typeof ageConfirmationSchema>;
+
+/** Reads the checkbox value a form (or script) submitted into a boolean. Only "on", "true" and "1" mean confirmed. */
+export function ageConfirmedFromForm(formData: FormData): boolean {
+  const value = formData.get(AGE_CONFIRMATION_FIELD);
+  return value === "on" || value === "true" || value === "1";
+}
+
+/** Server-side gate for flows without a zod schema: null when confirmed, else the typed error code. */
+export function ageConfirmationError(formData: FormData): string | null {
+  return ageConfirmationSchema.safeParse(ageConfirmedFromForm(formData)).success ? null : AGE_NOT_CONFIRMED_CODE;
 }
 
 export const registrationSchema = z
   .object({
     displayName: displayNameSchema,
     email: emailSchema,
-    username: z
-      .string()
-      .trim()
-      .refine((value) => isUsernameWellFormed(value), { message: "registration.error.usernameShape" }),
     accountType: z.string().trim().min(1, { message: "authPasswordPreview.error.accountTypeRequired" }),
     password: passwordSchema,
-    birthDate: z.string({ invalid_type_error: "authPasswordPreview.error.birthDateRequired", required_error: "authPasswordPreview.error.birthDateRequired" }).trim(),
+    ageConfirmed: ageConfirmationSchema,
   })
   .superRefine((value, ctx) => {
     addWeakPasswordIssues(value.password, [value.email], ["password"], ctx);
-    const birthDate = parseBirthDate(value.birthDate);
-    if (!birthDate.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: birthDate.code, path: ["birthDate"] });
   });
 
 /**
- * Registration for INVITED PLATFORM STAFF: exactly the marketplace rules for name, e-mail, password and birth date, with no username and no
+ * Registration for INVITED PLATFORM STAFF: exactly the marketplace rules for name, e-mail, password and the 18+ attestation, with no username and no
  * account type (staff are never given a marketplace persona). Kept beside registrationSchema so the two cannot drift.
  */
 export const staffRegistrationSchema = z
@@ -129,12 +118,10 @@ export const staffRegistrationSchema = z
     displayName: displayNameSchema,
     email: emailSchema,
     password: passwordSchema,
-    birthDate: z.string({ invalid_type_error: "authPasswordPreview.error.birthDateRequired", required_error: "authPasswordPreview.error.birthDateRequired" }).trim(),
+    ageConfirmed: ageConfirmationSchema,
   })
   .superRefine((value, ctx) => {
     addWeakPasswordIssues(value.password, [value.email], ["password"], ctx);
-    const birthDate = parseBirthDate(value.birthDate);
-    if (!birthDate.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: birthDate.code, path: ["birthDate"] });
   });
 
 export const resetPasswordSchema = z
@@ -160,10 +147,9 @@ export function passwordWithContextSchema(context: readonly string[]) {
 const REGISTRATION_FIELD_CODES: Record<string, string> = {
   displayName: "authPasswordPreview.error.fullNameRequired",
   email: "authPasswordPreview.error.invalidEmail",
-  username: "registration.error.usernameShape",
   accountType: "authPasswordPreview.error.accountTypeRequired",
   password: "authPasswordPreview.error.passwordTooShort",
-  birthDate: "authPasswordPreview.error.birthDateRequired",
+  ageConfirmed: AGE_NOT_CONFIRMED_CODE,
 };
 
 export function registrationIssueCode(issue: { message?: string; path?: (string | number)[] } | undefined): string {

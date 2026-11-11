@@ -235,7 +235,7 @@ export function PasswordSignUpForm({
       ) : null}
       {hasOAuthProvider(providers) ? (
         <>
-          <EntryOAuthButtons next={next} accountType={initialAccountType || undefined} providers={providers} />
+          <EntryOAuthButtons next={next} accountType={initialAccountType || undefined} providers={providers} ageConfirmed={age.checked} />
           <OrDivider label={t("authPasswordPreview.signUp.or")} />
         </>
       ) : null}

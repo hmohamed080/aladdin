@@ -28,7 +28,6 @@ const m = vi.hoisted(() => ({
   phoneTaken: vi.fn(),
   createUser: vi.fn(),
   deleteUser: vi.fn(),
-  birthday: vi.fn(),
   start: vi.fn(),
   verify: vi.fn(),
   attach: vi.fn(),
@@ -45,7 +44,6 @@ vi.mock("@/lib/supabase/admin-server", () => ({
   isCanonicalPhoneTaken: m.phoneTaken,
   createPhoneSignUpUser: m.createUser,
   deleteCraftsmanPasswordUser: m.deleteUser,
-  saveVerifiedBirthDate: m.birthday,
 }));
 
 import { requestPhoneSignUp, resendPhoneSignUpCode, verifyPhoneSignUp } from "./phone-sign-up";
@@ -62,10 +60,9 @@ function form(patch: Record<string, string> = {}) {
   const base: Record<string, string> = {
     contact: "01012345678",
     displayName: "Mona Adel",
-    username: "mona.adel",
     accountType: "supplier",
     password: GOOD_PASSWORD,
-    birthDate: "1990-05-17",
+    ageConfirmed: "on",
     consent_terms: "on",
     consent_privacy: "on",
     consent_pilot: "on",
@@ -100,10 +97,9 @@ beforeEach(() => {
   m.service.mockReturnValue({ start: m.start, verify: m.verify, attach: m.attach });
   m.createUser.mockImplementation(async () => { m.order.push("create"); return { ok: true, userId: "u-new" }; });
   m.deleteUser.mockResolvedValue(true);
-  m.birthday.mockImplementation(async () => { m.order.push("birthday"); });
   m.signInWithPassword.mockResolvedValue({ error: null });
   m.signOut.mockResolvedValue({ error: null });
-  m.rpc.mockImplementation(async (name: string) => { m.order.push(name); return name === "username_available" ? { data: true, error: null } : { data: null, error: null }; });
+  m.rpc.mockImplementation(async (name: string) => { m.order.push(name); return { data: null, error: null }; });
 });
 
 const verifyForm = (token: string) => {
@@ -119,7 +115,7 @@ async function startSignUp() {
 }
 
 describe("requestPhoneSignUp", () => {
-  it("checks every field, Turnstile, the limiter and the username, then asks the authority for a challenge - it holds no code of its own", async () => {
+  it("checks every field, Turnstile, the limiter and the 18+ attestation, then asks the authority for a challenge - it holds no code of its own", async () => {
     await startSignUp();
     expect(m.siteverify).toHaveBeenCalledWith("token-a", expect.objectContaining({ expectedAction: "sign-up" }));
     expect(m.start).toHaveBeenCalledWith(expect.stringMatching(RID_RE), "+201012345678", "203.0.113.9", "ar");
@@ -139,10 +135,11 @@ describe("requestPhoneSignUp", () => {
 
   it.each([
     [{ displayName: "" }, "authPasswordPreview.error.fullNameRequired"],
-    [{ username: "1bad" }, "registration.error.usernameShape"],
     [{ accountType: "end_consumer" }, "authPasswordPreview.error.accountTypeRequired"],
     [{ password: "short" }, "authPasswordPreview.error.passwordTooShort"],
-    [{ birthDate: "2015-01-01" }, "authPasswordPreview.error.birthDateTooYoung"],
+    [{ ageConfirmed: "" }, "authPasswordPreview.error.ageNotConfirmed"],
+    [{ ageConfirmed: "false" }, "authPasswordPreview.error.ageNotConfirmed"],
+    [{ ageConfirmed: "yes" }, "authPasswordPreview.error.ageNotConfirmed"],
     [{ consent_pilot: "" }, "authPasswordPreview.error.consentRequired"],
   ])("refuses %o before any challenge is opened", async (patch, code) => {
     expect((await requestPhoneSignUp(form(patch), PHONE)).code).toBe(code);
@@ -150,13 +147,11 @@ describe("requestPhoneSignUp", () => {
     expect(m.siteverify).not.toHaveBeenCalled();
   });
 
-  it("refuses a failed challenge, a limited number, a taken username, or the authority's own limits", async () => {
+  it("refuses a failed challenge, a limited number, or the authority's own limits", async () => {
     m.siteverify.mockResolvedValueOnce({ ok: false, reason: "rejected" });
     expect((await requestPhoneSignUp(form(), PHONE)).code).toBe("authPasswordPreview.error.captchaRejected");
     m.limit.mockResolvedValueOnce("limited");
     expect((await requestPhoneSignUp(form(), PHONE)).code).toBe("authPasswordPreview.error.rateLimited");
-    m.rpc.mockResolvedValueOnce({ data: false, error: null });
-    expect((await requestPhoneSignUp(form(), PHONE)).code).toBe("registration.error.usernameUnavailable");
     expect(m.start).not.toHaveBeenCalled();
     m.start.mockResolvedValueOnce({ status: "rate_limited", retryAfterSeconds: 60 });
     expect((await requestPhoneSignUp(form(), PHONE)).code).toBe("authPasswordPreview.error.rateLimited");
@@ -210,11 +205,11 @@ describe("verifyPhoneSignUp", () => {
     expect(m.createUser).toHaveBeenCalledWith({ grant: expect.objectContaining({ alias: ALIAS, phone: "+201012345678", registrationId: registrationId() }), password: GOOD_PASSWORD, fullName: "Mona Adel", locale: "ar" });
     expect(m.signInWithPassword).toHaveBeenCalledWith({ email: ALIAS, password: GOOD_PASSWORD, options: { captchaToken: "token-b" } });
     expect(m.rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "business", p_account_type: "supplier" });
-    expect(m.rpc).toHaveBeenCalledWith("profile_set_username", { p_username: "mona.adel" });
-    expect(m.birthday).toHaveBeenCalledWith("u-new", "1990-05-17");
+    expect(m.rpc).not.toHaveBeenCalledWith("profile_set_username", expect.anything());
+    expect(m.rpc).not.toHaveBeenCalledWith("username_available", expect.anything());
     expect(m.attach).toHaveBeenCalledWith("u-new", grantFor(registrationId()).id);
     // Order matters: grant -> create user -> profile initialization (phone set) -> attach (phone_verified_at).
-    expect(m.order).toEqual(["username_available", "create", "record_consent", "onboarding_select_account_type", "profile_set_phone", "profile_set_username", "profile_set_display_name", "birthday", "attach"]);
+    expect(m.order).toEqual(["create", "record_consent", "onboarding_select_account_type", "profile_set_phone", "profile_set_display_name", "attach"]);
     expect(cookieJar.has("psu")).toBe(false);
   });
 
@@ -253,13 +248,19 @@ describe("verifyPhoneSignUp", () => {
     expect(cookieJar.has("psu")).toBe(false);
   });
 
-  it("rolls the new account back when the username was taken meanwhile", async () => {
-    await startSignUp();
-    m.rpc.mockImplementation(async (name: string) => (name === "profile_set_username" ? { data: null, error: { code: "23505" } } : { data: null, error: null }));
-    expect((await verifyPhoneSignUp(verifyForm("246810"))).code).toBe("registration.error.usernameUnavailable");
-    expect(m.deleteUser).toHaveBeenCalledWith("u-new");
-    expect(m.attach).not.toHaveBeenCalled();
+  it("phone sign-up REQUIRES ageConfirmed: a missing attestation opens no challenge, sends no code and creates nothing", async () => {
+    const f = form();
+    f.delete("ageConfirmed");
+    expect((await requestPhoneSignUp(f, PHONE)).code).toBe("authPasswordPreview.error.ageNotConfirmed");
+    expect(m.start).not.toHaveBeenCalled();
+    expect(m.createUser).not.toHaveBeenCalled();
     expect(cookieJar.has("psu")).toBe(false);
+  });
+
+  it("the sealed pending sign-up holds no username and no birth date", async () => {
+    await startSignUp();
+    const raw = Buffer.from(cookieJar.get("psu") ?? "", "base64url");
+    expect(raw.toString("utf8")).not.toMatch(/mona\.adel|1990/);
   });
 
   it("tells the person to choose another password when Auth refuses it, leaving no account and no cookie (the grant stays unspent)", async () => {

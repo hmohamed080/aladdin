@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
+import { ageConfirmationError } from "@/features/auth-password-preview/password-policy";
 
 const CONSENT_TYPES = ["terms", "privacy", "pilot"] as const;
 
@@ -46,6 +47,10 @@ export async function chooseAccountTypeAction(
   _prev: AccountTypeChoiceState,
   formData: FormData,
 ): Promise<AccountTypeChoiceState> {
+  // Becoming access-ready is the point the 18+ self-attestation is enforced for OAuth and recovery registrations (proposed interim
+  // policy; nothing is stored). Checked before anything else so a missing attestation never reaches the database.
+  const ageError = ageConfirmationError(formData);
+  if (ageError) return { ok: false, code: ageError };
   const key = formData.get("accountType");
   const choice = typeof key === "string" ? CHOICES_BY_KEY[key] : undefined;
   if (!choice || choice.comingSoon || choice.transitional) {
@@ -73,35 +78,11 @@ export async function chooseAccountTypeAction(
 export type UsernameState = { ok: boolean; code?: string };
 
 /**
- * The mandatory username step (`public.profile_set_username`) — reached
- * whenever `my_registration_state()` returns `username_pending`: consent and
- * an account type are already recorded, but no valid username is stored yet.
- * Shared by both the canonical `/onboarding/username` page and canonical
- * password auth's own finish-registration recovery screen, so the
- * error-code shape (`registration.error.*`) is the SAME anti-enumeration
- * boundary in both places — `profile_set_username` itself never reveals
- * whether a collision was with a reserved word or another account.
+ * INERT since P1 PR-2. The application no longer has a username, so there is nothing to choose. The server action is kept only so the
+ * (about to be deleted) username step still compiles and, if a stale page posts to it, gets a safe answer: nothing is written, no
+ * database call is made, and the person is sent on to the onboarding gate, which re-derives the real state. Delete together with
+ * `features/onboarding/username-step.tsx`.
  */
-export async function chooseUsernameAction(_prev: UsernameState, formData: FormData): Promise<UsernameState> {
-  const username = formData.get("username");
-  if (typeof username !== "string" || username.length === 0) {
-    return { ok: false, code: "registration.error.usernameRequired" };
-  }
-
-  const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/auth/sign-in");
-
-  const { error } = await supabase.rpc("profile_set_username", { p_username: username });
-  if (error) {
-    // profile_set_username raises the SAME shape (23505, "username is
-    // unavailable") for a reserved word as for a genuine collision — this
-    // code intentionally does not try to distinguish them either.
-    if (error.code === "22023") return { ok: false, code: "registration.error.usernameShape" };
-    return { ok: false, code: "registration.error.usernameUnavailable" };
-  }
-
+export async function chooseUsernameAction(_prev: UsernameState, _formData: FormData): Promise<UsernameState> {
   redirect("/onboarding");
 }

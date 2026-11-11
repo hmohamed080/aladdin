@@ -1,5 +1,5 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
-import { signIn, IDENTITIES } from "./helpers/auth";
+import { signIn, IDENTITIES, confirmAge } from "./helpers/auth";
 import { createConfirmedAccount } from "./helpers/fixtures";
 
 /**
@@ -62,6 +62,7 @@ test.describe("shared onboarding", () => {
     // Coming Soon types are visible but cannot be chosen.
     await expect(page.getByRole("button", { name: /^engineer/i })).toBeDisabled();
     await page.getByRole("button", { name: /craftsmen/i }).click();
+    await confirmAge(page); // the account-type step enforces the 18+ confirmation
     await page.getByRole("button", { name: /^continue$/i }).click();
 
     await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
@@ -72,6 +73,7 @@ test.describe("shared onboarding", () => {
     await prefs(page, "en", "light");
     await registerFreshUser(page, request);
     await page.getByRole("button", { name: /sales team/i }).click();
+    await confirmAge(page);
     await page.getByRole("button", { name: /^continue$/i }).click();
     await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
 
@@ -98,6 +100,7 @@ test.describe("shared onboarding", () => {
     await noOverflow(page);
 
     await page.getByRole("button", { name: /المورد/ }).click();
+    await confirmAge(page);
     await page.getByRole("button", { name: /متابعة/ }).click();
 
     // access_ready with ZERO organizations: no organization was created for

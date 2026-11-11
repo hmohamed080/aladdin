@@ -13,22 +13,24 @@ import { readSessionIdentity } from "@/server/auth/session";
  * `app.activate_personal_account()` (which never fires for the business
  * track). `access_ready` is a NEW, additive terminal state: authentication is
  * complete (confirmed email + consent + an approved top-level account type +
- * a valid stored username), independent of profile completeness or whether
+ * and nothing else), independent of profile completeness or whether
  * an organization exists yet. Both states mean "may enter the app" — see
  * `hasAppAccess` below, which every gate should call instead of comparing to
  * `"active_personal"` directly.
  *
- * `username_pending` is a NEW, narrower state between `account_type_pending`
- * and `access_ready` — the RPC no longer returns `profile_pending`,
- * `contact_pending`, or any track-specific sub-state (consumer/persona/
- * organization-setup/invitation); that informational value now lives in the
- * non-gating `my_profile_completion()` RPC instead.
+ * There is no username state any more (P1 PR-2): the application no longer
+ * collects usernames. A database that has not had migration M1 applied can
+ * still return the retired `username_pending` value; it is not a known state
+ * here, so it falls into the indeterminate branch of `getRegistrationState`
+ * (the earliest resume point) and never grants access. Apply M1 before
+ * promoting this release. The RPC does not return `profile_pending`,
+ * `contact_pending`, or any track-specific sub-state; that informational
+ * value lives in the non-gating `my_profile_completion()` RPC instead.
  */
 export type RegistrationState =
   | "unverified"
   | "consent_pending"
   | "account_type_pending"
-  | "username_pending"
   | "active_personal"
   | "access_ready"
   | "manually_blocked";
@@ -37,7 +39,6 @@ const KNOWN: readonly RegistrationState[] = [
   "unverified",
   "consent_pending",
   "account_type_pending",
-  "username_pending",
   "active_personal",
   "access_ready",
   "manually_blocked",

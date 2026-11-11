@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseBirthDate, registrationIssueCode, passwordSchema, registrationSchema, resetPasswordSchema, PASSWORD_MIN_LENGTH, PASSWORD_MAX_BYTES, passwordByteLength } from "./password-policy";
+import { AGE_CONFIRMATION_FIELD, ageConfirmationSchema, ageConfirmedFromForm, ageConfirmationError, staffRegistrationSchema, registrationIssueCode, passwordSchema, registrationSchema, resetPasswordSchema, PASSWORD_MIN_LENGTH, PASSWORD_MAX_BYTES, passwordByteLength } from "./password-policy";
 
 describe("passwordSchema", () => {
   it("rejects a password shorter than the minimum", () => {
@@ -41,17 +41,25 @@ describe("passwordSchema", () => {
 });
 
 describe("registrationSchema", () => {
-  const base = { displayName: "Mona Adel", email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: "a-very-long-passphrase-1", birthDate: "1990-05-17" };
+  const base = { displayName: "Mona Adel", email: "person@example.test", accountType: "installer_technician", password: "a-very-long-passphrase-1", ageConfirmed: true };
 
   it("accepts a complete registration with no confirm-password", () => {
     expect(registrationSchema.safeParse(base).success).toBe(true);
   });
 
-  it("requires an adult birthday", () => {
-    const missing = registrationSchema.safeParse({ ...base, birthDate: undefined });
-    expect(missing.success || missing.error.issues[0]?.message).toBe("authPasswordPreview.error.birthDateRequired");
-    const child = registrationSchema.safeParse({ ...base, birthDate: `${new Date().getFullYear() - 10}-01-01` });
-    expect(child.success || child.error.issues[0]?.message).toBe("authPasswordPreview.error.birthDateTooYoung");
+  it.each([[undefined], [false], ["true"], ["on"], [1], [null]])("requires the 18+ attestation to be literally true (%s)", (value) => {
+    const parsed = registrationSchema.safeParse({ ...base, ageConfirmed: value });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.message).toBe("authPasswordPreview.error.ageNotConfirmed");
+      expect(registrationIssueCode(parsed.error.issues[0])).toBe("authPasswordPreview.error.ageNotConfirmed");
+    }
+  });
+
+  it("has no username and no birth date field any more: stray values are stripped, never required", () => {
+    const parsed = registrationSchema.safeParse({ ...base, username: "x", birthDate: "2015-01-01" });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(Object.keys(parsed.data).sort()).toEqual(["accountType", "ageConfirmed", "displayName", "email", "password"]);
   });
 
   it("rejects an invalid email", () => {
@@ -59,19 +67,37 @@ describe("registrationSchema", () => {
   });
 });
 
-describe("parseBirthDate", () => {
-  const today = new Date(Date.UTC(2026, 9, 28));
-
-  it("accepts someone who turned 18 today, and refuses someone who turns 18 tomorrow", () => {
-    expect(parseBirthDate("2008-10-28", today)).toEqual({ ok: true, value: "2008-10-28" });
-    expect(parseBirthDate("2008-10-29", today)).toEqual({ ok: false, code: "authPasswordPreview.error.birthDateTooYoung" });
+describe("age confirmation contract (shared with the UI)", () => {
+  it("exports the field name the form must send", () => {
+    expect(AGE_CONFIRMATION_FIELD).toBe("ageConfirmed");
   });
 
-  it("refuses impossible or out-of-range dates", () => {
-    for (const raw of ["1990-02-30", "1899-12-31", "17/05/1990", "1990-5-17"]) {
-      expect(parseBirthDate(raw, today)).toEqual({ ok: false, code: "authPasswordPreview.error.birthDateInvalid" });
+  it("the schema accepts only boolean true", () => {
+    expect(ageConfirmationSchema.safeParse(true).success).toBe(true);
+    for (const v of [false, "true", 1, undefined, null]) expect(ageConfirmationSchema.safeParse(v).success).toBe(false);
+  });
+
+  it("reads a checkbox as confirmed only for on / true / 1", () => {
+    const form = (v?: string) => {
+      const f = new FormData();
+      if (v !== undefined) f.set("ageConfirmed", v);
+      return f;
+    };
+    for (const v of ["on", "true", "1"]) {
+      expect(ageConfirmedFromForm(form(v))).toBe(true);
+      expect(ageConfirmationError(form(v))).toBeNull();
     }
-    expect(parseBirthDate("", today)).toEqual({ ok: false, code: "authPasswordPreview.error.birthDateRequired" });
+    for (const v of [undefined, "", "off", "false", "0", "yes"]) {
+      expect(ageConfirmedFromForm(form(v))).toBe(false);
+      expect(ageConfirmationError(form(v))).toBe("authPasswordPreview.error.ageNotConfirmed");
+    }
+  });
+
+  it("the staff registration schema requires it too", () => {
+    const staff = { displayName: "Mona Adel", email: "person@example.test", password: "a-very-long-passphrase-1" };
+    expect(staffRegistrationSchema.safeParse({ ...staff, ageConfirmed: true }).success).toBe(true);
+    const refused = staffRegistrationSchema.safeParse({ ...staff, ageConfirmed: false });
+    expect(refused.success || refused.error.issues[0]?.message).toBe("authPasswordPreview.error.ageNotConfirmed");
   });
 });
 
@@ -99,17 +125,17 @@ describe("resetPasswordSchema", () => {
 
 describe("registrationIssueCode", () => {
   it("never shows a raw validator message", () => {
-    expect(registrationIssueCode({ message: "Expected string, received null", path: ["birthDate"] })).toBe("authPasswordPreview.error.birthDateRequired");
+    expect(registrationIssueCode({ message: "Expected true, received null", path: ["ageConfirmed"] })).toBe("authPasswordPreview.error.ageNotConfirmed");
     expect(registrationIssueCode({ message: "Expected string, received null", path: ["accountType"] })).toBe("authPasswordPreview.error.accountTypeRequired");
     expect(registrationIssueCode({ message: "Invalid email", path: ["email"] })).toBe("authPasswordPreview.error.invalidEmail");
   });
 
   it("keeps the schema's own message key", () => {
-    expect(registrationIssueCode({ message: "authPasswordPreview.error.birthDateTooYoung", path: ["birthDate"] })).toBe("authPasswordPreview.error.birthDateTooYoung");
+    expect(registrationIssueCode({ message: "authPasswordPreview.error.passwordCommon", path: ["password"] })).toBe("authPasswordPreview.error.passwordCommon");
   });
 
-  it("a missing birthday is asked for by name", () => {
-    const parsed = registrationSchema.safeParse({ displayName: "Mona Adel", email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: "a-very-long-passphrase-1", birthDate: "" });
-    expect(parsed.success || registrationIssueCode(parsed.error.issues[0])).toBe("authPasswordPreview.error.birthDateRequired");
+  it("a missing attestation is asked for by name", () => {
+    const parsed = registrationSchema.safeParse({ displayName: "Mona Adel", email: "person@example.test", accountType: "installer_technician", password: "a-very-long-passphrase-1" });
+    expect(parsed.success || registrationIssueCode(parsed.error.issues[0])).toBe("authPasswordPreview.error.ageNotConfirmed");
   });
 });

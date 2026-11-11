@@ -3,18 +3,16 @@
 import { useState, type FormEvent } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { Checkbox } from "@/components/ui/controls";
+import { AGE_CONFIRMATION_FIELD, AGE_NOT_CONFIRMED_CODE } from "./password-policy";
 
 /**
  * PROPOSED INTERIM (Phase 1, account identity; pending legal approval): every registration form asks the person to
- * confirm they are 18 or older instead of collecting a birth date. The wire contract with PR-2 (server side) is a
- * checkbox field named `ageConfirmed` whose submitted value is "true"; the server answers a missing/false value with
- * the typed code `authPasswordPreview.error.ageNotConfirmed`.
- *
- * FOLLOW-UP: once PR-2 merges, import `AGE_CONFIRMATION_FIELD` from the password-policy validation module instead of
- * this local copy (the server module is owned by PR-2 and is not edited here).
+ * confirm they are 18 or older instead of collecting a birth date. The wire contract with the server (password-policy)
+ * is a checkbox field `AGE_CONFIRMATION_FIELD` ("ageConfirmed") submitted as "on"; the server answers a missing/false
+ * value with `AGE_NOT_CONFIRMED_CODE`. Nothing is stored.
  */
-export const AGE_CONFIRMED_FIELD = "ageConfirmed";
-export const AGE_NOT_CONFIRMED_CODE = "authPasswordPreview.error.ageNotConfirmed";
+export const AGE_CONFIRMED_FIELD = AGE_CONFIRMATION_FIELD;
+export const AGE_NOT_CONFIRMED_KEY = AGE_NOT_CONFIRMED_CODE;
 
 /** True for the typed server code that belongs under the age checkbox. */
 export function isAgeNotConfirmedCode(code: string | undefined): boolean {
@@ -32,7 +30,7 @@ export function useAgeConfirmation(serverCode?: string) {
   const [checked, setChecked] = useState(false);
   const [showLocalError, setShowLocalError] = useState(false);
   const serverError = isAgeNotConfirmedCode(serverCode) ? serverCode : undefined;
-  const errorText = showLocalError && !checked ? t(AGE_NOT_CONFIRMED_CODE) : serverError && !checked ? t(serverError) : null;
+  const errorText = showLocalError && !checked ? t(AGE_NOT_CONFIRMED_KEY) : serverError && !checked ? t(serverError) : null;
 
   const guardSubmit = (event: FormEvent<HTMLFormElement>) => {
     if (checked) return;
@@ -54,7 +52,6 @@ export function useAgeConfirmation(serverCode?: string) {
         aria-invalid={errorText ? true : undefined}
         aria-describedby={errorText ? "ageConfirmedError" : undefined}
         aria-required
-        value="true"
       >
         {t("authPasswordPreview.signUp.ageConfirmLabel")}
       </Checkbox>
