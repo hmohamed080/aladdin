@@ -10,6 +10,12 @@ const OTHER_ACCOUNT = "b".repeat(32);
 const prodUrl = `https://${PRODUCTION_SUPABASE_REF}.supabase.co`;
 const accUrl = `https://${ACCEPTANCE_SUPABASE_REF}.supabase.co`;
 const ACC_BUCKET = ENVIRONMENT_MANIFEST.staging.buckets.private!;
+const PINNED_ACCOUNT = ENVIRONMENT_MANIFEST.production.r2AccountId!;
+// The state before the owner approved Production resources: nothing pinned, so everything must fail closed.
+const unapproved: Record<"production" | "staging", EnvironmentIdentity> = {
+  production: { ...ENVIRONMENT_MANIFEST.production, r2AccountId: null, buckets: { private: null, public: null, site: null } },
+  staging: ENVIRONMENT_MANIFEST.staging,
+};
 
 // A Production identity as it will look once the owner approves the resources.
 const approved: Record<"production" | "staging", EnvironmentIdentity> = {
@@ -21,7 +27,17 @@ const prod = (extra = {}) => ({ appEnv: "production" as const, supabaseUrl: prod
 describe("exact environment identity", () => {
   it("accepts exactly the approved Production and Acceptance resources", () => {
     expect(mediaEnvironmentProblems(prod({ siteBucket: "aladdin-prod-site-1" }), approved)).toEqual([]);
-    expect(mediaEnvironmentProblems({ appEnv: "staging", supabaseUrl: accUrl, privateBucket: ACC_BUCKET })).toEqual([]);
+    expect(mediaEnvironmentProblems({ appEnv: "staging", supabaseUrl: accUrl, privateBucket: ACC_BUCKET, accountId: PINNED_ACCOUNT })).toEqual([]);
+  });
+
+  it("accepts the committed Production names with the pinned account and nothing else", () => {
+    const real = { appEnv: "production" as const, supabaseUrl: prodUrl, accountId: PINNED_ACCOUNT, privateBucket: "aladdin-media-private", siteBucket: "aladdin-site-media" };
+    expect(mediaEnvironmentProblems(real)).toEqual([]);
+    expect(mediaEnvironmentProblems({ ...real, privateBucket: "aladdin-media-private-2" })).not.toEqual([]);
+    expect(mediaEnvironmentProblems({ ...real, siteBucket: "aladdin-site-media-2" })).not.toEqual([]);
+    expect(mediaEnvironmentProblems({ ...real, accountId: OTHER_ACCOUNT })).not.toEqual([]);
+    expect(mediaEnvironmentProblems({ ...real, supabaseUrl: accUrl })).not.toEqual([]);
+    expect(mediaEnvironmentProblems({ ...real, privateBucket: "aladdin-production-db-backups" })).not.toEqual([]);
   });
 
   it("refuses a misleading name in Acceptance: containing 'acceptance' is not enough", () => {
@@ -37,8 +53,8 @@ describe("exact environment identity", () => {
   });
 
   it("fails closed in Production until a bucket and the account are approved", () => {
-    expect(mediaEnvironmentProblems(prod())).not.toEqual([]);
-    expect(mediaEnvironmentProblems(prod({ privateBucket: "anything" }))).toEqual(
+    expect(mediaEnvironmentProblems(prod(), unapproved)).not.toEqual([]);
+    expect(mediaEnvironmentProblems(prod({ privateBucket: "anything" }), unapproved)).toEqual(
       expect.arrayContaining([expect.stringContaining("no approved bucket"), expect.stringContaining("not pinned")]));
   });
 
