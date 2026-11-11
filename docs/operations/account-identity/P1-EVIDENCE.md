@@ -117,7 +117,7 @@ Reading: #172 alone is red; #173 is green on every check for its exact head (one
 | Supabase security advisors (baseline) | 5 lint groups: `rls_enabled_no_policy`, `function_search_path_mutable`, `anon_security_definer_function_executable`, `authenticated_security_definer_function_executable`, `auth_leaked_password_protection` | `get_advisors` |
 | Auto-deploy: workflows | PASS: none applies migrations; `ci.yml` on `main` only `wrangler deploy --dry-run`; `cloudflare-production.yml` dispatch-only | repo |
 | Auto-deploy: dashboards | Supabase branches none (PASS); Workers Builds git triggers none on 4 Workers (PASS); Vercel team 0 projects (PASS); Supabase GitHub integration and Cloudflare Pages Git: **UNVERIFIED** (owner dashboard check) | MCP reads |
-| Backup readiness | **FAIL / action needed:** the only restore-verified Acceptance snapshot (`aladdin-acceptance-20261108T060819Z`, runs `42461215127`, `42469078723`) predates the 2026-11-07 migrations; schedules off; `app.backup_environment` 0 rows; the `aladdin-backups` "success" runs are plan-only | `gh run view`, `execute_sql` counts |
+| Backup readiness | **Corrected 2026-11-11 (see 8.2):** newest restore-verified snapshot is `aladdin-acceptance-20261108T094450Z` (backup run `42468447400` PASS, restore run `42469078723` PASS; 167 tables, 2584 rows, 203 migrations, 9 R2 files), present in the bucket; a historical reference, not a current recovery point; sufficient for function-only M1 with the tested forward-fix; fresh backup mandatory before M2/M3/Auth cleanup/audit redaction. `app.backup_environment` has 1 row (initialized 2026-11-11 12:29Z); schedules off | `gh run view`, job logs, Cloudflare R2 objects API, `execute_sql` |
 
 ### 8.1 PR heads and CI per exact SHA (final read 2026-11-11 about 11:00 UTC, stable over three polls; `gh pr view` / `gh pr checks`)
 
@@ -133,3 +133,32 @@ The #171 branch and the #173 branch were pushed by another agent during this pre
 
 Reading: M1's #171 is green on its exact head; #173 needs the flaky RTL test to pass on a rerun before merge.
 
+
+### 8.2 Backup evidence reconciliation (2026-11-11, read-only)
+
+This supersedes the "FAIL / action needed" backup row and the earlier GO-1 recommendation. The earlier docs named `aladdin-acceptance-20261108T060819Z` as the newest snapshot and attached restore run `42469078723` to it; both were wrong.
+
+| Item | Result | Evidence |
+|---|---|---|
+| Newest snapshot | `aladdin-acceptance-20261108T094450Z`: backup run `42468447400` PASS (job `backup (acceptance)`, 2026-11-08 09:44:36Z to 09:49:46Z); log: 167 tables, 2584 rows, 203 migrations, sha256 `ea38cefd53f67b2bdd1e18027173e3e3faccdff37cd4812c0a7797172583d67d`, 9 R2 originals backed up, 0 missing | `gh api repos/hmohamed080/aladdin-backups/actions/jobs/128693356245/logs` |
+| Restore | run `42469078723` PASS (job `restore`, 09:53:42Z to 09:56:05Z): sha256 matches manifest and stored metadata, decryption and part checksums ok, Auth/Storage schema identical, row counts exact (167 tables, 2584 rows), R2 inventory exact (9 files, retired originals excluded), 9 of 9 sampled files restored with recorded sha256 and size, RESULT: PASS | job `128695391281` log |
+| Superseded snapshot | `...T060819Z` (2548 rows): restore run `42461215127` PASS; older, kept only for history | job `128670734388` log |
+| Still present | `db/acceptance/daily/2026/11/08/` `.tar.age` 6,063,850 bytes (equals the backup log), `.json`, `.r2media.json`, `.r2media.tsv.age`, and the same four under `db/acceptance/weekly/2026/`; bucket `aladdin-acceptance-backups-weur`, 52 objects under `db/acceptance/`. Existence and size only; bytes not re-downloaded | Cloudflare API `GET /accounts/{id}/r2/buckets/aladdin-acceptance-backups-weur/objects` |
+| Bucket lock | none: `GET .../lock` returns `rules: []` (objects are deletable; do not describe them as locked) | Cloudflare API |
+| Not covered | writes after 2026-11-08 09:44:50Z (audit log: 6 `profile.phone_set`, 4 `onboarding.completed`, 4 `profile.username_set`, 3 `profile.avatar_set`, product/organization image and verification-document edits, up to 2026-11-10 14:13Z; latest sign-in 2026-11-10 15:59Z); the four 2026-11-07 migrations (Acceptance 207 vs snapshot 203); the 2026-11-11 12:29Z backup-console initialization. Restore into the 207-migration schema was never tested | `execute_sql` aggregates, `list_migrations` |
+| `app.backup_environment` | 1 row: `environment=acceptance`, `initialized_at=2026-11-11 12:29:19Z`, audit action `backup.environment_initialized`; `app.backup_runs` 0, `app.backup_run_events` 0, `app.backup_settings` 1. The earlier "0 rows / not initialized" claim is obsolete | `execute_sql` counts |
+| Schedules | `ACCEPTANCE_BACKUP_SCHEDULE=off`, `PRODUCTION_BACKUP_ENABLED=false`; the green scheduled "Daily backup" runs skip the `backup` job (plan only) | `gh api repos/.../actions/variables`, run jobs |
+| Sufficiency for M1 | Function-only (`CREATE OR REPLACE FUNCTION`, `COMMENT`, `REVOKE`, `GRANT`; no table DDL, no top-level DML), so no data can change and a data restore is not the recovery path. Recovery = the locally tested forward-fix (sha256 `5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045`, pinned in `acceptance-gate.mjs`). Hence no redundant fresh backup for M1; the media migration (function-only, no tested forward-fix) reuses the pinned snapshot label | scripts/hosted-db (PR #179), runbook section 3 |
+| Mandatory fresh backup | before M2, M3, Auth metadata / `identity_data` cleanup, audit-log redaction, any Production step | runbook section 3 |
+| Script tests | `node --test scripts/hosted-db/*.test.mjs` 159/159 (8 new recovery-gate tests) on #179 head `9ba06a57` | local |
+
+### 8.3 Final PR heads and CI per exact SHA (read 2026-11-11 ~15:15 UTC; `gh pr view N --json headRefOid,mergeable,mergeStateStatus`, `gh pr checks N`)
+
+| PR | Head SHA (full) | Mergeable | CI per check on that SHA |
+|---|---|---|---|
+| #171 M1 | `82accd9cce031e3a516f10f8e2b8c89152e313a7` | MERGEABLE / CLEAN, draft | backend, backup-kit, docs, frontend, frontend-cloudflare, migration-policy, supabase-rls: all pass |
+| #173 combined Auth + Frontend/Admin | `6f6076571abb73b9be4326ab0e3939dc98a4f5dc` | MERGEABLE / CLEAN, draft | auth-captcha-e2e, backend, backup-kit, docs, frontend, frontend-cloudflare, gotrue-direct (fail), gotrue-direct (spent), migration-policy, showroom-rc2-e2e, supabase-rls: all pass |
+| #179 re-pinned Acceptance scripts | `9ba06a57d5677005976ec386b988626cdcbfab28` | MERGEABLE, draft | backend, backup-kit, docs, frontend, frontend-cloudflare, migration-policy, supabase-rls: all pass (run `43025323292`, `43025323297`) |
+| #170 documentation | moves with each docs commit; read it live | MERGEABLE, draft | expected 7 of 7; see the final handoff for the value read after the last push |
+
+Reading: green CI is not release approval. No hosted environment was written; nothing merged, deployed or backed up in this reconciliation.

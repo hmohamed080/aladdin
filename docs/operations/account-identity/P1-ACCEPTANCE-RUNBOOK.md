@@ -13,7 +13,10 @@ Target project: Acceptance `nxossqhdfltcqdwvbewi` ONLY. Production `kkpkgjrweysg
 | Production history | 207 applied, latest `20261107090006` (same list, compared by eye; not machine-diffed) | `list_migrations` 2026-11-11 |
 | Acceptance schema equals a clean replay of the 207 repo migrations | **PASS**: all 12 catalog-fingerprint sections (functions, function grants/owner, columns, relations/RLS/ACLs, views, indexes, constraints, triggers, policies, column grants, types, counts) have identical md5 on hosted Acceptance and on a local replay of the 207 migrations | `scripts/hosted-db/catalog-fingerprint.sql`, SELECT only, 10:3xZ |
 | Function permissions | **PASS**: 753 functions, aggregate md5 `da4d2dd7d95a27ce3e8292d351b6f983` identical to the local replay, which passes `verify-permissions-readonly.mjs ... 20261107090006` (753/753) | read-only `execute_sql`, 10:32Z |
-| Counts (aggregates only) | auth users 23, public users 23, `media_storage_locations` 18, `storage.objects` 1, `app.backup_environment` 0, `app.backup_settings` 1, `app.backup_runs` 0 | `execute_sql` 10:35Z |
+| Counts (aggregates only) | auth users 23, public users 23, `media_storage_locations` 18, `storage.objects` 1, `app.backup_settings` 1 | `execute_sql` 10:35Z |
+| Admin backups console | **initialized 2026-11-11 12:29:19Z** (`app.backup_environment` 1 row, `environment=acceptance`; audit action `backup.environment_initialized`); `app.backup_runs` 0, `app.backup_run_events` 0, `app.backup_settings` 1. Schedules still off (`ACCEPTANCE_BACKUP_SCHEDULE=off`, `PRODUCTION_BACKUP_ENABLED=false`). An earlier version of this runbook said "0 rows": obsolete | `execute_sql` counts 2026-11-11 ~13:00Z |
+| Newest restore-verified Acceptance snapshot | **`aladdin-acceptance-20261108T094450Z`**: backup run `42468447400` PASS (2026-11-08 09:44-09:49Z), restore run `42469078723` PASS (09:53-09:56Z); 167 tables, 2584 rows, 203 migrations, 9 R2 media files, sha256 `ea38cefd...d67d` (matches manifest and metadata), RESULT: PASS | `gh run view` / job logs, 2026-11-11 |
+| Snapshot still exists (read-only) | `db/acceptance/daily/2026/11/08/aladdin-acceptance-20261108T094450Z.tar.age` 6,063,850 bytes (equals the backup log) plus `.json`, `.r2media.json`, `.r2media.tsv.age`, and a weekly copy under `db/acceptance/weekly/2026/`, in bucket `aladdin-acceptance-backups-weur` (52 objects under `db/acceptance/`). Bucket lock rules: **none configured** (`/lock` returns `rules: []`), so the objects are present but not protected by a bucket-level retention rule | Cloudflare API `GET .../r2/buckets/.../objects` and `/lock`, 2026-11-11. Existence and size only; the object bytes were not downloaded or re-decrypted (the 2026-11-08 restore did) |
 | Supabase branching | none (`list_branches` returns `[]`) | MCP |
 | Cloudflare Workers Builds git triggers | none on `aladdin-frontend-production`, `-preview`, `aladdin-backend-production`, `aladdin-whatsapp-otp-production` (read-only API) | MCP, 2026-11-11 |
 | Vercel | team `aladdin8` has 0 projects | MCP |
@@ -49,44 +52,42 @@ The CI side of "permission-gate upgrade compatibility": `supabase-rls.yml` runs 
 PR head (on #173 `42d5218d`: run `42995730943`, `PASS atomic migration 20261110090002_...` and `PASS 754 exact function permission contracts`).
 The gate itself cannot read a hosted database; the hosted counterpart is P4/post-check with `verify-permissions-readonly.sh`.
 
-## 3. Backup and restore verification (OWNER GO REQUIRED: this is the first hosted action)
+## 3. Backup and recovery evidence (corrected 2026-11-11; supersedes the earlier "fresh backup is GO-1" assessment)
 
-State today: the only restore-verified Acceptance snapshot is `aladdin-acceptance-20261108T060819Z` (restore PASS, `aladdin-backups`
-runs `42461215127` and `42469078723`, 2026-11-08). It was taken at 203 migrations, **before the four 2026-11-07 migrations were applied**, so it is
-**stale and does not count** for M1. Backup schedules are OFF (`ACCEPTANCE_BACKUP_SCHEDULE=off`, `PRODUCTION_BACKUP_ENABLED=false`); the
-"success" runs in `aladdin-backups` are plan-only no-ops (the data job is skipped). The Admin console path is not available:
-`app.backup_environment` has 0 rows (not initialized), so use the manual workflows.
+**What exists.** Snapshot `aladdin-acceptance-20261108T094450Z` (backup run `42468447400` PASS, restore run `42469078723` PASS: sha256 matches, decryption and part checksums ok, Auth/Storage schema identical, row counts exact 167 tables / 2584 rows, 203 migrations, media inventory exact 9 files, 9 of 9 sampled files restored). The object is still present and the size matches (section 0). The older `...T060819Z` (restore run `42461215127`) was wrongly named in earlier versions as the newest and wrongly credited with run `42469078723`; it is superseded.
 
-1. **Fresh snapshot (owner GO: a backup run writes locked objects to the backup bucket, read-only on the database).**
-   `gh workflow run "Daily backup" --repo hmohamed080/aladdin-backups -f label=acceptance -f request_id=p1-pre-<media|m1>`
-   Success: the `backup` job (not just `plan`) concludes `success`; note the snapshot name `aladdin-acceptance-YYYYMMDDTHHMMSSZ`.
-2. **Restore test of that exact snapshot (owner GO).**
-   `gh workflow run "Monthly restore test" --repo hmohamed080/aladdin-backups -f label=acceptance -f backup_key=<db/acceptance/.../snapshot.tar.age>`
-   Success: the `restore` job concludes `success` and reports RESULT PASS (schema exact, row counts, media inventory exact). A green `plan` with a skipped `restore` job is NOT a pass.
-3. Freshness rule: no migration, user-visible write or deploy to Acceptance between the snapshot and the apply except the planned ones; if one happens, repeat 1-2.
-4. Record the snapshot label; `acceptance-apply.sh` requires it as `--backup-label`.
+**What it is NOT.** It is a **historical recovery reference, not a current full recovery point.** It is a data-only dump (`public`, `app`, `auth`, `storage`, `supabase_migrations`) taken at 203 migrations. It does not contain: the four 2026-11-07 migrations' schema (Acceptance is at 207), the writes after 2026-11-08 09:44:50Z (audit log shows phone sets, onboardings, username sets, avatar, product and organization-image edits until 2026-11-10 14:13Z; the latest sign-in is 2026-11-10 15:59Z), or the Admin console initialization of 2026-11-11 12:29Z. Restoring it would lose that data and was never tested against the 207-migration schema. The bucket has no lock rule. Backup schedules are off; the green scheduled "Daily backup" runs in `aladdin-backups` are plan-only (the `backup` job is skipped).
 
-Who authorizes: the owner (each workflow dispatch). Nothing here is done by this preparation.
+**Why it is sufficient for function-only M1 (and the function-only media migration).** Both files contain only `CREATE OR REPLACE FUNCTION`, `COMMENT ON FUNCTION`, `REVOKE` and `GRANT`: no table, column, index, constraint or trigger DDL and no top-level DML (checked 2026-11-11, plus the catalog diff in 4.3). Applying them cannot lose or alter data, so a data restore is not a recovery path and a fresh backup would add no protection for them. The recovery path for M1 is the **locally tested forward-fix** (`scripts/hosted-db/forward-fix/m1-restore-previous.sql` on PR #179, same bytes as [drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql](drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql), sha256 `5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045`), backed by the strict gates below. `acceptance-apply.sh` therefore:
+- `--plan m1`: needs **no** `--backup-label`; it checks the pinned forward-fix hash before the password prompt (`acceptance-gate.mjs recovery`).
+- `--plan media` and `--plan media+m1`: the media migration has no tested forward-fix, so a `--backup-label` of a **pinned restore-verified snapshot** is required (only `aladdin-acceptance-20261108T094450Z` is pinned). Reusing it is allowed; no fresh backup is required. It is recorded as a historical reference.
+- All plans keep the history guard, exact dry run, permissions vs contract, row-count, structure, catalog-fingerprint and catalog-diff gates.
+
+**A fresh, restore-tested backup remains MANDATORY (owner GO each time) before any of:** M2 `20261111090001`, M3 `20261111090002`, the Auth metadata / `identity_data` cleanup, the audit-log username redaction, any Production step, or any other change that writes or deletes data. Procedure for those (owner GO: a backup run writes objects to the backup bucket, read-only on the database):
+1. `gh workflow run "Daily backup" --repo hmohamed080/aladdin-backups -f label=acceptance -f request_id=p1-pre-<step>`; success = the `backup` job (not just `plan`) is `success`; note the label `aladdin-acceptance-YYYYMMDDTHHMMSSZ`.
+2. `gh workflow run "Monthly restore test" --repo hmohamed080/aladdin-backups -f label=acceptance -f backup_key=<db/acceptance/.../snapshot.tar.age>`; success = the `restore` job is `success` with RESULT: PASS. A green `plan` with a skipped `restore` job is NOT a pass.
+3. Freshness: repeat 1-2 if any migration, user-visible write or deploy to Acceptance happened between the snapshot and the step.
+4. Pin the new label in `RESTORE_VERIFIED_SNAPSHOTS` (`acceptance-gate.mjs`) only after the restore reports PASS. Also consider turning the Admin console schedule on (owner decision) and a bucket lock rule (none today).
 
 ## 4. Apply
 
 ### 4.1 Plan A (recommended): `media`, then `m1`
 
 Step M-1 (OWNER GO; hosted migration). From a clean checkout equal to `origin/main` (any SHA that contains `20261110090001` and not M1):
-`bash scripts/hosted-db/acceptance-apply.sh --plan media --sha <40-char origin/main sha> --backup-label <label from section 3>`.
+`bash scripts/hosted-db/acceptance-apply.sh --plan media --sha <40-char origin/main sha> --backup-label aladdin-acceptance-20261108T094450Z` (historical reference; no fresh backup).
 The script: checkout gates, hidden password prompt, link, pre checks (history 207, dry run lists exactly `20261110090001`, permissions vs `20261107090006`,
 counts, structure, catalog fingerprint), the typed confirmation `APPLY media TO ACCEPTANCE`, `supabase db push --linked` (no `--include-all`, no repair),
 post checks (history 208, permissions vs `20261110090001`, counts, catalog diff limited to `app.media_storage_key_assign`,
 `public.media_migration_target_key` (new), `public.media_migration_switch`, `public.media_migration_rollback`). It prints PASS only when all hold.
 After it: the Track C copy rehearsal (A-ACC) is a **separate GO** in the r2 runbook, not part of this one.
 
-Step M-2 (after #171 merged, OWNER GO; repeat sections 2 and 3 first): same script with `--plan m1` and the new `main` SHA.
+Step M-2 (after #171 merged, OWNER GO; repeat section 2 first): same script with `--plan m1` and the new `main` SHA, **no `--backup-label`** (the pinned forward-fix is checked instead).
 Expected: history 208 -> 209, pending before = exactly `20261110090002`, permissions vs `20261110090001` before and `20261110090002` after (754 functions), catalog diff limited to
 `public.my_registration_state`, `app.profile_completion`, `public.admin_users_directory`.
 
 ### 4.2 Plan B: `media+m1`
 
-Only after #171 is merged: `acceptance-apply.sh --plan media+m1 ...`, typed `APPLY media+m1 TO ACCEPTANCE`. 207 -> 209; pre contract `20261107090006`, post contract `20261110090002`.
+Not recommended (one GO covers both; the media part has no tested forward-fix). Only after #171 is merged: `acceptance-apply.sh --plan media+m1 ... --backup-label aladdin-acceptance-20261108T094450Z`, typed `APPLY media+m1 TO ACCEPTANCE`. 207 -> 209; pre contract `20261107090006`, post contract `20261110090002`.
 
 ### 4.3 What was proven locally (pinned CLI 2.110.0, isolated stack `aladdin_p1pf` on ports 524xx, no docker prune, no other stack touched)
 
@@ -124,7 +125,7 @@ Not done: `supabase db diff` (the catalog-fingerprint comparison covers more tha
 - Before the app ships, to undo M1: apply a **new migration** containing [drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql](drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql) (proven above). It restores `username_pending` for `my_registration_state`; roll the application back to the previous Worker version at the same time. Needs its own GO and the same gates.
 - After the app ships, do **not** restore: the new app sends no username and would strand sign-ups. Fix forward instead.
 - Media migration: forward-fix by a new migration; the in-database rollback semantics of the media functions are described in the migration header. R2 objects are never deleted.
-- A failed push: each file is its own transaction; history stops at the first failing file; do not retry blindly: read `migration list`, decide forward-fix or restore of the section 3 snapshot (owner decision, `scripts/hosted-db/restore-acceptance.sh` only with owner approval and a backup in its layout).
+- A failed push: each file is its own transaction; history stops at the first failing file; do not retry blindly: read `migration list`, decide forward-fix (M1: the pinned script, as a new migration). A data restore of the historical snapshot is NOT the path for function-only changes: it would discard every write since 2026-11-08 09:44Z.
 
 ## 7. Application deployment (only after M1 is applied on Acceptance)
 
@@ -146,7 +147,20 @@ Order: **M1 first, always**. Then merge #173 (after M1, per master plan 3.10) an
 - No permanent date-of-birth or username residual is approved.
 - Production: untouched; a separate request (`production-recovery-snapshot.sh`, `production-rehearsal.sh`, its own GO).
 
-## 10. The first hosted action that needs the owner's authorization
+## 10. Exact sequence and the first authorization needed (recommended; every row is its own owner approval)
 
-**GO-1: the fresh Acceptance backup run (`gh workflow run "Daily backup" ... -f label=acceptance`) followed by its restore test.** Everything before it
-(sections 0 and 2 read-only checks through the MCP or with the DB password) is read-only. The first hosted **migration** is step M-1 (or 4.2), which additionally needs decision D1, a restore-verified snapshot from section 3, and its own GO.
+The media migration and M1 stay separate gates. Order matters because the gate pins which files may be pending: `media` is only valid while `origin/main` does **not** yet contain M1, so the media apply happens **before** #171 is merged.
+
+| Step | Action | Approval | Gate / expected result |
+|---|---|---|---|
+| 0 | Owner dashboard checks P0 (Supabase GitHub integration off, Cloudflare Pages Git off) | owner | none enabled |
+| 1 | Merge #179 (re-pinned scripts) and #170 (docs) to `main`. Neither adds a migration; merging triggers only `ci.yml` | merge approval | `origin/main` has exactly `20261110090001` pending |
+| 2 | Read-only preflight `bash scripts/hosted-db/acceptance-preflight.sh media` (hidden DB password) | hosted read | `Acceptance gate: ok (plan media: 207 applied ...)` |
+| 3 | **GO-M: apply `media`** (`acceptance-apply.sh --plan media --backup-label aladdin-acceptance-20261108T094450Z`, typed `APPLY media TO ACCEPTANCE`) | hosted migration | 207 -> 208, permissions `20261110090001` (754), catalog diff = the four media functions |
+| 4 | Stop. Verify, record. The Track C copy rehearsal is a separate GO elsewhere | none | |
+| 5 | Merge #171 (M1 only) | merge approval | `origin/main` has exactly `20261110090002` pending |
+| 6 | Read-only preflight `acceptance-preflight.sh m1` | hosted read | gate ok (plan m1: 208 applied) |
+| 7 | **GO-M1: apply `m1`** (`acceptance-apply.sh --plan m1`, no backup label, typed `APPLY m1 TO ACCEPTANCE`) | hosted migration | 208 -> 209, permissions `20261110090002` (754), catalog diff = exactly the three M1 functions, forward-fix hash verified |
+| 8 | Post-M1 verification (section 5), then merge #173, deploy preview, smoke, E2E (sections 7, 8) | merge, deploy, workflow approvals | |
+
+**The first action that needs the owner's authorization is step 1 (merge #179 and #170), not a backup.** The first **hosted** action is the step-2 read-only preflight (needs the owner's DB password) and the first hosted **write** is GO-M (step 3). The apply script requires `HEAD == origin/main`, so there is no safe way to run it from an unmerged branch; do not weaken that rule.
