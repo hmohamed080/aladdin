@@ -1,13 +1,13 @@
 # P1 Migration Design - M1 / M2 / M3, Auth-metadata scrub, audit_log redaction
 
-**Purpose.** Specify the forward-only database and data changes that retire application usernames and date of birth. **Current decision.** Three migrations plus an Auth-metadata scrub, compatibility first, no `CASCADE`, no edit of applied migrations (master plan D-18..D-22). **Rationale.** The registration state machine, sign-in resolver and admin directory depend on username today; removing columns first would break registration. **Scope.** M1 is **implemented** in PR-1 (#171, migration `20261110090001`) and section 2 below describes what it actually does; M2, M3, the Auth scrub and the audit redaction are design only. **Nothing here has been applied to any hosted environment and PR-0 contains no SQL.** Local proofs for the Auth scrub and the audit redaction are indexed in [P1-EVIDENCE.md](P1-EVIDENCE.md). **Deferred.** Execution, owner approvals, hosted runs. **Consequences.** M2/M3 data erasure is not reversible except from backup. **Related files.** [Master plan](../../architecture/ACCOUNT_IDENTITY_LIFECYCLE_MASTER_PLAN.md), [P1-IMPACT-INVENTORY.md](P1-IMPACT-INVENTORY.md), [P1-PR-CONFLICT-MATRIX.md](P1-PR-CONFLICT-MATRIX.md), [P1-COMPAT-MATRIX.md](P1-COMPAT-MATRIX.md), [P1-AUTH-METADATA-SCRUB.md](P1-AUTH-METADATA-SCRUB.md), [P1-AUDIT-LOG-REDACTION-DESIGN.md](P1-AUDIT-LOG-REDACTION-DESIGN.md), [P1-EVIDENCE.md](P1-EVIDENCE.md).
+**Purpose.** Specify the forward-only database and data changes that retire application usernames and date of birth. **Current decision.** Three migrations plus an Auth-metadata scrub, compatibility first, no `CASCADE`, no edit of applied migrations (master plan D-18..D-22). **Rationale.** The registration state machine, sign-in resolver and admin directory depend on username today; removing columns first would break registration. **Scope.** M1 is **implemented** in PR-1 (#171, migration `20261110090002`) and section 2 below describes what it actually does; M2, M3, the Auth scrub and the audit redaction are design only. **Nothing here has been applied to any hosted environment and PR-0 contains no SQL.** Local proofs for the Auth scrub and the audit redaction are indexed in [P1-EVIDENCE.md](P1-EVIDENCE.md). **Deferred.** Execution, owner approvals, hosted runs. **Consequences.** M2/M3 data erasure is not reversible except from backup. **Related files.** [Master plan](../../architecture/ACCOUNT_IDENTITY_LIFECYCLE_MASTER_PLAN.md), [P1-IMPACT-INVENTORY.md](P1-IMPACT-INVENTORY.md), [P1-PR-CONFLICT-MATRIX.md](P1-PR-CONFLICT-MATRIX.md), [P1-COMPAT-MATRIX.md](P1-COMPAT-MATRIX.md), [P1-AUTH-METADATA-SCRUB.md](P1-AUTH-METADATA-SCRUB.md), [P1-AUDIT-LOG-REDACTION-DESIGN.md](P1-AUDIT-LOG-REDACTION-DESIGN.md), [P1-EVIDENCE.md](P1-EVIDENCE.md).
 
 Facts are from read-only audits of 2026-11-10 (subagent-reported, awaiting reviewer verification): Production and Acceptance both at 207 migrations ending `20261107090006`; counts in master plan 3.2.
 
 ## 1. Ordering
 
-1. #128/#129 are on **HOLD** (not merged, not modified); after Phase 1 they are reworked without username dependencies and relabelled to `>= 20261112...` (see the conflict matrix). Deployed history ends `20261107090006`; M1 is `20261110090001`; M2/M3 take `20261111...`.
-2. **M1** `20261110090001_registration_stop_username_dob_compat` (PR-1).
+1. #128/#129 are on **HOLD** (not merged, not modified); after Phase 1 they are reworked without username dependencies and relabelled to `>= 20261112...` (see the conflict matrix). Deployed history ends `20261107090006`; M1 is `20261110090002`; M2/M3 take `20261111...`.
+2. **M1** `20261110090002_registration_stop_username_dob_compat` (PR-1).
 3. App release (PR-2/PR-3): sign-in, sign-up, OAuth, staff, onboarding, settings, admin; age attestation (D-20). Sessions drained.
 4. Restore-verified backup (aladdin-backups snapshot plus restore test).
 5. Auth-metadata scrub (script, section 5).
@@ -17,7 +17,7 @@ Facts are from read-only audits of 2026-11-10 (subagent-reported, awaiting revie
 
 Each step: Acceptance first under separate owner approval, then Production under a new approval. No step runs on a hosted project from this PR.
 
-## 2. M1 - compatibility (expand only) - ACTUAL implementation (PR #171, `20261110090001_registration_stop_username_dob_compat.sql`)
+## 2. M1 - compatibility (expand only) - ACTUAL implementation (PR #171, `20261110090002_registration_stop_username_dob_compat.sql`)
 
 PR-0 originally described a larger M1. The implemented M1 is smaller because part of the described work was already true on `main`. Every item below is stated as implemented, already true, or deferred.
 
@@ -33,7 +33,7 @@ PR-0 originally described a larger M1. The implemented M1 is smaller because par
 | `public.username_available`, `public.profile_set_username` | **Untouched.** Retired in M2 after the OLD app is gone |
 | Birth date | **Nothing in SQL.** No table, column or function requires it |
 | Stored usernames, `username_normalized`, its unique index | Untouched |
-| Permissions | `supabase/permissions/20261110090001.json`; every redefined function is `SECURITY DEFINER` with `search_path = ''` and re-asserts its grants; no widening of `anon`; nothing dropped, no `CASCADE` |
+| Permissions | `supabase/permissions/20261110090002.json`; every redefined function is `SECURITY DEFINER` with `search_path = ''` and re-asserts its grants; no widening of `anon`; nothing dropped, no `CASCADE` |
 
 Locks: only `CREATE OR REPLACE FUNCTION` runs, which takes no table lock.
 
@@ -116,3 +116,7 @@ Summary: one reviewed migration, in a single transaction, replaces `app.guard_au
 ## 8. Age policy (PROPOSED INTERIM requirement, pending legal approval)
 
 Removing the birth date removes the only 18+ control in the product (it exists only in application code; OAuth has none). Nothing in this design silently drops eligibility protection. The **proposed interim requirement** (decision D-20, not yet approved by legal or the owner) is a required, server-enforced self-attestation "I confirm I am 18 or older" in every sign-up path (email, phone, staff invitation) and in OAuth finish-registration, with **no date of birth stored**. It is a PROPOSAL until legal and the owner approve it: the wording, where it is recorded (inside the existing Terms agreement line, or a new consent type, which needs an enum migration; compat matrix B6), and whether a version bump needs re-acceptance (the owner decided no automatic re-acceptance for removal alone) are all open. Whether the 18+ rule stays, changes per account type, or is dropped is a legal decision recorded as D-03 (CONDITIONAL). Until that decision is recorded, Acceptance and Production must not ship unrestricted account creation; PR-2 must ship the attestation or an explicitly approved alternative, and the Terms and Privacy copy changes go with it.
+
+## Addendum (v1.3, 2026-11-11): label change and gates
+
+M1 is `20261110090002` (renamed because `main` has its own `20261110090001`, media ids-only keys); M2/M3 stay `20261111090001` / `20261111090002`. Open gates, none executed: Auth `identity_data` copies, audit_log redaction placement (own migration versus M2 step; hosted run not approved), legal approval of the 18+ attestation, Privacy copy timing (no erasure claim before M2), #128/#129 HOLD. Detail: master plan section 3.10.

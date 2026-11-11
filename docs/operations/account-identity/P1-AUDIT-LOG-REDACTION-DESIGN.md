@@ -39,7 +39,7 @@ There is no bypass flag, GUC or redaction helper today. Triggers do not fire for
 
 **Concurrency.** The UPDATE touches 860 rows in Production; row locks only, inserts continue. The function replacement does not lock the table. Run off-peak anyway; a lock timeout aborts cleanly and the migration can be retried (re-runs update zero rows).
 
-**Placement.** Run it after the new app is live and `profile_set_username` stops writing audit rows (M2 drops the function), as its own migration file between the Auth scrub and M2, or as step 4 of M2 (design open: separate file is easier to review and to roll forward independently). The file name and timestamp are assigned when it is promoted from `drafts/`; the current numbering plan is M1 `20261110090001`, M2/M3 `20261111...`, so a separate file takes `20261111090003` or later, and it needs its own permission snapshot only if it changes an ACL (it does not).
+**Placement.** Run it after the new app is live and `profile_set_username` stops writing audit rows (M2 drops the function), as its own migration file between the Auth scrub and M2, or as step 4 of M2 (design open: separate file is easier to review and to roll forward independently). The file name and timestamp are assigned when it is promoted from `drafts/`; the current numbering plan is M1 `20261110090002`, M2/M3 `20261111...`, so a separate file takes `20261111090003` or later, and it needs its own permission snapshot only if it changes an ACL (it does not).
 
 ## 3. Local proof (not a hosted run)
 

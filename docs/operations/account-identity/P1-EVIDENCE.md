@@ -54,7 +54,7 @@ Ten experiments (E1-E10), results in [P1-AUTH-METADATA-SCRUB.md section 1](P1-AU
 | Stack | Code under test | Result |
 |---|---|---|
 | CLI 3.0.0, image `postgres:17.11.0.011` | `main` `1b00ff4` (before M1, main's contract `20261107090006`) | **13 functions deviate** |
-| CLI 3.0.0, image `postgres:17.11.0.011` | PR #171 (M1 applied, contract `20261110090001`) | the **same 13 functions** (identical set); nothing new from M1 |
+| CLI 3.0.0, image `postgres:17.11.0.011` | PR #171 (M1 applied, contract `20261110090002`) | the **same 13 functions** (identical set); nothing new from M1 |
 | **CLI 2.110.0 (the repo pin), image `postgres:17.6.1.143`** | PR #171, fresh `supabase start` with all 208 migrations | **`PASS 753 exact function permission contracts`** |
 | CI, CLI 2.110.0, image 17.6.1.143 | PR #171 | `PASS 753 exact function permission contracts` (twice) |
 
@@ -67,3 +67,16 @@ Method note: the pinned stack ran from a scratch directory outside the repositor
 ## 6. Not evidence
 
 Nothing in this file is hosted evidence. Acceptance and Production remain untouched (read-only audit counts of 2026-11-10 are in the master plan 3.2).
+
+## 7. PR stack heads and CI (as of 2026-11-11 08:30 UTC; to be finalized)
+
+The integrator is still pushing to #171/#172/#173, so the SHAs below are provisional; the final read is recorded in the "Final" block. M1 is renamed to `20261110090002` on these branches (the CI recorded at `b30ad71d` ran with the old label `20261110090001`, so it is **not** evidence for the renamed head).
+
+| PR | Branch | Head SHA | Mergeable | CI per check (verified via `gh pr checks`) |
+|---|---|---|---|---|
+| #170 docs | `docs/p1-username-dob-plan-20261110` | to be finalized | to be finalized | to be finalized |
+| #171 M1 | `feat/p1-username-dob-db-compat-20261110` | to be finalized (last seen `b30ad71d`) | CONFLICTING with `main` | none verified for the renamed head. At `b30ad71d` (old label): backend, backup-kit, docs, frontend, frontend-cloudflare, migration-policy, supabase-rls all pass |
+| #172 PR-2 | `feat/p1-username-dob-auth-20261110` | to be finalized (last seen `379f00d3`) | CONFLICTING with `main` | no checks reported (CI does not trigger on a conflicting PR) |
+| #173 PR-3 | `feat/p1-username-dob-frontend-admin-20261110` | to be finalized (last seen `582ed210`) | CONFLICTING with `main` | no checks reported (same reason) |
+
+Reading: "CONFLICTING" plus "no checks reported" means CI has not run, which is not a pass. No hosted environment was touched for any row.

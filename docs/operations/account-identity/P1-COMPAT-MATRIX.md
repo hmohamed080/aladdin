@@ -8,7 +8,7 @@ Legend: OK = works as intended; CHANGED = behaviour differs but is intended and 
 
 | Step | Changes (actual for M1) | Deliberately NOT changed |
 |---|---|---|
-| M1 `20261110090001` | `my_registration_state()` loses only the `username_pending` branch; `app.profile_completion()` loses the username criterion and the all-audience denominator goes 4 to 3; `admin_users_directory()` loses only the username search term | `pending_registrations` (NOT NULL already dropped in `20261028090003`, lease check already admits NULL/NULL), `pending_registration_save/consume`, `admin_user_detail` (still returns the stored username), `username_available`, `profile_set_username`, every column, index and stored value |
+| M1 `20261110090002` | `my_registration_state()` loses only the `username_pending` branch; `app.profile_completion()` loses the username criterion and the all-audience denominator goes 4 to 3; `admin_users_directory()` loses only the username search term | `pending_registrations` (NOT NULL already dropped in `20261028090003`, lease check already admits NULL/NULL), `pending_registration_save/consume`, `admin_user_detail` (still returns the stored username), `username_available`, `profile_set_username`, every column, index and stored value |
 | M2 (design) | `birth_date` and `profiles.username` set to NULL, lease columns cleared, optional audit redaction, `REVOKE UPDATE (birth_date)`, drop of `profile_set_username`, `username_available`, lease helpers | no column dropped |
 | M3 (design) | drop columns, indexes, constraints, `reserved_usernames`, `normalize_username_for_uniqueness`; recreate `pending_registration_consume` without username; **redefine `admin_users_directory`, `admin_user_detail`, `pending_registration_save` without the dropped columns** (new, see break B5) | |
 
@@ -106,3 +106,7 @@ CHANGED, not breaking: shape `{percent, missing, audience, has_org}` unchanged; 
 ## 4. Not testable locally
 
 Google OAuth first login and callback (no provider on the local stack), WhatsApp code delivery (OFF locally; the verification authority is covered by its own suites), hosted data shapes (counts only, from the 2026-11-10 audit), concurrent OLD and NEW instances (needs a deployed preview pair), and every post-M2 / post-M3 cell (SQL not written). Acceptance rehearsal on a restored snapshot of each environment closes these before any hosted step.
+
+## 5. Release order (v1.3)
+
+M1 (`20261110090002`) must be applied to an environment **before** the new app release there: pre-M1 database plus new app cannot complete new registrations. The old app must be gone before M3. Merge #171, #172, #173 back-to-back (the e2e fixes in #172/#173 depend on each other). See master plan section 3.10 for the CI-trigger caveats and open gates.

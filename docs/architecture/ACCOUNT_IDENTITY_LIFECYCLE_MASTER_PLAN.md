@@ -82,7 +82,7 @@
 
 **D-20 status (v1.2):** the 18+ self-attestation is a **PROPOSED INTERIM requirement pending legal and owner approval**, not an approved mechanism and not a legal conclusion. No wording in this plan means eligibility protection is dropped: until legal records a decision (D-03), Acceptance and Production must not ship unrestricted account creation; PR-2 ships the attestation or an explicitly approved alternative. Open details: exact wording, where it is recorded (inside the Terms agreement line, or a new `consent_type`, which is an enum and needs a migration), re-acceptance mechanics. See [P1-MIGRATION-DESIGN.md section 8](../operations/account-identity/P1-MIGRATION-DESIGN.md) and [P1-COMPAT-MATRIX.md B6](../operations/account-identity/P1-COMPAT-MATRIX.md).
 
-**PR hold (v1.2):** #128 and #129 are recorded as **HOLD** (not merged, not modified). After Phase 1 they are reworked without username dependencies (#129 `admin_view_craftsman_profile` reads `p.username`) and relabelled to migration timestamps `>= 20261112...`, because deployed history ends `20261107090006`, M1 is `20261110090001` and M2/M3 are `20261111...`.
+**PR hold (v1.2):** #128 and #129 are recorded as **HOLD** (not merged, not modified). After Phase 1 they are reworked without username dependencies (#129 `admin_view_craftsman_profile` reads `p.username`) and relabelled to migration timestamps `>= 20261112...`, because deployed history ends `20261107090006`, M1 is `20261110090002` and M2/M3 are `20261111...`.
 
 **Owner constraints recorded 2026-11-10:** do not close, modify or merge unrelated PRs without approval; nothing is deployed or applied to hosted environments; no merge to `main` without approval; PR-2..PR-5 do not start until PR-1 compatibility and the blockers in 3.9 are reviewed.
 
@@ -216,7 +216,7 @@ pgTAP numbers 116-118 are already taken on `main` (tests run to 124), so #128/#1
 
 | Step | Content | Reversibility |
 |---|---|---|
-| M1 `20261110090001_registration_stop_username_dob_compat` (PR #171, implemented) | Compatibility only, **function revisions with no DDL**: `my_registration_state` drops only the `username_pending` branch; `profile_completion` drops the username criterion (denominator 4 to 3); `admin_users_directory` drops only the username search term (still emits the stored `username` key). `pending_registrations` needed no DDL (NOT NULL already dropped in `20261028090003`, lease check already admits NULL/NULL); `pending_registration_save/consume` unchanged (the app passes `p_username: null` explicitly); `admin_user_detail`, `username_available`, `profile_set_username` untouched (M2/M3). No drops, no CASCADE. Old and new app both work. | Forward-fix by `CREATE OR REPLACE` of previous definitions (note in PR-1, not a migration) |
+| M1 `20261110090002_registration_stop_username_dob_compat` (PR #171, implemented) | Compatibility only, **function revisions with no DDL**: `my_registration_state` drops only the `username_pending` branch; `profile_completion` drops the username criterion (denominator 4 to 3); `admin_users_directory` drops only the username search term (still emits the stored `username` key). `pending_registrations` needed no DDL (NOT NULL already dropped in `20261028090003`, lease check already admits NULL/NULL); `pending_registration_save/consume` unchanged (the app passes `p_username: null` explicitly); `admin_user_detail`, `username_available`, `profile_set_username` untouched (M2/M3). No drops, no CASCADE. Old and new app both work. | Forward-fix by `CREATE OR REPLACE` of previous definitions (note in PR-1, not a migration) |
 | App release (PR-2/PR-3) | Remove username/DOB from UI and server; age attestation per D-20 | Standard release rollback |
 | Auth-metadata scrub | Script via Auth Admin API `updateUserById` (removes the key from `raw_user_meta_data`, verified locally); never SQL on `auth.users`; counts-only evidence; `identities.identity_data` is **not** cleaned by any supported API (verified locally): owner decision | Not reversible except from backup |
 | M2 `20261111090001_registration_username_dob_cleanup` | Data erasure and function/grant removal; audit_log redaction only with owner approval | Not reversible except from backup |
@@ -237,6 +237,27 @@ pgTAP numbers 116-118 are already taken on `main` (tests run to 124), so #128/#1
 9. Where the age attestation is stored (Terms line vs a new `consent_type` enum value) and its wording (legal).
 10. M3 design gap found 2026-11-10: functions that still read the dropped columns must be redefined first ([P1-COMPAT-MATRIX.md B5](../operations/account-identity/P1-COMPAT-MATRIX.md)); closed in the design, to be implemented with M2/M3.
 11. The 13 local permission-gate deviations are **resolved as a local CLI/image artifact** (CLI 3.0.0 image vs the repo pin 2.110.0; the gate passes with the pin locally and in CI): [P1-EVIDENCE.md section 5](../operations/account-identity/P1-EVIDENCE.md).
+
+### 3.10 PR stack, release order and open gates (v1.3, 2026-11-11)
+
+**Stack.** #170 (this documentation, PR-0) is independent. The implementation stack is **#171 (M1, DB compat) -> #172 (PR-2, auth) -> #173 (PR-3, frontend/admin)**: all three target `main`, each branch contains the previous one. Heads and CI per SHA are in [P1-EVIDENCE.md section 7](../operations/account-identity/P1-EVIDENCE.md). M1 was renamed to **`20261110090002`** because `main` (`d95bb416`) gained its own `20261110090001` (media ids-only keys); M2/M3 labels stay `20261111090001` / `20261111090002`.
+
+**Merge and release rules.**
+
+1. Merge order #171, #172, #173, back-to-back. #172's and #173's e2e fixes depend on each other, so neither is shippable alone.
+2. **M1 must be applied to an environment before the new app release there**: a pre-M1 database with the new app cannot complete new registrations ([P1-COMPAT-MATRIX.md](../operations/account-identity/P1-COMPAT-MATRIX.md)).
+3. The **old app must be gone** (no old-app instance or cached client calling the removed functions) before M3.
+4. CI facts: workflows trigger only for pull requests based on `main` or `integration/**`; do **not** retarget stacked PRs onto feature branches. `pull_request` CI does **not** trigger while a PR conflicts with `main` (GitHub cannot build the merge ref), so after `main` moves the branch must be merged or rebased with `main` before checks appear; "no checks reported" on a conflicting PR is not a pass.
+
+**Remaining gates: all OPEN, none executed.**
+
+| Gate | Needed decision / owner | State |
+|---|---|---|
+| (a) `auth.identities.identity_data` `birth_date` copies (2 Production, 11 Acceptance) | Owner picks one: accept as documented residual; owner-approved surgical write rehearsed on a restored snapshot; Supabase support. `updateUserById` does not clear them ([P1-AUTH-METADATA-SCRUB.md](../operations/account-identity/P1-AUTH-METADATA-SCRUB.md)) | OPEN, not executed |
+| (b) `audit_log` username redaction | Design approved; **hosted execution NOT approved**; open: own migration versus a step of M2 ([P1-AUDIT-LOG-REDACTION-DESIGN.md](../operations/account-identity/P1-AUDIT-LOG-REDACTION-DESIGN.md)) | OPEN, not executed |
+| (c) Legal approval of the 18+ self-attestation (proposed interim) incl. storage (Terms line vs new `consent_type`) and wording | Legal/owner | OPEN |
+| (d) Privacy statement timing | Rule: the Privacy copy must **not** claim historical username/DOB are already erased before M2 (and the gates above) have run; PR-3 fixes the copy to that rule | Rule documented; PR-3 to implement |
+| (e) #128 / #129 | HOLD (not merged, not modified); rework without username dependency and relabel to `>= 20261112...` after Phase 1 | HOLD |
 
 ---
 
@@ -280,7 +301,7 @@ pgTAP numbers 116-118 are already taken on `main` (tests run to 124), so #128/#1
 #### P1.2 — Approved contract and migration design
 
 - [ ] Define new signup input contracts, server schemas, field errors and one-field sign-in format (phone/email only). Confirm accepted E.164 normalization and existing phone alias resolution remain unchanged.
-- [x] Define `my_registration_state()` without a username-required branch; preserve consent/account type/verification states and existing activation semantics. *Evidence: implemented in PR #171 (`20261110090001`); pgTAP 125 tests 26-34 prove every state and order (56 of 56 pass post-M1, 8 fail pre-M1 by design); PR #171 CI run `42848064753` (`Files=158, Tests=7350 Result: PASS`, `PASS 753 exact function permission contracts`). Local and CI evidence only; reviewer sign-off on PR #171 pending.* See [P1-EVIDENCE.md](../operations/account-identity/P1-EVIDENCE.md).
+- [x] Define `my_registration_state()` without a username-required branch; preserve consent/account type/verification states and existing activation semantics. *Evidence: implemented in PR #171 (`20261110090002`); pgTAP 125 tests 26-34 prove every state and order (56 of 56 pass post-M1, 8 fail pre-M1 by design); PR #171 CI run `42848064753` (`Files=158, Tests=7350 Result: PASS`, `PASS 753 exact function permission contracts`). Local and CI evidence only; reviewer sign-off on PR #171 pending.* See [P1-EVIDENCE.md](../operations/account-identity/P1-EVIDENCE.md).
 - [ ] Define behavior for existing accounts with a username only and no verified phone/email. Do not strand them; document a safe recovery/remediation path.
 - [ ] Decide treatment of old username URLs/deep links with an explicit incompatibility note; do not keep a hidden username field without approval.
 - [ ] Define DOB metadata deletion scope and non-recollection guarantees for OAuth/signup/invitations; document which snapshots/backups are immutable and their retention/expiry process. *Partial: scope, local tests and the `identity_data` finding are in [P1-AUTH-METADATA-SCRUB.md](../operations/account-identity/P1-AUTH-METADATA-SCRUB.md); backup expiry wording and the owner decision on `identity_data` are open, so this box stays unticked.*
@@ -580,7 +601,7 @@ docs/architecture/ACCOUNT_IDENTITY_LIFECYCLE_MASTER_PLAN.md
 ### 2026-11-10 - [P1.2 / P1.5 design] PR-0 sync with PR-1, local proofs, owner-decision findings (W2)
 - Status: REVIEW
 - Owner / subagent: Claude Code (W2, worktree `aladdin-wt-p1-docs`)
-- Commit / PR / migration: PR-0 (#170, draft); M1 is PR #171, migration `20261110090001`; no migration in this PR
+- Commit / PR / migration: PR-0 (#170, draft); M1 is PR #171, migration `20261110090002`; no migration in this PR
 - Environment: local only (Supabase CLI 3.0.0 stack; a second stack with the repo-pinned CLI 2.110.0 for the gate check); no hosted write
 - Changed objects / scope: design docs synced to the real M1 (what was already true, what changed, what is deferred to M2/M3); #128/#129 recorded as HOLD; audit_log redaction design plus draft SQL and tests under `docs/operations/account-identity/drafts/`; Auth metadata scrub findings; compatibility matrix; evidence index with the permission-gate investigation; age policy wording
 - Tests + exact pass/fail summary: audit redaction proof 39 of 39 pass; pgTAP 125 pre-M1 8 fail (intended), post-M1 56 of 56; permission gate: 13 deviations on CLI 3.0.0 (also on `main`), `PASS 753` on the pinned CLI locally and in CI
@@ -588,6 +609,16 @@ docs/architecture/ACCOUNT_IDENTITY_LIFECYCLE_MASTER_PLAN.md
 - Data privacy impact / before-after counts (no personal values): none; synthetic fixtures only, throwaway users deleted
 - Reviewer / approval link: pending; one checkbox ticked with evidence recorded next to it
 - Next gate / rollback or forward-fix: owner decisions (audit_log execution, `identity_data`, age attestation, #128/#129 hold); PR-2/PR-3 start only after PR-1 review
+
+### 2026-11-11 - [P1 stack sync] PR-0 sync with the PR stack and new `main` (docs agent)
+- Status: REVIEW
+- Owner / subagent: Claude Code (docs agent, worktree `aladdin-wt-p1-docs`)
+- Commit / PR / migration: PR-0 (#170); M1 `20261110090002` in #171; PR-2 #172; PR-3 #173; no migration in this PR
+- Environment: documentation only; hosted state untouched
+- Changed objects / scope: renamed M1 references after `main` took `20261110090001`; added 3.10 (stack, release order, CI-trigger caveats, open gates a-e); evidence section 7 with SHAs per PR and CI per check
+- Tests + exact pass/fail summary: see P1-EVIDENCE section 7 (only what was verified through `gh`)
+- Reviewer / approval link: pending; no new checkbox ticked (no new reviewer-verified evidence)
+- Next gate / rollback or forward-fix: owner decisions on gates (a)-(e); merge #171, #172, #173 back-to-back only after review
 
 A checkbox is changed to `[x]` **only** when there is a working link or artifact reference, the reviewer has checked the result, and production/acceptance evidence is not conflated with local tests. Keep unfinished work unchecked and describe reasons. Records of failures and superseded decisions should remain in the history.
 
@@ -598,6 +629,7 @@ A checkbox is changed to `[x]` **only** when there is a working link or artifact
 | 2026-11-10 | 1.0 | Initial product decisions, DB/code findings, future lifecycle architecture, retention draft, **Phase 1-first gated execution plan**, all checkboxes initially open | ChatGPT drafting for product owner | Conversation; direct read-only GitHub/Supabase inspection |
 | 2026-11-10 | 1.1 | Added to repository as PR-0; progress board (P0/P1 IN PROGRESS); decisions D-18..D-23 and owner constraints; baseline corrected with verified 2026-11-10 numbers; stranding, audit_log, code and age-gate findings; open-PR matrix; M1/M2/M3 plan; risks and blockers; P1.1 status notes (no box ticked); status-update entry. All v1.0 phases, decisions and retention content retained unchanged. | Claude Code for product owner | PR-0 + read-only audits (2026-11-10) |
 | 2026-11-10 | 1.2 | Synced with the actual PR-1 implementation (M1 is function revisions only; pending_registrations, save/consume and admin_user_detail untouched); #128/#129 HOLD and relabel plan; audit_log redaction design approved / execution not approved with local proof; Auth metadata findings (`identity_data` not cleanable by a supported API); M3 function-redefinition gap; permission-gate deviations explained; age attestation marked PROPOSED INTERIM; one checkbox ticked with evidence | Claude Code for product owner | [P1-EVIDENCE.md](../operations/account-identity/P1-EVIDENCE.md) |
+| 2026-11-11 | 1.3 | Merged `main` `d95bb416`; M1 renamed to `20261110090002`; PR stack #171 -> #172 -> #173 and release rules (3.10); gates (a)-(e) recorded as OPEN; CI-trigger caveats; evidence table with exact SHAs (P1-EVIDENCE section 7); no checkbox ticked beyond the one already evidenced | Claude Code for product owner | [P1-EVIDENCE.md](../operations/account-identity/P1-EVIDENCE.md) section 7 |
 
 ## 11. Next action
 
