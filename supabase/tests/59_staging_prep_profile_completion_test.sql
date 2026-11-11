@@ -75,7 +75,7 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"59000000-0000-4000-8000-00000000000a","role":"authenticated"}';
 
 select lives_ok($$ select public.my_profile_completion() $$, 'my_profile_completion() runs (raised 22P02 before Increment 10)');
-select is((public.my_profile_completion() ->> 'percent')::int, 25, 'consumer: 1 of 4 all-audience items (username) = 25%');
+select is((public.my_profile_completion() ->> 'percent')::int, 0, 'consumer: 0 of 3 all-audience items (P1 M1: the username item is retired; a claimed legacy username counts for nothing) = 0%');
 select ok((public.my_profile_completion() -> 'missing') ? 'display_name',
   'an automatic fallback display name does NOT count as complete');
 select ok(not ((public.my_profile_completion() -> 'missing') ? 'locality'),
@@ -90,7 +90,7 @@ select isnt((select display_name_confirmed_at from public.profiles where user_id
   null, 'and ONLY that explicit save sets display_name_confirmed_at');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"59000000-0000-4000-8000-00000000000a","role":"authenticated"}';
-select is((public.my_profile_completion() ->> 'percent')::int, 50, 'confirming the display name raises completion to 50%');
+select is((public.my_profile_completion() ->> 'percent')::int, 33, 'confirming the display name raises completion to 33% (1 of 3)');
 
 -- ===========================================================================
 -- 3. Canonical phone — E.164 uniqueness, neutral collision error
@@ -98,7 +98,7 @@ select is((public.my_profile_completion() ->> 'percent')::int, 50, 'confirming t
 select throws_ok($$ select public.profile_set_phone('EG', '1012345678', '01012345678') $$, '22023', null,
   'a non-E.164 value is refused by the shape backstop');
 select lives_ok($$ select public.profile_set_phone('EG', '1012345678', '+201012345678') $$, 'A saves a canonical E.164 phone');
-select is((public.my_profile_completion() ->> 'percent')::int, 75, 'the phone raises completion to 75%');
+select is((public.my_profile_completion() ->> 'percent')::int, 67, 'the phone raises completion to 67% (2 of 3)');
 
 set local request.jwt.claims = '{"sub":"59000000-0000-4000-8000-00000000000b","role":"authenticated"}';
 select throws_ok($$ select public.profile_set_phone('EG', '1012345678', '+201012345678') $$, '23505',
