@@ -1,3 +1,12 @@
+## 2026-11-11 - Account identity Phase 1 Acceptance preflight (v1.5, docs + scripts, PR #170 and draft PR #179)
+
+- Scope: read-only hosted reads and local work only. Acceptance `nxossqhdfltcqdwvbewi` re-read: **207 applied, latest `20261107090006`, no gaps**; the only repo migration not applied is `20261110090001` (media ids-only keys); M1 `20261110090002` (#171) is next. Production list the same. Hosted Acceptance catalog (12 fingerprint sections) and function permissions (753, one aggregate hash) are identical to a clean local replay of the 207 migrations.
+- Local dry run (pinned CLI 2.110.0, isolated stack, no prune): M1 as the only extra migration changes exactly `my_registration_state`, `app.profile_completion`, `admin_users_directory` and nothing else; grants unchanged; pgTAP 125 + 8 modified tests PASS (439 tests, seeds loaded). Forward-fix SQL restoring the previous definitions proven. The media migration changes exactly its four media functions.
+- Scripts re-pinned in draft PR #179 (plans `media`, `m1`, `media+m1`, catalog fingerprint/diff; 151 offline tests pass). Never run against a hosted project with a write.
+- Found: the only restore-verified Acceptance snapshot (2026-11-08) predates the 2026-11-07 migrations (stale); backup schedules are off; the Admin console path is not initialized. Supabase has no branches; no Workers Builds git triggers on four Workers; Vercel team has no projects.
+- Docs: new `P1-ACCEPTANCE-RUNBOOK.md`, master plan v1.5 (3.12), P1-EVIDENCE section 8, README. Owner decision D1 (media first vs both) flagged. No hosted write, deploy, merge, dispatch or secret; no checkbox ticked.
+- Next: owner GO for a fresh Acceptance backup plus restore test (the first hosted action), decision D1, then the apply steps in the runbook.
+
 ## 2026-11-11 - Account identity Phase 1 release-candidate docs (v1.4, docs only, PR #170)
 
 - Scope: documentation only. Merged `origin/main` `66a0f0ab` into the #170 branch (clean). Master plan v1.4: combined release PR strategy (#173 contains every commit of #171 and #172, verified with `git rev-list`; #172 superseded and never merged alone; #171 first as the DB-only step, then #173, then close #172, owner actions not executed), verified merge/deploy triggers, release order per environment, gates (a)-(g) all OPEN, new 3.11 Acceptance checklist (all unticked, authorization marked). Updated P1-EVIDENCE section 7 (per exact SHA), P1-PR-CONFLICT-MATRIX, README index, RUNTIME_STATE.

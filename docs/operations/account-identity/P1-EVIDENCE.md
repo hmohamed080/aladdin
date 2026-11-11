@@ -98,3 +98,25 @@ Heads read with `gh pr view N --json headRefOid,mergeable` and checks with `gh p
 **Mergeability against `main` `66a0f0ab`:** `git merge-tree --write-tree` of the #171, #172 and #173 heads each reports a clean merge (exit 0, no conflict list). **Containment:** `git rev-list` shows 0 commits of #171 and 0 of #172 missing from #173. **Diff of #173 against `main`:** 109 files, +28983 / -2013 (`git diff --numstat`); +27279 of the additions are `supabase/permissions/20261110090002.json`; the only migration is `supabase/migrations/20261110090002_registration_stop_username_dob_compat.sql`.
 
 Reading: #172 alone is red; #173 is green on every check for its exact head (one flaky unrelated test passed on a single rerun). Release strategy and order: master plan 3.10 and 3.11.
+
+## 8. Acceptance preflight evidence (2026-11-11; read-only hosted reads and local runs; counts and hashes only)
+
+| Item | Result | Evidence |
+|---|---|---|
+| Acceptance history | PASS (read): 207 applied, latest `20261107090006`, no gaps; pending vs `main` `2aa365a5` = `20261110090001` only | Supabase MCP `list_migrations` 10:14Z; `comm` of the version lists |
+| Production history | 207, latest `20261107090006` (same list, compared by eye) | `list_migrations` |
+| Hosted catalog equals clean replay | PASS: 12 of 12 fingerprint sections identical (`scripts/hosted-db/catalog-fingerprint.sql`) | read-only `execute_sql` |
+| Hosted function permissions | PASS: 753 functions, aggregate md5 `da4d2dd7d95a27ce3e8292d351b6f983` = local replay, which passes contract `20261107090006` 753/753 | read-only `execute_sql` 10:32Z |
+| M1-only dry run (local, CLI 2.110.0) | PASS: history 208, exactly 3 functions changed, no other catalog change, grants unchanged; file sha256 `83bde264...c290f1` (#171 head `b8c06ccf`) | `catalog-diff.mjs --expect-changed` |
+| pgTAP 125 + modified tests 11, 21, 22, 25, 58, 59, 60, 117 | PASS: 9 files, 439 tests, with demo seeds loaded (without seeds 4 of 9 files fail on missing fixtures: environment artifact) | `supabase test db --local` on the isolated stack |
+| Media migration `20261110090001` | exactly 4 functions (3 changed, 1 added); with M1, `PASS 754 functions` vs contract `20261110090002` | local |
+| M1 DDL scan | 3 create or replace function, 2 comment, 3 revoke, 2 grant; no table DDL, no top-level DML | grep of line-start verbs |
+| Forward-fix SQL | PASS: M1 + restore = pre-M1 fingerprint exactly; permissions PASS 753 vs `20261107090006` | `drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql` |
+| Offline script tests | PASS: `node --test scripts/hosted-db/*.test.mjs` 151/151 (PR #179) | local |
+| CI upgrade-mode permission gate | PASS on #173 `42d5218d`: run `42995730943` (`PASS atomic migration 20261110090002...`, `PASS 754 exact function permission contracts`) | `gh run view` |
+| Supabase security advisors (baseline) | 5 lint groups: `rls_enabled_no_policy`, `function_search_path_mutable`, `anon_security_definer_function_executable`, `authenticated_security_definer_function_executable`, `auth_leaked_password_protection` | `get_advisors` |
+| Auto-deploy: workflows | PASS: none applies migrations; `ci.yml` on `main` only `wrangler deploy --dry-run`; `cloudflare-production.yml` dispatch-only | repo |
+| Auto-deploy: dashboards | Supabase branches none (PASS); Workers Builds git triggers none on 4 Workers (PASS); Vercel team 0 projects (PASS); Supabase GitHub integration and Cloudflare Pages Git: **UNVERIFIED** (owner dashboard check) | MCP reads |
+| Backup readiness | **FAIL / action needed:** the only restore-verified Acceptance snapshot (`aladdin-acceptance-20261108T060819Z`, runs `42461215127`, `42469078723`) predates the 2026-11-07 migrations; schedules off; `app.backup_environment` 0 rows; the `aladdin-backups` "success" runs are plan-only | `gh run view`, `execute_sql` counts |
+
+@@PRTABLE@@

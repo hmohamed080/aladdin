@@ -1,5 +1,7 @@
 # Migration dry-run, preflight and rollback runbook (2026-11-08)
 
+> **Superseded for Acceptance (2026-11-11):** the four 2026-11-07 migrations are already applied (Acceptance 207 / `20261107090006`). The current Acceptance procedure for the pending migrations is [account-identity/P1-ACCEPTANCE-RUNBOOK.md](account-identity/P1-ACCEPTANCE-RUNBOOK.md); the scripts are re-pinned in PR #179. The 203-based text below is history.
+
 Preparation only. Nothing here was run against a hosted database except read-only history listings. Every hosted step below needs its own owner approval. Rule: migrations only through `supabase db push`; no SQL Editor, no history repair.
 
 Live history, read 2026-11-08 07:50Z (Supabase tool, read-only):
