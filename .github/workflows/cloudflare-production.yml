@@ -72,6 +72,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Cloudflare account preflight (fail closed on a missing or different account)
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/r2-account-preflight.mjs
       - name: Enable pnpm (corepack, pinned to packageManager)
         run: |
           corepack enable
