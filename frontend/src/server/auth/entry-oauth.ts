@@ -20,13 +20,6 @@ import type { Database } from "@/types/database.types";
  * then finishes registration (account type) on the canonical finish-registration
  * screen; an account type picked on the landing page (`?type=`) is applied for
  * them, after the server re-checks it.
- *
- * AGE GATE (proposed interim policy, P1 PR-2; no date of birth is collected): becoming
- * access-ready is gated on the 18+ self-attestation (`ageConfirmed`). The preselected
- * account type is therefore applied here ONLY when the entry form carried the
- * attestation (`ageConfirmed=1` on the callback URL, set by `startEntryOAuth` from the
- * form checkbox); otherwise the person lands on finish-registration, where
- * `chooseAccountTypeAction` enforces it. The attestation is not stored.
  */
 
 export const OAUTH_PROVIDERS = ["google", "facebook"] as const;
@@ -50,13 +43,12 @@ export function openAccountType(value: unknown): string | null {
 }
 
 /** The callback URL handed to Supabase. Only a sanitized `next` and an open account type ride it. */
-export function entryCallbackUrl(origin: string, next: unknown, accountType?: unknown, ageConfirmed?: boolean): string {
+export function entryCallbackUrl(origin: string, next: unknown, accountType?: unknown): string {
   const url = new URL(ENTRY_CALLBACK_PATH, origin);
   const safeNext = sanitizeNext(next);
   if (safeNext !== "/b2b") url.searchParams.set("next", safeNext);
   const type = openAccountType(accountType);
   if (type) url.searchParams.set("type", type);
-  if (ageConfirmed === true) url.searchParams.set("ageConfirmed", "1");
   return url.toString();
 }
 
@@ -97,7 +89,7 @@ export type EntryOAuthOutcome = { path: string; signedOut?: boolean };
  */
 export async function completeEntryOAuth(
   supabase: Client,
-  params: { code: string | null; next: string | null; accountType?: string | null; ageConfirmed?: boolean; locale?: "en" | "ar"; providerError: string | null },
+  params: { code: string | null; next: string | null; accountType?: string | null; locale?: "en" | "ar"; providerError: string | null },
 ): Promise<EntryOAuthOutcome> {
   const back = (reason: string) => `${OAUTH_SIGN_IN_PATH}?error=${reason}`;
   if (params.providerError || !params.code) return { path: back("oauth") };
@@ -129,8 +121,7 @@ export async function completeEntryOAuth(
   }
 
   const type = openAccountType(params.accountType);
-  // No attestation, no automatic account type: the account must not become access-ready without it.
-  if (state === "account_type_pending" && type && params.ageConfirmed === true) {
+  if (state === "account_type_pending" && type) {
     const choice = CHOICES_BY_KEY[type] as (typeof CHOICES_BY_KEY)[string];
     const { error: typeError } = await supabase.rpc("onboarding_select_account_type", {
       p_track: choice.track === "business" ? "business" : "professional",
@@ -141,7 +132,7 @@ export async function completeEntryOAuth(
   }
 
   if (state === "account_type_pending") {
-    // Prefill the name the provider knows; the person still confirms the account type and their age.
+    // Prefill the name the provider knows; the person still confirms the account type.
     const name = displayNameSchema.safeParse(data.user.user_metadata?.full_name ?? data.user.user_metadata?.name);
     if (name.success) {
       const { error: nameError } = await supabase.rpc("profile_set_display_name", { p_display_name: name.data });

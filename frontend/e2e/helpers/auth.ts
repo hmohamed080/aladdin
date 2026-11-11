@@ -109,16 +109,6 @@ export async function readNewOtp(
  * through `/auth/sign-up` choose it themselves. Never a production credential.
  */
 export const E2E_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
-/**
- * Every registration asks for an "I confirm I am 18 or older" checkbox (Phase 1 of the account-identity plan: no birth
- * date and no username are collected). PROPOSED INTERIM wording, pending legal approval.
- */
-export const AGE_CONFIRM_LABEL = /^i confirm i am 18 or older$|^أقرّ بأن عمري ١٨ عامًا أو أكثر$/i;
-
-/** Ticks the 18+ confirmation on a sign-up form. */
-export async function confirmAge(page: Page): Promise<void> {
-  await page.getByLabel(AGE_CONFIRM_LABEL).check();
-}
 /** The one sign-in field and the sign-up contact field (ADR-0025), EN and AR. */
 export const SIGN_IN_IDENTIFIER_LABEL = /^mobile number or email$|^رقم الموبايل أو البريد الإلكتروني$/i;
 export const SIGN_UP_CONTACT_LABEL = /^mobile number or email$|^رقم الموبايل أو البريد الإلكتروني$/i;
@@ -271,7 +261,7 @@ export async function accountTypeOptions(page: Page): Promise<Array<{ text: stri
 
 /**
  * Register a brand-new account through the REAL canonical `/auth/sign-up`
- * (email, password, Full Name, account type, 18+ confirmation, Turnstile)
+ * (email, password, Full Name, account type, Turnstile)
  * and its OTP confirmation, then wait for the app landing. Leaves the browser
  * signed in; the account's password is `E2E_PASSWORD`.
  */
@@ -291,7 +281,6 @@ export async function registerWithPassword(
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(E2E_PASSWORD);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill(displayName);
   await selectAccountType(page, accountType);
-  await confirmAge(page);
   const seen = await messageIdsFor(request, email);
   await waitForCaptchaToken(page);
   await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();

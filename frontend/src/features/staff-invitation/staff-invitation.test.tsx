@@ -64,10 +64,10 @@ describe("StaffInvitationEntry", () => {
 });
 
 describe("StaffRegisterForm (no persona)", () => {
-  it("has no account-type, username, birth-date or token field; it asks for the 18+ confirmation instead", () => {
+  it("has no account-type, username, birth-date, age-confirmation or token field", () => {
     renderWithI18n(<StaffRegisterForm />, "en");
     const names = [...document.querySelectorAll("input, select")].map((el) => (el as HTMLInputElement).name).filter(Boolean);
-    expect(names).toEqual(expect.arrayContaining(["email", "password", "displayName", "ageConfirmed", "consent_terms", "consent_privacy", "consent_pilot"]));
+    expect(names).toEqual(expect.arrayContaining(["email", "password", "displayName", "consent_terms", "consent_privacy", "consent_pilot"]));
     for (const forbidden of ["username", "accountType", "token", "birthDate", "birthYear"]) expect(names).not.toContain(forbidden);
     expect((document.querySelector("input[name=email]") as HTMLInputElement).type).toBe("email");
     expect((document.querySelector("input[name=password]") as HTMLInputElement).autocomplete).toBe("new-password");

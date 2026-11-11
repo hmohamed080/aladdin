@@ -7,7 +7,6 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { isLocale } from "@/lib/i18n/locales";
 import { CHOICES_BY_KEY, INVITED_EMPLOYEE_KEY } from "@/lib/onboarding/account-types";
-import { ageConfirmationError } from "@/features/auth-password-preview/password-policy";
 import { EG_PHONE_PATTERN } from "@/lib/onboarding/validation";
 
 /**
@@ -61,9 +60,6 @@ export async function saveContactAction(_prev: OnboardingActionState, formData: 
 
 /** Step 3 — Account-Type Selection: records INTENT and reaches the handoff. */
 export async function selectAccountTypeAction(_prev: OnboardingActionState, formData: FormData): Promise<OnboardingActionState> {
-  // 18+ self-attestation (proposed interim policy; replaces the date of birth; not stored): enforced where an account type is chosen.
-  const ageError = ageConfirmationError(formData);
-  if (ageError) return { ok: false, code: ageError };
   const choiceKey = formData.get("choice");
   if (typeof choiceKey !== "string" || choiceKey.length === 0) {
     return { ok: false, code: "onboarding.error.selectType" };

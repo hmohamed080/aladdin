@@ -1,5 +1,5 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
-import { signIn, IDENTITIES, confirmAge } from "./helpers/auth";
+import { signIn, IDENTITIES } from "./helpers/auth";
 import { createConfirmedAccount } from "./helpers/fixtures";
 
 /**
@@ -12,7 +12,7 @@ import { createConfirmedAccount } from "./helpers/fixtures";
  * Rewritten from the Sprint 7.3 wizard assertions, which the base branch's
  * Increment 7 made permanently stale (they waited for /onboarding/profile).
  *
- * The canonical `/auth/sign-up` now takes the account type and the 18+ confirmation on
+ * The canonical `/auth/sign-up` now takes the account type on
  * Step 1, so it never produces an account_type_pending account. These steps
  * still serve accounts in that state (e.g. pre-password registrations), so
  * the state is seeded as a local-DB fixture and entered through the real
@@ -62,7 +62,6 @@ test.describe("shared onboarding", () => {
     // Coming Soon types are visible but cannot be chosen.
     await expect(page.getByRole("button", { name: /^engineer/i })).toBeDisabled();
     await page.getByRole("button", { name: /craftsmen/i }).click();
-    await confirmAge(page); // the account-type step enforces the 18+ confirmation
     await page.getByRole("button", { name: /^continue$/i }).click();
 
     await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
@@ -73,7 +72,6 @@ test.describe("shared onboarding", () => {
     await prefs(page, "en", "light");
     await registerFreshUser(page, request);
     await page.getByRole("button", { name: /sales team/i }).click();
-    await confirmAge(page);
     await page.getByRole("button", { name: /^continue$/i }).click();
     await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
 
@@ -100,7 +98,6 @@ test.describe("shared onboarding", () => {
     await noOverflow(page);
 
     await page.getByRole("button", { name: /المورد/ }).click();
-    await confirmAge(page);
     await page.getByRole("button", { name: /متابعة/ }).click();
 
     // access_ready with ZERO organizations: no organization was created for
@@ -121,10 +118,10 @@ test.describe("shared onboarding", () => {
     await page.waitForURL(/\/auth\/sign-in$/, { waitUntil: "commit" });
 
     // An incomplete account signing in resumes exactly where it stopped: the
-    // password flow's recovery screen asks for the missing account type (and the 18+ confirmation), never a username.
+    // password flow's recovery screen asks for the missing account type, never a username or an age confirmation.
     await signIn(page, request, email, /\/auth\/finish-registration$/);
     await expect(page.getByLabel(/^username$/i)).toHaveCount(0);
-    await expect(page.getByLabel(/^i confirm i am 18 or older$/i)).toBeVisible();
+    await expect(page.getByLabel(/^i confirm i am 18 or older$/i)).toHaveCount(0);
     await expect(page.getByLabel(/^password$/i)).toHaveCount(0);
   });
 

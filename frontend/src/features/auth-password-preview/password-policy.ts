@@ -67,50 +67,19 @@ export const displayNameSchema = z
   .min(1, { message: "authPasswordPreview.error.fullNameRequired" })
   .max(DISPLAY_NAME_MAX_LENGTH, { message: "authPasswordPreview.error.fullNameTooLong" });
 
-/**
- * AGE POLICY (PROPOSED INTERIM, pending legal approval; P1 PR-2). The application no longer collects or stores a date of birth. Eligibility
- * protection is kept as a server-enforced self-attestation: "I confirm I am 18 or older".
- *
- * CONTRACT (shared by every registration path and by the UI):
- *   * form field name  : `ageConfirmed` (AGE_CONFIRMATION_FIELD); a checkbox, submitted as "on" (or "true"/"1" from a script)
- *   * parsed value     : boolean, must be literally `true` (ageConfirmationSchema)
- *   * failure          : error code `authPasswordPreview.error.ageNotConfirmed` (AGE_NOT_CONFIRMED_CODE)
- * The attestation is checked at request time and is NOT persisted anywhere (no column, no metadata). Whether it must be recorded to prove
- * enforcement is an open legal question.
- */
-export const AGE_CONFIRMATION_FIELD = "ageConfirmed";
-export const MINIMUM_SIGN_UP_AGE = 18;
-export const AGE_NOT_CONFIRMED_CODE = "authPasswordPreview.error.ageNotConfirmed";
-
-/** Must be exactly boolean `true`; anything else (false, missing, "yes", 1) fails with AGE_NOT_CONFIRMED_CODE. */
-export const ageConfirmationSchema = z.literal(true, { errorMap: () => ({ message: AGE_NOT_CONFIRMED_CODE }) });
-export type AgeConfirmation = z.infer<typeof ageConfirmationSchema>;
-
-/** Reads the checkbox value a form (or script) submitted into a boolean. Only "on", "true" and "1" mean confirmed. */
-export function ageConfirmedFromForm(formData: FormData): boolean {
-  const value = formData.get(AGE_CONFIRMATION_FIELD);
-  return value === "on" || value === "true" || value === "1";
-}
-
-/** Server-side gate for flows without a zod schema: null when confirmed, else the typed error code. */
-export function ageConfirmationError(formData: FormData): string | null {
-  return ageConfirmationSchema.safeParse(ageConfirmedFromForm(formData)).success ? null : AGE_NOT_CONFIRMED_CODE;
-}
-
 export const registrationSchema = z
   .object({
     displayName: displayNameSchema,
     email: emailSchema,
     accountType: z.string().trim().min(1, { message: "authPasswordPreview.error.accountTypeRequired" }),
     password: passwordSchema,
-    ageConfirmed: ageConfirmationSchema,
   })
   .superRefine((value, ctx) => {
     addWeakPasswordIssues(value.password, [value.email], ["password"], ctx);
   });
 
 /**
- * Registration for INVITED PLATFORM STAFF: exactly the marketplace rules for name, e-mail, password and the 18+ attestation, with no username and no
+ * Registration for INVITED PLATFORM STAFF: exactly the marketplace rules for name, e-mail and password, with no username and no
  * account type (staff are never given a marketplace persona). Kept beside registrationSchema so the two cannot drift.
  */
 export const staffRegistrationSchema = z
@@ -118,7 +87,6 @@ export const staffRegistrationSchema = z
     displayName: displayNameSchema,
     email: emailSchema,
     password: passwordSchema,
-    ageConfirmed: ageConfirmationSchema,
   })
   .superRefine((value, ctx) => {
     addWeakPasswordIssues(value.password, [value.email], ["password"], ctx);
@@ -149,7 +117,6 @@ const REGISTRATION_FIELD_CODES: Record<string, string> = {
   email: "authPasswordPreview.error.invalidEmail",
   accountType: "authPasswordPreview.error.accountTypeRequired",
   password: "authPasswordPreview.error.passwordTooShort",
-  ageConfirmed: AGE_NOT_CONFIRMED_CODE,
 };
 
 export function registrationIssueCode(issue: { message?: string; path?: (string | number)[] } | undefined): string {

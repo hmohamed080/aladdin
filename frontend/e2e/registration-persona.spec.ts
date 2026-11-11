@@ -5,7 +5,7 @@ import { registerWithPassword } from "./helpers/auth";
  * Registration account type → AUTHORITATIVE persona (staging-prep Increment
  * 11), end to end against the REAL local Supabase + Mailpit, through the
  * CANONICAL `/auth/sign-up` (Full Name, the account-type
- * dropdown and the 18+ confirmation on Step 1; `onboarding_select_account_type`
+ * dropdown on Step 1; `onboarding_select_account_type`
  * applied after the OTP). Turnstile-gated like every
  * Create Account: run where challenges.cloudflare.com loads.
  */

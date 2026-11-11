@@ -62,7 +62,6 @@ function form(patch: Record<string, string> = {}) {
     displayName: "Mona Adel",
     accountType: "supplier",
     password: GOOD_PASSWORD,
-    ageConfirmed: "on",
     consent_terms: "on",
     consent_privacy: "on",
     consent_pilot: "on",
@@ -115,7 +114,7 @@ async function startSignUp() {
 }
 
 describe("requestPhoneSignUp", () => {
-  it("checks every field, Turnstile, the limiter and the 18+ attestation, then asks the authority for a challenge - it holds no code of its own", async () => {
+  it("checks every field, Turnstile, and the limiter, then asks the authority for a challenge - it holds no code of its own", async () => {
     await startSignUp();
     expect(m.siteverify).toHaveBeenCalledWith("token-a", expect.objectContaining({ expectedAction: "sign-up" }));
     expect(m.start).toHaveBeenCalledWith(expect.stringMatching(RID_RE), "+201012345678", "203.0.113.9", "ar");
@@ -137,9 +136,6 @@ describe("requestPhoneSignUp", () => {
     [{ displayName: "" }, "authPasswordPreview.error.fullNameRequired"],
     [{ accountType: "end_consumer" }, "authPasswordPreview.error.accountTypeRequired"],
     [{ password: "short" }, "authPasswordPreview.error.passwordTooShort"],
-    [{ ageConfirmed: "" }, "authPasswordPreview.error.ageNotConfirmed"],
-    [{ ageConfirmed: "false" }, "authPasswordPreview.error.ageNotConfirmed"],
-    [{ ageConfirmed: "yes" }, "authPasswordPreview.error.ageNotConfirmed"],
     [{ consent_pilot: "" }, "authPasswordPreview.error.consentRequired"],
   ])("refuses %o before any challenge is opened", async (patch, code) => {
     expect((await requestPhoneSignUp(form(patch), PHONE)).code).toBe(code);
@@ -248,13 +244,12 @@ describe("verifyPhoneSignUp", () => {
     expect(cookieJar.has("psu")).toBe(false);
   });
 
-  it("phone sign-up REQUIRES ageConfirmed: a missing attestation opens no challenge, sends no code and creates nothing", async () => {
+  it("phone sign-up needs no age confirmation: the challenge opens without one", async () => {
     const f = form();
-    f.delete("ageConfirmed");
-    expect((await requestPhoneSignUp(f, PHONE)).code).toBe("authPasswordPreview.error.ageNotConfirmed");
-    expect(m.start).not.toHaveBeenCalled();
-    expect(m.createUser).not.toHaveBeenCalled();
-    expect(cookieJar.has("psu")).toBe(false);
+    expect(f.has("ageConfirmed")).toBe(false);
+    const res = await requestPhoneSignUp(f, PHONE);
+    expect(res).toMatchObject({ ok: true, code: "authPasswordPreview.info.whatsappCodeSent" });
+    expect(m.start).toHaveBeenCalledTimes(1);
   });
 
   it("the sealed pending sign-up holds no username and no birth date", async () => {

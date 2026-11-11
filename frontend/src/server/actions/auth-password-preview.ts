@@ -27,7 +27,6 @@ import { hasAppAccess, type RegistrationState } from "@/server/queries/registrat
 import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 import type { Database } from "@/types/database.types";
 import {
-  ageConfirmedFromForm,
   displayNameSchema,
   emailSchema,
   registrationIssueCode,
@@ -274,8 +273,6 @@ export async function requestPasswordSignUp(
     email: field("email"),
     accountType: field("accountType"),
     password: field("password"),
-    // Server-enforced 18+ self-attestation (proposed interim policy; replaces the date of birth). Not stored.
-    ageConfirmed: ageConfirmedFromForm(formData),
   });
   if (!parsed.success) return { ok: false, code: registrationIssueCode(parsed.error.issues[0]) };
 

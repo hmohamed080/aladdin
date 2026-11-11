@@ -5,7 +5,6 @@ import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
-import { ageConfirmationError } from "@/features/auth-password-preview/password-policy";
 
 const CONSENT_TYPES = ["terms", "privacy", "pilot"] as const;
 
@@ -47,10 +46,6 @@ export async function chooseAccountTypeAction(
   _prev: AccountTypeChoiceState,
   formData: FormData,
 ): Promise<AccountTypeChoiceState> {
-  // Becoming access-ready is the point the 18+ self-attestation is enforced for OAuth and recovery registrations (proposed interim
-  // policy; nothing is stored). Checked before anything else so a missing attestation never reaches the database.
-  const ageError = ageConfirmationError(formData);
-  if (ageError) return { ok: false, code: ageError };
   const key = formData.get("accountType");
   const choice = typeof key === "string" ? CHOICES_BY_KEY[key] : undefined;
   if (!choice || choice.comingSoon || choice.transitional) {

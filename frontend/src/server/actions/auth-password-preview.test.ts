@@ -150,7 +150,6 @@ function consented(entries: Record<string, string> = {}) {
     captchaToken: "test-captcha-token",
     displayName: "Mona Adel",
     accountType: "installer_technician",
-    ageConfirmed: "on",
     ...entries,
   });
 }
@@ -261,18 +260,14 @@ describe("weak-password rejection", () => {
 });
 
 describe("requestPasswordSignUp (Architecture B — signUp() sets the password atomically)", () => {
-  it.each([
-    ["missing", {} as Record<string, string>, true],
-    ["unchecked", { ageConfirmed: "off" }, false],
-    ["false", { ageConfirmed: "false" }, false],
-    ["a non-checkbox value", { ageConfirmed: "yes" }, false],
-  ])("requires the 18+ attestation (%s) before anything reaches signUp()", async (_label, entries, remove) => {
-    const form = consented({ email: "person@example.test", password: GOOD_PASSWORD, ...entries });
-    if (remove) form.delete("ageConfirmed");
-    const res = await requestPasswordSignUp({ ok: false }, form);
-    expect(res.code).toBe("authPasswordPreview.error.ageNotConfirmed");
-    expect(signUp).not.toHaveBeenCalled();
-    expect(savePendingRegistration).not.toHaveBeenCalled();
+  it("registers without any age confirmation, and a stray ageConfirmed field changes nothing", async () => {
+    for (const entries of [{} as Record<string, string>, { ageConfirmed: "false" }]) {
+      signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "u-x" } } });
+      const res = await requestPasswordSignUp({ ok: false }, consented({ email: "person@example.test", password: GOOD_PASSWORD, ...entries }));
+      expect(res.ok).toBe(true);
+    }
+    expect(signUp).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(signUp.mock.calls.map((c) => c[0]))).not.toMatch(/age/i);
   });
 
   it("no longer reads, validates or forwards a birth date or username", async () => {
@@ -288,7 +283,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
   it("requires all three consents", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
-      fd({ displayName: "Mona Adel", email: "person@example.test", accountType: "installer_technician", ageConfirmed: "on", password: GOOD_PASSWORD, consent_terms: "on" }),
+      fd({ displayName: "Mona Adel", email: "person@example.test", accountType: "installer_technician", password: GOOD_PASSWORD, consent_terms: "on" }),
     );
     expect(res.code).toBe("authPasswordPreview.error.consentRequired");
     expect(signUp).not.toHaveBeenCalled();
