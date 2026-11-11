@@ -72,8 +72,8 @@ select lives_ok(
   $$ select public.onboarding_select_account_type('professional'::public.onboarding_track, 'installer_technician') $$,
   'account type recorded for the second fixture');
 select is(
-  public.my_registration_state(), 'username_pending',
-  'account type known, consent recorded, but no username -> username_pending, never access_ready');
+  public.my_registration_state(), 'access_ready',
+  'account type known, consent recorded, no username -> access_ready (P1 M1: username_pending is gone, not a gate)');
 select lives_ok(
   $$ select public.profile_set_username('secondfixture') $$,
   'the recovery path (picking a username) succeeds');
