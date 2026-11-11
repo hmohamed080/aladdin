@@ -229,8 +229,6 @@ jobs:
         run: bash ops/backups/build-repo-test.sh
       - name: Media record validator (fail-closed rules)
         run: python3 ops/backups/media-record-test.py
-      - name: Site-media backup and verifier (fake S3, offline)
-        run: bash ops/backups/site-media-backup-test.sh
       # age and age-keygen: built from the pinned module version v1.1.1 (the version Ubuntu 24.04 packages); go install verifies the
       # module against the Go checksum database (sum.golang.org). No apt.
       - name: Install age (pinned module version, checksum-database verified)
@@ -251,6 +249,8 @@ jobs:
           "$RUNNER_TEMP/s3/bin/moto_server" -p 8333 >"$RUNNER_TEMP/moto.log" 2>&1 &
           for _ in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:8333/ && break; sleep 1; done
           echo "$RUNNER_TEMP/shim" >> "$GITHUB_PATH"
+      - name: Site-media backup and verifier (fake S3, offline)
+        run: bash ops/backups/site-media-backup-test.sh
       - name: Media coverage fails closed (Supabase Storage, R2, mixed, partial, empty; switches off)
         env: { AWS_ACCESS_KEY_ID: testkey, AWS_SECRET_ACCESS_KEY: testsecret }
         run: bash ops/backups/media-coverage-test.sh
