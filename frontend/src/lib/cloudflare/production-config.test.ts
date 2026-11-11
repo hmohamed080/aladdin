@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   checkBackend,
+  checkCutoverStage,
   checkFrontend,
   checkLiveValues,
   jwtProjectRef,
@@ -48,7 +49,29 @@ describe("Cloudflare production config (committed Wrangler files)", () => {
     expect(checkFrontend(config)).toContain("frontend production: BACKEND must bind aladdin-backend-production");
   });
 
-  it("refuses a public address, an acceptance resource or R2/Redis switched on", () => {
+  it("requires R2-only media: R2 on, production writes approved and Supabase Storage writes closed", () => {
+    const vars = frontendConfig().env.production.vars;
+    expect(vars.R2_STORAGE_ENABLED).toBe("true");
+    expect(vars.R2_PRODUCTION_WRITES_APPROVED).toBe("true");
+    expect(vars.MEDIA_LEGACY_STORAGE_WRITES).toBe("false");
+    for (const [flag, bad] of [["R2_STORAGE_ENABLED", "false"], ["R2_PRODUCTION_WRITES_APPROVED", "false"], ["MEDIA_LEGACY_STORAGE_WRITES", "true"]] as const) {
+      const config = frontendConfig();
+      config.env.production.vars[flag] = bad;
+      expect(checkFrontend(config).some((p) => p.includes(flag))).toBe(true);
+    }
+    const config = frontendConfig();
+    delete config.env.production.vars.MEDIA_LEGACY_STORAGE_WRITES;
+    expect(checkFrontend(config).some((p) => p.includes("MEDIA_LEGACY_STORAGE_WRITES"))).toBe(true);
+  });
+
+  it("refuses an immediate deploy until the owner's cutover approval is recorded", () => {
+    expect(checkCutoverStage("frontend", undefined)).toHaveLength(1);
+    expect(checkCutoverStage("frontend", "false")).toHaveLength(1);
+    expect(checkCutoverStage("frontend", "true")).toEqual([]);
+    for (const stage of ["check", "backend", "frontend-upload", undefined]) expect(checkCutoverStage(stage, undefined)).toEqual([]);
+  });
+
+  it("refuses a public address, an acceptance resource or Redis switched on", () => {
     const config = frontendConfig();
     config.env.production.workers_dev = true;
     config.env.production.vars.R2_PRIVATE_BUCKET = "aladdin-r2-acceptance-20261011-private";

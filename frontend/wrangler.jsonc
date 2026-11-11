@@ -79,10 +79,15 @@
         "APP_PUBLIC_ORIGIN": "https://aladdindecore.com",
         // Mobile-number sign-up codes: PHONE_* switches are absent on purpose (feature OFF). The Meta token never
         // lives in this app; it belongs to the separate delivery Worker (PR #114), which stays disabled.
-        // First cutover: media stays on Supabase Storage and Redis stays off. Each one
-        // is turned on later by its own approval.
-        "R2_STORAGE_ENABLED": "false",
-        "R2_PRODUCTION_WRITES_APPROVED": "false",
+        // R2-only media (owner-approved 2026-11-11): every NEW upload goes to R2 and a Supabase Storage write fails
+        // closed (no fallback); reads of existing Supabase objects stay open. Merging this file activates nothing: the
+        // flags reach Production only through a Worker version that is promoted by hand, and the manual workflow
+        // refuses `stage=frontend` (immediate deploy) until the GitHub variable R2_CUTOVER_APPROVED is "true".
+        // Rolling back to a version older than this change reopens Supabase writes: do that only on purpose.
+        // Redis stays off; it has its own approval.
+        "R2_STORAGE_ENABLED": "true",
+        "R2_PRODUCTION_WRITES_APPROVED": "true",
+        "MEDIA_LEGACY_STORAGE_WRITES": "false",
         // Production R2 resources (owner-approved names; pinned in environment-manifest.ts, which a test keeps equal).
         // The buckets must exist before R2 is switched on; the switches above stay false until their own approvals.
         "R2_ACCOUNT_ID": "a4c2b7ac45e58a81691b9165492ce6a2",

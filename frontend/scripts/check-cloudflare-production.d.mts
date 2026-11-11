@@ -15,3 +15,5 @@ export function checkFrontend(config: WranglerConfig): string[];
 export function checkBackend(config: WranglerConfig): string[];
 export function jwtProjectRef(key: string): string | null;
 export function checkLiveValues(values: Record<string, string | undefined>): string[];
+export const R2_ONLY_FLAGS: Record<string, string>;
+export function checkCutoverStage(stage: string | undefined, approved: string | undefined): string[];
