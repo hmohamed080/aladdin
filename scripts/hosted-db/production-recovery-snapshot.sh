@@ -14,7 +14,7 @@
 # Test mode (local only): SNAPSHOT_DB_URL=postgresql://...@127.0.0.1:PORT/postgres
 set -euo pipefail
 export LC_ALL=C
-PROD="kkpkgjrweysgvhvkhzun"; EXPECT_COUNT=203; EXPECT_LATEST="20261107090003"
+PROD="kkpkgjrweysgvhvkhzun"; EXPECT_COUNT=207; EXPECT_LATEST="20261107090006"
 HERE="$(cd "$(dirname "$0")" && pwd)"; cd "$HERE/../.."
 KIT="$HERE"
 sb() { pnpm exec supabase "$@"; }
