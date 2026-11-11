@@ -1,3 +1,10 @@
+## 2026-11-08 - Production migrations gate for the 4 pending migrations (draft PR, nothing applied)
+
+- Added `docs/operations/PRODUCTION_MIGRATIONS_20261108_GATE.md`: pending set, review of merged PR #148, static risk review of 20261105090001 / 090004 / 090005 / 090006, backward-compatibility verdict for live frontend `a3b08a22`, apply ordering (migrations before promotion; a 0% upload is inert), owner commands for the dry run and gated push, read-only post-apply queries, rollback decision tree, abort criteria and stop points.
+- Pending set confirmed by read-only `list_migrations` on Production (203 applied, latest 20261107090003) against 207 repo files.
+- Findings on #148: the frontend rollback target is stated as `39bdf3a2` but the live version is `a3b08a22`; the OTP rollout checklist still shows 195/8; `production-post-migration-check.sh` still expects 191 and must not be used.
+- NOT done: any database connection with credentials, push, dry run, deploy, merge or comment on a PR.
+
 ## 2026-11-05 — Showroom social and website links in business onboarding (draft PR)
 
 - Scope: owner-approved design [showroom-social-links-onboarding.md](../frontend/showroom-social-links-onboarding.md). A showroom needs at least one valid Facebook, Instagram, TikTok or website link to leave step 1 of `/onboarding/business`; existing showrooms are not blocked and get one profile-completion item. Branch `feat/showroom-social-links-20261105`, not pushed, no PR, nothing applied to Acceptance or Production.
@@ -7432,6 +7439,11 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Open: backup freshness decision (4 auth rows touched since the 06:08Z snapshot), merge of #153 before the apply, owner GO. No push, merge or Production change.
 
 
+## 2026-11-08 - #154 reconciled with #153 (Track 3)
+
+- Merged `origin/main` (`7d965394`, includes #153) cleanly. Re-read Production `list_migrations` (read-only): the four pending versions are still absent, latest `20261107090003`; `supabase/` on main is identical to `fc62c4b5` (207 files). No change.
+- Gate doc: linked #153's Acceptance apply scripts and plan instead of duplicating them; corrected the claim that Acceptance carries `090003` (it is at `090002`; its pending set differs from Production's); stated the RC SHA rule lives in the #145 checklist.
+- p2-gate tests pass. No Production write, merge or deployment.
 ## 2026-11-08 - #145 final review after #153 (Track 3)
 
 - Merged `origin/main` (`7d965394`, includes #153) into the #145 branch; only `AGENT_WORK_LOG.md` conflicted (kept both sides). Targeted tests pass (56).
