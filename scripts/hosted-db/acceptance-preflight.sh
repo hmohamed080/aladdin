@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # READ-ONLY on Acceptance (nxossqhdfltcqdwvbewi): the real Supabase CLI history list and `db push --dry-run`, checked by
 # acceptance-gate.mjs. It never pushes. Run on the owner machine, from a clean checkout equal to origin/main.
-#   bash scripts/hosted-db/acceptance-preflight.sh
+#   bash scripts/hosted-db/acceptance-preflight.sh <plan>     (plan: media | m1 | media+m1, see acceptance-gate.mjs)
 # The database password is read at a hidden prompt. `supabase/.temp` is removed on exit (unlinks again).
 set -euo pipefail
 export LC_ALL=C
 ACC="nxossqhdfltcqdwvbewi"; PROD="kkpkgjrweysgvhvkhzun"
+PLAN="${1:-}"; [[ "$PLAN" =~ ^(media|m1|media\+m1)$ ]] || { echo "usage: $0 media|m1|media+m1"; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"; cd "$HERE/../.."
 sb() { pnpm exec supabase "$@"; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP" supabase/.temp' EXIT
@@ -20,6 +21,6 @@ sb link --project-ref "$ACC" >/dev/null
 [ "$(cat supabase/.temp/project-ref)" != "$PROD" ] || { echo "REFUSED: linked to Production"; exit 1; }
 sb migration list --linked --output-format json > "$TMP/list.json" 2>/dev/null
 sb db push --linked --dry-run --output-format json > "$TMP/dry.json" 2>/dev/null     # NO --include-all: a plain push must be enough
-node "$HERE/acceptance-gate.mjs" "$TMP/list.json" "$TMP/dry.json" supabase/migrations
+node "$HERE/acceptance-gate.mjs" "$PLAN" "$TMP/list.json" "$TMP/dry.json" supabase/migrations
 node scripts/migration-history-guard.mjs "$TMP/list.json" --expect plan --dry-run "$TMP/dry.json"
 echo "Acceptance preflight passed. Nothing was pushed. The push needs its own owner GO."
