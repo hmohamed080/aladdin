@@ -7483,3 +7483,9 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 ## 2026-11-08 - A2 gate uses the headed run (Track 3)
 
 - Codex finding on #145 (P2): the A2 command and gate list still dispatched the headless workflow, which cannot pass real Turnstile. A2 is now `pnpm --filter frontend e2e:acceptance:headed` (owner-run, real browser) everywhere in the P-7 sequence. Docs only; no hosted change.
+
+## 2026-11-10 - Track A: Admin Backup & Recovery activation readiness (agent)
+
+- Finding: #140 is deployed and migration 090006 is on both databases, but nothing could run `admin_backup_initialize` (service role only, no tooling), and `BACKUP_GITHUB_*` was undocumented. Added `ops/backups/admin-initialize.sh` (read-only preflight by default; `--apply` needs typed phrase, super-admin actor, pinned project/key), `admin-initialize-test.sh` (12 shimmed checks, wired into CI), `.env.example` entries, and `docs/operations/BACKUPS_ADMIN_ACTIVATION.md` with the exact owner GO list for Acceptance and Production.
+- Local checks green: plan-test 86/86, restore-pin 7/7, target-guard 20/20, workflow-isolation, runtime-schedule 7/7. DB test 124 and vitest not run here (no Docker/deps).
+- No hosted write, deploy, migration, dispatch, secret or schedule change. Backups stay OFF; Admin Backup initialization remains uninitialized pending GO-A1..A5.
