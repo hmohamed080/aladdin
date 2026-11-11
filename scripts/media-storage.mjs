@@ -489,23 +489,34 @@ function supabaseIo(supabase) {
   };
 }
 
-function r2Io(env) {
+function r2Io(env, supabase = null) {
   if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_PRIVATE_BUCKET) throw new OperatorError("R2 settings are required for this command");
   const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
   const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
   const s3 = new S3Client({ region: "auto", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED", responseChecksumValidation: "WHEN_REQUIRED", endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY },
     maxAttempts: 3, requestHandler: { connectionTimeout: 5_000, requestTimeout: 30_000 } });
-  const key = (row) => `${row.namespace}/${row.object_key}`;
+  // Physical key: the database decides it (media_migration_target_key: ids-only u/<user> or o/<org> keys, or the
+  // recorded key of an existing r2 record). Without a database client (cleanup) the legacy key is used.
+  const cache = new Map();
+  const keyFor = async (row) => {
+    const logical = `${row.namespace}/${row.object_key}`;
+    if (!supabase) return logical;
+    if (cache.has(logical)) return cache.get(logical);
+    const { data, error } = await supabase.rpc("media_migration_target_key", { p_namespace: row.namespace, p_key: row.object_key });
+    if (error || typeof data !== "string" || !data) throw new Error("Target key unavailable");
+    cache.set(logical, data);
+    return data;
+  };
   return {
-    s3, DeleteObjectCommand, bucket: env.R2_PRIVATE_BUCKET, key,
+    s3, DeleteObjectCommand, bucket: env.R2_PRIVATE_BUCKET, keyFor,
     exists: async (objectKey) => {
       try { await s3.send(new HeadObjectCommand({ Bucket: env.R2_PRIVATE_BUCKET, Key: objectKey })); return true; }
       catch (error) { if (error?.$metadata?.httpStatusCode === 404 || error?.name === "NotFound") return false; throw error; }
     },
     putDestination: async (row, bytes) => {
       try {
-        await s3.send(new PutObjectCommand({ Bucket: env.R2_PRIVATE_BUCKET, Key: key(row), Body: bytes,
+        await s3.send(new PutObjectCommand({ Bucket: env.R2_PRIVATE_BUCKET, Key: await keyFor(row), Body: bytes,
           ContentType: row.content_type, CacheControl: "private, no-store", IfNoneMatch: "*" }));
         return "created";
       } catch (error) {
@@ -514,7 +525,7 @@ function r2Io(env) {
       }
     },
     destinationBytes: async (row, maxBytes) => {
-      const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: env.R2_PRIVATE_BUCKET, Key: key(row) }), { expiresIn: 60 });
+      const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: env.R2_PRIVATE_BUCKET, Key: await keyFor(row) }), { expiresIn: 60 });
       const response = await fetch(url, { signal: AbortSignal.timeout(30_000), cache: "no-store" });
       if (response.status === 404) { await response.body?.cancel(); return null; }
       return readBoundedBody(response, maxBytes);
@@ -613,7 +624,7 @@ export async function main(argv = process.argv.slice(2)) {
         estimatedEgressBytes: guard.estimate, allowance: guard.allowance, stop: selection.stop, skipped: selection.counts,
         journalTornLines: journal?.torn ?? 0 };
       if (!options.execute) { console.log(JSON.stringify(summary)); return; }
-      const result = await migrateRows(selection.selected, { ...db, ...r2Io(env) }, journal, { maxBytes, batchSize, egressAllowance: guard.allowance });
+      const result = await migrateRows(selection.selected, { ...db, ...r2Io(env, supabase) }, journal, { maxBytes, batchSize, egressAllowance: guard.allowance });
       const more = result.budgetStop || selection.stop;
       console.log(JSON.stringify({ ...summary, ...result, next: more ? "Budget or batch limit reached; rerun the same command to continue." : "Selected namespaces complete for this inventory." }));
       if (result.failed || result.mismatches || result.conflicts) process.exitCode = 1;
@@ -634,7 +645,7 @@ export async function main(argv = process.argv.slice(2)) {
       return;
     }
     const targets = journalTargets(journalState, { namespaces: options.namespaces, key: options.key, which: "rehash" });
-    const result = await rehashTargets(targets, r2Io(env), journal);
+    const result = await rehashTargets(targets, r2Io(env, supabase), journal);
     console.log(JSON.stringify({ project, ...result }));
     if (result.mismatches || result.missing) process.exitCode = 1;
   } finally { journal?.close(); }

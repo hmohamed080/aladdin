@@ -39,7 +39,7 @@ begin
   v_persona := coalesce(app.effective_persona(v_uid), v_op.selected_persona);
   v_org_type := v_op.selected_org_type;
 
-  -- P1 M1 (20261110090001): the 'username' criterion is retired, so this reference copy drops it too and keeps
+  -- P1 M1 (20261110090002): the 'username' criterion is retired, so this reference copy drops it too and keeps
   -- comparing only what 20261107090002 changed (organization_links).
   v_total := v_total + 3;
   if v_profile.avatar_media_id is not null then v_done := v_done + 1; else v_missing := array_append(v_missing, 'avatar'); end if;

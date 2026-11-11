@@ -18,6 +18,8 @@ mkdir -p "$DEST/backup/kit" "$DEST/.github/workflows" "$DEST/supabase" "$DEST/r2
 # Every script and helper of the kit (a fixed list once left out media-verify.sh and the validators, so the built
 # repo could not run its restore test); build-repo-test.sh fails if anything is missing.
 cp "$HERE"/*.sh "$HERE"/*.py "$HERE"/*.sql "$DEST/backup/"
+# Operator-only tool of the main repo (holds the service-role key by design): it must never ship into the backup repo.
+rm -f "$DEST/backup/admin-initialize.sh" "$DEST/backup/admin-initialize-test.sh"
 cp "$ROOT"/scripts/hosted-db/{security-tail,schema-fingerprint,rowcounts,auth-storage-columns,local-only-roles-cleanup,local-default-privileges-reset}.sql "$DEST/backup/kit/"
 cp "$HERE"/workflows/*.yml "$DEST/.github/workflows/"
 # Inactive build: drop the `schedule:` trigger (its cron lines) from every workflow; manual runs stay possible and
