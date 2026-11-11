@@ -23,6 +23,9 @@ fresh() { # new bucket; <storage_objects> <r2_required> [r2_media_records]  -> m
   head -c 300 /dev/urandom > "$T/blob"; s3 s3api put-object --bucket "$B" --key "$DAY/$NAME.tar.age" --body "$T/blob" >/dev/null
   printf '{"label":"production","storage_objects":%s,"r2_media_records":%s,"r2_required_originals":%s}' "$1" "${3:-$2}" "$2" > "$T/m"
   s3 s3api put-object --bucket "$B" --key "$DAY/$NAME.json" --body "$T/m" >/dev/null
+  # Production also requires the site-media copy (an empty site bucket is a complete record of 0), so every Production
+  # fixture carries one; the site-media rule itself is proven in site-media-backup-test.sh.
+  rec sitemedia 0 0 true
 }
 rec() { # <kind: media|r2media> <objects> <backed_up> <complete>
   printf '{"snapshot":"%s","label":"production","objects":%s,"backed_up":%s,"missing":%s,"copy_failures":0,"complete":%s,"r2_media_records_not_covered":0,"inventory_sha256":"%s"}' \
@@ -31,7 +34,7 @@ rec() { # <kind: media|r2media> <objects> <backed_up> <complete>
   head -c 200 /dev/urandom > "$T/inv"; s3 s3api put-object --bucket "$B" --key "$DAY/$NAME.$1.tsv.age" --body "$T/inv" >/dev/null
 }
 cov() { env "$@" bash -c '. "$0/lib.sh"; media_coverage "$1" "$2"' "$HERE" "$DAY" "$NAME" 2>&1; }
-PROD="BACKUP_LABEL=production"; ACC="BACKUP_LABEL=acceptance"; OFF="LEGACY_MEDIA_BACKUP=0 R2_MEDIA_BACKUP=0"
+PROD="BACKUP_LABEL=production R2_SITE_BACKUP=1"; ACC="BACKUP_LABEL=acceptance"; OFF="LEGACY_MEDIA_BACKUP=0 R2_MEDIA_BACKUP=0"
 # shellcheck disable=SC2086
 covp() { cov $PROD "$@"; }
 
