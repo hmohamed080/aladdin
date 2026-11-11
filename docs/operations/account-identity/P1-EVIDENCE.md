@@ -148,7 +148,7 @@ This supersedes the "FAIL / action needed" backup row and the earlier GO-1 recom
 | Not covered | writes after 2026-11-08 09:44:50Z (audit log: 6 `profile.phone_set`, 4 `onboarding.completed`, 4 `profile.username_set`, 3 `profile.avatar_set`, product/organization image and verification-document edits, up to 2026-11-10 14:13Z; latest sign-in 2026-11-10 15:59Z); the four 2026-11-07 migrations (Acceptance 207 vs snapshot 203); the 2026-11-11 12:29Z backup-console initialization. Restore into the 207-migration schema was never tested | `execute_sql` aggregates, `list_migrations` |
 | `app.backup_environment` | 1 row: `environment=acceptance`, `initialized_at=2026-11-11 12:29:19Z`, audit action `backup.environment_initialized`; `app.backup_runs` 0, `app.backup_run_events` 0, `app.backup_settings` 1. The earlier "0 rows / not initialized" claim is obsolete | `execute_sql` counts |
 | Schedules | `ACCEPTANCE_BACKUP_SCHEDULE=off`, `PRODUCTION_BACKUP_ENABLED=false`; the green scheduled "Daily backup" runs skip the `backup` job (plan only) | `gh api repos/.../actions/variables`, run jobs |
-| Sufficiency for M1 | Function-only (`CREATE OR REPLACE FUNCTION`, `COMMENT`, `REVOKE`, `GRANT`; no table DDL, no top-level DML), so no data can change and a data restore is not the recovery path. Recovery = the locally tested forward-fix (sha256 `5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045`, pinned in `acceptance-gate.mjs`). Hence no redundant fresh backup for M1; the media migration (function-only, no tested forward-fix) reuses the pinned snapshot label | scripts/hosted-db (PR #179), runbook section 3 |
+| Sufficiency for M1 and media | Both migrations are function-only (`CREATE [OR REPLACE] FUNCTION`, `COMMENT`, `REVOKE`, `GRANT`; no table DDL, no top-level DML): they rewrite no stored row, **but they change runtime behaviour** (correction: earlier wording implied otherwise). Recovery = a locally tested forward-fix per migration, pinned by sha256 in `acceptance-gate.mjs` (M1 `5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045`, media `4f0f4ce33ed49ca85555756ff7186a33da6d3b6cca17f391da9bc4daf735f270`, see 8.4). No backup is required for either; the historical snapshot is an optional reference only | scripts/hosted-db (PR #179), runbook section 3 |
 | Mandatory fresh backup | before M2, M3, Auth metadata / `identity_data` cleanup, audit-log redaction, any Production step | runbook section 3 |
 | Script tests | `node --test scripts/hosted-db/*.test.mjs` 159/159 (8 new recovery-gate tests) on #179 head `9ba06a57` | local |
 
@@ -158,7 +158,47 @@ This supersedes the "FAIL / action needed" backup row and the earlier GO-1 recom
 |---|---|---|---|
 | #171 M1 | `82accd9cce031e3a516f10f8e2b8c89152e313a7` | MERGEABLE / CLEAN, draft | backend, backup-kit, docs, frontend, frontend-cloudflare, migration-policy, supabase-rls: all pass |
 | #173 combined Auth + Frontend/Admin | `6f6076571abb73b9be4326ab0e3939dc98a4f5dc` | MERGEABLE / CLEAN, draft | auth-captcha-e2e, backend, backup-kit, docs, frontend, frontend-cloudflare, gotrue-direct (fail), gotrue-direct (spent), migration-policy, showroom-rc2-e2e, supabase-rls: all pass |
-| #179 re-pinned Acceptance scripts | `9ba06a57d5677005976ec386b988626cdcbfab28` | MERGEABLE, draft | backend, backup-kit, docs, frontend, frontend-cloudflare, migration-policy, supabase-rls: all pass (run `43025323292`, `43025323297`) |
+| #179 re-pinned Acceptance scripts, media forward-fix, CI dependency pinning | `27f6c38c7e44227e3bda04100325c85d6aa1efca` | MERGEABLE / CLEAN, draft | backend, backup-kit, docs, frontend, frontend-cloudflare, migration-policy (run `43048225374`), supabase-rls (run `43048225379`, includes pgTAP `126_media_forward_fix_test.sql` ok): all pass |
 | #170 documentation | moves with each docs commit; read it live | MERGEABLE, draft | expected 7 of 7; see the final handoff for the value read after the last push |
 
 Reading: green CI is not release approval. No hosted environment was written; nothing merged, deployed or backed up in this reconciliation.
+
+### 8.4 Media migration `20261110090001`: forward-fix design and local proof (2026-11-12)
+
+What the migration changes (read from the file): replaces trigger function `app.media_storage_key_assign()` (the key may change only inside the two migration functions, via the transaction-local flag `app.media_migration`), replaces `public.media_migration_switch` (records an ids-only `storage_key` instead of NULL, keeps an existing r2 key) and `public.media_migration_rollback` (clears the key when flipping to supabase), and adds `public.media_migration_target_key` (service_role only). No table, constraint, index, RLS policy or row changes at apply time.
+
+Forward-fix: `scripts/hosted-db/forward-fix/media-restore-previous.sql` (sha256 `4f0f4ce33ed49ca85555756ff7186a33da6d3b6cca17f391da9bc4daf735f270`; identical copy in `supabase/tests/helpers/media_forward_fix.inc`, pinned by a node test). Definitions extracted with `pg_get_functiondef` from a clean 207-migration replay. **Guard:** raises `55000` before changing anything if an open ledger row's object holds an r2 `storage_key` (the previous rollback would violate `media_storage_locations_storage_key_check` on such a row and the previous switch would not recompute it). Valid only before the Track C copy rehearsal switches objects under the new semantics.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Environment | isolated stack `aladdin_p1media` (own containers and ports 525xx), pinned CLI 2.110.0, 207 repo migrations + demo seeds; no other stack touched; no hosted system touched | local |
+| Fixtures (synthetic; the seeds hold no media rows) | one legacy r2 flat-key record with an open ledger row, one application-reserved r2 record with an ids-only key, one supabase-provider record | `fixtures.sql` (scratch) |
+| Rows rewritten by the media migration | **none**: digest of `media_storage_locations` (3 rows) and `media_migration_ledger` (1 row) identical before and after | md5 of `to_jsonb(row)` ordered |
+| Catalog diff, media vs 207 | exactly the four media functions (3 changed, 1 added); nothing else | `catalog-diff.mjs --expect-changed` "exactly 4 object(s) changed" |
+| Grants after media | `PASS 754 functions match contract 20261110090001` | `verify-permissions-readonly.mjs` |
+| Forward-fix applied (media applied first) | **`no catalog differences`** vs the pre-media fingerprint (all 12 sections: functions, grants, columns, relations/RLS, views, indexes, constraints, triggers, policies, column grants, types, counts) | `catalog-diff.mjs` |
+| Grants after forward-fix | `PASS 753 functions match contract 20261107090006` | `verify-permissions-readonly.mjs` |
+| Rows after forward-fix | digest identical to before: **no media row changed** | md5 |
+| Definitions restored | md5 of the three functions equals the pre-media values `d38d4ff772c7e19bff62117d0338145f` (trigger fn), `9b0391bf8c827424990d2fa9aa586a96` (switch), `0205a8a0f76326de36901bf743c0d164` (rollback) | `pg_get_functiondef` |
+| Hosted Acceptance today (read-only, 2026-11-12) | the same three md5 values (so the forward-fix restores exactly the live definitions); `media_migration_target_key` absent; 18 `media_storage_locations` rows (all provider r2: 11 flat-key verified, 5 ids-only verified, 2 ids-only unverified), `media_migration_ledger` 0 rows, 0 open ledger rows with a key (the guard would pass today) | `execute_sql` aggregates, hashes only |
+| pgTAP `126_media_forward_fix_test.sql` | 31 assertions PASS via `supabase test db --local`: new switch/rollback/target-key semantics and determinism, guard refusal (`55000`), no row changed, three definitions restored, target key dropped, execute grants unchanged (service_role only), RLS policy count and enabled flag unchanged, key immutable again, old switch writes NULL key, old rollback works | local |
+| Offline tests | `node --test scripts/hosted-db/*.test.mjs`: 167 PASS (forward-fix hashes pinned, helper copy identical, guard block in the pgTAP test equals the file, structure: guard first, no BEGIN/COMMIT, no top-level DML, drops only `media_migration_target_key`) | local |
+
+Not proven (stated, not assumed): behaviour against live hosted media rows beyond the structural argument (the migration and forward-fix touch no row; hosted counts above are aggregates); the CLI `db push` path for the forward-fix as a migration (the file is atomic by design and was applied with `psql -1`); concurrency with live traffic (`CREATE OR REPLACE FUNCTION` and `DROP FUNCTION` take short catalog locks); any state after `media_migration_switch` has run under the new semantics (the guard refuses; recovery then needs a different design and a fresh backup).
+
+### 8.5 Auto-deploy and migration triggers of merging #170 and #179
+
+See runbook section 11. Verified from the workflow files: only `ci.yml` runs on a push to `main` (dry-run only); no workflow runs `supabase db push`; #170 (docs) and #179 (`scripts/hosted-db`, `supabase/tests`) match no deploy path filter and add no migration. **Open (owner):** Supabase GitHub integration and Cloudflare Pages Git, not verifiable here.
+
+### 8.6 CI infrastructure failures on #179 and the dependency-pinning fix (2026-11-11)
+
+Root cause: `apt` could not resolve `azure.archive.ubuntu.com` on hosted runners (about 14:35-15:00 UTC), failing the `frontend` (`playwright install --with-deps`) and `backup-kit` (`apt install age`) jobs across reruns (run `43033314827`, attempt 3) while every code check passed; no assertion failed. Fix (no test skipped or weakened, no `continue-on-error`; see `docs/operations/CI_DEPENDENCY_PINNING.md` on #179): runner `ubuntu-24.04`; frontend in the official Playwright image pinned by digest with a version guard; ffmpeg from a digest-pinned static image with a hard encoder check (the transcode tests skip silently without ffmpeg); `age` v1.1.1 via `go install` verified by the Go checksum database.
+
+| Check on `27f6c38c7e44227e3bda04100325c85d6aa1efca` | Result |
+|---|---|
+| Six `CI` jobs and `supabase-rls` | all pass |
+| Backend | ffmpeg 7.1.1 and ffprobe 7.1.1 present, `118 passed`, no skips (transcode tests run) |
+| Frontend | job container digest `sha256:dcc5531e...7580e`; guard `Version 1.62.1`, Chromium 1234 present; access-routing `10 passed`; vitest `4825 passed, 40 skipped`, identical to the last green run before the change (Redis tests still run: `redis.test.ts` 25 tests) |
+| Backup-kit | `age` and `age-keygen` `v1.1.1` installed without apt |
+| pgTAP | `126_media_forward_fix_test.sql ok` in CI; suite `Files=158, Tests=7325, Result: PASS` |
+| Other workflows | still use `playwright install --with-deps` (`auth-captcha-e2e`, `showroom-rc2-e2e`, `hosted-acceptance-e2e`, `phone-signup-security`): same risk, follow-up |

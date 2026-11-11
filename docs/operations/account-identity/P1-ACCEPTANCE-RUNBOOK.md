@@ -58,9 +58,12 @@ The gate itself cannot read a hosted database; the hosted counterpart is P4/post
 
 **What it is NOT.** It is a **historical recovery reference, not a current full recovery point.** It is a data-only dump (`public`, `app`, `auth`, `storage`, `supabase_migrations`) taken at 203 migrations. It does not contain: the four 2026-11-07 migrations' schema (Acceptance is at 207), the writes after 2026-11-08 09:44:50Z (audit log shows phone sets, onboardings, username sets, avatar, product and organization-image edits until 2026-11-10 14:13Z; the latest sign-in is 2026-11-10 15:59Z), or the Admin console initialization of 2026-11-11 12:29Z. Restoring it would lose that data and was never tested against the 207-migration schema. The bucket has no lock rule. Backup schedules are off; the green scheduled "Daily backup" runs in `aladdin-backups` are plan-only (the `backup` job is skipped).
 
-**Why it is sufficient for function-only M1 (and the function-only media migration).** Both files contain only `CREATE OR REPLACE FUNCTION`, `COMMENT ON FUNCTION`, `REVOKE` and `GRANT`: no table, column, index, constraint or trigger DDL and no top-level DML (checked 2026-11-11, plus the catalog diff in 4.3). Applying them cannot lose or alter data, so a data restore is not a recovery path and a fresh backup would add no protection for them. The recovery path for M1 is the **locally tested forward-fix** (`scripts/hosted-db/forward-fix/m1-restore-previous.sql` on PR #179, same bytes as [drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql](drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql), sha256 `5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045`), backed by the strict gates below. `acceptance-apply.sh` therefore:
-- `--plan m1`: needs **no** `--backup-label`; it checks the pinned forward-fix hash before the password prompt (`acceptance-gate.mjs recovery`).
-- `--plan media` and `--plan media+m1`: the media migration has no tested forward-fix, so a `--backup-label` of a **pinned restore-verified snapshot** is required (only `aladdin-acceptance-20261108T094450Z` is pinned). Reusing it is allowed; no fresh backup is required. It is recorded as a historical reference.
+**What "function-only" does and does not mean (corrected 2026-11-12).** Both pending migrations contain only `CREATE [OR REPLACE] FUNCTION`, `COMMENT ON FUNCTION`, `REVOKE` and `GRANT`: no table, column, index, constraint or trigger DDL and no top-level DML, so applying them **rewrites no stored row** (proven for the media migration by row digests, P1-EVIDENCE 8.4). That is NOT "no behaviour change": M1 changes the runtime behaviour of `my_registration_state`, `app.profile_completion` and `admin_users_directory` (by design), and the media migration changes the **trigger function** `app.media_storage_key_assign()` (the key is no longer immutable for the two migration functions), the semantics of `media_migration_switch` (it now records an ids-only `storage_key`) and `media_migration_rollback` (it now clears the key), and adds `media_migration_target_key`. Earlier text implying function-only migrations cannot change behaviour was wrong. The recovery for such a change is not a data restore but a **locally tested forward-fix** (a new migration), pinned by sha256 in `acceptance-gate.mjs` and checked before the password prompt:
+- **M1:** `scripts/hosted-db/forward-fix/m1-restore-previous.sql` (PR #179; same bytes as [drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql](drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql)), sha256 `5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045`. Tested: after M1 plus the script the catalog fingerprint equals the pre-M1 fingerprint.
+- **Media:** `scripts/hosted-db/forward-fix/media-restore-previous.sql` (PR #179), sha256 `4f0f4ce33ed49ca85555756ff7186a33da6d3b6cca17f391da9bc4daf735f270`. It restores the three pre-media definitions (md5-identical to hosted Acceptance today) and drops `media_migration_target_key`. It carries a **data-safety guard**: it REFUSES to run while a switched object (open ledger row) holds an ids-only `storage_key`, because the previous rollback function cannot undo such a row (it would violate `media_storage_locations_storage_key_check`) and the previous switch would no longer recompute the key. So it is valid **only before the Track C copy rehearsal** calls `media_migration_switch` under the new semantics. After that, rows have to be rolled back with the current rollback first, or a different forward-fix designed. Tested on an isolated stack at 207 migrations (P1-EVIDENCE 8.4): fingerprint back to the pre-media state exactly, grants 753/753, no media row changed, pgTAP 126 (31 assertions).
+- It never touches stored media or R2 objects; it is not applied anywhere.
+
+`acceptance-apply.sh` therefore needs **no backup label for any plan**; an optional `--backup-label` is accepted only for the pinned restore-verified snapshot and is recorded as a historical reference, never as a current recovery point.
 - All plans keep the history guard, exact dry run, permissions vs contract, row-count, structure, catalog-fingerprint and catalog-diff gates.
 
 **A fresh, restore-tested backup remains MANDATORY (owner GO each time) before any of:** M2 `20261111090001`, M3 `20261111090002`, the Auth metadata / `identity_data` cleanup, the audit-log username redaction, any Production step, or any other change that writes or deletes data. Procedure for those (owner GO: a backup run writes objects to the backup bucket, read-only on the database):
@@ -74,7 +77,7 @@ The gate itself cannot read a hosted database; the hosted counterpart is P4/post
 ### 4.1 Plan A (recommended): `media`, then `m1`
 
 Step M-1 (OWNER GO; hosted migration). From a clean checkout equal to `origin/main` (any SHA that contains `20261110090001` and not M1):
-`bash scripts/hosted-db/acceptance-apply.sh --plan media --sha <40-char origin/main sha> --backup-label aladdin-acceptance-20261108T094450Z` (historical reference; no fresh backup).
+`bash scripts/hosted-db/acceptance-apply.sh --plan media --sha <40-char origin/main sha>` (no backup label; the pinned media forward-fix is checked first).
 The script: checkout gates, hidden password prompt, link, pre checks (history 207, dry run lists exactly `20261110090001`, permissions vs `20261107090006`,
 counts, structure, catalog fingerprint), the typed confirmation `APPLY media TO ACCEPTANCE`, `supabase db push --linked` (no `--include-all`, no repair),
 post checks (history 208, permissions vs `20261110090001`, counts, catalog diff limited to `app.media_storage_key_assign`,
@@ -87,7 +90,7 @@ Expected: history 208 -> 209, pending before = exactly `20261110090002`, permiss
 
 ### 4.2 Plan B: `media+m1`
 
-Not recommended (one GO covers both; the media part has no tested forward-fix). Only after #171 is merged: `acceptance-apply.sh --plan media+m1 ... --backup-label aladdin-acceptance-20261108T094450Z`, typed `APPLY media+m1 TO ACCEPTANCE`. 207 -> 209; pre contract `20261107090006`, post contract `20261110090002`.
+Not recommended (one GO covers two behaviour changes that are better verified separately). Only after #171 is merged: `acceptance-apply.sh --plan media+m1 ...` (no backup label; both pinned forward-fixes are checked), typed `APPLY media+m1 TO ACCEPTANCE`. 207 -> 209; pre contract `20261107090006`, post contract `20261110090002`.
 
 ### 4.3 What was proven locally (pinned CLI 2.110.0, isolated stack `aladdin_p1pf` on ports 524xx, no docker prune, no other stack touched)
 
@@ -124,7 +127,7 @@ Not done: `supabase db diff` (the catalog-fingerprint comparison covers more tha
 
 - Before the app ships, to undo M1: apply a **new migration** containing [drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql](drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql) (proven above). It restores `username_pending` for `my_registration_state`; roll the application back to the previous Worker version at the same time. Needs its own GO and the same gates.
 - After the app ships, do **not** restore: the new app sends no username and would strand sign-ups. Fix forward instead.
-- Media migration: forward-fix by a new migration; the in-database rollback semantics of the media functions are described in the migration header. R2 objects are never deleted.
+- Media migration: forward-fix = `scripts/hosted-db/forward-fix/media-restore-previous.sql` as a new migration (owner decision; same gates), valid only while no switched object holds an ids-only key (its guard enforces that). Semantics of the functions are in the migration header. R2 objects are never deleted.
 - A failed push: each file is its own transaction; history stops at the first failing file; do not retry blindly: read `migration list`, decide forward-fix (M1: the pinned script, as a new migration). A data restore of the historical snapshot is NOT the path for function-only changes: it would discard every write since 2026-11-08 09:44Z.
 
 ## 7. Application deployment (only after M1 is applied on Acceptance)
@@ -145,6 +148,8 @@ Order: **M1 first, always**. Then merge #173 (after M1, per master plan 3.10) an
 - M2 `20261111090001` and M3 `20261111090002`: not started; need their own backup, rehearsal, GO; the old app must be gone before M3.
 - #128 / #129: HOLD (not merged, not modified).
 - No permanent date-of-birth or username residual is approved.
+- Track C media copy rehearsal (`media_migration_switch` calls): changes stored `media_storage_locations` rows and their keys; needs its own fresh restore-tested backup, its own gate and GO, and ends the validity of the media forward-fix guard unless every switched object is rolled back.
+- Dashboard-side auto-deploy checks stay OPEN (owner): Supabase GitHub integration and Cloudflare Pages Git cannot be verified with the available tools (section 11).
 - Production: untouched; a separate request (`production-recovery-snapshot.sh`, `production-rehearsal.sh`, its own GO).
 
 ## 10. Exact sequence and the first authorization needed (recommended; every row is its own owner approval)
@@ -156,7 +161,7 @@ The media migration and M1 stay separate gates. Order matters because the gate p
 | 0 | Owner dashboard checks P0 (Supabase GitHub integration off, Cloudflare Pages Git off) | owner | none enabled |
 | 1 | Merge #179 (re-pinned scripts) and #170 (docs) to `main`. Neither adds a migration; merging triggers only `ci.yml` | merge approval | `origin/main` has exactly `20261110090001` pending |
 | 2 | Read-only preflight `bash scripts/hosted-db/acceptance-preflight.sh media` (hidden DB password) | hosted read | `Acceptance gate: ok (plan media: 207 applied ...)` |
-| 3 | **GO-M: apply `media`** (`acceptance-apply.sh --plan media --backup-label aladdin-acceptance-20261108T094450Z`, typed `APPLY media TO ACCEPTANCE`) | hosted migration | 207 -> 208, permissions `20261110090001` (754), catalog diff = the four media functions |
+| 3 | **GO-M: apply `media`** (`acceptance-apply.sh --plan media`, no backup label, typed `APPLY media TO ACCEPTANCE`) | hosted migration | 207 -> 208, permissions `20261110090001` (754), catalog diff = the four media functions; media forward-fix hash verified |
 | 4 | Stop. Verify, record. The Track C copy rehearsal is a separate GO elsewhere | none | |
 | 5 | Merge #171 (M1 only) | merge approval | `origin/main` has exactly `20261110090002` pending |
 | 6 | Read-only preflight `acceptance-preflight.sh m1` | hosted read | gate ok (plan m1: 208 applied) |
@@ -164,3 +169,9 @@ The media migration and M1 stay separate gates. Order matters because the gate p
 | 8 | Post-M1 verification (section 5), then merge #173, deploy preview, smoke, E2E (sections 7, 8) | merge, deploy, workflow approvals | |
 
 **The first action that needs the owner's authorization is step 1 (merge #179 and #170), not a backup.** The first **hosted** action is the step-2 read-only preflight (needs the owner's DB password) and the first hosted **write** is GO-M (step 3). The apply script requires `HEAD == origin/main`, so there is no safe way to run it from an unmerged branch; do not weaken that rule.
+
+## 11. What merging #170 and #179 can and cannot trigger (verified 2026-11-12 from the repository; dashboards stay open)
+
+Verified from `.github/workflows/*.yml` on `origin/main`: the only workflow with a push trigger on `main` is `ci.yml` (build, test and `wrangler deploy --dry-run`; no deploy, no migration). Every other push trigger names a specific `claude/*` or `integration/*` branch, never `main`; `cloudflare-production.yml` is `workflow_dispatch` only (environment-protected); no workflow contains `supabase db push`, `migration up` or `supabase link`. #170 changes only `docs/`; #179 changes only `scripts/hosted-db/` and `supabase/tests/` (no `frontend/`, `backend/` or `edge/` path), so no path-filtered deploy workflow matches either. #179 adds no migration file, so no migration is pending on a merge.
+
+Still **open, owner dashboard checks** (not verifiable by repository or API tools used here): Supabase Dashboard -> Integrations -> GitHub (automatic migrations on merge) and branching; Cloudflare Pages Git integration for this repository. Workers Builds git triggers (none on four Workers), Supabase branches (none) and the Vercel team (0 projects) were checked read-only on 2026-11-11. Do not merge until the owner confirms the two dashboard items are off.
