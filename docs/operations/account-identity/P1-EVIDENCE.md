@@ -68,15 +68,15 @@ Method note: the pinned stack ran from a scratch directory outside the repositor
 
 Nothing in this file is hosted evidence. Acceptance and Production remain untouched (read-only audit counts of 2026-11-10 are in the master plan 3.2).
 
-## 7. PR stack heads and CI (as of 2026-11-11 08:30 UTC; to be finalized)
+## 7. PR stack heads and CI (final read 2026-11-11 09:00 UTC)
 
-The integrator is still pushing to #171/#172/#173, so the SHAs below are provisional; the final read is recorded in the "Final" block. M1 is renamed to `20261110090002` on these branches (the CI recorded at `b30ad71d` ran with the old label `20261110090001`, so it is **not** evidence for the renamed head).
+Heads were stable from 08:42 to 09:00 UTC (the integrator pushed #171 at 08:34, #172 at 08:36 and #173 at 08:42 UTC; no later push observed). All three PRs target `main` and were MERGEABLE at the read. CI statuses come from `gh pr checks` at that time. The earlier CI on `b30ad71d` ran with the old M1 label and is superseded. If a head moved after 09:00 UTC this table is stale; re-read with `gh pr view N --json headRefOid`.
 
-| PR | Branch | Head SHA | Mergeable | CI per check (verified via `gh pr checks`) |
-|---|---|---|---|---|
-| #170 docs | `docs/p1-username-dob-plan-20261110` | to be finalized | to be finalized | to be finalized |
-| #171 M1 | `feat/p1-username-dob-db-compat-20261110` | to be finalized (last seen `b30ad71d`) | CONFLICTING with `main` | none verified for the renamed head. At `b30ad71d` (old label): backend, backup-kit, docs, frontend, frontend-cloudflare, migration-policy, supabase-rls all pass |
-| #172 PR-2 | `feat/p1-username-dob-auth-20261110` | to be finalized (last seen `379f00d3`) | CONFLICTING with `main` | no checks reported (CI does not trigger on a conflicting PR) |
-| #173 PR-3 | `feat/p1-username-dob-frontend-admin-20261110` | to be finalized (last seen `582ed210`) | CONFLICTING with `main` | no checks reported (same reason) |
+| PR | Branch | Head SHA (full) | CI per check at 09:00 UTC |
+|---|---|---|---|
+| #171 M1 `20261110090002` | `feat/p1-username-dob-db-compat-20261110` | `b8c06ccfcc740f7000d9578a5c9e177bdd5a44c2` | backend, backup-kit, docs, frontend, frontend-cloudflare, migration-policy, supabase-rls: all pass |
+| #172 PR-2 auth | `feat/p1-username-dob-auth-20261110` | `5cd0cbc65ae07d1e2dcbd53e6c7f09321d918b8a` | backend, backup-kit, docs, frontend, frontend-cloudflare, gotrue-direct (fail), gotrue-direct (spent), migration-policy, supabase-rls: pass; **auth-captcha-e2e: still pending at the read** (not verified; its e2e fixes depend on #173) |
+| #173 PR-3 frontend/admin | `feat/p1-username-dob-frontend-admin-20261110` | `ccdd3a4609c1459fbc6bdaf07acd5701d9047331` | auth-captcha-e2e, backend, backup-kit, docs, frontend, frontend-cloudflare, gotrue-direct (fail), gotrue-direct (spent), migration-policy, showroom-rc2-e2e, supabase-rls: all pass |
+| #170 docs | `docs/p1-username-dob-plan-20261110` | see the PR (this file cannot contain its own head SHA) | see the PR |
 
-Reading: "CONFLICTING" plus "no checks reported" means CI has not run, which is not a pass. No hosted environment was touched for any row.
+Reading: green CI is not release approval; no hosted environment was touched for any row, and nothing is merged. #172 is not proven green until its auth-captcha-e2e finishes.
