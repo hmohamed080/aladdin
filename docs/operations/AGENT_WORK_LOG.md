@@ -1,3 +1,10 @@
+## 2026-11-08 - Production migrations gate for the 4 pending migrations (draft PR, nothing applied)
+
+- Added `docs/operations/PRODUCTION_MIGRATIONS_20261108_GATE.md`: pending set, review of merged PR #148, static risk review of 20261105090001 / 090004 / 090005 / 090006, backward-compatibility verdict for live frontend `a3b08a22`, apply ordering (migrations before promotion; a 0% upload is inert), owner commands for the dry run and gated push, read-only post-apply queries, rollback decision tree, abort criteria and stop points.
+- Pending set confirmed by read-only `list_migrations` on Production (203 applied, latest 20261107090003) against 207 repo files.
+- Findings on #148: the frontend rollback target is stated as `39bdf3a2` but the live version is `a3b08a22`; the OTP rollout checklist still shows 195/8; `production-post-migration-check.sh` still expects 191 and must not be used.
+- NOT done: any database connection with credentials, push, dry run, deploy, merge or comment on a PR.
+
 ## 2026-11-05 — Showroom social and website links in business onboarding (draft PR)
 
 - Scope: owner-approved design [showroom-social-links-onboarding.md](../frontend/showroom-social-links-onboarding.md). A showroom needs at least one valid Facebook, Instagram, TikTok or website link to leave step 1 of `/onboarding/business`; existing showrooms are not blocked and get one profile-completion item. Branch `feat/showroom-social-links-20261105`, not pushed, no PR, nothing applied to Acceptance or Production.
@@ -7383,6 +7390,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - D1 binding validated by `database_id` (API-shaped fixtures); zone/route/domain discovery paginated and refuses partial results; owner commands given for Git Bash.
 - No Production writes, deployment, merge, rotation or P-4 rerun. Delivery OFF.
 
+## 2026-11-08 - Acceptance L1/L2 readiness runbook (agent)
+
+- Rewrote docs/operations/ACCEPTANCE_L1_L2_READINESS.md for RC fc62c4b5: A1 redeploy and verify commands (not run), manual L1/L2 table for the three accounts, automation gaps (real CAPTCHA stays ON, #155 on hold) with proposed release-gate exception wording, failure triage. Token setup is done (see ACCEPTANCE_E2E_ACCESS_TOKEN.md).
+- Documentation only. No Production write, merge, deploy, secret, Access change or workflow dispatch. WhatsApp delivery OFF.
 ## 2026-11-07 - P-6 recorded complete; P-7 prepared (agent)
 
 - Recorded P-6 (private OTP Worker version `4415c515`) with the owner's independent Cloudflare API evidence and an agent read-only re-check (config, one version at 100%, bindings, D1 switch tables empty, frontend `a3b08a22` still alone at 100%).
@@ -7432,6 +7443,31 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Open: backup freshness decision (4 auth rows touched since the 06:08Z snapshot), merge of #153 before the apply, owner GO. No push, merge or Production change.
 
 
+## 2026-11-08 - Hosted Acceptance E2E: smoke-only scope (agent)
+
+- Real CAPTCHA stays ON on hosted Acceptance, so the persona sign-in tests (dummy Turnstile token) cannot pass; the owner runs L1 persona checks manually.
+- `workflow_dispatch` gets `scope` (smoke default, full). Smoke needs only the two Access credentials, exports no persona password, runs `--grep` on the anchored public smoke describe and fails on zero or non-smoke matches. Pushes stay `full`.
+- Pinned by frontend/e2e-acceptance/smoke-scope.test.ts. No CAPTCHA, secret, Access or Production change; workflow not dispatched.
+## 2026-11-08 - Production release sequence (agent)
+
+- Added docs/operations/PRODUCTION_RELEASE_SEQUENCE_20261108.md: ordered gates G0 to G7 (merges and RC check, Gate M, 0% upload, override-header tests, single-recipient WhatsApp path, promotion, limits, first live message), parallel-vs-blocked table, shortest safe path, and 13 contradictions or gaps between sources.
+- Document only. No merge, deployment, dispatch, Production or database write, secret change or WhatsApp activation. Commands are owner-run and each step needs its own approval.
+
+## 2026-11-08 - Release sequence rewrite (agent)
+
+- Rewrote docs/operations/PRODUCTION_RELEASE_SEQUENCE_20261108.md around the owner decisions: allowlist pilot removed (#157 closed), open mode in both environments, Acceptance first with a manual E2E, Production straight to GA with smoke plus one live delivery check, and requirement 9 (database switches enabled last; sign-up delivery gate code PR marked a GA blocker; interim rule: delivery OFF together with signup_enabled=false).
+- Document only. No merge, deployment, dispatch, Production or Acceptance write, secret change or activation.
+
+
+## 2026-11-08 - Release sequence cutover correction (agent)
+
+- Corrected docs/operations/PRODUCTION_RELEASE_SEQUENCE_20261108.md (PR #158, draft): live Production still serves the legacy OTP-less phone sign-up, so the order is now verify-then-promote: Gate M, five missing Production frontend secrets, Worker delivery readiness, 0% upload and verify, DB switches on plus ONE real owner sign-up through the override header, then promotion; rollback to a3b08a22 restores legacy registration. Added the #160 gate semantics (eventual, about 5 s, per isolate), blockers, PR list.
+- Document only. No merge, deployment, dispatch, Production or Acceptance write, secret change or activation. Not verified here: the facts A-E were supplied from read-only checks, not re-run.
+## 2026-11-08 - #154 reconciled with #153 (Track 3)
+
+- Merged `origin/main` (`7d965394`, includes #153) cleanly. Re-read Production `list_migrations` (read-only): the four pending versions are still absent, latest `20261107090003`; `supabase/` on main is identical to `fc62c4b5` (207 files). No change.
+- Gate doc: linked #153's Acceptance apply scripts and plan instead of duplicating them; corrected the claim that Acceptance carries `090003` (it is at `090002`; its pending set differs from Production's); stated the RC SHA rule lives in the #145 checklist.
+- p2-gate tests pass. No Production write, merge or deployment.
 ## 2026-11-08 - #145 final review after #153 (Track 3)
 
 - Merged `origin/main` (`7d965394`, includes #153) into the #145 branch; only `AGENT_WORK_LOG.md` conflicted (kept both sides). Targeted tests pass (56).

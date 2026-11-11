@@ -9,7 +9,7 @@
 #   secrets: ACCEPTANCE_E2E_OWNER_PASSWORD, ACCEPTANCE_E2E_MANAGER_PASSWORD, ACCEPTANCE_E2E_REP_PASSWORD,
 #            ACCEPTANCE_E2E_ACCESS_CLIENT_ID, ACCEPTANCE_E2E_ACCESS_CLIENT_SECRET (a DEDICATED Cloudflare Access service token,
 #            authorised only for the aladdin-frontend-preview application; the preview is behind Access)
-# Without all five the run stops at the first step and tests nothing.
+# Scope `full` needs all five; scope `smoke` (workflow_dispatch default) needs only the two Access credentials. Missing ones stop the run at the first step.
 #
 # Runs on pushes to its branch: GitHub only offers the manual button for workflows on the default branch.
 
@@ -17,6 +17,12 @@ name: Hosted acceptance E2E
 
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: "smoke = public smoke only (Access token only, no account passwords; the default, because `full` cannot pass while real CAPTCHA is on). full = also the persona sign-in tests."
+        type: choice
+        options: [smoke, full]
+        default: smoke
   push:
     branches: [claude/project-thread-ytjg02]
     paths: ["frontend/e2e-acceptance/**", "frontend/playwright.acceptance.config.ts", ".github/workflows/hosted-acceptance-e2e.yml"]
@@ -36,15 +42,25 @@ jobs:
     environment: acceptance-e2e
     env:
       ACCEPTANCE_BASE_URL: https://aladdin-frontend-preview.bstalent9.workers.dev
-      ACCEPTANCE_E2E_OWNER_PASSWORD: ${{ secrets.ACCEPTANCE_E2E_OWNER_PASSWORD }}
-      ACCEPTANCE_E2E_MANAGER_PASSWORD: ${{ secrets.ACCEPTANCE_E2E_MANAGER_PASSWORD }}
-      ACCEPTANCE_E2E_REP_PASSWORD: ${{ secrets.ACCEPTANCE_E2E_REP_PASSWORD }}
+      # Push runs have no inputs: they stay `full`, as before. Only a manual dispatch can choose `smoke` (its default).
+      SCOPE: ${{ github.event_name == 'workflow_dispatch' && inputs.scope || 'full' }}
+      ACCEPTANCE_E2E_OWNER_PASSWORD: ${{ (github.event_name != 'workflow_dispatch' || inputs.scope == 'full') && secrets.ACCEPTANCE_E2E_OWNER_PASSWORD || '' }}
+      ACCEPTANCE_E2E_MANAGER_PASSWORD: ${{ (github.event_name != 'workflow_dispatch' || inputs.scope == 'full') && secrets.ACCEPTANCE_E2E_MANAGER_PASSWORD || '' }}
+      ACCEPTANCE_E2E_REP_PASSWORD: ${{ (github.event_name != 'workflow_dispatch' || inputs.scope == 'full') && secrets.ACCEPTANCE_E2E_REP_PASSWORD || '' }}
       ACCEPTANCE_E2E_ACCESS_CLIENT_ID: ${{ secrets.ACCEPTANCE_E2E_ACCESS_CLIENT_ID }}
       ACCEPTANCE_E2E_ACCESS_CLIENT_SECRET: ${{ secrets.ACCEPTANCE_E2E_ACCESS_CLIENT_SECRET }}
     steps:
-      - name: Require the three test-account secrets
+      - name: Require the secrets this scope needs
+        # smoke: only the two Access credentials (the persona passwords are not even exported to the job).
+        # full: also the three test-account passwords.
         run: |
-          for name in ACCEPTANCE_E2E_OWNER_PASSWORD ACCEPTANCE_E2E_MANAGER_PASSWORD ACCEPTANCE_E2E_REP_PASSWORD ACCEPTANCE_E2E_ACCESS_CLIENT_ID ACCEPTANCE_E2E_ACCESS_CLIENT_SECRET; do
+          names="ACCEPTANCE_E2E_ACCESS_CLIENT_ID ACCEPTANCE_E2E_ACCESS_CLIENT_SECRET"
+          if [ "$SCOPE" = "full" ]; then
+            names="ACCEPTANCE_E2E_OWNER_PASSWORD ACCEPTANCE_E2E_MANAGER_PASSWORD ACCEPTANCE_E2E_REP_PASSWORD $names"
+          elif [ "$SCOPE" != "smoke" ]; then
+            echo "::error::unknown scope '$SCOPE' (expected smoke or full)"; exit 1
+          fi
+          for name in $names; do
             [ -n "${!name}" ] || { echo "::error::$name is missing from the acceptance-e2e Environment"; exit 1; }
           done
       - uses: actions/checkout@v4
@@ -70,12 +86,24 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p .artifacts/acceptance-e2e
-          pnpm --filter frontend exec playwright test -c playwright.acceptance.config.ts 2>&1 | tee .artifacts/acceptance-e2e/run.log
+          args=()
+          if [ "$SCOPE" = "smoke" ]; then
+            # Anchored on the describe title ("<project> <file> public smoke <test>"); pinned by e2e-acceptance/smoke-scope.test.ts.
+            SMOKE_GREP='hosted-acceptance\.spec\.ts public smoke '
+            listed="$(pnpm --filter frontend exec playwright test -c playwright.acceptance.config.ts --list --grep "$SMOKE_GREP")"
+            echo "$listed"
+            count="$(echo "$listed" | grep -c ' public smoke ' || true)"
+            others="$(echo "$listed" | grep -E 'spec\.ts:' | grep -vc ' public smoke ' || true)"
+            [ "$count" -ge 1 ] || { echo "::error::smoke selection matched zero tests"; exit 1; }
+            [ "$others" -eq 0 ] || { echo "::error::smoke selection matched a non-smoke test"; exit 1; }
+            args=(--grep "$SMOKE_GREP")
+          fi
+          pnpm --filter frontend exec playwright test -c playwright.acceptance.config.ts "${args[@]}" 2>&1 | tee .artifacts/acceptance-e2e/run.log
       - name: Preserve the text report (no traces, videos or screenshots)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hosted-acceptance-e2e-${{ github.sha }}
+          name: hosted-acceptance-e2e-${{ env.SCOPE }}-${{ github.sha }}
           path: .artifacts/acceptance-e2e/
           retention-days: 14
           if-no-files-found: warn
