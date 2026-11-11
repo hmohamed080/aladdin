@@ -119,4 +119,17 @@ Reading: #172 alone is red; #173 is green on every check for its exact head (one
 | Auto-deploy: dashboards | Supabase branches none (PASS); Workers Builds git triggers none on 4 Workers (PASS); Vercel team 0 projects (PASS); Supabase GitHub integration and Cloudflare Pages Git: **UNVERIFIED** (owner dashboard check) | MCP reads |
 | Backup readiness | **FAIL / action needed:** the only restore-verified Acceptance snapshot (`aladdin-acceptance-20261108T060819Z`, runs `42461215127`, `42469078723`) predates the 2026-11-07 migrations; schedules off; `app.backup_environment` 0 rows; the `aladdin-backups` "success" runs are plan-only | `gh run view`, `execute_sql` counts |
 
-@@PRTABLE@@
+### 8.1 PR heads and CI per exact SHA (final read 2026-11-11 about 11:00 UTC, stable over three polls; `gh pr view` / `gh pr checks`)
+
+The #171 branch and the #173 branch were pushed by another agent during this preflight (both merged `main` `2aa365a5`). **M1 is unchanged: still `20261110090002_registration_stop_username_dob_compat.sql`, sha256 `83bde2643a371fd5...` on both heads, same version number.**
+
+| PR | Head SHA (full) | Mergeable | CI per check on that SHA |
+|---|---|---|---|
+| #171 M1 | `82accd9cce031e3a516f10f8e2b8c89152e313a7` | MERGEABLE / CLEAN | backend pass, backup-kit pass, docs pass, frontend pass, frontend-cloudflare pass, migration-policy pass, supabase-rls pass (run `43004326729`) |
+| #173 combined PR-2 + PR-3 | `1f1c111f9951bbadce6c70ae9faab345b0512c02` | MERGEABLE | auth-captcha-e2e pass, backend pass, backup-kit pass, docs pass, frontend pass, frontend-cloudflare pass, gotrue-direct (fail) pass, gotrue-direct (spent) pass, migration-policy pass, supabase-rls pass (run `43004489649`), **showroom-rc2-e2e FAIL** (run `43004489722`: 37 passed, 2 skipped, 1 failed: `showroom-mvp.spec.ts:419 the language control flips the workspace to RTL`, the same unrelated flaky test that failed once and passed on rerun on the previous head `42d5218d`; not re-run here because a rerun is a CI action outside this preflight) |
+| #172 | `5cd0cbc65ae07d1e2dcbd53e6c7f09321d918b8a` (unchanged, superseded by #173; never merge alone) | MERGEABLE | auth-captcha-e2e FAIL as before (stacking artifact) |
+| #170 docs | read from the PR (a file cannot contain its own SHA) | MERGEABLE | see the PR |
+| #179 scripts (draft) | `952e595de626e7a0b352345e32467e84d44e25b5` | MERGEABLE | backend, backup-kit, docs, frontend, frontend-cloudflare, migration-policy, supabase-rls: all pass |
+
+Reading: M1's #171 is green on its exact head; #173 needs the flaky RTL test to pass on a rerun before merge.
+
