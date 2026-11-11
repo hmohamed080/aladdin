@@ -68,15 +68,33 @@ Method note: the pinned stack ran from a scratch directory outside the repositor
 
 Nothing in this file is hosted evidence. Acceptance and Production remain untouched (read-only audit counts of 2026-11-10 are in the master plan 3.2).
 
-## 7. PR stack heads and CI (final read 2026-11-11 09:00 UTC)
+## 7. PR stack heads and CI (final read 2026-11-11, after `main` `66a0f0ab`)
 
-Heads were stable from 08:42 to 09:00 UTC (the integrator pushed #171 at 08:34, #172 at 08:36 and #173 at 08:42 UTC; no later push observed). All three PRs target `main` and were MERGEABLE at the read. CI statuses come from `gh pr checks` at that time. The earlier CI on `b30ad71d` ran with the old M1 label and is superseded. If a head moved after 09:00 UTC this table is stale; re-read with `gh pr view N --json headRefOid`.
+Heads read with `gh pr view N --json headRefOid,mergeable` and checks with `gh pr checks N` / `gh run view`. All four PRs target `main`; #171, #172, #173 and #170 were MERGEABLE (#171 reported UNKNOWN once while GitHub recomputed, then MERGEABLE/CLEAN). If a head moved after this read, this table is stale; re-read. Green CI is not release approval; no hosted environment was touched and nothing is merged.
 
-| PR | Branch | Head SHA (full) | CI per check at 09:00 UTC |
+| PR | Branch | Head SHA (full) | CI per check on that exact SHA |
 |---|---|---|---|
 | #171 M1 `20261110090002` | `feat/p1-username-dob-db-compat-20261110` | `b8c06ccfcc740f7000d9578a5c9e177bdd5a44c2` | backend, backup-kit, docs, frontend, frontend-cloudflare, migration-policy, supabase-rls: all pass |
-| #172 PR-2 auth | `feat/p1-username-dob-auth-20261110` | `5cd0cbc65ae07d1e2dcbd53e6c7f09321d918b8a` | backend, backup-kit, docs, frontend, frontend-cloudflare, gotrue-direct (fail), gotrue-direct (spent), migration-policy, supabase-rls: pass; **auth-captcha-e2e: FAIL** (run 42988297027, finished after the 09:00 read; the e2e fixes of #172 and #173 depend on each other, and #173 passes the same check, so the stack is only proven green with both merged; the cause of the #172 failure was not investigated by the docs agent) |
-| #173 PR-3 frontend/admin | `feat/p1-username-dob-frontend-admin-20261110` | `ccdd3a4609c1459fbc6bdaf07acd5701d9047331` | auth-captcha-e2e, backend, backup-kit, docs, frontend, frontend-cloudflare, gotrue-direct (fail), gotrue-direct (spent), migration-policy, showroom-rc2-e2e, supabase-rls: all pass |
-| #170 docs | `docs/p1-username-dob-plan-20261110` | see the PR (this file cannot contain its own head SHA) | see the PR |
+| #172 PR-2 auth | `feat/p1-username-dob-auth-20261110` | `5cd0cbc65ae07d1e2dcbd53e6c7f09321d918b8a` | backend, backup-kit, docs, frontend, frontend-cloudflare, gotrue-direct (fail), gotrue-direct (spent), migration-policy, supabase-rls: pass; **auth-captcha-e2e: FAIL** (run 42988297027). Stacking artifact, confirmed from the job logs by the owner: the old sign-up specs/UI are incompatible with server-side `ageConfirmed`; the fix is in #173. **#172 is superseded by #173 and must not merge on its own.** |
+| #173 PR-3 combined (contains #171 + #172) | `feat/p1-username-dob-frontend-admin-20261110` | `42d5218d3da43d326f03ed959487f02cc1c56b46` (a one-file revert of an unintended `frontend/next-env.d.ts` dev-artifact change) | see the per-check table below: all 11 pass |
+| #170 docs | `docs/p1-username-dob-plan-20261110` | the head of this PR (a file cannot contain its own SHA; read it from the PR) | the `docs` job and the others, see the PR |
 
-Reading: green CI is not release approval; no hosted environment was touched for any row, and nothing is merged. #172 alone is red on auth-captcha-e2e; it is not proven green on its own.
+**#173 per-check results on `42d5218d`** (runs started 2026-11-11 09:30 UTC; these supersede the earlier all-pass result on the previous head `ccdd3a46`, which is no longer the head):
+
+| Check | Result | Run / job |
+|---|---|---|
+| backend | pass (49s) | CI run `42995730718` |
+| backup-kit | pass (7m36s) | CI run `42995730718` |
+| docs | pass (15s) | CI run `42995730718` |
+| frontend | pass (6m20s) | CI run `42995730718` |
+| frontend-cloudflare | pass (2m14s) | CI run `42995730718` |
+| migration-policy | pass (31s) | CI run `42995730718` |
+| auth-captcha-e2e | pass (7m34s) | run `42995730710` |
+| gotrue-direct (fail) | pass (1m57s) | run `42995730710` |
+| gotrue-direct (spent) | pass (1m57s) | run `42995730710` |
+| supabase-rls | pass (13m35s) | run `42995730943`; log shows `PASS atomic migration 20261110090002_registration_stop_username_dob_compat.sql` (permission gate `upgrade` mode) and `PASS 754 exact function permission contracts` twice |
+| showroom-rc2-e2e | **pass on rerun** (attempt 2, 9m32s); attempt 1 failed | run `42995730871`. Attempt 1: 37 passed, 2 skipped, 1 failed in the first suite, `showroom-mvp.spec.ts:419 the language control flips the workspace to RTL` (expected `dir="rtl"`, received `ltr` after 10 s). This is the same known flake that passed on rerun earlier (an unrelated test: it toggles the language control; the PR changes nothing in it). It was re-run once (failed jobs only) and passed; no other check was re-run. |
+
+**Mergeability against `main` `66a0f0ab`:** `git merge-tree --write-tree` of the #171, #172 and #173 heads each reports a clean merge (exit 0, no conflict list). **Containment:** `git rev-list` shows 0 commits of #171 and 0 of #172 missing from #173. **Diff of #173 against `main`:** 109 files, +28983 / -2013 (`git diff --numstat`); +27279 of the additions are `supabase/permissions/20261110090002.json`; the only migration is `supabase/migrations/20261110090002_registration_stop_username_dob_compat.sql`.
+
+Reading: #172 alone is red; #173 is green on every check for its exact head (one flaky unrelated test passed on a single rerun). Release strategy and order: master plan 3.10 and 3.11.

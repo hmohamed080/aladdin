@@ -1,6 +1,6 @@
 # Account identity - Phase 1 working documents
 
-Index for the removal of application usernames and date of birth. Authority: [master plan v1.2](../../architecture/ACCOUNT_IDENTITY_LIFECYCLE_MASTER_PLAN.md).
+Index for the removal of application usernames and date of birth. Authority: [master plan v1.4](../../architecture/ACCOUNT_IDENTITY_LIFECYCLE_MASTER_PLAN.md).
 
 | Document | Content |
 |---|---|

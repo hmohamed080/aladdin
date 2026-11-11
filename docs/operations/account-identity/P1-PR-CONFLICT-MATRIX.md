@@ -9,6 +9,7 @@
 | #116 | Head is an ancestor of `main` (0 ahead): open but already in main (stale). Tip tree holds an unmerged file | `20261102090001_phone_code_budget_and_verified_proof.sql` (superseded) | indirect | Low | Do not base on it; owner may close as stale |
 | #120 #121 #122 #124 #125 #126 #127 #136 | Heads are ancestors of `main` (0 commits ahead). Content reached `main` via merge `d3b8737` and R2 merge `4ef1452` | none | none | Low | Stale; do not base on them |
 | #117 | Docs only, clean | none | none | None | Independent |
+| #171 / #172 / #173 | Phase 1 implementation stack, all based on `main`. **#173 contains every commit of #171 and #172** (0 missing, `git rev-list`, 2026-11-11), so it is the combined Auth + Frontend/Admin application PR; `git merge-tree` of #173 against `main` `66a0f0ab` is conflict-free | M1 `20261110090002` only (in #171 and #173) | this is the Phase 1 change | **#172 is superseded by #173 and must NOT be merged on its own** (its `auth-captcha-e2e` fails: old sign-up specs/UI are incompatible with server-side `ageConfirmed`; the fix is in #173) | Merge #171 first (DB only), then merge `main` into #173 and merge #173, then close #172 with a comment pointing to #173 (owner actions, not executed). See master plan 3.10 |
 | #128 | **HOLD.** Base `main`; clean to `main` for files audited | `20261101090001_verification_apply_reviewer_gate.sql` | none | Medium: out-of-order timestamp (deployed history ends `20261107090006`, so `20261101...` would be an out-of-order apply) and pgTAP number clash | HOLD. After Phase 1: rebase, relabel to `>= 20261112...`, renumber pgTAP above the highest on `main` |
 | #129 | **HOLD.** Stacked on #128 | `20261101090001`, `20261101090002`, `20261101090003` | `admin_view_craftsman_profile` returns `p.username` and calls `app.profile_completion` | **High**: merge-tree conflicts with `main` in `auth.ts`, `auth-sign-out.test.ts`, pgTAP 41 and 85, and `AGENT_WORK_LOG`; `p.username` breaks at run time once M3 drops the column (PL/pgSQL bodies do not block the drop) | HOLD. After Phase 1: rework `admin_view_craftsman_profile` to drop the username key and column read, keep its use of `app.profile_completion` (its `missing`/`percent` contract changed in M1), rebase over the Phase 1 app changes, relabel to `>= 20261112...` |
 | #130 | CI validation only, conflicts | n/a | n/a | Low | Never merge |
@@ -29,8 +30,8 @@
 ## 3. Recommended order (needs owner approval where marked)
 
 1. #128/#129 stay on HOLD (recorded; owner confirms the hold and later the relabel).
-2. M1 compatibility migration (PR-1, #171; CI green on `b30ad71d`, see [P1-EVIDENCE.md](P1-EVIDENCE.md)).
-3. App release (PR-2/PR-3).
+2. M1 compatibility migration (PR-1, #171; CI per exact SHA in [P1-EVIDENCE.md section 7](P1-EVIDENCE.md)). Apply M1 to the environment before its app release.
+3. App release: #173 (combined PR-2 + PR-3); #172 is closed as superseded, never merged alone.
 4. Auth-metadata scrub.
 5. M2 cleanup (needs restore-verified backup).
 6. M3 drop.
