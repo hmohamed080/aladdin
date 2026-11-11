@@ -1,4 +1,4 @@
--- pgTAP: P1 / M1 - registration stops requiring a username (20261110090001_registration_stop_username_dob_compat.sql).
+-- pgTAP: P1 / M1 - registration stops requiring a username (20261110090002_registration_stop_username_dob_compat.sql).
 --
 -- The NEW app sends no username and never calls username_available / profile_set_username; the OLD app still does.
 -- Both must work against this one schema. Proves, against the real schema:
