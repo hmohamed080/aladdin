@@ -11,11 +11,11 @@ Gate S of the Production R2 plan: one encrypted, read-back-verified copy of ever
 ## Steps (each needs its own OWNER GO; none given yet)
 1. Check the real Supabase egress allowance first (dashboard Usage). The Production run reads about 222 MB plus the 34 other objects.
 2. Create the Storage S3 key (Dashboard > Storage > S3 connection). Note the region.
-3. Copy:
+3. Copy (OUT_DIR must be new or empty: after a failed run use a fresh folder, never reuse the partial one):
    ```sh
    export PROJECT_REF=kkpkgjrweysgvhvkhzun S3_ENDPOINT=https://kkpkgjrweysgvhvkhzun.storage.supabase.co/storage/v1/s3 S3_REGION=<region>
    export AWS_ACCESS_KEY_ID=<key id> AWS_SECRET_ACCESS_KEY=<secret> AGE_RECIPIENTS="<owner pub> <restore-test pub>"
-   export OUT_DIR=/d/preserve/production-20261110 CONFIRM="preserve production media"
+   export OUT_DIR=/d/preserve/production-<new date>/storage CONFIRM="preserve production media"
    bash ops/backups/preserve/storage-preserve.sh
    ```
 4. Revoke the S3 key, close the shell, then verify with the owner private key only:

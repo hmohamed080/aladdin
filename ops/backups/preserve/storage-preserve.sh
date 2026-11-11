@@ -42,17 +42,19 @@ args=(); for r in $AGE_RECIPIENTS; do args+=(-r "$r"); done
 umask 077; mkdir -p "$OUT_DIR/objects"; WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 s3() { aws --endpoint-url "$S3_ENDPOINT" --region "$S3_REGION" s3api "$@"; }
 KNOWN="avatars organization-images product-images professional-certificates professional-portfolio purchase-request-images business-verification-documents"
+HERE="$(cd "$(dirname "$0")" && pwd)"
 START="$(date -u +%FT%TZ)"
 
 : > "$WORK/manifest.tsv"
-BUCKETS="$(s3 list-buckets --query 'Buckets[].Name' --output text | tr '\t' '\n')"
-[ -n "$BUCKETS" ] || die "no buckets listed: wrong key or endpoint"
+# Listings are read as JSON and parsed by s3-list.py (empty buckets, CRLF, "None", pagination, odd keys are handled or refused there).
+BUCKETS="$(s3 list-buckets --output json | python3 -I "$HERE/s3-list.py" buckets)" || die "cannot list buckets safely"
+BUCKETS="$(printf '%s\n' "$BUCKETS" | tr -d '\r')"
 for b in $BUCKETS; do case " $KNOWN " in *" $b "*) ;; *) die "unknown bucket '$b': review it before preserving (add it to KNOWN on purpose)";; esac; done
 N=0; EMPTY=0; BYTES=0
 for b in $BUCKETS; do
-  s3 list-objects-v2 --bucket "$b" --query 'Contents[].[Key,Size,ETag]' --output text > "$WORK/list.tsv" || die "cannot list $b"
-  while IFS=$'\t' read -r key size etag; do
-    [ -n "$key" ] && [ "$key" != None ] || continue
+  s3 list-objects-v2 --bucket "$b" --output json | python3 -I "$HERE/s3-list.py" objects > "$WORK/list.tsv" || die "cannot list bucket $b safely"
+  LISTED="$(wc -l < "$WORK/list.tsv" | tr -d ' ')"; N0=$N
+  while IFS=$'\t' read -r size key; do
     N=$((N+1)); name="$(printf '%s/%s' "$b" "$key" | sha256sum | cut -d' ' -f1)"
     s3 get-object --bucket "$b" --key "$key" "$WORK/f" >/dev/null || die "cannot read object #$N in $b"
     got="$(wc -c < "$WORK/f" | tr -d ' ')"; [ "$got" = "$size" ] || die "object #$N in $b: $got bytes read, $size listed"
@@ -65,7 +67,8 @@ for b in $BUCKETS; do
     BYTES=$((BYTES+size))
     printf '%s\t%s\t%s\t%s\tFILE\t%s\n' "$b" "$key" "$size" "$sum" "$name" >> "$WORK/manifest.tsv"
   done < "$WORK/list.tsv"
-  log "bucket $b done ($N objects so far)"
+  [ $((N-N0)) = "$LISTED" ] || die "bucket $b: $((N-N0)) objects read, $LISTED listed"
+  log "bucket $b done: $LISTED objects ($N so far)"
 done
 END="$(date -u +%FT%TZ)"
 age "${args[@]}" -o "$OUT_DIR/manifest.tsv.age" "$WORK/manifest.tsv"
