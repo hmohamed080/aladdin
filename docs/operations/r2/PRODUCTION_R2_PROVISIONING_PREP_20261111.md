@@ -6,10 +6,12 @@ Context: [Track C plan](TRACK_C_PRODUCTION_R2_LEGACY_MEDIA_PREP_20261110.md). Th
 ## Hard gate (owner)
 Production R2-only writes (`R2_STORAGE_ENABLED=true`, `R2_PRODUCTION_WRITES_APPROVED=true`) stay off until (1) an independent Production **R2 media backup exists** and (2) **a restore of it has passed**. Order: source-preservation backup (Track D) then copy then R2 backup and restore then cutover. Creating buckets, tokens and Worker secrets below does not enable any write.
 
-## Two deviations from the relay text (please confirm)
+## Approved design decisions (owner, 2026-11-11; design only, not a GO for any hosted write)
 1. **CORS on the private bucket is required.** The application uploads browser-direct with presigned `PUT` URLs (`frontend/src/server/storage/r2-provider.ts`, 120 s URLs). With no CORS rule the browser preflight fails and every upload breaks. The reviewed rule `cors-production-private.json` allows only `PUT` from `https://aladdindecore.com` and `https://www.aladdindecore.com`. The **site** bucket gets no CORS, exactly like the Acceptance site bucket.
 2. **The private bucket also needs the 2-day `pending/` expiry** (`lifecycle-private.json`), besides the 7-day multipart abort, so abandoned uploads do not accumulate. The site bucket gets only the 7-day multipart abort (`lifecycle-public.json`).
-Both rule files already exist in the repository and are reviewed.
+3. No CORS on `aladdin-site-media`.
+4. No automatic expiry on completed user or organization media or on preserved backups: the only expiry rules are the `pending/` prefix (2 days) and incomplete multipart uploads (7 days).
+Both rule files already exist in the repository and are reviewed; they contain exactly these rules and nothing else.
 
 ## C-2: bucket provisioning commands (one GO)
 Run from `frontend/` by the owner with only a 1-day R2 admin token in the environment (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID=a4c2b7ac45e58a81691b9165492ce6a2`). Stop at the first unexpected output.
@@ -53,7 +55,7 @@ Rollback: both buckets are empty at creation; `wrangler r2 bucket delete <name>`
 `node frontend/scripts/check-r2-credential-scope.mjs` proves a credential reaches only its bucket (run after creating each).
 
 ## C-3: code pin (this pull request)
-`frontend/src/lib/storage/environment-manifest.ts`: Production account `a4c2b7ac45e58a81691b9165492ce6a2`, private `aladdin-media-private`, site `aladdin-site-media`; Acceptance account pinned to the same account and site bucket `aladdin-acceptance-site-media` (exists since 2026-11-08). `frontend/wrangler.jsonc` production vars add the same three values (`R2_ACCOUNT_ID`, `R2_PRIVATE_BUCKET`, `R2_SITE_BUCKET`); the existing test keeps wrangler and manifest equal; `R2_STORAGE_ENABLED` and `R2_PRODUCTION_WRITES_APPROVED` stay `"false"` and the production guard script still passes. Merging changes nothing at runtime while the switches are false. One risk: the Acceptance Preview Worker passes `R2_ACCOUNT_ID` from the repository variable `CLOUDFLARE_ACCOUNT_ID`; if that variable were a different account, Acceptance media would now fail closed. It should equal the account above (owner-confirmed); verify before merge.
+`frontend/src/lib/storage/environment-manifest.ts`: Production account `a4c2b7ac45e58a81691b9165492ce6a2`, private `aladdin-media-private`, site `aladdin-site-media`; Acceptance account pinned to the same account and site bucket `aladdin-acceptance-site-media` (exists since 2026-11-08). `frontend/wrangler.jsonc` production vars add the same three values (`R2_ACCOUNT_ID`, `R2_PRIVATE_BUCKET`, `R2_SITE_BUCKET`); the existing test keeps wrangler and manifest equal; `R2_STORAGE_ENABLED` and `R2_PRODUCTION_WRITES_APPROVED` stay `"false"` and the production guard script still passes. Merging changes nothing at runtime while the switches are false. One risk: the Acceptance Preview Worker passes `R2_ACCOUNT_ID` from the repository variable `CLOUDFLARE_ACCOUNT_ID`; if that variable were a different account, Acceptance media would now fail closed. Verified 2026-11-11 from the log of the Cloudflare frontend preview run 42826005238 (2026-11-10), which prints `CLOUDFLARE_ACCOUNT_ID: a4c2b7ac45e58a81691b9165492ce6a2` (exact match; the owner also confirmed the live Acceptance Worker `R2_ACCOUNT_ID`). The variable cannot be read directly through the available tools, so the next preview deploy log is the re-check.
 
 ## C-4: Worker configuration for `aladdin-frontend-production` (one GO, undeployed version)
 - Variables: already committed by C-3 (`R2_ACCOUNT_ID`, `R2_PRIVATE_BUCKET`, `R2_SITE_BUCKET`).
