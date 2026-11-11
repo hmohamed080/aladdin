@@ -148,6 +148,13 @@ jobs:
       R2_SOURCE_BUCKET: ${{ vars.R2_MEDIA_SOURCE_BUCKET }}
       R2_SOURCE_ACCESS_KEY_ID: ${{ secrets.R2_MEDIA_READ_KEY_ID }}
       R2_SOURCE_SECRET_ACCESS_KEY: ${{ secrets.R2_MEDIA_READ_SECRET }}
+      # Dynamic site media (Admin banners, hero art): its own bucket, copied whole with the same read-only token
+      # (scope it to BOTH media buckets of THIS project). Required for Production; the bucket may be empty.
+      R2_SITE_BACKUP: ${{ vars.R2_SITE_BACKUP }}
+      R2_SITE_SOURCE_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      R2_SITE_SOURCE_BUCKET: ${{ vars.R2_SITE_SOURCE_BUCKET }}
+      R2_SITE_SOURCE_ACCESS_KEY_ID: ${{ secrets.R2_MEDIA_READ_KEY_ID }}
+      R2_SITE_SOURCE_SECRET_ACCESS_KEY: ${{ secrets.R2_MEDIA_READ_SECRET }}
       BACKUP_SLOT_DATE: ${{ needs.control.outputs[format('slot_{0}', matrix.label)] }}
       SKIP_IF_TAKEN: ${{ github.event_name == 'schedule' && '1' || '' }}
     steps:
@@ -170,6 +177,8 @@ jobs:
         run: bash backup/media-backup.sh
       - name: R2 media backup (originals hosted in R2, independent bucket)
         run: bash backup/r2-media-backup.sh
+      - name: Site media backup (dynamic site assets, independent bucket)
+        run: bash backup/site-media-backup.sh
       - name: Verify complete coverage
         if: steps.database.outputs.skipped != '1'
         run: bash backup/verify-complete.sh

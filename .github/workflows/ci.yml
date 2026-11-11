@@ -229,6 +229,8 @@ jobs:
         run: bash ops/backups/build-repo-test.sh
       - name: Media record validator (fail-closed rules)
         run: python3 ops/backups/media-record-test.py
+      - name: Site-media backup and verifier (fake S3, offline)
+        run: bash ops/backups/site-media-backup-test.sh
       # age and age-keygen: built from the pinned module version v1.1.1 (the version Ubuntu 24.04 packages); go install verifies the
       # module against the Go checksum database (sum.golang.org). No apt.
       - name: Install age (pinned module version, checksum-database verified)

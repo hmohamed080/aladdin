@@ -53,6 +53,19 @@
       }
     },
     {
+      "id": "expire-production-media-site",
+      "enabled": true,
+      "conditions": {
+        "prefix": "media/production/site/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 7776000
+        }
+      }
+    },
+    {
       "id": "expire-production-media-legacy-supabase",
       "enabled": true,
       "conditions": {

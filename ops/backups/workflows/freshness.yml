@@ -54,6 +54,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_READ_SECRET }}
       LEGACY_MEDIA_BACKUP: ${{ vars.LEGACY_MEDIA_BACKUP }}
       R2_MEDIA_BACKUP: ${{ vars.R2_MEDIA_BACKUP }}
+      R2_SITE_BACKUP: ${{ vars.R2_SITE_BACKUP }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
     steps:

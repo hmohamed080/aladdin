@@ -44,9 +44,10 @@ for label in ("production", "acceptance"):
     for k, days in want.items():
         if seen.get(f"db/{label}/{k}/") != days * D: bad.append(f"{label} {k} lifecycle is {seen.get(f'db/{label}/{k}/')}, wanted {days} days")
     if seen.get(f"media/{label}/r2/") != r2 * D: bad.append(f"{label} r2 media lifecycle is not {r2} days")
+    if seen.get(f"media/{label}/site/") != r2 * D: bad.append(f"{label} site media lifecycle is not {r2} days")
     if seen.get(f"media/{label}/supabase/") != legacy * D: bad.append(f"{label} legacy media lifecycle is not {legacy} days")
     if not any("abortMultipartUploadsTransition" in r for r in rules): bad.append(f"{label} lacks the multipart abort rule")
-    if len(seen) != 5: bad.append(f"{label} has {len(seen)} expiry rules, wanted 5")
+    if len(seen) != 6: bad.append(f"{label} has {len(seen)} expiry rules, wanted 6")
 lock_rules = json.load(open(f"{r2dir}/production/lock.json"))["rules"]
 if {r["prefix"] for r in lock_rules} != {f"db/production/{k}/" for k in want}: bad.append("production lock covers the wrong prefixes")
 for r in lock_rules:
