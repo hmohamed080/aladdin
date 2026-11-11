@@ -50,25 +50,47 @@ test("media+m1 is exactly media then m1, and the post contract is the M1 one", (
 });
 
 const SNAP = "aladdin-acceptance-20261108T094450Z";
-const fixSha = createHash("sha256").update(readFileSync(fileURLToPath(new URL("./" + FORWARD_FIX.m1.file, import.meta.url)))).digest("hex");
-test("recovery: m1 needs no backup label when the pinned forward-fix hash matches", () => assert.deepEqual(checkRecovery({ plan: "m1", label: "", forwardFixSha256: fixSha }), []));
-test("recovery: the committed m1 forward-fix file is exactly the pinned one", () => assert.equal(fixSha, FORWARD_FIX.m1.sha256));
-test("recovery: m1 refuses a missing or altered forward-fix", () => {
-  has(checkRecovery({ plan: "m1", label: "", forwardFixSha256: undefined }), /forward-fix/);
-  has(checkRecovery({ plan: "m1", label: "", forwardFixSha256: "0".repeat(64) }), /differs from the pinned/);
+const here = (f) => fileURLToPath(new URL("./" + f, import.meta.url));
+const sha = (f) => createHash("sha256").update(readFileSync(here(f))).digest("hex");
+const allShas = () => Object.fromEntries(Object.entries(FORWARD_FIX).map(([k, v]) => [k, sha(v.file)]));
+test("recovery: committed forward-fix files are exactly the pinned ones", () => {
+  for (const [k, v] of Object.entries(FORWARD_FIX)) assert.equal(sha(v.file), v.sha256, k);
 });
-test("recovery: m1 accepts the pinned snapshot label as an extra reference but refuses an unpinned one", () => {
-  assert.deepEqual(checkRecovery({ plan: "m1", label: SNAP, forwardFixSha256: fixSha }), []);
-  has(checkRecovery({ plan: "m1", label: "aladdin-acceptance-20260101T000000Z", forwardFixSha256: fixSha }), /not a pinned restore-verified/);
-});
-for (const n of ["media", "media+m1"]) {
-  test(`recovery: ${n} requires a pinned restore-verified snapshot label (reuse is allowed, no fresh backup)`, () => {
-    assert.deepEqual(checkRecovery({ plan: n, label: SNAP }), []);
-    has(checkRecovery({ plan: n, label: "" }), /no tested forward-fix/);
-    has(checkRecovery({ plan: n, label: "aladdin-acceptance-20260101T000000Z" }), /not a pinned/);
+for (const n of Object.keys(PLANS)) {
+  test(`recovery: ${n} needs no backup label when its pinned forward-fix hashes match`, () => assert.deepEqual(checkRecovery({ plan: n, label: "", forwardFixSha256: allShas() }), []));
+  test(`recovery: ${n} refuses a missing or altered forward-fix`, () => {
+    for (const fx of PLANS[n].fixes) {
+      has(checkRecovery({ plan: n, label: "", forwardFixSha256: { ...allShas(), [fx]: undefined } }), /missing or its sha256/);
+      has(checkRecovery({ plan: n, label: "", forwardFixSha256: { ...allShas(), [fx]: "0".repeat(64) } }), /differs from the pinned/);
+    }
+  });
+  test(`recovery: ${n} accepts only the pinned snapshot label as an optional reference`, () => {
+    assert.deepEqual(checkRecovery({ plan: n, label: SNAP, forwardFixSha256: allShas() }), []);
+    has(checkRecovery({ plan: n, label: "aladdin-acceptance-20260101T000000Z", forwardFixSha256: allShas() }), /not a pinned restore-verified/);
   });
 }
+test("recovery: media+m1 needs both forward-fixes", () => assert.deepEqual(PLANS["media+m1"].fixes, ["media", "m1"]));
 test("recovery: the pinned snapshot records the audited coverage", () => {
   assert.deepEqual(RESTORE_VERIFIED_SNAPSHOTS[SNAP], { backupRun: "42468447400", restoreRun: "42469078723", tables: 167, rows: 2584, migrations: 203 });
 });
-test("recovery: every plan declares a recovery mode", () => { for (const n of Object.keys(PLANS)) assert.ok(["forward-fix", "snapshot"].includes(plan(n).recovery)); });
+test("recovery: every plan declares forward-fix recovery with pinned fixes", () => {
+  for (const n of Object.keys(PLANS)) { assert.equal(plan(n).recovery, "forward-fix"); for (const fx of plan(n).fixes) assert.ok(FORWARD_FIX[fx], fx); }
+});
+// The media forward-fix is also included byte for byte in the pgTAP helper, and its guard block is embedded verbatim in the test.
+test("media forward-fix: the pgTAP helper copy is byte-identical", () => {
+  assert.equal(readFileSync(here("../../supabase/tests/helpers/media_forward_fix.inc"), "utf8"), readFileSync(here(FORWARD_FIX.media.file), "utf8"));
+});
+test("media forward-fix: the guard block in pgTAP test 126 equals the guard in the file", () => {
+  const fix = readFileSync(here(FORWARD_FIX.media.file), "utf8");
+  const g = fix.match(/^do \$guard\$[\s\S]*?^\$guard\$;/m)?.[0];
+  assert.ok(g, "guard block present");
+  assert.ok(readFileSync(here("../../supabase/tests/126_media_forward_fix_test.sql"), "utf8").includes(g));
+});
+test("media forward-fix: data-safety structure (guard first, no BEGIN/COMMIT, no top-level DML, drops only the added function)", () => {
+  const fix = readFileSync(here(FORWARD_FIX.media.file), "utf8").split("\n").filter((l) => !l.startsWith("--")).join("\n");
+  assert.ok(fix.indexOf("do $guard$") < fix.indexOf("CREATE OR REPLACE FUNCTION"));
+  assert.ok(!/^\s*(begin|commit)\s*;/im.test(fix));
+  const outside = fix.replace(/\$guard\$[\s\S]*?\$guard\$/g, "").replace(/\$function\$[\s\S]*?\$function\$/g, "");
+  assert.ok(!/\b(insert|update|delete|truncate|alter table|drop table)\b/i.test(outside), "no top-level DML or table DDL");
+  assert.deepEqual([...outside.matchAll(/drop function ([\w.]+)\(/gi)].map((m) => m[1]), ["public.media_migration_target_key"]);
+});

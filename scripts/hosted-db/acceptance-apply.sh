@@ -6,6 +6,13 @@
 #   media+m1   apply both, in order, one plain push                             207 -> 209
 # NOT to be run without the owner's separate explicit GO. Production is refused. Never uses --include-all, repair or reset.
 #   bash scripts/hosted-db/acceptance-apply.sh --plan <plan> --sha <full 40-char origin/main sha> [--backup-label <pinned restore-verified snapshot>]
+#   No backup label is required: every plan's migrations are function-only (no table DDL, no DML, no stored row rewritten) and each has a
+#   locally tested forward-fix pinned by sha256 (acceptance-gate.mjs recovery), checked before the password prompt. They DO change runtime
+#   behaviour, so the forward-fix, not a data restore, is the recovery path. --backup-label is optional and only accepted for the pinned
+#   restore-verified snapshot, which is a HISTORICAL reference, not a current recovery point. A fresh restore-tested backup is mandatory
+#   before M2, M3, Auth metadata cleanup, audit-log redaction, the Track C media copy (media_migration_switch) and any Production step.
+# NOT to be run without the owner's separate explicit GO. Production is refused. Never uses --include-all, repair or reset.
+#   bash scripts/hosted-db/acceptance-apply.sh --plan <plan> --sha <full 40-char origin/main sha> [--backup-label <pinned restore-verified snapshot>]
 #   m1 needs NO backup label: it is function-only and its tested forward-fix is pinned by sha256 (acceptance-gate.mjs recovery).
 #   media and media+m1 need --backup-label of a pinned restore-verified snapshot (no fresh backup required; it is a HISTORICAL reference,
 #   not a current recovery point). A fresh restore-tested backup is mandatory before M2, M3, Auth metadata cleanup, audit-log redaction.
@@ -14,7 +21,7 @@
 #        (history, permissions vs the plan's post contract, structure, counts, catalog fingerprint: exactly the plan's
 #        functions changed and nothing else). PASS is printed only when every check succeeded.
 # If the push itself fails: nothing is retried. Each migration file is its own transaction, so history stops at the first
-# failing file; the script prints the state it can read and stops. Recovery = the pinned forward-fix (m1) or an owner-approved forward-fix migration; data restore is not the path for function-only plans.
+# failing file; the script prints the state it can read and stops. Recovery = the pinned forward-fix for the plan as a new migration (owner decision); a data restore is not the path for function-only plans.
 set -euo pipefail
 set +x
 umask 077
