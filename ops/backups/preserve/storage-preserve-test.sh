@@ -11,7 +11,7 @@ a=("\$@"); cmd=""; for x in "\${a[@]}"; do case "\$x" in list-buckets|list-objec
 get(){ for i in "\${!a[@]}"; do [ "\${a[\$i]}" = "\$1" ] && echo "\${a[\$((i+1))]}"; done; }
 case \$cmd in
  list-buckets) ls "$T/fx" | tr '\n' '\t';;
- list-objects-v2) b=\$(get --bucket); for f in "$T/fx/\$b"/*; do printf '%s\t%s\t"x"\n' "\$(basename \$f)" "\$(wc -c < \$f | tr -d ' ')"; done;;
+ list-objects-v2) b=\$(get --bucket); for f in "$T/fx/\$b"/*; do printf '%s\t%s\t"x"\n' "\$(basename \$f)" "\$([ -n "\${LIE_EMPTY:-}" ] && echo 0 || wc -c < \$f | tr -d ' ')"; done;;
  get-object) b=\$(get --bucket); k=\$(get --key); cp "$T/fx/\$b/\$k" "\${a[\$((\${#a[@]}-1))]}"; [ "\${FAILGET:-}" ] && exit 1; echo '{}';;
 esac
 STUB
@@ -29,4 +29,5 @@ env -u AWS_SECRET_ACCESS_KEY -u AWS_ACCESS_KEY_ID AGE_IDENTITY_FILE="$T/k.txt" E
 f="$(ls "$T/out/objects" | head -1)"; printf x >> "$T/out/objects/$f"
 env -u AWS_SECRET_ACCESS_KEY -u AWS_ACCESS_KEY_ID AGE_IDENTITY_FILE="$T/k.txt" bash "$H/storage-preserve-verify.sh" "$T/out" >/dev/null 2>&1; ok "read-back FAILS on a tampered file" $([ $? = 1 ] && echo 0 || echo 1)
 "${base[@]}" CONFIRM="preserve production media" FAILGET=1 OUT_DIR="$T/o5" bash "$H/storage-preserve.sh" >/dev/null 2>&1; ok "a read failure stops the run" $([ $? = 1 ] && echo 0 || echo 1)
+"${base[@]}" CONFIRM="preserve production media" LIE_EMPTY=1 OUT_DIR="$T/o6" bash "$H/storage-preserve.sh" >/dev/null 2>&1; ok "an object listed empty but holding bytes stops the run" $([ $? = 1 ] && echo 0 || echo 1)
 echo "storage-preserve-test: $pass passed, $failn failed"; [ "$failn" = 0 ]

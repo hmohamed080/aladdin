@@ -13,7 +13,7 @@ age -d -i "$AGE_IDENTITY_FILE" -o "$W/m.tsv" "$D/manifest.tsv.age" || { echo "FA
 files=0; empty=0; total=0
 while IFS=$'\t' read -r b k size sum cls name; do
   total=$((total+1))
-  if [ "$cls" = EMPTY ]; then [ "$size" = 0 ] && empty=$((empty+1)) || { echo "FAIL: bad empty entry #$total"; fail=1; }; continue; fi
+  if [ "$cls" = EMPTY ]; then [ "$size" = 0 ] && [ "$sum" = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ] && empty=$((empty+1)) || { echo "FAIL: bad empty entry #$total"; fail=1; }; continue; fi
   age -d -i "$AGE_IDENTITY_FILE" -o "$W/f" "$D/objects/$name.age" 2>/dev/null || { echo "FAIL: entry #$total does not decrypt"; fail=1; continue; }
   [ "$(wc -c < "$W/f" | tr -d ' ')" = "$size" ] && [ "$(sha256sum "$W/f" | cut -d' ' -f1)" = "$sum" ] || { echo "FAIL: entry #$total size/sha256 differs"; fail=1; }
   files=$((files+1)); rm -f "$W/f"

@@ -54,13 +54,13 @@ for b in $BUCKETS; do
   while IFS=$'\t' read -r key size etag; do
     [ -n "$key" ] && [ "$key" != None ] || continue
     N=$((N+1)); name="$(printf '%s/%s' "$b" "$key" | sha256sum | cut -d' ' -f1)"
-    if [ "$size" = 0 ]; then
-      EMPTY=$((EMPTY+1))
-      printf '%s\t%s\t0\te3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\tEMPTY\t\n' "$b" "$key" >> "$WORK/manifest.tsv"; continue
-    fi
     s3 get-object --bucket "$b" --key "$key" "$WORK/f" >/dev/null || die "cannot read object #$N in $b"
     got="$(wc -c < "$WORK/f" | tr -d ' ')"; [ "$got" = "$size" ] || die "object #$N in $b: $got bytes read, $size listed"
     sum="$(sha256sum "$WORK/f" | cut -d' ' -f1)"
+    if [ "$size" = 0 ]; then
+      # read, not assumed: an object listed as empty must really read back as zero bytes
+      EMPTY=$((EMPTY+1)); printf '%s\t%s\t0\t%s\tEMPTY\t\n' "$b" "$key" "$sum" >> "$WORK/manifest.tsv"; continue
+    fi
     age "${args[@]}" -o "$OUT_DIR/objects/$name.age" "$WORK/f"; rm -f "$WORK/f"
     BYTES=$((BYTES+size))
     printf '%s\t%s\t%s\t%s\tFILE\t%s\n' "$b" "$key" "$size" "$sum" "$name" >> "$WORK/manifest.tsv"
