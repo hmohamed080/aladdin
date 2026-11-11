@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkAcceptance, checkAcceptancePost, PLANS, plan } from "./acceptance-gate.mjs";
+import { checkAcceptance, checkAcceptancePost, checkRecovery, FORWARD_FIX, RESTORE_VERIFIED_SNAPSHOTS, PLANS, plan } from "./acceptance-gate.mjs";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const hist = (n) => Array.from({ length: n }, (_, i) => ({ local: `2025${1000 + i}000000`, remote: `2025${1000 + i}000000` }));
 // 206 filler + the real latest 20261107090006 = 207 applied
@@ -45,3 +48,27 @@ test("media+m1 is exactly media then m1, and the post contract is the M1 one", (
   assert.equal(PLANS["media+m1"].postContract, PLANS.m1.postContract);
   assert.equal(PLANS.m1.preContract, PLANS.media.postContract);
 });
+
+const SNAP = "aladdin-acceptance-20261108T094450Z";
+const fixSha = createHash("sha256").update(readFileSync(fileURLToPath(new URL("./" + FORWARD_FIX.m1.file, import.meta.url)))).digest("hex");
+test("recovery: m1 needs no backup label when the pinned forward-fix hash matches", () => assert.deepEqual(checkRecovery({ plan: "m1", label: "", forwardFixSha256: fixSha }), []));
+test("recovery: the committed m1 forward-fix file is exactly the pinned one", () => assert.equal(fixSha, FORWARD_FIX.m1.sha256));
+test("recovery: m1 refuses a missing or altered forward-fix", () => {
+  has(checkRecovery({ plan: "m1", label: "", forwardFixSha256: undefined }), /forward-fix/);
+  has(checkRecovery({ plan: "m1", label: "", forwardFixSha256: "0".repeat(64) }), /differs from the pinned/);
+});
+test("recovery: m1 accepts the pinned snapshot label as an extra reference but refuses an unpinned one", () => {
+  assert.deepEqual(checkRecovery({ plan: "m1", label: SNAP, forwardFixSha256: fixSha }), []);
+  has(checkRecovery({ plan: "m1", label: "aladdin-acceptance-20260101T000000Z", forwardFixSha256: fixSha }), /not a pinned restore-verified/);
+});
+for (const n of ["media", "media+m1"]) {
+  test(`recovery: ${n} requires a pinned restore-verified snapshot label (reuse is allowed, no fresh backup)`, () => {
+    assert.deepEqual(checkRecovery({ plan: n, label: SNAP }), []);
+    has(checkRecovery({ plan: n, label: "" }), /no tested forward-fix/);
+    has(checkRecovery({ plan: n, label: "aladdin-acceptance-20260101T000000Z" }), /not a pinned/);
+  });
+}
+test("recovery: the pinned snapshot records the audited coverage", () => {
+  assert.deepEqual(RESTORE_VERIFIED_SNAPSHOTS[SNAP], { backupRun: "42468447400", restoreRun: "42469078723", tables: 167, rows: 2584, migrations: 203 });
+});
+test("recovery: every plan declares a recovery mode", () => { for (const n of Object.keys(PLANS)) assert.ok(["forward-fix", "snapshot"].includes(plan(n).recovery)); });

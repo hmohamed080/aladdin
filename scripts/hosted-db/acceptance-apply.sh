@@ -5,13 +5,16 @@
 #   m1         apply 20261110090002 only (P1 M1); media must already be applied 208 -> 209
 #   media+m1   apply both, in order, one plain push                             207 -> 209
 # NOT to be run without the owner's separate explicit GO. Production is refused. Never uses --include-all, repair or reset.
-#   bash scripts/hosted-db/acceptance-apply.sh --plan <plan> --sha <full 40-char origin/main sha> --backup-label <snapshot label>
+#   bash scripts/hosted-db/acceptance-apply.sh --plan <plan> --sha <full 40-char origin/main sha> [--backup-label <pinned restore-verified snapshot>]
+#   m1 needs NO backup label: it is function-only and its tested forward-fix is pinned by sha256 (acceptance-gate.mjs recovery).
+#   media and media+m1 need --backup-label of a pinned restore-verified snapshot (no fresh backup required; it is a HISTORICAL reference,
+#   not a current recovery point). A fresh restore-tested backup is mandatory before M2, M3, Auth metadata cleanup, audit-log redaction.
 # Order: checkout gates -> password (hidden) -> link -> PRE checks (history, dry run, permissions vs the plan's pre contract,
 #        table counts, structure, catalog fingerprint) -> typed confirmation -> `supabase db push --linked` -> POST checks
 #        (history, permissions vs the plan's post contract, structure, counts, catalog fingerprint: exactly the plan's
 #        functions changed and nothing else). PASS is printed only when every check succeeded.
 # If the push itself fails: nothing is retried. Each migration file is its own transaction, so history stops at the first
-# failing file; the script prints the state it can read and stops. Recovery = forward-fix or restore the named snapshot.
+# failing file; the script prints the state it can read and stops. Recovery = the pinned forward-fix (m1) or an owner-approved forward-fix migration; data restore is not the path for function-only plans.
 set -euo pipefail
 set +x
 umask 077
@@ -19,9 +22,9 @@ export LC_ALL=C
 ACC="nxossqhdfltcqdwvbewi"; PROD="kkpkgjrweysgvhvkhzun"
 PLAN=""; SHA=""; LABEL=""
 while [ $# -gt 0 ]; do case "$1" in --plan) PLAN="${2:-}"; shift 2;; --sha) SHA="${2:-}"; shift 2;; --backup-label) LABEL="${2:-}"; shift 2;; *) echo "unknown argument $1"; exit 2;; esac; done
-[[ "$PLAN" =~ ^(media|m1|media\+m1)$ ]] || { echo "usage: --plan media|m1|media+m1 --sha <40-char sha> --backup-label <label>"; exit 2; }
-[[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: --plan <plan> --sha <40-char sha> --backup-label <label>"; exit 2; }
-[[ "$LABEL" =~ ^aladdin-acceptance-[0-9]{8}T[0-9]{6}Z$ ]] || { echo "--backup-label must look like aladdin-acceptance-YYYYMMDDTHHMMSSZ"; exit 2; }
+[[ "$PLAN" =~ ^(media|m1|media\+m1)$ ]] || { echo "usage: --plan media|m1|media+m1 --sha <40-char sha> [--backup-label <label>]"; exit 2; }
+[[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: --plan <plan> --sha <40-char sha> [--backup-label <label>]"; exit 2; }
+[ -z "$LABEL" ] || [[ "$LABEL" =~ ^aladdin-acceptance-[0-9]{8}T[0-9]{6}Z$ ]] || { echo "--backup-label must look like aladdin-acceptance-YYYYMMDDTHHMMSSZ"; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # Plan facts come from acceptance-gate.mjs (single source): PRE_CONTRACT POST_CONTRACT N_PENDING POST_APPLIED LATEST EXPECT_CHANGED PENDING_VERSIONS
 eval "$(node "$HERE/acceptance-gate.mjs" describe "$PLAN")"
@@ -29,7 +32,7 @@ eval "$(node "$HERE/acceptance-gate.mjs" describe "$PLAN")"
 OUT=""; STEP="start"; PUSHED=0
 cleanup() { rc=$?; [ -n "$OUT" ] && rm -rf "$OUT"; rm -rf supabase/.temp 2>/dev/null || true; unset SUPABASE_DB_PASSWORD 2>/dev/null || true
   if [ "$rc" -ne 0 ]; then
-    if [ "$PUSHED" = 1 ]; then echo "FAIL at step '$STEP' (exit $rc) AFTER the push started. Do NOT retry blindly: check 'supabase migration list --linked', then forward-fix or restore snapshot $LABEL (owner decision)."
+    if [ "$PUSHED" = 1 ]; then echo "FAIL at step '$STEP' (exit $rc) AFTER the push started. Do NOT retry blindly: check 'supabase migration list --linked', then forward-fix (scripts/hosted-db/forward-fix, owner decision)."
     else echo "FAIL at step '$STEP' (exit $rc). The push had NOT started; nothing was changed in any database."; fi
   fi; }
 trap cleanup EXIT
@@ -48,6 +51,8 @@ git fetch -q origin main
 for f in $PENDING_VERSIONS; do ls supabase/migrations/${f}_*.sql >/dev/null; done
 [ -f "supabase/permissions/${POST_CONTRACT}.json" ] || { echo "REFUSED: permission contract ${POST_CONTRACT} is not in this checkout"; exit 1; }
 echo "checkout OK: exact $SHA = origin/main, clean tree; plan $PLAN ($PENDING_VERSIONS)"
+STEP="recovery gate"
+node "$HERE/acceptance-gate.mjs" recovery "$PLAN" "${LABEL:-none}" "$HERE"
 OUT="$(mktemp -d)"
 
 STEP="password prompt"
@@ -68,7 +73,7 @@ run "pre: permissions vs $PRE_CONTRACT" "$OUT/perms-pre.out" -- node scripts/hos
 run "pre: table counts" "$OUT/counts-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/table-counts.sql
 run "pre: structure" "$OUT/struct-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/acceptance-structure.sql
 run "pre: catalog fingerprint" "$OUT/fp-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/catalog-fingerprint.sql
-echo "pre-checks passed. Backup snapshot named for this change: $LABEL"
+echo "pre-checks passed. Recovery: $RECOVERY${LABEL:+ (historical snapshot reference $LABEL, not a current recovery point)}"
 
 STEP="confirmation"
 echo "About to APPLY $N_PENDING migration(s) [$PENDING_VERSIONS] (plan $PLAN) to ACCEPTANCE $ACC from $SHA."
