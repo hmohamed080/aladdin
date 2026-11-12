@@ -279,11 +279,12 @@ test.describe("Already-registered email on sign-up (explicit warning, 2026-11-12
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
 
     // The warning appears under the field; the person is NOT sent to wait for a code that will never arrive.
-    await expect(page.locator("[data-existing-account]")).toContainText(/already registered|مسجّل بهذا البريد/i);
+    await expect(page.locator("[data-existing-account]")).toContainText(/already registered|مسجّل بالفعل/i);
     await expect(page.locator('[data-sign-up-step="email-code"]')).toHaveCount(0);
 
     // One tap on "Log in instead" opens sign-in with the SAME email filled in; it travels in an httpOnly cookie, never the URL.
-    await page.getByRole("button", { name: /log in instead|سجّل الدخول بدلًا من ذلك/i }).click();
+    await expect(page.locator("[data-existing-account]").getByRole("link", { name: /recover your password|استعد كلمة المرور/i })).toHaveAttribute("href", "/auth/forgot-password");
+    await page.locator("[data-existing-account]").getByRole("button", { name: /^(sign in|سجّل الدخول)$/i }).click();
     await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
     expect(page.url()).not.toContain(encodeURIComponent(existingEmail));
     expect(page.url()).not.toContain(existingEmail);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { continueToSignIn, forgetPendingRegistration, resendPasswordSignUpCode, verifyPasswordSignUp, type PasswordAuthState } from "@/server/actions/auth-password-preview";
@@ -49,22 +49,49 @@ const EXISTING_ACCOUNT_CODES = new Set([
   "authPasswordPreview.error.phoneExists",
 ]);
 
-/** Id of the stand-alone hand-off form (rendered OUTSIDE the sign-up form: HTML forbids nested forms). */
-const SIGN_IN_HANDOFF_FORM = "existing-account-sign-in";
+/** The small red "!" at the end of a field that is in error (decorative: the message below is the accessible text). */
+function ErrorMark() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-danger" fill="currentColor">
+      <circle cx="8" cy="8" r="8" />
+      <rect x="7.25" y="3.5" width="1.5" height="5.5" rx="0.75" fill="white" />
+      <circle cx="8" cy="11.5" r="0.95" fill="white" />
+    </svg>
+  );
+}
 
-function FieldError({ code }: { code?: string }) {
+function FieldError({ code, contact }: { code?: string; contact?: string }) {
   const { t } = useI18n();
+  const [handingOff, startHandOff] = useTransition();
   if (!code) return null;
   if (EXISTING_ACCOUNT_CODES.has(code)) {
-    // A warning, not a dead end: one tap takes the person to sign-in with the SAME email / number already filled in. The button belongs to
-    // the separate hand-off form below through the `form` attribute, so the sign-up form's password never travels with it.
+    // A pale-red notice under the field (not a dead end): "<this is already registered>. To access this account, Sign in or Recover your password".
+    // "Sign in" calls the `continueToSignIn` server action with ONLY the typed email / number (the sign-up password never travels with it), which
+    // carries it to the sign-in field through an httpOnly cookie and navigates there. Only an email has a password to recover by email.
+    const handOff = () => {
+      const data = new FormData();
+      data.set("contact", contact ?? "");
+      startHandOff(async () => {
+        await continueToSignIn(data);
+      });
+    };
+    const link = "font-semibold text-fg underline underline-offset-2 hover:text-accent";
     return (
-      <p role="alert" data-existing-account className="rounded-md border border-warning/40 bg-warning/10 px-md py-2.5 text-body text-fg">
-        {t(code)}{" "}
-        <button type="submit" form={SIGN_IN_HANDOFF_FORM} className="font-semibold text-accent hover:underline">
+      <div role="alert" data-existing-account className="rounded-md bg-danger/10 px-md py-3 text-body leading-relaxed text-fg-secondary">
+        {t(code)} {t("authPasswordPreview.error.existingAccountAccess")}{" "}
+        {/* type=button + inline reset: the auth stage styles every submit button in a form as the big primary button. */}
+        <button type="button" onClick={handOff} disabled={handingOff} className={link} style={{ minHeight: 0, width: "auto", fontSize: "inherit", background: "none" }}>
           {t("authPasswordPreview.error.existingAccountSignIn")}
         </button>
-      </p>
+        {code.endsWith("accountExists") ? (
+          <>
+            {" "}{t("authPasswordPreview.error.existingAccountOr")}{" "}
+            <Link href="/auth/forgot-password" className={link}>
+              {t("authPasswordPreview.error.existingAccountRecover")}
+            </Link>
+          </>
+        ) : null}
+      </div>
     );
   }
   return <p role="alert" className="text-label text-danger">{t(code)}</p>;
@@ -263,25 +290,29 @@ export function PasswordSignUpForm({
       ) : null}
 
       <form action={dispatchSend} className="flex flex-col gap-sm" noValidate data-sign-up-step="details">
-        <FieldError code={restartCode} />
+        <FieldError code={restartCode} contact={values.contact} />
 
         <label htmlFor="contact" className="sr-only">{t("authPasswordPreview.signUp.contactLabel")}</label>
-        <Input
-          id="contact"
-          name="contact"
-          type="text"
-          inputMode="email"
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
-          dir="ltr"
-          required
-          value={values.contact}
-          onChange={set("contact")}
-          placeholder={t("authPasswordPreview.signUp.contactLabel")}
-          aria-invalid={errorField === "contact" || undefined}
-        />
-        <FieldError code={errorFor("contact")} />
+        <div className="relative">
+          <Input
+            id="contact"
+            name="contact"
+            type="text"
+            inputMode="email"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            dir="ltr"
+            required
+            value={values.contact}
+            onChange={set("contact")}
+            placeholder={t("authPasswordPreview.signUp.contactLabel")}
+            aria-invalid={errorField === "contact" || undefined}
+            className={errorField === "contact" ? "pr-10" : undefined}
+          />
+          {errorField === "contact" ? <ErrorMark /> : null}
+        </div>
+        <FieldError code={errorFor("contact")} contact={values.contact} />
 
         <label htmlFor="password" className="sr-only">{t("authPasswordPreview.passwordLabel")}</label>
         <PasswordInput
@@ -368,10 +399,6 @@ export function PasswordSignUpForm({
         <SubmitButton className="w-full" pendingLabel={t("authPasswordPreview.signUp.submitting")}>
           {t("authPasswordPreview.signUp.submit")}
         </SubmitButton>
-      </form>
-      {/* "Log in instead": carries what was typed (value rides an httpOnly cookie through the server action, never the URL). */}
-      <form id={SIGN_IN_HANDOFF_FORM} action={continueToSignIn} hidden>
-        <input type="hidden" name="contact" value={values.contact} />
       </form>
     </AuthCard>
   );

@@ -144,7 +144,7 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     expect(sql(`select count(*) from public.profiles where phone_e164 = '${e164}' and phone_verified_at is not null;`)).toBe("1");
   });
 
-  test("an already registered number is warned at once, offered 'Log in instead', and gets no message and no second account", async ({ page, browser }) => {
+  test("an already registered number is warned at once, offered 'Sign in', and gets no message and no second account", async ({ page, browser }) => {
     test.skip(!outbox, "needs PHONE_OTP_DELIVERY=outbox and E2E_NEXT_MODE=dev");
     const phone = uniquePhone();
     const e164 = e164Of(phone);
@@ -164,7 +164,7 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     expect(await readSignUpCode(e164, since, 4_000), "a registered number must receive no code").toBeNull();
 
     // One tap opens sign-in with the SAME number filled in (httpOnly cookie, never the URL); still no second account.
-    await other.getByRole("button", { name: /log in instead|سجّل الدخول بدلًا من ذلك/i }).click();
+    await other.locator("[data-existing-account]").getByRole("button", { name: /^(sign in|سجّل الدخول)$/i }).click();
     await other.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
     expect(other.url()).not.toContain(phone);
     await expect(other.getByLabel(/mobile number or email|رقم الموبايل أو البريد الإلكتروني/i)).toHaveValue(phone);
