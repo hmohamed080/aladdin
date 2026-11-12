@@ -7576,3 +7576,8 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 
 - `savePendingRegistration` now calls the username-less `pending_registration_save` overload by name with NO `p_username` (requires M3a applied in the target database BEFORE this code is deployed). Deleted the dead code: `checkUsername`, `chooseUsernameAction`, `features/installer-phone-auth/username.ts`, `lib/identity/username.ts` and their tests; removed the `profile_set_username` steps from the two local-integration fixtures and the `username` key from the identity snapshot SQL; `database.types.ts` gets the additive overload.
 - No database change, no hosted write, no deployment, no R2 change. Backups, Auth scrub, M2, audit redaction and M3b stay blocked.
+
+## 2026-11-12 - Sign-up warning on hosted GoTrue (agent)
+
+- Finding: the "account already registered" warning only handled GoTrue's error `user_already_exists` (local stack). Hosted Supabase returns an obfuscated user with empty `identities` instead, so a confirmed email went to the OTP step with no code.
+- Fix: `requestPasswordSignUp` also treats `identities.length === 0` as an existing confirmed account (same budget, same degrade to neutral, nothing staged). Missing `identities` is treated as a new registration. Unit tests cover empty, populated and missing. No migration, no R2/secret/hosted-DB change.

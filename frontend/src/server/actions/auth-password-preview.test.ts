@@ -407,6 +407,43 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
       expect(cookieStore.has("reg_email")).toBe(false);
     });
 
+    describe("hosted GoTrue answers an existing CONFIRMED address with an obfuscated user (success, made-up id, EMPTY identities)", () => {
+      const obfuscated = { error: null, data: { user: { id: "made-up-id", identities: [] } } };
+
+      it("is told so, nothing is staged and no routing cookie is set", async () => {
+        signUp.mockResolvedValueOnce(obfuscated);
+        const res = await requestPasswordSignUp({ ok: false }, consented({ email: "taken@example.test", password: GOOD_PASSWORD }));
+        expect(res).toEqual({ ok: false, code: "authPasswordPreview.error.accountExists", email: "taken@example.test" });
+        expect(savePendingRegistration).not.toHaveBeenCalled();
+        expect(cookieStore.has("reg_email")).toBe(false);
+      });
+
+      it("spends the same budget and degrades to the neutral reply once it is spent or unavailable", async () => {
+        signUp.mockResolvedValueOnce(obfuscated);
+        await requestPasswordSignUp({ ok: false }, consented({ email: "Taken@Example.test", password: GOOD_PASSWORD }));
+        expect(phoneAuthLimit).toHaveBeenCalledWith("sign-up", "email:taken@example.test", expect.anything());
+        for (const verdict of ["limited", "unavailable"] as const) {
+          phoneAuthLimit.mockResolvedValueOnce(verdict);
+          signUp.mockResolvedValueOnce(obfuscated);
+          const res = await requestPasswordSignUp({ ok: false }, consented({ email: "taken@example.test", password: GOOD_PASSWORD }));
+          expect(res).toMatchObject({ ok: true, code: "authPasswordPreview.info.codeSent" });
+        }
+        expect(savePendingRegistration).not.toHaveBeenCalled();
+      });
+
+      it("a genuine new registration (identity present), an unconfirmed re-sign-up and a response without `identities` all continue as before", async () => {
+        for (const user of [{ id: "new-1", identities: [{ provider: "email" }] }, { id: "unconfirmed-1", identities: [{ provider: "email" }] }, { id: "old-gotrue-1" }]) {
+          savePendingRegistration.mockClear();
+          phoneAuthLimit.mockClear();
+          signUp.mockResolvedValueOnce({ error: null, data: { user } });
+          const res = await requestPasswordSignUp({ ok: false }, consented({ email: "person@example.test", password: GOOD_PASSWORD }));
+          expect(res).toMatchObject({ ok: true, code: "authPasswordPreview.info.codeSent" });
+          expect(savePendingRegistration).toHaveBeenCalledTimes(1);
+          expect(phoneAuthLimit).not.toHaveBeenCalled();
+        }
+      });
+    });
+
     it("an UNCONFIRMED address (GoTrue obfuscates it: success + same user id) is NOT reported as existing: the registration simply continues", async () => {
       signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "u-unconfirmed" } } });
       const res = await requestPasswordSignUp({ ok: false }, consented({ email: "unfinished@example.test", password: GOOD_PASSWORD }));
