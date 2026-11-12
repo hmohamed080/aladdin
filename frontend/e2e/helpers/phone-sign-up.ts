@@ -83,8 +83,8 @@ export async function readSignUpCode(e164: string, since: number, waitMs = 15_00
   }
 }
 
-/** Submits the sign-up form with a mobile number and waits for the WhatsApp code step. Returns when the code was requested (ms epoch). */
-export async function requestPhoneSignUp(
+/** Submits the sign-up form with a mobile number WITHOUT waiting for any outcome. Returns when it was submitted (ms epoch). */
+export async function submitPhoneSignUpForm(
   page: Page,
   { phone, name, password = E2E_PASSWORD, type = "installer_technician" }: { phone: string; name: string; password?: string; type?: string },
 ): Promise<number> {
@@ -97,6 +97,15 @@ export async function requestPhoneSignUp(
   const since = Date.now() - 1_000;
   if (deliveryViaRig) await rigAllow(e164Of(phone));
   await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
+  return since;
+}
+
+/** Submits the sign-up form with a mobile number and waits for the WhatsApp code step. Returns when the code was requested (ms epoch). */
+export async function requestPhoneSignUp(
+  page: Page,
+  details: { phone: string; name: string; password?: string; type?: string },
+): Promise<number> {
+  const since = await submitPhoneSignUpForm(page, details);
   await expect(page.getByRole("heading", { name: /enter the whatsapp code|أدخل رمز واتساب/i })).toBeVisible({ timeout: 20_000 });
   return since;
 }

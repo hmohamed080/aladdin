@@ -279,7 +279,7 @@ test.describe("Already-registered email on sign-up (explicit warning, 2026-11-12
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
 
     // The warning appears under the field; the person is NOT sent to wait for a code that will never arrive.
-    await expect(page.locator("[data-existing-account]")).toContainText(/already registered|مسجّل بالفعل/i);
+    await expect(page.locator("[data-existing-account]")).toContainText(/already registered|مسجّل بهذا البريد/i);
     await expect(page.locator('[data-sign-up-step="email-code"]')).toHaveCount(0);
 
     // One tap on "Log in instead" opens sign-in with the SAME email filled in; it travels in an httpOnly cookie, never the URL.
@@ -338,6 +338,7 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
     const email = uniqueEmail("session-guarantee");
     await page.goto("/auth/sign-up");
     await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
+    const seenBeforeSubmit = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
@@ -368,13 +369,10 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
     // so `readNewOtp` deterministically reads the code this resubmission
     // actually generates, not whichever of two pending messages happens to
     // sort first.
+    // Coming back, the sign-up page reopens on the code step by itself (the unverified registration is remembered in this browser).
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
-    const seenBeforeRetry = await messageIdsFor(request, email);
-    await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
-    await expectSignUpStep2(page);
-    const code = await readNewOtp(request, email, seenBeforeRetry);
+    await expect(page.locator('[data-sign-up-step="email-code"]')).toBeVisible();
+    const code = await readNewOtp(request, email, seenBeforeSubmit);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
 
@@ -386,10 +384,11 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
 });
 
 test.describe("Refresh / interruption behavior (§Refresh, back, interruption)", () => {
-  test("refreshing on the OTP step returns to Step 1 with no crash and no password anywhere in storage — resubmitting proceeds normally", async ({ page, request }) => {
+  test("refreshing on the OTP step reopens the code step with no crash and no password anywhere in storage — the same code still verifies", async ({ page, request }) => {
     const email = uniqueEmail("refresh");
     await page.goto("/auth/sign-up");
     await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
+    const seenBeforeSubmit = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
@@ -408,19 +407,13 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     // Wait for the reloaded page to finish loading: fields typed into the server-rendered HTML before React
     // hydrates are reset by hydration, which made this resubmission flaky (empty name and email).
     await page.reload({ waitUntil: "load" });
-    await expect(page.getByLabel(SIGN_UP_CONTACT_LABEL)).toBeVisible();
-    await expect(page.getByLabel(/one-time code|الرمز لمرة واحدة/i)).toHaveCount(0);
+    // The unverified email registration is remembered in an httpOnly routing cookie (email only), so the page reopens on the code step.
+    await expect(page.locator('[data-sign-up-step="email-code"]')).toBeVisible();
+    await expect(page.getByLabel(SIGN_UP_CONTACT_LABEL)).toHaveCount(0);
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
 
-    // Resubmitting the SAME email (still unconfirmed from the first attempt)
-    // is exactly GoTrue's own obfuscated re-signup case — succeeds again,
-    // re-sending a new usable code, no corruption.
-    await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
-    const seenBeforeResubmit = await messageIdsFor(request, email);
-    await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
-    await expectSignUpStep2(page);
-
-    const code = await readNewOtp(request, email, seenBeforeResubmit);
+    // The code sent before the refresh is still the one that verifies: nothing was re-sent, nothing was lost.
+    const code = await readNewOtp(request, email, seenBeforeSubmit);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
     await expectAppLanding(page);
