@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # READ-ONLY on Acceptance (nxossqhdfltcqdwvbewi): the real Supabase CLI history list and `db push --dry-run`, checked by
 # acceptance-gate.mjs. It never pushes. Run on the owner machine, from a clean checkout equal to origin/main.
-#   bash scripts/hosted-db/acceptance-preflight.sh <plan>     (plan: media | m1 | media+m1, see acceptance-gate.mjs)
+#   bash scripts/hosted-db/acceptance-preflight.sh <plan>     (plan: media | m1 | m3a | media+m1, see acceptance-gate.mjs)
 # The database password is read at a hidden prompt. `supabase/.temp` is removed on exit (unlinks again).
 set -euo pipefail
 export LC_ALL=C
 ACC="nxossqhdfltcqdwvbewi"; PROD="kkpkgjrweysgvhvkhzun"
-PLAN="${1:-}"; [[ "$PLAN" =~ ^(media|m1|media\+m1)$ ]] || { echo "usage: $0 media|m1|media+m1"; exit 2; }
+PLAN="${1:-}"; [[ "$PLAN" =~ ^(media|m1|m3a|media\+m1)$ ]] || { echo "usage: $0 media|m1|m3a|media+m1"; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"; cd "$HERE/../.."
 sb() { pnpm exec supabase "$@"; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP" supabase/.temp' EXIT

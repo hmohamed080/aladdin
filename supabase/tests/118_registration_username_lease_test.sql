@@ -67,7 +67,7 @@ select is((select format_type(prorettype, null) from pg_proc where oid = 'public
 -- 2. A first registration leases its name
 -- ===========================================================================
 set local role service_role;
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a1', 'Falcon', 'persona_type', 'engineer'),
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a1', 'Falcon', 'persona_type', 'engineer', 30),
   true, 'p1 takes the lease on "Falcon"');
 reset role;
 
@@ -89,7 +89,7 @@ reset role;
 -- 3. A second registration cannot take the same name; it keeps its account type
 -- ===========================================================================
 set local role service_role;
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a2', 'FALCON', 'organization_type', 'showroom_dealer'),
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a2', 'FALCON', 'organization_type', 'showroom_dealer', 30),
   false, 'p2 cannot lease a name p1 holds');
 reset role;
 select is((select username from app.pending_registrations where user_id = '91180000-0000-4000-8000-0000000000a2'),
@@ -103,7 +103,7 @@ select is((select audience_value from app.pending_registrations where user_id = 
 update app.pending_registrations set username_reserved_at = now() - interval '10 minutes'
  where user_id = '91180000-0000-4000-8000-0000000000a1';
 set local role service_role;
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a1', 'Hijacker', 'organization_type', 'importer'),
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a1', 'Hijacker', 'organization_type', 'importer', 30),
   true, 'a repeat sign-up only reports the existing active lease');
 reset role;
 select results_eq($$ select username, audience_value from app.pending_registrations where user_id = '91180000-0000-4000-8000-0000000000a1' $$,
@@ -123,17 +123,17 @@ select is(public.username_available('Falcon'), true, 'an expired lease no longer
 reset role;
 
 set local role service_role;
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a1', 'Falcon', 'persona_type', 'engineer'),
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a1', 'Falcon', 'persona_type', 'engineer', 30),
   false, 'p1 cannot renew its expired lease by signing up again');
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a3', 'Falcon', 'persona_type', 'contractor'),
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a3', 'Falcon', 'persona_type', 'contractor', 30),
   true, 'p3 can now lease "Falcon"');
 
 -- ===========================================================================
 -- 6. Only a just-created, unconfirmed account can stage
 -- ===========================================================================
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000c1', 'Merlin', 'persona_type', 'engineer'),
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000c1', 'Merlin', 'persona_type', 'engineer', 30),
   false, 'an unconfirmed account created 20 minutes ago cannot stage');
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000b1', 'Merlin', 'persona_type', 'engineer'),
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000b1', 'Merlin', 'persona_type', 'engineer', 30),
   false, 'a confirmed account cannot stage');
 reset role;
 select is((select count(*)::int from app.pending_registrations
@@ -144,11 +144,11 @@ select is((select count(*)::int from app.pending_registrations
 -- 7. Reserved, taken and malformed names are never leased
 -- ===========================================================================
 set local role service_role;
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a4', 'Admin', 'persona_type', 'engineer'),
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a4', 'Admin', 'persona_type', 'engineer', 30),
   false, 'a reserved word is never leased');
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a5', 'ExistingName', 'persona_type', 'engineer'),
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a5', 'ExistingName', 'persona_type', 'engineer', 30),
   false, 'a name an existing account owns is never leased');
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a6', 'bad name!', 'persona_type', 'engineer'),
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a6', 'bad name!', 'persona_type', 'engineer', 30),
   false, 'a malformed name is never leased');
 reset role;
 select is((select count(*)::int from app.pending_registrations
@@ -196,7 +196,7 @@ update app.pending_registrations set username = 'Osprey', username_reserved_at =
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"91180000-0000-4000-8000-0000000000a2","role":"authenticated"}';
 select results_eq($$ select username, audience_value from public.pending_registration_consume() $$,
-  $$ values ('Osprey'::text, 'showroom_dealer'::text) $$, 'consume returns the leased name and account type');
+  $$ values (null::text, 'showroom_dealer'::text) $$, 'consume returns the account type and, since P1 M3a, never the leased name (username is always NULL)');
 select is((select count(*)::int from public.pending_registration_consume()), 0, 'consume is one-shot');
 reset role;
 

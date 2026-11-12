@@ -13,7 +13,7 @@
 #   before M2, M3, Auth metadata cleanup, audit-log redaction, the Track C media copy (media_migration_switch) and any Production step.
 # NOT to be run without the owner's separate explicit GO. Production is refused. Never uses --include-all, repair or reset.
 #   bash scripts/hosted-db/acceptance-apply.sh --plan <plan> --sha <full 40-char origin/main sha> [--backup-label <pinned restore-verified snapshot>]
-#   m1 needs NO backup label: it is function-only and its tested forward-fix is pinned by sha256 (acceptance-gate.mjs recovery).
+#   m1 and m3a need NO backup label: it is function-only and its tested forward-fix is pinned by sha256 (acceptance-gate.mjs recovery).
 #   media and media+m1 need --backup-label of a pinned restore-verified snapshot (no fresh backup required; it is a HISTORICAL reference,
 #   not a current recovery point). A fresh restore-tested backup is mandatory before M2, M3, Auth metadata cleanup, audit-log redaction.
 # Order: checkout gates -> password (hidden) -> link -> PRE checks (history, dry run, permissions vs the plan's pre contract,
@@ -29,7 +29,7 @@ export LC_ALL=C
 ACC="nxossqhdfltcqdwvbewi"; PROD="kkpkgjrweysgvhvkhzun"
 PLAN=""; SHA=""; LABEL=""
 while [ $# -gt 0 ]; do case "$1" in --plan) PLAN="${2:-}"; shift 2;; --sha) SHA="${2:-}"; shift 2;; --backup-label) LABEL="${2:-}"; shift 2;; *) echo "unknown argument $1"; exit 2;; esac; done
-[[ "$PLAN" =~ ^(media|m1|media\+m1)$ ]] || { echo "usage: --plan media|m1|media+m1 --sha <40-char sha> [--backup-label <label>]"; exit 2; }
+[[ "$PLAN" =~ ^(media|m1|m3a|media\+m1)$ ]] || { echo "usage: --plan media|m1|m3a|media+m1 --sha <40-char sha> [--backup-label <label>]"; exit 2; }
 [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: --plan <plan> --sha <40-char sha> [--backup-label <label>]"; exit 2; }
 [ -z "$LABEL" ] || [[ "$LABEL" =~ ^aladdin-acceptance-[0-9]{8}T[0-9]{6}Z$ ]] || { echo "--backup-label must look like aladdin-acceptance-YYYYMMDDTHHMMSSZ"; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"

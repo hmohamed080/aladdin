@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const hist = (n) => Array.from({ length: n }, (_, i) => ({ local: `2025${1000 + i}000000`, remote: `2025${1000 + i}000000` }));
 // 206 filler + the real latest 20261107090006 = 207 applied
 const base = () => [...hist(206), { local: "20261107090006", remote: "20261107090006" }];
-const appliedFor = (P) => (P.applied === 207 ? base() : [...base(), { local: "20261110090001", remote: "20261110090001" }]);
+const appliedFor = (P) => [...base(), ...(P.applied >= 208 ? [{ local: "20261110090001", remote: "20261110090001" }] : []), ...(P.applied >= 209 ? [{ local: "20261110090002", remote: "20261110090002" }] : [])];
 const list = (name, extra = []) => {
   const P = PLANS[name];
   return { migrations: [...appliedFor(P), ...P.pending.map((v) => ({ local: v, remote: null })), ...extra] };
@@ -41,6 +41,18 @@ test("the old 203-migration / 090003..090006 baseline is refused by every plan",
 });
 test("the media plan refuses a history where media is already applied", () => {
   has(checkAcceptance({ plan: "media", list: list("m1"), dry: dry(["20261110090002"]), localVersions: ["20261110090001"] }), /applied migrations|latest applied|pending is/);
+});
+test("the m3a plan starts from the 209-migration state (M1 applied) and refuses the 208 and 210 states", () => {
+  assert.deepEqual(PLANS.m3a.pending, ["20261112090001"]);
+  assert.equal(PLANS.m3a.applied, 209); assert.equal(PLANS.m3a.latest, "20261110090002");
+  assert.equal(PLANS.m3a.preContract, PLANS.m1.postContract);
+  const l208 = { migrations: [...base(), { local: "20261110090001", remote: "20261110090001" }, { local: "20261110090002", remote: null }, { local: "20261112090001", remote: null }] };
+  has(checkAcceptance({ plan: "m3a", list: l208, dry: dry(["20261110090002", "20261112090001"]), localVersions: ["20261112090001"] }), /applied migrations|pending is|dry run would push/);
+  const l210 = { migrations: [...appliedFor(PLANS.m3a), { local: "20261112090001", remote: "20261112090001" }] };
+  has(checkAcceptance({ plan: "m3a", list: l210, dry: dry([]), localVersions: ["20261112090001"] }), /applied migrations|latest applied|pending is/);
+});
+test("m3a may change exactly the four functions of the migration and nothing else", () => {
+  assert.deepEqual([...PLANS.m3a.changed].sort(), ["public.admin_user_detail", "public.admin_users_directory", "public.pending_registration_consume", "public.pending_registration_save"]);
 });
 test("unknown plan is refused", () => assert.throws(() => plan("backup-4"), /unknown plan/));
 test("media+m1 is exactly media then m1, and the post contract is the M1 one", () => {

@@ -9,6 +9,7 @@
  *   media     main today: only 20261110090001 (Track C media ids-only keys) is pending. 207 -> 208.
  *   m1        after `media` is applied: only 20261110090002 (P1 M1) is pending. 208 -> 209.
  *   media+m1  one plain push of both, in order. 207 -> 209.
+ *   m3a       after `m1` is applied (Acceptance and Production are both at 209 today): only 20261112090001 (P1 M3a) is pending. 209 -> 210.
  *
  *   node acceptance-gate.mjs <plan> <migration-list.json> <dry-run.json> <migrations dir>
  *   node acceptance-gate.mjs post <plan> <migration-list.json>
@@ -21,13 +22,15 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const ACCEPTANCE_REF = "nxossqhdfltcqdwvbewi";
-const MEDIA = "20261110090001", M1 = "20261110090002", BASE = "20261107090006";
+const MEDIA = "20261110090001", M1 = "20261110090002", M3A = "20261112090001", BASE = "20261107090006";
 /** changed = function names (schema.name, every overload) the plan is allowed to touch; nothing else may change in the catalog. */
 export const PLANS = {
   media: { fixes: ["media"], recovery: "forward-fix", applied: 207, latest: BASE, pending: [MEDIA], preContract: BASE, postContract: MEDIA,
     changed: ["app.media_storage_key_assign", "public.media_migration_target_key", "public.media_migration_switch", "public.media_migration_rollback"] },
   m1: { fixes: ["m1"], recovery: "forward-fix", applied: 208, latest: MEDIA, pending: [M1], preContract: MEDIA, postContract: M1,
     changed: ["public.my_registration_state", "app.profile_completion", "public.admin_users_directory"] },
+  m3a: { fixes: ["m3a"], recovery: "forward-fix", applied: 209, latest: M1, pending: [M3A], preContract: M1, postContract: M3A,
+    changed: ["public.pending_registration_consume", "public.pending_registration_save", "public.admin_users_directory", "public.admin_user_detail"] },
   "media+m1": { fixes: ["media", "m1"], recovery: "forward-fix", applied: 207, latest: BASE, pending: [MEDIA, M1], preContract: BASE, postContract: M1,
     changed: ["app.media_storage_key_assign", "public.media_migration_target_key", "public.media_migration_switch", "public.media_migration_rollback",
       "public.my_registration_state", "app.profile_completion", "public.admin_users_directory"] },
@@ -41,6 +44,8 @@ export const PLANS = {
  * Recovery for such a change is a locally tested FORWARD-FIX (a new migration), pinned here by sha256 and checked before the
  * password prompt. A data restore of a backup is not the recovery path and no backup is required for these plans.
  *   m1     forward-fix/m1-restore-previous.sql
+ *   m3a    forward-fix/m3a-restore-previous.sql  (re-creates the previous consume/directory/detail and drops the new save overload; proven
+ *          locally: M3a + this script gives a catalog fingerprint identical to the pre-M3a one)
  *   media  forward-fix/media-restore-previous.sql  (has a data-safety guard: it refuses once a switched object holds an ids-only key,
  *          i.e. it is only valid before the Track C copy rehearsal calls media_migration_switch under the new semantics)
  * An optional --backup-label is accepted only if it is in RESTORE_VERIFIED_SNAPSHOTS (restore PASS recorded in aladdin-backups).
@@ -53,6 +58,7 @@ export const RESTORE_VERIFIED_SNAPSHOTS = {
 };
 export const FORWARD_FIX = {
   m1: { file: "forward-fix/m1-restore-previous.sql", sha256: "5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045" },
+  m3a: { file: "forward-fix/m3a-restore-previous.sql", sha256: "d4161977e7664e3345d000ee87503fd3a5983935c81257dd082c0a5ef0b43ec3" },
   media: { file: "forward-fix/media-restore-previous.sql", sha256: "4f0f4ce33ed49ca85555756ff7186a33da6d3b6cca17f391da9bc4daf735f270" },
 };
 /** forwardFixSha256: { <fix name>: <sha256 of the file in this checkout, or undefined> } for every fix the plan needs. */
