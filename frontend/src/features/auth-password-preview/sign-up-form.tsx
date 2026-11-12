@@ -121,7 +121,10 @@ export function PasswordSignUpForm({
 
   // This browser started an email registration and has not verified it (refresh, closed tab, lost connection): reopen its code step.
   // `pendingEmail` is the server-side httpOnly routing cookie, never the URL; it is only set when a code was really sent.
-  const restoredEmail = pendingEmail && !sendState.ok ? pendingEmail : null;
+  // Only for the address that was already pending when this page loaded: a sign-up submitted from this form sets a NEW cookie and the page re-renders
+  // with it, and that must never bring an older address's code step back after a failed replacement submission.
+  const [pendingAtLoad] = useState(pendingEmail);
+  const restoredEmail = pendingEmail && pendingEmail === pendingAtLoad && !sendState.ok ? pendingEmail : null;
   const codeSent = restoredEmail !== null || (sendState.ok && !editing);
   const channel = restoredEmail ? "email" : (sendState.channel ?? "email");
   const contact = restoredEmail ?? sendState.email ?? "";

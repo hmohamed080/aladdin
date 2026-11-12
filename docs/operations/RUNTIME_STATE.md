@@ -834,3 +834,7 @@ Effective live alias and production target both dpl_6F4cLptBtEtR5LwF7mQAneigsc83
 
 ## R2 registration integration (Draft PR, not merged, nothing applied) — 2026-10-31
 - Branch `integration/unified-registration-r2-20261031`. Hosted state unchanged: the R1 alias guard is not installed, `20261030090001/2` and `20261031090001` are not applied anywhere, no `PHONE_*` flag is set, the interim hook is not enabled. Phone sign-up stays unavailable in any deployment that has all switches off.
+
+## 2026-11-12 - Account Identity Phase 1 (docs only)
+
+- Production and Acceptance databases: 209 migrations applied (latest `20261110090002`). Production frontend Worker `32d08bff` at 100%; Acceptance Preview `6db4a740`. Username and DOB data and schema still exist; cleanup (M2, M3, Auth scrub, audit redaction) is not started and is gated: see `docs/operations/account-identity/P1-CLEANUP-READINESS-20261112.md`.

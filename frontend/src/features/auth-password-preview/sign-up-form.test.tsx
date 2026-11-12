@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, screen, fireEvent } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { PasswordSignUpForm } from "./sign-up-form";
 import { ar } from "@/lib/i18n/messages/ar";
 import { en } from "@/lib/i18n/messages/en";
@@ -134,6 +135,23 @@ describe("PasswordSignUpForm (Instagram style)", () => {
     expect(document.querySelector('input[type="password"], input[name="password"]')).toBeNull();
     expect(screen.getByRole("button", { name: en.authPasswordPreview.changeEmail })).toHaveAttribute("type", "submit");
     expect(document.querySelector('[data-sign-up-step="details"]')).toBeNull();
+  });
+
+  it("a cookie that appears AFTER load (this form's own sign-up) never brings an older code step back when a replacement submission fails", async () => {
+    vi.mocked(requestSignUp).mockResolvedValueOnce({ ok: false, code: "authPasswordPreview.error.accountExists", email: "taken@example.test", channel: "email" });
+    const { rerender } = renderWithI18n(<PasswordSignUpForm pendingEmail={null} />, "en");
+    fireEvent.change(screen.getByLabelText(en.authPasswordPreview.signUp.contactLabel), { target: { value: "taken@example.test" } });
+    // The server action set a new reg_email and Next re-rendered the page with it.
+    rerender(
+      <I18nProvider locale="en" dir="ltr">
+        <PasswordSignUpForm pendingEmail="first@example.test" />
+      </I18nProvider>,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: en.authPasswordPreview.signUp.submit }));
+    });
+    expect(document.querySelector('[data-sign-up-step="email-code"]')).toBeNull();
+    expect(await screen.findByText(en.authPasswordPreview.error.accountExists)).toBeInTheDocument();
   });
 
   it("shows the plain details form when there is no unfinished registration", () => {
