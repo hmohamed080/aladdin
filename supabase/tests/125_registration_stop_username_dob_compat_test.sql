@@ -95,7 +95,7 @@ delete from app.pending_registrations where user_id = '91250000-0000-4000-8000-0
 -- B. NEW-style: no username, no lease, no reservation
 -- ===========================================================================
 set local role service_role;
-select is(public.pending_registration_save('91250000-0000-4000-8000-0000000000a1', null, 'persona_type', 'engineer'),
+select is(public.pending_registration_save('91250000-0000-4000-8000-0000000000a1', null, 'persona_type', 'engineer', 30),
   false, 'new app (positional NULL username): saves, and reports that no username lease is held');
 reset role;
 select results_eq($$ select username, username_reserved_at, audience_kind::text, audience_value
@@ -132,9 +132,9 @@ select is(pg_temp.q('91250000-0000-4000-8000-0000000000a1',
 -- C. OLD-style: username + lease still behave exactly as before
 -- ===========================================================================
 set local role service_role;
-select is(public.pending_registration_save('91250000-0000-4000-8000-0000000000a2', 'OldStyle', 'persona_type', 'engineer'),
+select is(public.pending_registration_save('91250000-0000-4000-8000-0000000000a2', 'OldStyle', 'persona_type', 'engineer', 30),
   true, 'old app: a username takes a lease');
-select is(public.pending_registration_save('91250000-0000-4000-8000-0000000000a3', 'oldstyle', 'organization_type', 'supplier'),
+select is(public.pending_registration_save('91250000-0000-4000-8000-0000000000a3', 'oldstyle', 'organization_type', 'supplier', 30),
   false, 'old app: a second registration cannot lease a name already leased');
 reset role;
 select results_eq($$ select username, (username_reserved_at is not null) from app.pending_registrations where user_id = '91250000-0000-4000-8000-0000000000a2' $$,
@@ -145,7 +145,7 @@ select is(pg_temp.q('91250000-0000-4000-8000-0000000000b1', $$ public.username_a
   'false', 'old app: username_available (untouched) reads a leased name as unavailable');
 select is(pg_temp.q('91250000-0000-4000-8000-0000000000a2',
   $$ (select username from public.pending_registration_consume()) $$),
-  'OldStyle', 'old app: consume returns the username while the lease is active');
+  null, 'old app: consume no longer returns the username even while the lease is active (P1 M3a; the shape keeps the column, the value is NULL)');
 
 -- Old profile_set_username (untouched) still works for a legacy caller (returns void -> empty text).
 select is(pg_temp.q('91250000-0000-4000-8000-0000000000b4', $$ public.profile_set_username('legacyname') $$),
@@ -207,11 +207,11 @@ select is(pg_temp.q(:'padmin', $$ public.admin_users_directory(p_search => 'zxqw
   'searching a username no longer finds the account');
 select is(pg_temp.q(:'padmin', $$ public.admin_users_directory(p_search => 'Quasar Zed') -> 'total' $$), '1', 'display-name search still works');
 select is(pg_temp.q(:'padmin', $$ public.admin_users_directory(p_search => 'quasar-ad1') -> 'total' $$), '1', 'email search still works');
-select is(pg_temp.q(:'padmin', $$ public.admin_users_directory(p_search => 'Quasar Zed') -> 'rows' -> 0 ->> 'username' $$), 'zxqwuniq',
-  'rows still carry the stored legacy username key (the Admin mapper is null-tolerant; the key goes with the column later)');
+select is(pg_temp.q(:'padmin', $$ (public.admin_users_directory(p_search => 'Quasar Zed') -> 'rows' -> 0) ? 'username' $$), 'false',
+  'rows no longer carry a username key (P1 M3a)');
 select is(pg_temp.q(:'padmin', $$ (select array_agg(k order by k) from jsonb_object_keys(public.admin_users_directory(p_search => 'Quasar Zed') -> 'rows' -> 0) k) $$),
-  '{account_type,city,completion,created_at,display_name,display_name_ar,display_name_en,email,flags,governorate,id,is_verified,latest_verification_status,organization,organization_count,phone,profile_id,public_profile_available,registered_account,status,username,verification_state}',
-  'the row shape is unchanged');
+  '{account_type,city,completion,created_at,display_name,display_name_ar,display_name_en,email,flags,governorate,id,is_verified,latest_verification_status,organization,organization_count,phone,profile_id,public_profile_available,registered_account,status,verification_state}',
+  'the row shape is unchanged except for the removed username key (P1 M3a)');
 select is(pg_temp.q('91250000-0000-4000-8000-0000000000d1', $$ public.admin_users_directory() $$), 'ERR:42501',
   'a non-admin is still refused by the permission check');
 

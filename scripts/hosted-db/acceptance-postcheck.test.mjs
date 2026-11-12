@@ -15,6 +15,11 @@ test("the m1 plan passes from the post-media state, media+m1 from the original s
   assert.deepEqual(postcheck({ plan: "m1", preS: postS, preC, postS: { ...postS, latest_migration: "20261110090002", applied_migrations: 209 }, postC: preC }).fail, []);
   assert.deepEqual(postcheck({ plan: "media+m1", preS, preC, postS: { ...preS, latest_migration: "20261110090002", applied_migrations: 209 }, postC: preC }).fail, []);
 });
+test("the m3a plan passes from the post-M1 state (209 -> 210)", () => {
+  const m1S = { ...preS, latest_migration: "20261110090002", applied_migrations: 209 };
+  assert.deepEqual(postcheck({ plan: "m3a", preS: m1S, preC, postS: { ...m1S, latest_migration: "20261112090001", applied_migrations: 210 }, postC: preC }).fail, []);
+  has(postcheck({ plan: "m3a", preS: m1S, preC, postS: { ...m1S, latest_migration: "20261110090002", applied_migrations: 209 }, postC: preC }).fail, /latest migration/);
+});
 test("a wrong latest migration or count fails", () => {
   has(postcheck({ plan: "media", preS, preC, postS: { ...postS, latest_migration: "20261107090006" }, postC: preC }).fail, /latest migration/);
   has(postcheck({ plan: "media", preS, preC, postS: { ...postS, applied_migrations: 207 }, postC: preC }).fail, /207 migrations applied/);
