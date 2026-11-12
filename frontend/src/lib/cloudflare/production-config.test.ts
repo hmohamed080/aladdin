@@ -188,4 +188,22 @@ describe("Production release media modes (R2 stays off for a UI release; the com
     expect(bad.status).not.toBe(0);
     expect(bad.stdout).not.toContain("n=");
   });
+
+  it("the cutover approval reaches every guard invocation: it is job-level env, and an approved stage=frontend passes in both modes", () => {
+    const text = workflow();
+    const jobEnv = text.slice(text.indexOf("    env:\n      STAGE:"), text.indexOf("    steps:"));
+    expect(jobEnv).toContain("R2_CUTOVER_APPROVED: ${{ vars.R2_CUTOVER_APPROVED }}");
+    expect(text.match(/R2_CUTOVER_APPROVED: \$\{\{/g)?.length).toBe(1);
+    const guard = (args: string[], env: Record<string, string>) =>
+      spawnSync("node", [join(FRONTEND, "scripts", "check-cloudflare-production.mjs"), ...args], { encoding: "utf8", env: { ...process.env, ...env } });
+    for (const mode of ["legacy-hold", "r2-only"]) {
+      expect(guard(["--verify-media-mode", mode], { STAGE: "frontend", R2_CUTOVER_APPROVED: "true" }).status).toBe(0);
+      expect(guard(["--verify-media-mode", mode], { STAGE: "frontend", R2_CUTOVER_APPROVED: "" }).status).toBe(1);
+      expect(guard(["--verify-media-mode", mode], { STAGE: "frontend-upload", R2_CUTOVER_APPROVED: "" }).status).toBe(0);
+    }
+    const helper = (approved: string) =>
+      spawnSync("bash", ["-e", "-c", `cd "${join(FRONTEND, "scripts")}" && export MEDIA_MODE=legacy-hold STAGE=frontend R2_CUTOVER_APPROVED=${approved} && source ./production-media-vars.sh && echo "n=\${#MEDIA_VARS[@]}"`], { encoding: "utf8" });
+    expect(helper("true").stdout.trim()).toBe("n=6");
+    expect(helper("").status).not.toBe(0);
+  });
 });

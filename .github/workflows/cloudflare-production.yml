@@ -80,6 +80,9 @@ jobs:
     env:
       STAGE: ${{ inputs.stage }}
       MEDIA_MODE: ${{ inputs.media_mode }}
+      # Set to "true" by the owner at the final cutover approval; until then stage=frontend (immediate deploy) is refused. Job-level so every
+      # invocation of the production guard (config check, release-flags check, the sourced media helper) sees the same approval.
+      R2_CUTOVER_APPROVED: ${{ vars.R2_CUTOVER_APPROVED }}
       NEXT_PUBLIC_APP_ENV: production
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -99,9 +102,6 @@ jobs:
           corepack enable
           corepack prepare pnpm@9.0.0 --activate
       - name: Production config and live values only
-        env:
-          # Set to "true" by the owner at the final cutover approval; until then stage=frontend (immediate deploy) is refused.
-          R2_CUTOVER_APPROVED: ${{ vars.R2_CUTOVER_APPROVED }}
         run: |
           node frontend/scripts/check-cloudflare-production.mjs --live-values
           # The live project must accept the anon key (legacy JWT or sb_publishable_ alike).
