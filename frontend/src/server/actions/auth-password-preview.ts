@@ -312,6 +312,27 @@ export async function requestPasswordSignUp(
   // only after the OTP proves the email (verifyPasswordSignUp).
   const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
   const callStart = Date.now();
+
+  /**
+   * The answer for an email that already belongs to a CONFIRMED account (product decision, 2026-11-12: a person must not wait for a code that
+   * will never arrive). This answer is an existence signal, so it is BUDGETED, and the budget is only ever spent here: GoTrue has already judged
+   * the CAPTCHA (a garbage token fails earlier and never gets this far), so an unverified request can neither read the answer nor burn anyone's
+   * budget. The durable limiter allows 10 explicit answers per IP and 5 per address per 15 minutes (HMAC keys, `email:` namespaced). Once it is
+   * spent (or cannot answer) the reply DEGRADES to the neutral "code sent" response a new registration gets, never to a distinguishable "rate
+   * limited", so the budget really bounds what can be learned. Nothing is staged for an existing account.
+   */
+  const existingAccountReply = async (): Promise<PasswordAuthState> => {
+    const budget = await phoneAuthLimit("sign-up", `email:${parsed.data.email.toLowerCase()}`, await headers());
+    if (budget === "allowed") {
+      return { ok: false, code: "authPasswordPreview.error.accountExists", email: parsed.data.email };
+    }
+    await rememberRegistrationEmail(parsed.data.email);
+    // Timing protection: this degraded answer must not arrive faster than a genuine "code sent" (which waits for the mail send), or the
+    // difference would reopen the oracle the budget just closed. Both neutral outcomes are padded to the same floor.
+    await padToRegistrationFloor(callStart);
+    return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
+  };
+
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
@@ -331,28 +352,18 @@ export async function requestPasswordSignUp(
     if ((error as GoTrueError).code === "weak_password") {
       return { ok: false, code: "authPasswordPreview.error.passwordRejected", email: parsed.data.email };
     }
-    // An email that already belongs to a CONFIRMED account is told so, with a way to log in instead (product decision, 2026-11-12: a person must
-    // not wait for a code that will never arrive). Only this case is explicit: a still-UNCONFIRMED address is obfuscated by GoTrue itself
-    // (success, same user id, the code is re-sent), so an interrupted registration simply continues.
-    // This answer is an existence signal, so it is BUDGETED, and the budget is only ever spent here: GoTrue has already judged the CAPTCHA
-    // (a garbage token fails above and never gets this far), so an unverified request can neither read the answer nor burn anyone's budget.
-    // The durable limiter allows 10 explicit answers per IP and 5 per address per 15 minutes (HMAC keys, `email:` namespaced). Once it is spent
-    // (or cannot answer) the reply DEGRADES to the neutral "code sent" response a new registration gets, never to a distinguishable
-    // "rate limited", so the budget really bounds what can be learned. Nothing is staged for an existing account.
-    if (isAccountExistsError(error as GoTrueError)) {
-      const budget = await phoneAuthLimit("sign-up", `email:${parsed.data.email.toLowerCase()}`, await headers());
-      if (budget === "allowed") {
-        return { ok: false, code: "authPasswordPreview.error.accountExists", email: parsed.data.email };
-      }
-      await rememberRegistrationEmail(parsed.data.email);
-      // Timing protection (restored): this degraded answer must not arrive faster than a genuine "code sent" (which waits for the mail send), or the
-      // difference would reopen the oracle the budget just closed. Both neutral outcomes are padded to the same floor.
-      await padToRegistrationFloor(callStart);
-      return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
-    }
+    // GoTrue that answers a confirmed existing address with an ERROR (the local stack): see existingAccountReply.
+    if (isAccountExistsError(error as GoTrueError)) return existingAccountReply();
     logSignUpSendFailure("sign_up", error as GoTrueError);
     return { ok: false, code: "authPasswordPreview.error.sendFailed", email: parsed.data.email };
   }
+
+  // GoTrue that answers a confirmed existing address with SUCCESS (hosted Supabase, email confirmations ON): to stop user enumeration it returns an
+  // OBFUSCATED user - a made-up id, no mail sent - whose `identities` array is EMPTY. A genuinely new registration, and a re-sign-up of a still
+  // UNCONFIRMED address (GoTrue re-sends the code and returns the real user), both come back with their identity, so only the confirmed case is
+  // caught. If a GoTrue version omits `identities` altogether the registration is treated as new (the safe default: never block a real sign-up).
+  // The made-up id must never be staged, or the pending-registration table would hold a row for a user that does not exist.
+  if (Array.isArray(data?.user?.identities) && data.user.identities.length === 0) return existingAccountReply();
 
   // Stage the account-type choice NOW, keyed by the user id signUp() just returned — before any confirmation, so a refresh/restart on
   // the OTP step does not lose the choice (see Increment 6, supabase/migrations/20260924090006_pending_registrations.sql). Never the
