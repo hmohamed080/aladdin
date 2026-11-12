@@ -9,6 +9,8 @@ import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/acco
 vi.mock("@/server/actions/auth-password-preview", () => ({
   resendPasswordSignUpCode: vi.fn(),
   verifyPasswordSignUp: vi.fn(),
+  continueToSignIn: vi.fn(),
+  forgetPendingRegistration: vi.fn(),
 }));
 vi.mock("@/server/actions/sign-up", () => ({ requestSignUp: vi.fn(), resendPhoneSignUpCode: vi.fn(), verifyPhoneSignUp: vi.fn() }));
 vi.mock("@/server/actions/entry-oauth", () => ({ startEntryOAuth: vi.fn() }));
@@ -91,6 +93,48 @@ describe("PasswordSignUpForm (Instagram style)", () => {
     expect((google.closest("form")!.querySelector("input[name='accountType']") as HTMLInputElement).value).toBe("supplier");
     const separator = screen.getByRole("separator");
     expect(google.compareDocumentPosition(separator) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it.each([
+    ["authPasswordPreview.error.accountExists", "person@example.test", en.authPasswordPreview.error.accountExists],
+    ["authPasswordPreview.error.phoneExists", "01012345678", en.authPasswordPreview.error.phoneExists],
+  ])("%s: warns under the field and offers 'Log in instead' carrying what was typed", async (code, contact, message) => {
+    vi.mocked(requestSignUp).mockResolvedValueOnce({ ok: false, code, email: contact, channel: contact.includes("@") ? "email" : "phone" });
+    renderWithI18n(<PasswordSignUpForm />, "en");
+    fireEvent.change(screen.getByLabelText(en.authPasswordPreview.signUp.contactLabel), { target: { value: contact } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: en.authPasswordPreview.signUp.submit }));
+    });
+    const warning = await screen.findByText(message);
+    const box = warning.closest("[data-existing-account]") as HTMLFormElement;
+    expect(box).not.toBeNull();
+    expect((box.querySelector('input[name="contact"]') as HTMLInputElement).value).toBe(contact);
+    expect(screen.getByRole("button", { name: en.authPasswordPreview.error.existingAccountSignIn })).toHaveAttribute("type", "submit");
+    // The form stays on its details step: no code step, so nobody waits for a code.
+    expect(document.querySelector('[data-sign-up-step="details"]')).not.toBeNull();
+    expect(document.querySelector('[data-sign-up-step$="-code"]')).toBeNull();
+  });
+
+  it("has no \"continue registration\" link or notice anywhere", () => {
+    renderWithI18n(<PasswordSignUpForm />, "en");
+    expect(document.querySelector('a[href="/auth/continue-registration"]')).toBeNull();
+    expect(screen.queryByText(/continue registration|finish signing up/i)).toBeNull();
+  });
+
+  it("reopens the email code step for an unfinished registration, with no password field and a way to start clean", () => {
+    renderWithI18n(<PasswordSignUpForm pendingEmail="person@example.test" />, "en");
+    const step = document.querySelector('[data-sign-up-step="email-code"]')!;
+    expect(step).not.toBeNull();
+    expect((step.querySelector('input[name="email"]') as HTMLInputElement).value).toBe("person@example.test");
+    expect(document.querySelector('input[type="password"], input[name="password"]')).toBeNull();
+    expect(screen.getByRole("button", { name: en.authPasswordPreview.changeEmail })).toHaveAttribute("type", "submit");
+    expect(document.querySelector('[data-sign-up-step="details"]')).toBeNull();
+  });
+
+  it("shows the plain details form when there is no unfinished registration", () => {
+    renderWithI18n(<PasswordSignUpForm pendingEmail={null} />, "en");
+    expect(document.querySelector('[data-sign-up-step="details"]')).not.toBeNull();
+    expect(document.querySelector('[data-sign-up-step="email-code"]')).toBeNull();
   });
 
   it("is fully localized in English with no Arabic leakage", () => {

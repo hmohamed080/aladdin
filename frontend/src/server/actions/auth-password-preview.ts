@@ -157,6 +157,16 @@ async function rememberRegistrationEmail(email: string): Promise<void> {
 }
 
 /**
+ * "Log in instead" hand-off from the sign-up warning: the identifier the person already typed (email or mobile number) is carried to the
+ * sign-in field through this short-lived httpOnly cookie, NEVER through the URL (an address or phone number in a query string ends up in
+ * logs, history and Referer headers). It holds only text the same person just typed, is re-validated by the sign-in classifier before it
+ * is used, expires in two minutes and is dropped by the next sign-in attempt.
+ */
+const SIGN_IN_PREFILL_COOKIE = "signin_prefill";
+const SIGN_IN_PREFILL_PATH = "/auth";
+const SIGN_IN_PREFILL_MAX_AGE_SECONDS = 120;
+
+/**
  * GOTRUE-VALIDATED CAPTCHA (server/auth/captcha.ts). Every operation in this
  * module that GoTrue itself processes - signUp, resend, resetPasswordForEmail,
  * signInWithPassword - forwards the Turnstile token through the supported
@@ -293,6 +303,14 @@ export async function requestPasswordSignUp(
   const captcha = requireCaptcha(formData);
   if ("code" in captcha) return { ok: false, code: captcha.code, email: parsed.data.email };
 
+  // Because an already-registered email is now answered explicitly (below), this action can be used to probe which addresses have an account.
+  // The probe is bounded the same way the mobile sign-up's is: CAPTCHA first (above), then the durable per-IP (10) and per-address (5) budget
+  // for 15 minutes, keyed by HMAC only. A limiter that cannot answer fails closed. The key is namespaced so it never collides with a phone.
+  const limited = await phoneAuthLimit("sign-up", `email:${parsed.data.email.toLowerCase()}`, await headers());
+  if (limited !== "allowed") {
+    return { ok: false, code: limited === "limited" ? "authPasswordPreview.error.rateLimited" : "authPasswordPreview.error.sendFailed", email: parsed.data.email };
+  }
+
   const supabase = await getServerSupabase();
 
   // The Full Name rides in user METADATA (raw_user_meta_data), which
@@ -301,7 +319,6 @@ export async function requestPasswordSignUp(
   // data, not authorization. It is confirmed through profile_set_display_name
   // only after the OTP proves the email (verifyPasswordSignUp).
   const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
-  const callStart = Date.now();
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
@@ -321,20 +338,12 @@ export async function requestPasswordSignUp(
     if ((error as GoTrueError).code === "weak_password") {
       return { ok: false, code: "authPasswordPreview.error.passwordRejected", email: parsed.data.email };
     }
-    // ENUMERATION NORMALIZATION (§Account enumeration) — see
-    // `isAccountExistsError`'s doc comment. Collapse into the exact same
-    // success response a genuine new registration gets; never a different
-    // code path, never GoTrue's own wording. Response-time normalized too
-    // (`padToRegistrationFloor`) — the enumeration-safe response SHAPE alone
-    // is not enough if the two paths remain distinguishable by how fast they
-    // arrive. Deliberately NO pending-registration write on this branch —
-    // there is no new user id to key it by, and staging state for an
-    // existing account's id would be a foothold for exactly the enumeration
-    // this branch exists to close.
+    // An email that already belongs to a CONFIRMED account is told so, with a way to log in instead (product decision, 2026-11-12: a person must
+    // not wait for a code that will never arrive). Only this case is explicit: a still-UNCONFIRMED address is obfuscated by GoTrue itself
+    // (success, same user id, the code is re-sent), so an interrupted registration simply continues. Nothing is staged and no routing cookie
+    // is set for an existing account, so there is no pending-registration footing for another person's id.
     if (isAccountExistsError(error as GoTrueError)) {
-      await rememberRegistrationEmail(parsed.data.email);
-      await padToRegistrationFloor(callStart);
-      return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
+      return { ok: false, code: "authPasswordPreview.error.accountExists", email: parsed.data.email };
     }
     logSignUpSendFailure("sign_up", error as GoTrueError);
     return { ok: false, code: "authPasswordPreview.error.sendFailed", email: parsed.data.email };
@@ -353,7 +362,6 @@ export async function requestPasswordSignUp(
   }
 
   await rememberRegistrationEmail(parsed.data.email);
-  await padToRegistrationFloor(callStart);
   return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
 }
 
@@ -379,9 +387,7 @@ export async function resendPasswordSignUpCode(
   formData: FormData,
 ): Promise<PasswordAuthState> {
   if (!authFormWithinLimit(formData)) return { ok: false, code: "authPasswordPreview.error.passwordTooLong" };
-  // The form's email, else the interrupted-registration cookie (the
-  // continue-registration code step carries no editable email field).
-  const email = emailSchema.safeParse(formData.get("email") ?? (await pendingRegistrationEmail()));
+  const email = emailSchema.safeParse(formData.get("email"));
   if (!email.success) return { ok: false, code: "authPasswordPreview.error.invalidEmail" };
 
   const captcha = requireCaptcha(formData);
@@ -425,10 +431,34 @@ export async function pendingRegistrationEmail(): Promise<string | null> {
   return value && emailSchema.safeParse(value).success ? value : null;
 }
 
-/** "Use a different email" on the continue-registration screen: forget the routing cookie only. Nothing server-side changes. */
+/** "Use a different email" on the restored code step: forget the routing cookie only and show a clean sign-up form. Nothing server-side changes. */
 export async function forgetPendingRegistration(): Promise<void> {
   (await cookies()).delete({ name: REGISTRATION_EMAIL_COOKIE, path: REGISTRATION_COOKIE_PATH });
-  redirect("/auth/continue-registration");
+  redirect("/auth/sign-up");
+}
+
+/**
+ * "Log in instead" on the sign-up warning: hands the email or mobile number the person typed to the sign-in field (see
+ * SIGN_IN_PREFILL_COOKIE) and navigates there. Anything that is not a valid email or mobile number is dropped, and the person still lands on sign-in.
+ */
+export async function continueToSignIn(formData: FormData): Promise<void> {
+  const raw = formData.get("contact");
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (value.length > 0 && value.length <= 254 && classifySignInIdentifier(value)) {
+    (await cookies()).set(SIGN_IN_PREFILL_COOKIE, value, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: SIGN_IN_PREFILL_PATH,
+      maxAge: SIGN_IN_PREFILL_MAX_AGE_SECONDS,
+    });
+  }
+  redirect("/auth/sign-in");
+}
+
+/** The identifier carried by `continueToSignIn`, re-validated; null when there is none or it is no longer a valid email / mobile number. */
+export async function signInPrefillIdentifier(): Promise<string | null> {
+  const value = (await cookies()).get(SIGN_IN_PREFILL_COOKIE)?.value;
+  return value && classifySignInIdentifier(value) ? value : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -443,7 +473,7 @@ export async function verifyPasswordSignUp(
   formData: FormData,
 ): Promise<PasswordAuthState> {
   if (!authFormWithinLimit(formData)) return { ok: false, code: "authPasswordPreview.error.passwordTooLong" };
-  const email = emailSchema.safeParse(formData.get("email") ?? (await pendingRegistrationEmail()));
+  const email = emailSchema.safeParse(formData.get("email"));
   const token = formData.get("token");
   if (!email.success) return { ok: false, code: "authPasswordPreview.error.invalidEmail" };
   if (typeof token !== "string" || !otpSchema.test(token)) {
@@ -570,6 +600,8 @@ export async function passwordSignIn(
 ): Promise<PasswordAuthState> {
   if (!authFormWithinLimit(formData)) return { ok: false, code: "authPasswordPreview.error.passwordTooLong" };
   const callStart = Date.now();
+  // The hand-off from the sign-up warning has done its job once a sign-in is attempted.
+  (await cookies()).delete({ name: SIGN_IN_PREFILL_COOKIE, path: SIGN_IN_PREFILL_PATH });
   const rawIdentifier = typeof formData.get("identifier") === "string" ? String(formData.get("identifier")) : String(formData.get("email") ?? "");
   const identifier = classifySignInIdentifier(rawIdentifier);
   const echo = rawIdentifier.trim();

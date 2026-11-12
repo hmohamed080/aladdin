@@ -180,8 +180,18 @@ export async function requestPhoneSignUp(formData: FormData, phone: CanonicalPho
   const limited = await phoneAuthLimit("sign-up", phone.e164, await headers());
   if (limited !== "allowed") return fail(limited === "limited" ? E("rateLimited") : E("sendFailed"));
 
-  // There is deliberately NO "is this number registered?" check here: the answer would be a phone-number existence oracle. A number that
-  // already has an account goes through the same screens and simply receives no code (the authority suppresses delivery).
+  // A number that already has an account is told so, with a way to log in instead (product decision, 2026-11-12): the person must not wait for
+  // a WhatsApp code that will never arrive. This answer is an existence signal, so it sits BEHIND the same guards as everything else here:
+  // Turnstile (Siteverify, above), then the durable per-IP (10) and per-number (5) budget (above). Nothing is sent, sealed or staged for a
+  // taken number. A lookup that fails never guesses "free": it stops the sign-up. The authority still suppresses delivery for a taken number
+  // as a second line (a race between this check and the challenge, or a number that became taken meanwhile).
+  try {
+    if (await isCanonicalPhoneTaken(phone.e164)) return fail(E("phoneExists"));
+  } catch (error) {
+    logStepFailure("phone_precheck", error as { code?: string });
+    return fail(E("sendFailed"));
+  }
+
   // Fail closed BEFORE a code is requested: without the cookie secret the pending sign-up cannot be kept, so no message may be sent.
   try {
     cookieKey();
