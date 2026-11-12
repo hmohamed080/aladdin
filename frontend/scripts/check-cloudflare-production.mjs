@@ -148,6 +148,46 @@ export function checkCutoverStage(stage, approved) {
   return [];
 }
 
+/**
+ * MEDIA MODES for a Production release. The committed config is the FUTURE R2-only cutover state and is never edited to ship an
+ * unrelated release. A release picks a mode instead, and the mode's `--var` overrides are applied on the `wrangler` command line
+ * (a CLI var wins over the file):
+ *   legacy-hold  (default) R2 writes stay OFF and Supabase Storage writes stay open, exactly like the Worker that is live today.
+ *   r2-only      no overrides: the committed R2-only flags (the cutover; promotion needs its own approval).
+ */
+export const MEDIA_MODES = ["legacy-hold", "r2-only"];
+export const LEGACY_HOLD_FLAGS = { R2_STORAGE_ENABLED: "false", R2_PRODUCTION_WRITES_APPROVED: "false", MEDIA_LEGACY_STORAGE_WRITES: "true" };
+
+/** The `--var NAME:value` arguments a mode adds to wrangler, one array element each ([] for r2-only). */
+export function mediaModeArgs(mode) {
+  if (mode === "r2-only") return [];
+  if (mode === "legacy-hold") return Object.entries(LEGACY_HOLD_FLAGS).flatMap(([name, value]) => ["--var", `${name}:${value}`]);
+  throw new Error(`unknown media mode: ${mode}`);
+}
+
+/** The media flags the Worker would carry: the committed vars with the mode's own wrangler arguments applied on top. */
+export function effectiveMediaFlags(config, mode) {
+  const vars = { ...(config.env?.production?.vars ?? {}) };
+  const args = mediaModeArgs(mode);
+  for (let i = 0; i < args.length; i += 2) {
+    const [name, ...rest] = args[i + 1].split(":");
+    vars[name] = rest.join(":");
+  }
+  return Object.fromEntries(Object.keys(R2_ONLY_FLAGS).map((flag) => [flag, vars[flag]]));
+}
+
+/** Refuses a release whose effective media flags are not exactly the mode's promise. Run before anything is uploaded. */
+export function checkMediaMode(config, mode) {
+  if (!MEDIA_MODES.includes(mode)) return [`media_mode must be one of ${MEDIA_MODES.join(", ")} (got "${mode}")`];
+  const want = mode === "r2-only" ? R2_ONLY_FLAGS : LEGACY_HOLD_FLAGS;
+  const got = effectiveMediaFlags(config, mode);
+  const problems = [];
+  for (const [flag, value] of Object.entries(want)) {
+    if (got[flag] !== value) problems.push(`media_mode=${mode}: ${flag} would be "${got[flag]}", must be "${value}"`);
+  }
+  return problems;
+}
+
 function main() {
   const root = fileURLToPath(new URL("../../", import.meta.url));
   const problems = [
@@ -156,8 +196,29 @@ function main() {
   ];
   problems.push(...checkCutoverStage(process.env.STAGE, process.env.R2_CUTOVER_APPROVED));
   if (process.argv.includes("--live-values")) problems.push(...checkLiveValues(process.env));
+  // `--media-var-args <mode>`: print the wrangler arguments for the mode, one per line (the workflow reads them with mapfile).
+  const argsAt = process.argv.indexOf("--media-var-args");
+  const argsMode = argsAt === -1 ? null : process.argv[argsAt + 1];
+  if (argsMode !== null) problems.push(...checkMediaMode(parseJsonc(readFileSync(`${root}frontend/wrangler.jsonc`, "utf8")), argsMode));
+  // `--verify-media-mode <mode>`: fail unless the effective flags are exactly the mode's promise; print them for the run summary.
+  const verifyAt = process.argv.indexOf("--verify-media-mode");
+  if (verifyAt !== -1) {
+    const mode = process.argv[verifyAt + 1];
+    const config = parseJsonc(readFileSync(`${root}frontend/wrangler.jsonc`, "utf8"));
+    problems.push(...checkMediaMode(config, mode));
+    if (!problems.length) {
+      const flags = effectiveMediaFlags(config, mode);
+      console.log(`Release media mode: ${mode}`);
+      for (const [flag, value] of Object.entries(flags)) console.log(`  ${flag} = ${value}`);
+    }
+  }
   for (const problem of problems) console.error(`check-cloudflare-production: ${problem}`);
   if (problems.length) process.exit(1);
+  if (argsMode !== null) {
+    // Machine output only: the workflow reads these lines, so nothing else is printed in this mode.
+    for (const arg of mediaModeArgs(argsMode)) console.log(arg);
+    return;
+  }
   console.log("check-cloudflare-production: OK");
 }
 
