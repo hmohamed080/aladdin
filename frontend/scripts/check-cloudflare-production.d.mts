@@ -18,7 +18,13 @@ export function checkLiveValues(values: Record<string, string | undefined>): str
 export const R2_ONLY_FLAGS: Record<string, string>;
 export function checkCutoverStage(stage: string | undefined, approved: string | undefined): string[];
 export const MEDIA_MODES: string[];
-export const LEGACY_HOLD_FLAGS: Record<string, string>;
-export function mediaModeArgs(mode: string): string[];
-export function effectiveMediaFlags(config: WranglerConfig, mode: string): Record<string, string | undefined>;
-export function checkMediaMode(config: WranglerConfig, mode: string): string[];
+export const MEDIA_FLAGS: string[];
+export type MediaFlags = Record<string, string | undefined>;
+export function mediaFlagsFromBindings(bindings: unknown): MediaFlags;
+type FetchLike = (url: string, init?: { headers?: Record<string, string> }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
+export function fetchVersionMediaFlags(params: { accountId?: string; token?: string; worker?: string; versionId?: string; fetchImpl?: FetchLike; base?: string }): Promise<MediaFlags>;
+export function fetchLiveMediaFlags(params: { accountId?: string; token?: string; worker?: string; fetchImpl?: FetchLike; base?: string }): Promise<{ flags: MediaFlags; versionIds: string[] }>;
+export function mediaModeArgs(mode: string, liveFlags?: MediaFlags): string[];
+export function effectiveMediaFlags(config: WranglerConfig, mode: string, liveFlags?: MediaFlags): MediaFlags;
+export function checkMediaMode(config: WranglerConfig, mode: string, liveFlags?: MediaFlags): string[];
+export function checkVersionMatchesLive(versionFlags: MediaFlags, liveFlags: MediaFlags): string[];
