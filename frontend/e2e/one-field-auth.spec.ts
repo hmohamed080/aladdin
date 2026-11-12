@@ -62,7 +62,7 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     }
   });
 
-  test("sign in is one identifier field; sign up asks for mobile number or email and an 18+ confirmation", async ({ page }) => {
+  test("sign in is one identifier field; sign up asks for mobile number or email and no age confirmation", async ({ page }) => {
     await page.goto("/auth/sign-in");
     await expect(page.getByLabel(SIGN_IN_IDENTIFIER_LABEL)).toHaveCount(1);
     await expect(page.locator('input[type="tel"], input[type="email"]')).toHaveCount(0);
@@ -71,8 +71,8 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     await page.goto("/auth/sign-up");
     await expect(page.getByLabel(SIGN_UP_CONTACT_LABEL)).toHaveCount(1);
     await expect(page.locator('input[name="birthDate"], input[name="username"]')).toHaveCount(0); // neither is collected any more
-    await expect(page.locator('input[type="checkbox"]')).toHaveCount(1);
-    await expect(page.locator('input[name="ageConfirmed"]')).toHaveCount(1);
+    await expect(page.locator('input[type="checkbox"]')).toHaveCount(0); // no age confirmation, no consent boxes
+    await expect(page.locator('input[name="ageConfirmed"]')).toHaveCount(0);
     await expect(page.locator('input[name="confirmPassword"]')).toHaveCount(0);
   });
 

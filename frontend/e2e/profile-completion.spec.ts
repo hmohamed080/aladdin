@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { test, expect, type Page, type APIRequestContext, type BrowserContext } from "@playwright/test";
-import { confirmAge, IDENTITIES, reachLanding, messageIdsFor, readNewOtp, selectAccountType, signIn, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline } from "./helpers/auth";
+import { IDENTITIES, reachLanding, messageIdsFor, readNewOtp, selectAccountType, signIn, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline } from "./helpers/auth";
 
 // Offline sandboxes only (E2E_STUB_TURNSTILE=1); a no-op in CI, where the real widget runs.
 test.beforeEach(async ({ page }) => {
@@ -49,7 +49,6 @@ async function fillSignUp(page: Page, email: string, accountType: RegExp = SALES
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
   await selectAccountType(page, accountType);
-  await confirmAge(page);
   await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30000 });
 }
 
@@ -144,7 +143,7 @@ test.describe("Registration — account-type dropdown", () => {
     expect(options[0]).toEqual({ value: "", text: "اختر نوع الحساب", disabled: true });
     const byText = options.slice(1).map((o) => o.text);
     expect(byText).toEqual([
-      "المعرض", "المورد", "المصنع", "المستورد", "المقاول — قريبًا", "المهندس — قريبًا", "الصنايعية", "فريق المبيعات", "حساب شخصي — قريبًا",
+      "المعرض", "المورد", "المصنع", "المستورد", "الصنايعية", "فريق المبيعات", "المقاول — قريبًا", "المهندس — قريبًا", "حساب شخصي — قريبًا",
     ]);
     for (const o of options.slice(1)) expect(o.disabled, o.text).toBe(o.text.endsWith("قريبًا"));
     // Never a standalone Installer, never interior designer or wholesaler.

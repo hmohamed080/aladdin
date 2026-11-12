@@ -6666,7 +6666,6 @@ export const ar: Messages = {
     },
     signUp: {
       contactLabel: "رقم الموبايل أو البريد الإلكتروني",
-      ageConfirmLabel: "أقرّ بأن عمري ١٨ عامًا أو أكثر",
       agreementPrefix: "بالتسجيل، أنت توافق على",
       agreementSuffix: "وتعلم أن علاء الدين في مرحلة تجريبية وقد تتغير بعض الخصائص.",
       codeStepPhoneTitle: "أدخل رمز واتساب",
@@ -6770,7 +6769,6 @@ export const ar: Messages = {
     },
     error: {
       contactInvalid: "أدخل رقم موبايل أو بريدًا إلكترونيًا صحيحًا.",
-      ageNotConfirmed: "أكّد أن عمرك ١٨ عامًا أو أكثر لإنشاء حساب.",
       phoneExists: "يوجد حساب بهذا الرقم بالفعل. سجّل الدخول بدلًا من ذلك.",
       whatsappNumberInvalid: "تعذّر الوصول إلى هذا الرقم على واتساب. تحقق منه وحاول مجددًا.",
       whatsappUnavailable: "التسجيل برقم الموبايل غير متاح الآن. استخدم بريدك الإلكتروني.",

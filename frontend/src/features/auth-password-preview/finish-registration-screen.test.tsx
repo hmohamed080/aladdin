@@ -15,16 +15,9 @@ describe("FinishRegistrationScreen", () => {
     expect(document.querySelector('select[name="accountType"]')).not.toBeNull();
   });
 
-  it("asks for the 18+ confirmation (ageConfirmed) and has no username or birth-date field", () => {
+  it("has no age checkbox, username or birth-date field", () => {
     const { container } = renderWithI18n(<FinishRegistrationScreen />, "en");
-    const box = screen.getByRole("checkbox", { name: "I confirm I am 18 or older" });
-    expect(box).toHaveAttribute("name", "ageConfirmed");
-    expect(box).toHaveAttribute("aria-required", "true");
+    expect(container.querySelector('input[name="ageConfirmed"], input[type="checkbox"]')).toBeNull();
     expect(container.querySelector('input[name="username"], select[name="birthYear"]')).toBeNull();
-  });
-
-  it("renders the 18+ confirmation in Arabic", () => {
-    renderWithI18n(<FinishRegistrationScreen />, "ar");
-    expect(screen.getByRole("checkbox", { name: "أقرّ بأن عمري ١٨ عامًا أو أكثر" })).toBeTruthy();
   });
 });

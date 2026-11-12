@@ -14,7 +14,6 @@ import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "./password-input";
 import { TurnstileWidget } from "./turnstile-widget";
 import { DISPLAY_NAME_MAX_LENGTH } from "./password-policy";
-import { useAgeConfirmation } from "./age-confirm-checkbox";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
 
 const initial: PhoneSignUpState = { ok: false };
@@ -26,7 +25,7 @@ const PHONE_RESEND_COOLDOWN_SECONDS = 60;
 const NO_PROVIDERS: OAuthAvailability = { google: false, facebook: false };
 const CONSENT_TYPES = ["terms", "privacy", "pilot"] as const;
 
-type Field = "contact" | "password" | "displayName" | "accountType" | "age" | "form";
+type Field = "contact" | "password" | "displayName" | "accountType" | "form";
 
 /** Which field a server code belongs to, so the message renders under it. */
 function fieldFor(code: string | undefined): Field | null {
@@ -35,7 +34,6 @@ function fieldFor(code: string | undefined): Field | null {
   if (/error\.password/.test(code)) return "password";
   if (/error\.fullName/.test(code)) return "displayName";
   if (/error\.accountTypeRequired$/.test(code)) return "accountType";
-  if (/error\.ageNotConfirmed$/.test(code)) return "age";
   return "form";
 }
 
@@ -53,8 +51,8 @@ function FieldError({ code }: { code?: string }) {
 /**
  * Registration, Instagram style: Google / Facebook first, then ONE "Mobile
  * number or email" field, password, full name and (unless the landing
- * page already chose it) the account type, a required "I am 18 or older"
- * confirmation, and a single agreement line for the three consents. Every account type may use either:
+ * page already chose it) the account type,
+ * and a single agreement line for the three consents. Every account type may use either:
  *
  *   * email → the canonical signUp() + 6-digit EMAIL code (Architecture B,
  *     docs/frontend/auth-password-preview.md); the password goes to signUp()
@@ -98,7 +96,6 @@ export function PasswordSignUpForm({
   const contact = sendState.email ?? "";
   const errorField = fieldFor(sendState.ok ? undefined : sendState.code);
   const errorFor = (field: Field) => (errorField === field ? sendState.code : undefined);
-  const age = useAgeConfirmation(sendState.ok ? undefined : sendState.code);
   const set = (key: keyof typeof values) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: e.target.value }));
 
   useEffect(() => {
@@ -235,12 +232,12 @@ export function PasswordSignUpForm({
       ) : null}
       {hasOAuthProvider(providers) ? (
         <>
-          <EntryOAuthButtons next={next} accountType={initialAccountType || undefined} providers={providers} ageConfirmed={age.checked} />
+          <EntryOAuthButtons next={next} accountType={initialAccountType || undefined} providers={providers} />
           <OrDivider label={t("authPasswordPreview.signUp.or")} />
         </>
       ) : null}
 
-      <form action={dispatchSend} onSubmit={age.guardSubmit} className="flex flex-col gap-sm" noValidate data-sign-up-step="details">
+      <form action={dispatchSend} className="flex flex-col gap-sm" noValidate data-sign-up-step="details">
         <FieldError code={restartCode} />
 
         <label htmlFor="contact" className="sr-only">{t("authPasswordPreview.signUp.contactLabel")}</label>
@@ -322,9 +319,6 @@ export function PasswordSignUpForm({
             <FieldError code={errorFor("accountType")} />
           </>
         )}
-
-        {/* PROPOSED INTERIM, pending legal approval: replaces the retired birth-date fields. */}
-        {age.field}
 
         {CONSENT_TYPES.map((type) => (
           <input key={type} type="hidden" name={`consent_${type}`} value="on" />

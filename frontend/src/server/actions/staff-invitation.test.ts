@@ -51,7 +51,6 @@ const registration = (over: Record<string, string> = {}) =>
     email: "invited.person@example.com",
     password: PASSWORD,
     displayName: "Invited Person",
-    ageConfirmed: "on",
     consent_terms: "on",
     consent_privacy: "on",
     consent_pilot: "on",
@@ -152,7 +151,7 @@ describe("requestStaffSignUp (invited person, no persona)", () => {
     expect(JSON.stringify(result)).not.toContain(PASSWORD);
   });
 
-  it("applies the marketplace password, age-attestation and consent rules", async () => {
+  it("applies the marketplace password and consent rules", async () => {
     expect((await requestStaffSignUp(init, registration({ password: "short" }))).ok).toBe(false);
     expect(signUp).not.toHaveBeenCalled();
     expect((await requestStaffSignUp(init, registration({ consent_terms: "" }))).code).toBe("authPasswordPreview.error.consentRequired");
@@ -160,14 +159,13 @@ describe("requestStaffSignUp (invited person, no persona)", () => {
     expect(signUp).not.toHaveBeenCalled();
   });
 
-  it("staff invitation registration REQUIRES ageConfirmed: a missing or false attestation never reaches signUp()", async () => {
-    const missing = registration();
-    missing.delete("ageConfirmed");
-    for (const f of [missing, registration({ ageConfirmed: "false" }), registration({ ageConfirmed: "" })]) {
-      expect((await requestStaffSignUp(init, f)).code).toBe("authPasswordPreview.error.ageNotConfirmed");
-    }
-    expect(signUp).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+  it("staff invitation registration needs no age confirmation: it reaches signUp() without one", async () => {
+    rpc.mockResolvedValueOnce({ data: true, error: null });
+    signUp.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
+    const res = await requestStaffSignUp(init, registration());
+    expect(res.ok).toBe(true);
+    expect(signUp).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(signUp.mock.calls[0]![0])).not.toMatch(/age/i);
   });
 
   it("ignores a submitted birth date: nothing about it reaches signUp()", async () => {

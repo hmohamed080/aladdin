@@ -13,7 +13,6 @@ import { staffInvitationErrorCode } from "@/server/auth/staff-invitation-errors"
 import { clearStaffInvitationToken, readStaffInvitationToken } from "@/server/auth/staff-invitation-token";
 import { lookupStaffInvitation } from "@/server/queries/staff-invitations";
 import {
-  ageConfirmedFromForm,
   displayNameSchema,
   emailSchema,
   registrationIssueCode,
@@ -28,7 +27,7 @@ import {
  * is read from the httpOnly handoff cookie, the actor is the session, and identity is the Auth-confirmed e-mail. Nothing here logs a token,
  * an address, a password or a response body.
  *
- * Registration reuses the marketplace flow's building blocks: the same Turnstile token judged by GoTrue, the same password / name / 18+ attestation
+ * Registration reuses the marketplace flow's building blocks: the same Turnstile token judged by GoTrue, the same password / name
  * rules (staffRegistrationSchema), the same consent types, signUp() with the password set atomically, the same 6-digit e-mail code, and the same
  * enumeration and timing normalization (server/auth/signup-guards.ts). It deliberately has NO account type and NO username: staff are never
  * given a marketplace persona.
@@ -93,8 +92,6 @@ export async function requestStaffSignUp(_prev: StaffInvitationState, formData: 
     displayName: field("displayName"),
     email: field("email"),
     password: field("password"),
-    // Server-enforced 18+ self-attestation (proposed interim policy; replaces the date of birth). Not stored.
-    ageConfirmed: ageConfirmedFromForm(formData),
   });
   if (!parsed.success) return { ok: false, code: registrationIssueCode(parsed.error.issues[0]) };
   if (!CONSENT_TYPES.every((type) => formData.get(`consent_${type}`) === "on")) {

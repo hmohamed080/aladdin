@@ -4,7 +4,6 @@ import { useActionState, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { chooseAccountTypeAction, type AccountTypeChoiceState } from "@/server/actions/registration";
 import { CHOICE_GROUPS, CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
-import { isAgeNotConfirmedCode, useAgeConfirmation } from "./age-confirm-checkbox";
 import { Card } from "@/components/ui/primitives";
 import { LabeledField, Select, SubmitButton } from "@/components/ui/controls";
 import { Brand } from "@/components/layout/brand";
@@ -21,7 +20,6 @@ export function FinishRegistrationScreen() {
   const { t } = useI18n();
   const [state, dispatch] = useActionState(chooseAccountTypeAction, initial);
   const [accountTypeKey, setAccountTypeKey] = useState("");
-  const age = useAgeConfirmation(state.code);
 
   return (
     <Card className="flex flex-col gap-lg p-lg tablet:p-xl">
@@ -31,11 +29,11 @@ export function FinishRegistrationScreen() {
           <h1 className="font-display-ar text-headline text-fg">{t("authPasswordPreview.accountTypeLabel")}</h1>
         </div>
       </div>
-      <form action={dispatch} onSubmit={age.guardSubmit} className="flex flex-col gap-md" noValidate>
+      <form action={dispatch} className="flex flex-col gap-md" noValidate>
         <LabeledField
           label={t("authPasswordPreview.accountTypeLabel")}
           htmlFor="accountType"
-          error={state.code && !isAgeNotConfirmedCode(state.code) ? t(state.code) : undefined}
+          error={state.code ? t(state.code) : undefined}
         >
           <Select id="accountType" name="accountType" required value={accountTypeKey} onChange={(e) => setAccountTypeKey(e.target.value)}>
             <option value="" disabled>
@@ -52,8 +50,6 @@ export function FinishRegistrationScreen() {
             })}
           </Select>
         </LabeledField>
-        {/* PROPOSED INTERIM, pending legal approval: first-time OAuth registrants attest 18+ here (no birth date is collected). */}
-        {age.field}
         <SubmitButton className="w-full">{t("onboarding.continue")}</SubmitButton>
       </form>
     </Card>

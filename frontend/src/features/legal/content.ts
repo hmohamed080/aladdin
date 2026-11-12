@@ -43,7 +43,7 @@ const privacyEn: LegalDocument = {
       blocks: [
         p("Data you give us when you create and use an account:"),
         list(
-          "Account details: full name, email address and/or mobile phone number, the account type you choose (for example Showroom or Installer), your password and your confirmation that you are 18 or older. We no longer collect a date of birth or a username. Any values stored earlier are being removed as part of a scheduled clean-up. Passwords are stored only as a secure hash by our authentication provider; we never see or store them in plain text.",
+          "Account details: full name, email address and/or mobile phone number, the account type you choose (for example Showroom or Installer), and your password. We no longer collect a date of birth or a username. Any values stored earlier are being removed as part of a scheduled clean-up. Passwords are stored only as a secure hash by our authentication provider; we never see or store them in plain text.",
           "Profile details you add: display name, profile photo, trade and specialties, service areas, availability, portfolio images and certificates.",
           "Business details if you register a business: business name and legal name, business type, branches and their addresses and phone numbers, business photo and description, and verification information you submit.",
           "Content you create: products, prices, offers, purchase requests, quotations, job posts and applications, reviews, saved items and searches, and messages you send to other users.",
@@ -146,7 +146,7 @@ const privacyEn: LegalDocument = {
     {
       id: "children",
       heading: "11. Children",
-      blocks: [p("Aladdin is a professional service for adults. You confirm that you are 18 or older when you create an account. It is not intended for anyone under 18, and we do not knowingly collect data from children.")],
+      blocks: [p("Aladdin is a professional service for adults. The service is intended for people aged 18 or older. It is not intended for anyone under 18, and we do not knowingly collect data from children.")],
     },
     {
       id: "transfers",
@@ -184,7 +184,7 @@ const privacyAr: LegalDocument = {
       blocks: [
         p("بيانات تقدّمها لنا عند إنشاء حسابك واستخدامه:"),
         list(
-          "بيانات الحساب: الاسم الكامل، والبريد الإلكتروني و/أو رقم الموبايل، ونوع الحساب الذي تختاره (مثل معرض أو صنايعي)، وكلمة المرور، وإقرارك بأن عمرك ١٨ عامًا أو أكثر. لم نعد نجمع تاريخ الميلاد أو اسم المستخدم. وأي قيم سبق حفظها تُحذف ضمن عملية تنظيف مجدولة. تُحفظ كلمات المرور مشفّرة تشفيرًا أحادي الاتجاه لدى مزوّد خدمة الدخول، ولا نراها أو نحفظها كنص واضح أبدًا.",
+          "بيانات الحساب: الاسم الكامل، والبريد الإلكتروني و/أو رقم الموبايل، ونوع الحساب الذي تختاره (مثل معرض أو صنايعي)، وكلمة المرور. لم نعد نجمع تاريخ الميلاد أو اسم المستخدم. وأي قيم سبق حفظها تُحذف ضمن عملية تنظيف مجدولة. تُحفظ كلمات المرور مشفّرة تشفيرًا أحادي الاتجاه لدى مزوّد خدمة الدخول، ولا نراها أو نحفظها كنص واضح أبدًا.",
           "بيانات الملف الشخصي التي تضيفها: الاسم الظاهر، وصورة الملف، والحرفة والتخصصات، ومناطق الخدمة، وأوقات التوفر، وصور الأعمال والشهادات.",
           "بيانات النشاط التجاري إذا سجّلت نشاطًا: الاسم التجاري والاسم القانوني، ونوع النشاط، والفروع وعناوينها وأرقام هواتفها، وصورة النشاط ووصفه، وبيانات التوثيق التي ترسلها.",
           "المحتوى الذي تنشئه: المنتجات والأسعار والعروض وطلبات الشراء وعروض الأسعار وإعلانات الوظائف والتقديمات والتقييمات والعناصر وعمليات البحث المحفوظة والرسائل التي ترسلها للمستخدمين الآخرين.",
@@ -281,7 +281,7 @@ const privacyAr: LegalDocument = {
     {
       id: "children",
       heading: "١١. الأطفال",
-      blocks: [p("علاء الدين خدمة مهنية للبالغين. تُقرّ عند إنشاء حسابك بأن عمرك ١٨ عامًا أو أكثر. الخدمة غير موجهة لمن هم دون ١٨ عامًا، ولا نجمع عن قصد بيانات الأطفال.")],
+      blocks: [p("علاء الدين خدمة مهنية للبالغين. الخدمة موجهة لمن بلغ ١٨ عامًا أو أكثر. الخدمة غير موجهة لمن هم دون ١٨ عامًا، ولا نجمع عن قصد بيانات الأطفال.")],
     },
     {
       id: "transfers",
@@ -471,7 +471,7 @@ const termsEn: LegalDocument = {
       heading: "2. Who can use Aladdin",
       blocks: [
         list(
-          "You must be at least 18 years old and able to enter into a binding agreement. By creating an account you confirm that you are 18 or older; we do not collect your date of birth.",
+          "You must be at least 18 years old and able to enter into a binding agreement. We do not ask for or collect your date of birth.",
           "If you register or act for a business, you confirm that you are authorised to act for it, and the business is also bound by these Terms.",
           "You may not use Aladdin if we have previously suspended or removed your account, unless we agree otherwise.",
         ),
@@ -602,7 +602,7 @@ const termsAr: LegalDocument = {
       heading: "٢. من يمكنه استخدام علاء الدين",
       blocks: [
         list(
-          "يجب ألا يقل عمرك عن ١٨ عامًا وأن تكون أهلًا لإبرام اتفاق ملزم. بإنشاء حساب تُقرّ بأن عمرك ١٨ عامًا أو أكثر، ولا نجمع تاريخ ميلادك.",
+          "يجب ألا يقل عمرك عن ١٨ عامًا وأن تكون أهلًا لإبرام اتفاق ملزم. ولا نطلب تاريخ ميلادك ولا نجمعه.",
           "إذا سجّلت نشاطًا تجاريًا أو تصرفت نيابةً عنه فأنت تؤكد أنك مخوّل بذلك، ويلتزم النشاط أيضًا بهذه الشروط.",
           "لا يجوز لك استخدام علاء الدين إذا سبق أن أوقفنا حسابك أو أزلناه، إلا إذا وافقنا على غير ذلك.",
         ),

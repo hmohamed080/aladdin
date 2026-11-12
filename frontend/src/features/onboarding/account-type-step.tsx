@@ -8,7 +8,6 @@ import { CHOICE_GROUPS, CHOICES_BY_KEY, INVITED_EMPLOYEE_KEY } from "@/lib/onboa
 import { WizardShell, WizardProgress, ChoiceCard } from "@/features/onboarding/wizard";
 import { InlineError } from "@/components/ui/primitives";
 import { SubmitButton, Button } from "@/components/ui/controls";
-import { isAgeNotConfirmedCode, useAgeConfirmation } from "@/features/auth-password-preview/age-confirm-checkbox";
 
 const initial: OnboardingActionState = { ok: false };
 
@@ -35,13 +34,12 @@ export function AccountTypeStep({ selectedKey }: { selectedKey: string | null })
   const { t } = useI18n();
   const [state, dispatch] = useActionState(selectAccountTypeAction, initial);
   const [choice, setChoice] = useState<string | null>(selectedKey);
-  const age = useAgeConfirmation(state.code);
 
   const progress = <WizardProgress current={2} total={3} label={t("onboarding.stepAccountType")} />;
 
   return (
     <WizardShell progress={progress} title={t("onboarding.accountType.title")} subtitle={t("onboarding.accountType.subtitle")}>
-      <form action={dispatch} onSubmit={age.guardSubmit} className="flex flex-col gap-lg" noValidate>
+      <form action={dispatch} className="flex flex-col gap-lg" noValidate>
         <input type="hidden" name="choice" value={choice ?? ""} />
 
         {CHOICE_GROUPS.map(({ group, keys }) => (
@@ -83,10 +81,7 @@ export function AccountTypeStep({ selectedKey }: { selectedKey: string | null })
           <p className="mt-1 text-body text-fg-secondary">{t("onboarding.accountType.invitedNote")}</p>
         </div>
 
-        {/* PROPOSED INTERIM, pending legal approval: the server enforces the 18+ confirmation where the account type is chosen. */}
-        {age.field}
-
-        {state.code && !isAgeNotConfirmedCode(state.code) ? <InlineError>{t(state.code)}</InlineError> : null}
+        {state.code ? <InlineError>{t(state.code)}</InlineError> : null}
 
         <div className="flex items-center gap-sm">
           <Link href="/onboarding/contact">

@@ -9,7 +9,6 @@ import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "@/features/auth-password-preview/password-input";
 import { TurnstileWidget } from "@/features/auth-password-preview/turnstile-widget";
 import { DISPLAY_NAME_MAX_LENGTH } from "@/features/auth-password-preview/password-policy";
-import { isAgeNotConfirmedCode, useAgeConfirmation } from "@/features/auth-password-preview/age-confirm-checkbox";
 import { requestStaffSignUp, verifyStaffSignUp, type StaffInvitationState } from "@/server/actions/staff-invitation";
 
 const CONSENT_TYPES = ["terms", "privacy", "pilot"] as const;
@@ -35,7 +34,6 @@ export function StaffRegisterForm() {
   const [verifyState, dispatchVerify] = useActionState(verifyStaffSignUp, initial);
   const [password, setPassword] = useState("");
   const emailForCode = sendState.ok ? sendState.email : undefined;
-  const age = useAgeConfirmation(sendState.ok ? undefined : sendState.code);
 
   if (emailForCode) {
     return (
@@ -58,7 +56,7 @@ export function StaffRegisterForm() {
 
   return (
     <AuthCard title={t("staffInvitation.register.title")} subtitle={t("staffInvitation.register.intro")}>
-      <form action={dispatchSend} onSubmit={age.guardSubmit} className="flex flex-col gap-sm" noValidate data-staff-step="details">
+      <form action={dispatchSend} className="flex flex-col gap-sm" noValidate data-staff-step="details">
         <label htmlFor="email" className="sr-only">
           {t("authPasswordPreview.signUp.contactLabel")}
         </label>
@@ -100,7 +98,6 @@ export function StaffRegisterForm() {
           placeholder={t("authPasswordPreview.fullNameLabel")}
         />
         {/* PROPOSED INTERIM, pending legal approval: replaces the retired birth-date fields. */}
-        {age.field}
         {CONSENT_TYPES.map((type) => (
           <input key={type} type="hidden" name={`consent_${type}`} value="on" />
         ))}
@@ -116,7 +113,7 @@ export function StaffRegisterForm() {
           . {t("authPasswordPreview.signUp.agreementSuffix")}
         </p>
         <TurnstileWidget action="sign-up" resetKey={sendState} />
-        <FieldError code={!sendState.ok && !isAgeNotConfirmedCode(sendState.code) ? sendState.code : undefined} />
+        <FieldError code={!sendState.ok ? sendState.code : undefined} />
         <SubmitButton className="w-full" pendingLabel={t("staffInvitation.register.submitting")}>
           {t("staffInvitation.register.submit")}
         </SubmitButton>

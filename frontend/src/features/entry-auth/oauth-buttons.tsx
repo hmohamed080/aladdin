@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { useI18n } from "@/lib/i18n/context";
 import { startEntryOAuth } from "@/server/actions/entry-oauth";
-import { AGE_CONFIRMATION_FIELD } from "@/features/auth-password-preview/password-policy";
 import type { OAuthAvailability, OAuthProvider } from "@/server/auth/entry-oauth";
 
 
@@ -42,13 +41,10 @@ export function EntryOAuthButtons({
   next,
   accountType,
   providers,
-  ageConfirmed = false,
 }: {
   next?: string;
   accountType?: string;
   providers: OAuthAvailability;
-  /** Sign-up only: the 18+ box was already ticked on the form, so the provider round trip carries it (the server reads `ageConfirmed`). */
-  ageConfirmed?: boolean;
 }) {
   const { t } = useI18n();
   if (!providers.google && !providers.facebook) return null;
@@ -57,7 +53,6 @@ export function EntryOAuthButtons({
       <form action={startEntryOAuth} className="flex flex-col gap-sm">
         {next ? <input type="hidden" name="next" value={next} /> : null}
         {accountType ? <input type="hidden" name="accountType" value={accountType} /> : null}
-        {ageConfirmed ? <input type="hidden" name={AGE_CONFIRMATION_FIELD} value="on" /> : null}
         {providers.google ? <ProviderButton provider="google" label={t("entryAuth.continueWithGoogle")} icon={<ProviderMark provider="google" />} /> : null}
         {providers.facebook ? <ProviderButton provider="facebook" label={t("entryAuth.continueWithFacebook")} icon={<ProviderMark provider="facebook" />} /> : null}
       </form>

@@ -6901,7 +6901,6 @@ export const en = {
     },
     signUp: {
       contactLabel: "Mobile number or email",
-      ageConfirmLabel: "I confirm I am 18 or older",
       agreementPrefix: "By signing up, you agree to our",
       agreementSuffix: "You also understand Aladdin is a pilot release and features may change.",
       codeStepPhoneTitle: "Enter the WhatsApp code",
@@ -7005,7 +7004,6 @@ export const en = {
     },
     error: {
       contactInvalid: "Enter a valid mobile number or email address.",
-      ageNotConfirmed: "Confirm that you are 18 or older to create an account.",
       phoneExists: "This mobile number already has an account. Log in instead.",
       whatsappNumberInvalid: "We couldn't reach this number on WhatsApp. Check it and try again.",
       whatsappUnavailable: "Signing up with a mobile number isn't available right now. Use your email instead.",

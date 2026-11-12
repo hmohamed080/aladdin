@@ -12,7 +12,7 @@ import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { createPhoneSignUpUser, deleteCraftsmanPasswordUser, isCanonicalPhoneTaken } from "@/lib/supabase/admin-server";
-import { ageConfirmationError, displayNameSchema, passwordWithContextSchema } from "@/features/auth-password-preview/password-policy";
+import { displayNameSchema, passwordWithContextSchema } from "@/features/auth-password-preview/password-policy";
 import { phoneAuthLimit } from "@/server/auth/phone-auth-limit";
 import { captchaTokenFrom, isCaptchaFailure } from "@/server/auth/captcha";
 import { clientIpFrom, turnstileHostnamesFrom, verifyTurnstileToken } from "@/server/auth/turnstile";
@@ -166,10 +166,6 @@ export async function requestPhoneSignUp(formData: FormData, phone: CanonicalPho
   if (!choice || choice.comingSoon || choice.transitional || !choice.accountType) return fail(E("accountTypeRequired"));
   const password = passwordWithContextSchema([phone.e164, phone.national]).safeParse(formData.get("password"));
   if (!password.success) return fail(password.error.issues[0]?.message ?? E("passwordTooShort"));
-  // Server-enforced 18+ self-attestation (proposed interim policy; replaces the date of birth). Checked here, at request time, before any
-  // code is sent; it is not stored.
-  const ageError = ageConfirmationError(formData);
-  if (ageError) return fail(ageError);
   if (!CONSENT_TYPES.every((type) => formData.get(`consent_${type}`) === "on")) return fail(E("consentRequired"));
 
   // Never replace a signed-in person's identity or create a second account.

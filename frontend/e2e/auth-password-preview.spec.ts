@@ -7,8 +7,6 @@ import {
   reachLanding,
   newMessageSubjectsFor,
   selectAccountType,
-  confirmAge,
-  AGE_CONFIRM_LABEL,
   SIGN_IN_BUTTON,
   SIGN_IN_IDENTIFIER_LABEL,
   SIGN_UP_BUTTON,
@@ -41,16 +39,15 @@ function uniqueEmail(tag: string): string {
 
 const STRONG_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
 
-/** Fills the one sign-up form (ADR-0025): contact, password, name, account type and the 18+ confirmation. Consents are one agreement line, not checkboxes. */
+/** Fills the one sign-up form (ADR-0025): contact, password, name, and account type. Consents are one agreement line, not checkboxes. */
 async function fillSignUp(
   page: import("@playwright/test").Page,
-  { email, password, ageConfirmed = true }: { email: string; password: string; ageConfirmed?: boolean },
+  { email, password }: { email: string; password: string },
 ): Promise<void> {
   await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(email);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
   await selectAccountType(page);
-  if (ageConfirmed) await confirmAge(page);
 }
 
 /** The neutral Step-2 copy (§Account enumeration) — deliberately never an unconditional "we sent a code to X". */
@@ -191,21 +188,11 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
   });
 });
 
-test.describe("The 18+ confirmation is required BEFORE signUp() (no Auth user or email without it)", () => {
-  test("submitting without the 18+ confirmation is refused on Step 1 — no OTP step, no email", async ({ page, request }) => {
-    const email = uniqueEmail("noage");
+test.describe("Sign-up asks for no age confirmation", () => {
+  test("the sign-up form has no age checkbox and registers without one", async ({ page }) => {
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email, password: STRONG_PASSWORD, ageConfirmed: false });
-    await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
-    // The error is linked to the checkbox; anchored so the three Arabic "Coming Soon" descriptions never match.
-    await expect(page.getByRole("alert").filter({ hasText: /^(Confirm that you are 18 or older to create an account\.|أكّد أن عمرك ١٨ عامًا أو أكثر لإنشاء حساب\.)$/ })).toBeVisible();
-    await expect(page.getByLabel(AGE_CONFIRM_LABEL)).toHaveAttribute("aria-invalid", "true");
-    await expect(page.getByText(NEXT_STEP_TEXT)).toHaveCount(0);
-    await expect(page.locator('input[autocomplete="one-time-code"]')).toHaveCount(0);
-    // The user's values are still there, and signUp() never ran.
-    await expect(page.getByLabel(SIGN_UP_CONTACT_LABEL)).toHaveValue(email);
-    expect(await messageIdsFor(request, email)).toEqual(new Set());
+    await expect(page.locator('input[name="ageConfirmed"]')).toHaveCount(0);
+    await expect(page.getByText(/18 or older|١٨ عامًا/)).toHaveCount(0);
   });
 });
 

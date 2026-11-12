@@ -3,7 +3,7 @@ import { randomInt } from "node:crypto";
 import { resolve } from "node:path";
 import { expect, type Page } from "@playwright/test";
 import { latestOutboxEntry } from "../../src/server/phone-verification/outbox-reader";
-import { E2E_PASSWORD, confirmAge, reachLanding, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline, waitForCaptchaToken } from "./auth";
+import { E2E_PASSWORD, reachLanding, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline, waitForCaptchaToken } from "./auth";
 
 /**
  * Mobile-number sign-up (ADR-0025) through the REAL `/auth/sign-up` and server actions, proven by the ONE phone verification authority.
@@ -93,7 +93,6 @@ export async function requestPhoneSignUp(
   await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(phone);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill(name);
-  await confirmAge(page);
   await waitForCaptchaToken(page);
   const since = Date.now() - 1_000;
   if (deliveryViaRig) await rigAllow(e164Of(phone));
