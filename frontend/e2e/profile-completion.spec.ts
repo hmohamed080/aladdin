@@ -143,7 +143,7 @@ test.describe("Registration — account-type dropdown", () => {
     expect(options[0]).toEqual({ value: "", text: "اختر نوع الحساب", disabled: true });
     const byText = options.slice(1).map((o) => o.text);
     expect(byText).toEqual([
-      "المعرض", "المورد", "المصنع", "المستورد", "المقاول — قريبًا", "المهندس — قريبًا", "الصنايعية", "فريق المبيعات", "حساب شخصي — قريبًا",
+      "المعرض", "المورد", "المصنع", "المستورد", "الصنايعية", "فريق المبيعات", "المقاول — قريبًا", "المهندس — قريبًا", "حساب شخصي — قريبًا",
     ]);
     for (const o of options.slice(1)) expect(o.disabled, o.text).toBe(o.text.endsWith("قريبًا"));
     // Never a standalone Installer, never interior designer or wholesaler.
