@@ -15,3 +15,4 @@ Index for the removal of application usernames and date of birth. Authority: [ma
 | [drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql](drafts/P1-M1-FORWARD-FIX-RESTORE-PREVIOUS.sql) | Proven SQL restoring the pre-M1 definitions of the three functions (not applied) |
 
 Planned later (not yet written): `P1-TEST-MATRIX.md`, `P1-ACCEPTANCE-REPORT.md`, `P1-PRODUCTION-REPORT.md`. Nothing here is applied to a hosted environment; evidence holds counts only, never personal values.
+- [P1-CLEANUP-READINESS-20261112.md](P1-CLEANUP-READINESS-20261112.md): residue audit after the Production rollout, M2/M3/scrub/redaction plan, blockers (planning only).

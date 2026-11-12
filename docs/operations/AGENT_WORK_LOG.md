@@ -7540,3 +7540,9 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 
 - `Cloudflare production` stage=check on `6b94bdbf` passed (run 43181919879). Production DB read-only preflight: 207 applied, exactly `20261110090001` and `20261110090002` pending, no drift; media functions equal the pinned pre-media definitions. The live frontend Worker (`38d2db8a`) has R2 OFF while the committed config has R2-only ON, so a plain upload of `main` would switch media writes at promotion.
 - Added `media_mode` (default `legacy-hold`, or `r2-only`) to the production workflow: `--var` overrides for R2 off / legacy writes kept, verified before anything is built or uploaded (`check-cloudflare-production.mjs --verify-media-mode`), fail-closed helper `production-media-vars.sh`, tests in `production-config.test.ts`. The committed R2 cutover config is unchanged. Not run: `CLOUDFLARE_PRODUCTION_ENABLED` is still `false`; no upload, db push, promotion, R2 activation, backup or data change.
+
+## 2026-11-12 - P1 cleanup readiness and progress report (agent)
+
+- Read-only audit of Production and Acceptance (both 209 migrations) plus code scan: sign-in, sign-up, registration and admin no longer use username or DOB; the data (856 / 18 usernames, 3 / 13 birth dates, 2 / 11 Auth metadata and identity copies, 863 / 20 audit rows) and the schema remain. Production `birth_date` is 3 (was 4 on 2026-11-10): re-baseline before M2.
+- Wrote `docs/operations/account-identity/P1-CLEANUP-READINESS-20261112.md`: object list, risks, ordered plan with exact scope, tests and rollback limits, recommended M3 split (expand, app release, drop), blockers. Verdict NO-GO to execute, GO to prepare. Progress board and change log (v1.8) updated.
+- Nothing executed: no data deletion, migration, backup, merge or deployment. R2 is handled by another agent.
