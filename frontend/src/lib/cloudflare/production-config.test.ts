@@ -1,9 +1,15 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
 import {
   checkBackend,
   checkCutoverStage,
+  checkMediaMode,
+  effectiveMediaFlags,
+  LEGACY_HOLD_FLAGS,
+  mediaModeArgs,
+  R2_ONLY_FLAGS,
   checkFrontend,
   checkLiveValues,
   jwtProjectRef,
@@ -123,5 +129,63 @@ describe("Production build values", () => {
   it("read the project ref from a legacy anon key and ignore other key formats", () => {
     expect(jwtProjectRef(keyFor("kkpkgjrweysgvhvkhzun"))).toBe("kkpkgjrweysgvhvkhzun");
     expect(jwtProjectRef("sb_publishable_abc")).toBeNull();
+  });
+});
+
+describe("Production release media modes (R2 stays off for a UI release; the committed cutover config is preserved)", () => {
+  const workflow = () => readFileSync(join(FRONTEND, "..", ".github", "workflows", "cloudflare-production.yml"), "utf8");
+
+  it("legacy-hold carries exactly the live Worker's media flags and nothing else", () => {
+    expect(LEGACY_HOLD_FLAGS).toEqual({ R2_STORAGE_ENABLED: "false", R2_PRODUCTION_WRITES_APPROVED: "false", MEDIA_LEGACY_STORAGE_WRITES: "true" });
+    expect(mediaModeArgs("legacy-hold")).toEqual([
+      "--var", "R2_STORAGE_ENABLED:false", "--var", "R2_PRODUCTION_WRITES_APPROVED:false", "--var", "MEDIA_LEGACY_STORAGE_WRITES:true",
+    ]);
+    expect(effectiveMediaFlags(frontendConfig(), "legacy-hold")).toEqual(LEGACY_HOLD_FLAGS);
+    expect(checkMediaMode(frontendConfig(), "legacy-hold")).toEqual([]);
+  });
+
+  it("r2-only adds no override: the committed R2-only flags are the cutover, and they stay committed", () => {
+    expect(mediaModeArgs("r2-only")).toEqual([]);
+    expect(effectiveMediaFlags(frontendConfig(), "r2-only")).toEqual(R2_ONLY_FLAGS);
+    expect(checkMediaMode(frontendConfig(), "r2-only")).toEqual([]);
+    expect(checkFrontend(frontendConfig())).toEqual([]);
+    const committed = frontendConfig().env.production.vars;
+    for (const [flag, want] of Object.entries(R2_ONLY_FLAGS)) expect(committed[flag]).toBe(want);
+  });
+
+  it("refuses an unknown mode and a config whose flags differ from the mode's promise", () => {
+    expect(checkMediaMode(frontendConfig(), "")[0]).toMatch(/media_mode must be one of/);
+    expect(checkMediaMode(frontendConfig(), "typo")[0]).toMatch(/got "typo"/);
+    expect(() => mediaModeArgs("typo")).toThrow(/unknown media mode/);
+    const tampered = frontendConfig();
+    tampered.env.production.vars.R2_STORAGE_ENABLED = "false";
+    expect(checkMediaMode(tampered, "r2-only").join()).toMatch(/R2_STORAGE_ENABLED would be "false"/);
+  });
+
+  it("the workflow defaults to legacy-hold and every frontend wrangler command takes the mode's arguments", () => {
+    const text = workflow();
+    expect(text).toMatch(/media_mode:[\s\S]*?options: \[legacy-hold, r2-only\][\s\S]*?default: legacy-hold/);
+    expect(text).toContain('--verify-media-mode "$MEDIA_MODE"');
+    const blocks = text.split("- name:").filter((block) => /working-directory: frontend\b/.test(block) && /wrangler (deploy|versions upload)/.test(block));
+    // frontend dry run, upload and deploy
+    expect(blocks.length).toBe(3);
+    for (const block of blocks) {
+      expect(block).toContain("source ../frontend/scripts/production-media-vars.sh");
+      expect(block).toContain('"${MEDIA_VARS[@]}"');
+    }
+  });
+
+  it("the sourced helper fails closed (an unknown mode stops the step) and yields 6 args for legacy-hold, 0 for r2-only", () => {
+    const run = (mode: string) =>
+      spawnSync("bash", ["-e", "-c", `cd "${join(FRONTEND, "scripts")}" && export MEDIA_MODE=${mode} && source ./production-media-vars.sh && echo "n=\${#MEDIA_VARS[@]}"`], { encoding: "utf8" });
+    const hold = run("legacy-hold");
+    expect(hold.status).toBe(0);
+    expect(hold.stdout.trim()).toBe("n=6");
+    const cutover = run("r2-only");
+    expect(cutover.status).toBe(0);
+    expect(cutover.stdout.trim()).toBe("n=0");
+    const bad = run("bogus");
+    expect(bad.status).not.toBe(0);
+    expect(bad.stdout).not.toContain("n=");
   });
 });

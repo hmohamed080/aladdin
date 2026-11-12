@@ -16,6 +16,14 @@
 #                     exists, because the frontend's BACKEND service binding points at it. It also refuses unless the WhatsApp OTP
 #                     Worker exists (the OTP_WORKER service binding). Goes live immediately: prefer frontend-upload first.
 #
+# MEDIA MODE (input `media_mode`, frontend stages only). The committed config is the FUTURE R2-only cutover state and is never edited to
+# ship an unrelated release; the mode decides what a release carries, as `--var` overrides on the wrangler command line:
+#   legacy-hold  (default) R2_STORAGE_ENABLED=false, R2_PRODUCTION_WRITES_APPROVED=false, MEDIA_LEGACY_STORAGE_WRITES=true: the same
+#                media behaviour as the Worker that is live, so a release of UI/registration changes moves no media write path.
+#   r2-only      no overrides: the committed R2-only flags. This is the cutover; promoting such a version needs its own approval.
+# Before anything is uploaded the "Release flags" step computes the effective flags and fails unless they are exactly the mode's promise,
+# and prints them in the run summary. Every frontend wrangler command (dry run, upload, deploy) takes its overrides from the same script.
+#
 # R2-only media is ON in the committed config (R2_STORAGE_ENABLED / R2_PRODUCTION_WRITES_APPROVED true, legacy writes
 # closed). A version uploaded by frontend-upload serves 0% of traffic, so nothing goes live; stage=frontend (immediate
 # deploy) is refused unless the environment variable R2_CUTOVER_APPROVED is "true".
@@ -50,6 +58,11 @@ on:
         type: choice
         options: [check, backend, frontend-upload, frontend]
         default: check
+      media_mode:
+        description: "Frontend stages: legacy-hold = R2 writes OFF and Supabase Storage writes kept (like the live Worker); r2-only = the committed R2 cutover flags"
+        type: choice
+        options: [legacy-hold, r2-only]
+        default: legacy-hold
 
 concurrency:
   group: cloudflare-production
@@ -66,6 +79,7 @@ jobs:
     environment: cloudflare-production
     env:
       STAGE: ${{ inputs.stage }}
+      MEDIA_MODE: ${{ inputs.media_mode }}
       NEXT_PUBLIC_APP_ENV: production
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -95,6 +109,9 @@ jobs:
             "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/settings")
           [ "$status" = "200" ] || { echo "The live project does not accept NEXT_PUBLIC_SUPABASE_ANON_KEY (HTTP $status)"; exit 1; }
           echo "Stage: $STAGE, upload: $UPLOAD" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Release flags (effective media flags must be exactly the chosen mode, before anything is built or uploaded)
+        if: inputs.stage != 'backend'
+        run: node frontend/scripts/check-cloudflare-production.mjs --verify-media-mode "$MEDIA_MODE" | tee -a "$GITHUB_STEP_SUMMARY"
       - run: pnpm install --frozen-lockfile
 
       # Backend: FastAPI image + Worker, no public address.
@@ -145,7 +162,9 @@ jobs:
       - name: Frontend bundle (dry run)
         if: inputs.stage != 'backend'
         working-directory: frontend
-        run: pnpm exec wrangler deploy --env production --dry-run --outdir "$RUNNER_TEMP/frontend"
+        run: |
+          source ../frontend/scripts/production-media-vars.sh
+          pnpm exec wrangler deploy --env production --dry-run --outdir "$RUNNER_TEMP/frontend" "${MEDIA_VARS[@]}"
       - name: Upload aladdin-frontend-production as an UNDEPLOYED version (0% of traffic)
         if: inputs.stage == 'frontend-upload' && env.UPLOAD == 'true'
         working-directory: frontend
@@ -154,9 +173,11 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -o pipefail
-          pnpm exec wrangler versions upload --env production --message "upload-only ${GITHUB_SHA::12}" \
+          source ../frontend/scripts/production-media-vars.sh
+          pnpm exec wrangler versions upload --env production --message "upload-only ${GITHUB_SHA::12} ($MEDIA_MODE)" \
             --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
-            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$NEXT_PUBLIC_SUPABASE_ANON_KEY" | tee "$RUNNER_TEMP/upload.txt"
+            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            "${MEDIA_VARS[@]}" | tee "$RUNNER_TEMP/upload.txt"
           {
             echo "### Frontend version uploaded, NOT deployed (0% of traffic)"
             grep -i "version id" "$RUNNER_TEMP/upload.txt" || true
@@ -170,7 +191,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         # Server code reads the public Supabase values at runtime too.
         run: |
+          source ../frontend/scripts/production-media-vars.sh
           pnpm exec wrangler deploy --env production \
             --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
-            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            "${MEDIA_VARS[@]}"
           pnpm exec wrangler secret list --env production --format json | jq -r '.[].name' | sort | tee -a "$GITHUB_STEP_SUMMARY"
