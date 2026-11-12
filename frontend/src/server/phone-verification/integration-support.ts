@@ -83,7 +83,7 @@ export const SNAPSHOT_SQL = (ids: string[]): string => `
     'identities', (select coalesce(jsonb_agg(jsonb_build_object('provider', i.provider, 'id', i.id) order by i.provider, i.id), '[]') from auth.identities i where i.user_id = u.id),
     'mfa_factors', (select count(*) from auth.mfa_factors f where f.user_id = u.id),
     'public_user', (select jsonb_build_object('type', x.primary_account_type, 'status', x.status, 'verified', x.is_verified) from public.users x where x.id = u.id),
-    'profile', (select jsonb_build_object('id', p.id, 'username', p.username, 'phone_e164', p.phone_e164, 'country', p.phone_country_iso2,
+    'profile', (select jsonb_build_object('id', p.id, 'phone_e164', p.phone_e164, 'country', p.phone_country_iso2,
                   'national', p.phone_national, 'verified_at', p.phone_verified_at, 'display_name', p.display_name) from public.profiles p where p.user_id = u.id),
     'memberships', (select coalesce(jsonb_agg(jsonb_build_object('org', m.organization_id, 'status', m.status, 'org_type', o.org_type,
                   'org_contact_phone', o.contact_phone,

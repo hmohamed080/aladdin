@@ -7558,3 +7558,8 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Permission contract `20261112090001.json` (755 functions); forward-fix `scripts/hosted-db/forward-fix/m3a-restore-previous.sql` pinned by sha256 as the new `m3a` plan in `acceptance-gate.mjs` (209 -> 210). Locally proven on a clean replay: M3a changes exactly 4 catalog objects, and the forward-fix restores the pre-M3a catalog fingerprint exactly.
 - pgTAP `127` added; `82`, `118`, `125` and the lease concurrency script updated (untyped 4-argument positional calls to `pending_registration_save` are now ambiguous, so they pass an explicit TTL; the deployed app binds by name and is unaffected).
 - Not applied to Acceptance or Production; no data, backup, R2, frontend or deployment change.
+
+## 2026-11-12 - P1 PR-B: app stops using the username database objects (agent)
+
+- `savePendingRegistration` now calls the username-less `pending_registration_save` overload by name with NO `p_username` (requires M3a applied in the target database BEFORE this code is deployed). Deleted the dead code: `checkUsername`, `chooseUsernameAction`, `features/installer-phone-auth/username.ts`, `lib/identity/username.ts` and their tests; removed the `profile_set_username` steps from the two local-integration fixtures and the `username` key from the identity snapshot SQL; `database.types.ts` gets the additive overload.
+- No database change, no hosted write, no deployment, no R2 change. Backups, Auth scrub, M2, audit redaction and M3b stay blocked.

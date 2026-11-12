@@ -222,9 +222,10 @@ export function whatsappOtpNotificationRecord(a: { eventKey: string; kind: strin
  * Never stores a password. Best-effort by design: a failure here does not fail registration; `verifyPasswordSignUp` falls back to the
  * finish-registration recovery screen if nothing was staged.
  *
- * P1 PR-2: there is no username any more, so `p_username` is passed EXPLICITLY as null (only `p_ttl_minutes` has a database default; omitting
- * `p_username` would be a missing-argument error). Pre-M1 databases still declare the column NOT NULL and refuse this call (the failure is
- * logged and ignored, as for any lost staging write); post-M1 databases accept it, stage the audience only and take no lease.
+ * P1 PR-B: there is no username, so the call goes to the username-less overload added by M3a (`pending_registration_save(uuid,
+ * activity_audience_kind, text, integer)`) and sends NO `p_username`. supabase-js binds by NAME, which is what keeps the call unambiguous
+ * next to the old five-argument function until M3b drops it. Apply M3a to the target database BEFORE deploying this code: on a database
+ * without it the call fails (logged and ignored, like any lost staging write) and registration falls back to the finish-registration screen.
  */
 export async function savePendingRegistration(params: {
   userId: string;
@@ -234,8 +235,6 @@ export async function savePendingRegistration(params: {
   const admin = getAdminClient();
   const { error } = await admin.rpc("pending_registration_save", {
     p_user_id: params.userId,
-    // The generated types (pre-M1) still say `string`; regenerate after M3. The explicit null is the contract.
-    p_username: null as unknown as string,
     p_audience_kind: params.audienceKind,
     p_audience_value: params.audienceValue,
   });

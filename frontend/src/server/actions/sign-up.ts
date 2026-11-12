@@ -34,14 +34,3 @@ export async function resendPhoneSignUpCode(_prev: PhoneSignUpState, formData: F
 export async function verifyPhoneSignUp(_prev: PhoneSignUpState, formData: FormData): Promise<PhoneSignUpState> {
   return verifyPhoneCode(formData);
 }
-
-export type UsernameCheck = { status: "available" | "taken" | "invalid" | "unknown"; suggestion?: string };
-
-/**
- * INERT since P1 PR-2 (the application has no username any more). Kept only so the sign-up form's username field, which is being
- * removed, still compiles: it makes NO database call and always answers "unknown" (the neutral state the form already treats as "no
- * feedback"). Delete together with `features/auth-password-preview/username-check.tsx`.
- */
-export async function checkUsername(_raw: unknown): Promise<UsernameCheck> {
-  return { status: "unknown" };
-}

@@ -80,7 +80,6 @@ describe.skipIf(!target)("phone verification authority - local integration (real
       ["onboarding_select_account_type", { p_track: o.track ?? "professional", p_account_type: o.type ?? "installer_technician" }],
     ];
     if (ph) steps.push(["profile_set_phone", { p_country_iso2: ph.iso2, p_national: ph.national, p_e164: ph.e164 }]);
-    steps.push(["profile_set_username", { p_username: `${label.toLowerCase().replace(/[^a-z]/g, "").slice(0, 8) || "b1"}${tag}${a.id.slice(0, 4)}` }]);
     for (const [fn, args] of steps) {
       const r = await http.rpcAs(fn, args, a.token);
       if (r.status >= 300) throw new Error(`fixture ${label} ${fn}: ${r.data?.code ?? r.status}`);

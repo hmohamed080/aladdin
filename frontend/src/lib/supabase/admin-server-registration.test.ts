@@ -13,25 +13,25 @@ import * as admin from "./admin-server";
 
 beforeEach(() => vi.clearAllMocks());
 
-describe("savePendingRegistration (P1 PR-2)", () => {
-  it("calls pending_registration_save with an EXPLICIT p_username: null (only p_ttl_minutes has a default)", async () => {
+describe("savePendingRegistration (P1 PR-B)", () => {
+  it("calls the username-less pending_registration_save overload: named arguments, NO p_username", async () => {
     mocks.rpc.mockResolvedValue({ data: true, error: null });
     expect(await admin.savePendingRegistration({ userId: "u1", audienceKind: "persona_type", audienceValue: "engineer" })).toBe(true);
     const [name, args] = mocks.rpc.mock.calls[0]!;
     expect(name).toBe("pending_registration_save");
-    expect(args).toEqual({ p_user_id: "u1", p_username: null, p_audience_kind: "persona_type", p_audience_value: "engineer" });
-    expect(Object.prototype.hasOwnProperty.call(args, "p_username")).toBe(true);
+    expect(args).toEqual({ p_user_id: "u1", p_audience_kind: "persona_type", p_audience_value: "engineer" });
+    expect(args).not.toHaveProperty("p_username");
     expect(args).not.toHaveProperty("p_ttl_minutes");
   });
 
-  it("does not depend on the lease boolean the pre-M1 function returned: success means no error", async () => {
+  it("does not depend on the boolean the function returns: success means no error", async () => {
     mocks.rpc.mockResolvedValue({ data: false, error: null });
     expect(await admin.savePendingRegistration({ userId: "u1", audienceKind: "organization_type", audienceValue: "supplier" })).toBe(true);
   });
 
-  it("a pre-M1 database refusing the NULL username is a logged best-effort failure, never a throw", async () => {
+  it("a database without M3a (function not found) is a logged best-effort failure, never a throw", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    mocks.rpc.mockResolvedValue({ data: null, error: { code: "23502", message: "null value in column username" } });
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: "PGRST202", message: "Could not find the function public.pending_registration_save(p_audience_kind, p_audience_value, p_user_id)" } });
     expect(await admin.savePendingRegistration({ userId: "u1", audienceKind: "persona_type", audienceValue: "engineer" })).toBe(false);
     expect(log).toHaveBeenCalledTimes(1);
     log.mockRestore();

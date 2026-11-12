@@ -69,15 +69,3 @@ export async function chooseAccountTypeAction(
 
   redirect("/onboarding");
 }
-
-export type UsernameState = { ok: boolean; code?: string };
-
-/**
- * INERT since P1 PR-2. The application no longer has a username, so there is nothing to choose. The server action is kept only so the
- * (about to be deleted) username step still compiles and, if a stale page posts to it, gets a safe answer: nothing is written, no
- * database call is made, and the person is sent on to the onboarding gate, which re-derives the real state. Delete together with
- * `features/onboarding/username-step.tsx`.
- */
-export async function chooseUsernameAction(_prev: UsernameState, _formData: FormData): Promise<UsernameState> {
-  redirect("/onboarding");
-}
