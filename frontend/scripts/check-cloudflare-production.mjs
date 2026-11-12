@@ -6,7 +6,7 @@
  * uploaded, and by the frontend tests on every change. It checks two things:
  *   1. the committed Wrangler config: production Workers have no public address yet,
  *      the frontend reaches the backend through the BACKEND binding, Turnstile is
- *      pinned to the live hostnames, R2 and Redis stay off for the first cutover,
+ *      pinned to the live hostnames, R2-only media flags are on and Redis stays off,
  *      the required secrets are declared, and nothing points at an acceptance resource;
  *   2. with `--live-values`, the build-time values in the environment: the live Supabase
  *      project only, never the acceptance project or a secret key.
@@ -19,6 +19,8 @@ import { fileURLToPath } from "node:url";
 
 export const LIVE_SUPABASE_URL = "https://kkpkgjrweysgvhvkhzun.supabase.co";
 export const LIVE_HOSTNAMES = ["aladdindecore.com", "www.aladdindecore.com"];
+/** Production media flags in the committed config: R2 takes every new upload, Supabase Storage takes none. */
+export const R2_ONLY_FLAGS = { R2_STORAGE_ENABLED: "true", R2_PRODUCTION_WRITES_APPROVED: "true", MEDIA_LEGACY_STORAGE_WRITES: "false" };
 const ACCEPTANCE_MARKERS = ["nxossqhdfltcqdwvbewi", "acceptance", "cf-preview", "-preview", "workers.dev"];
 
 /** Strips `//` and `/* *\/` comments outside strings, then trailing commas. */
@@ -78,12 +80,15 @@ export function checkFrontend(config) {
   if (hosts.length === 0) problems.push(`${label}: TURNSTILE_ALLOWED_HOSTNAMES must pin the live hostnames`);
   for (const host of LIVE_HOSTNAMES) if (hosts.length && !hosts.includes(host)) problems.push(`${label}: TURNSTILE_ALLOWED_HOSTNAMES must include ${host}`);
   for (const host of hosts) if (host !== "aladdindecore.com" && !host.endsWith(".aladdindecore.com")) problems.push(`${label}: Turnstile hostname outside aladdindecore.com: ${host}`);
-  for (const flag of ["R2_STORAGE_ENABLED", "R2_PRODUCTION_WRITES_APPROVED", "REDIS_CACHE_ENABLED", "VIDEO_ENABLED", "MEDIA_EDGE_DELIVERY_ENABLED"]) {
-    if (flag in vars && vars[flag] !== "false") problems.push(`${label}: ${flag} must stay "false" at first cutover`);
+  // R2-only media: new uploads go to R2 and Supabase Storage writes stay closed. A committed config that reopens them
+  // (flags off, or legacy writes on) would let a routine redeploy silently resume Supabase writes, so it is refused.
+  for (const [flag, want] of Object.entries(R2_ONLY_FLAGS)) {
+    if (vars[flag] !== want) problems.push(`${label}: ${flag} must be "${want}" (R2-only media; Supabase Storage writes stay closed)`);
   }
-  for (const flag of ["R2_STORAGE_ENABLED", "R2_PRODUCTION_WRITES_APPROVED", "REDIS_CACHE_ENABLED"]) {
-    if (!(flag in vars)) problems.push(`${label}: ${flag} must be set to "false" explicitly`);
+  for (const flag of ["REDIS_CACHE_ENABLED", "VIDEO_ENABLED", "MEDIA_EDGE_DELIVERY_ENABLED"]) {
+    if (flag in vars && vars[flag] !== "false") problems.push(`${label}: ${flag} must stay "false" until its own approval`);
   }
+  if (!("REDIS_CACHE_ENABLED" in vars)) problems.push(`${label}: REDIS_CACHE_ENABLED must be set to "false" explicitly`);
   requiredSecrets(env, ["SUPABASE_SERVICE_ROLE_KEY", "TURNSTILE_SECRET_KEY", "AUTH_PASSWORD_PREVIEW_GRANT_SECRET"], label, problems);
   return problems;
 }
@@ -131,12 +136,25 @@ export function checkLiveValues(values) {
   return problems;
 }
 
+/**
+ * The committed config turns R2-only writes on, so a stage that deploys at once (`frontend`) would activate them
+ * on live Production. It is refused until the owner sets R2_CUTOVER_APPROVED=true. `check`, `backend` and
+ * `frontend-upload` (a version with 0% of traffic) are unaffected; promoting is a separate manual step.
+ */
+export function checkCutoverStage(stage, approved) {
+  if (stage === "frontend" && approved !== "true") {
+    return ["stage=frontend goes live immediately with R2-only writes on: it needs the GitHub variable R2_CUTOVER_APPROVED=true (owner's final cutover approval). Use stage=frontend-upload"];
+  }
+  return [];
+}
+
 function main() {
   const root = fileURLToPath(new URL("../../", import.meta.url));
   const problems = [
     ...checkFrontend(parseJsonc(readFileSync(`${root}frontend/wrangler.jsonc`, "utf8"))),
     ...checkBackend(parseJsonc(readFileSync(`${root}edge/backend-worker/wrangler.jsonc`, "utf8"))),
   ];
+  problems.push(...checkCutoverStage(process.env.STAGE, process.env.R2_CUTOVER_APPROVED));
   if (process.argv.includes("--live-values")) problems.push(...checkLiveValues(process.env));
   for (const problem of problems) console.error(`check-cloudflare-production: ${problem}`);
   if (problems.length) process.exit(1);
