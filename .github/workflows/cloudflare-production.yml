@@ -16,13 +16,15 @@
 #                     exists, because the frontend's BACKEND service binding points at it. It also refuses unless the WhatsApp OTP
 #                     Worker exists (the OTP_WORKER service binding). Goes live immediately: prefer frontend-upload first.
 #
-# MEDIA MODE (input `media_mode`, frontend stages only). The committed config is the FUTURE R2-only cutover state and is never edited to
-# ship an unrelated release; the mode decides what a release carries, as `--var` overrides on the wrangler command line:
-#   legacy-hold  (default) R2_STORAGE_ENABLED=false, R2_PRODUCTION_WRITES_APPROVED=false, MEDIA_LEGACY_STORAGE_WRITES=true: the same
-#                media behaviour as the Worker that is live, so a release of UI/registration changes moves no media write path.
-#   r2-only      no overrides: the committed R2-only flags. This is the cutover; promoting such a version needs its own approval.
-# Before anything is uploaded the "Release flags" step computes the effective flags and fails unless they are exactly the mode's promise,
-# and prints them in the run summary. Every frontend wrangler command (dry run, upload, deploy) takes its overrides from the same script.
+# MEDIA MODE (input `media_mode`, frontend stages only). Production is R2-ONLY today (R2_STORAGE_ENABLED=true, R2_PRODUCTION_WRITES_APPROVED=true,
+# MEDIA_LEGACY_STORAGE_WRITES=false) and NO mode ever reopens Supabase Storage writes (the old `legacy-hold` mode was removed).
+#   match-live  (default) FAIL-CLOSED. Reads the ACTIVE Production Worker version(s) from the Cloudflare API and carries exactly their three media
+#               flags as `--var` overrides on every frontend wrangler command, so an unrelated release cannot move a media write path. Any problem
+#               reading them (no token, API error, no active version, a missing flag, versions that disagree) stops the run before anything is built.
+#   r2-only     no overrides: the committed R2-only flags (the cutover config).
+# Before anything is built the "Release flags" step prints the effective flags, and after an upload the "Verify uploaded version" step reads the NEW
+# version's bindings back and fails unless they equal the live version's. Run the same check again right before promoting:
+#   CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... node frontend/scripts/check-cloudflare-production.mjs --verify-version <version id>
 #
 # R2-only media is ON in the committed config (R2_STORAGE_ENABLED / R2_PRODUCTION_WRITES_APPROVED true, legacy writes
 # closed). A version uploaded by frontend-upload serves 0% of traffic, so nothing goes live; stage=frontend (immediate
@@ -59,10 +61,10 @@ on:
         options: [check, backend, frontend-upload, frontend]
         default: check
       media_mode:
-        description: "Frontend stages: legacy-hold = R2 writes OFF and Supabase Storage writes kept (like the live Worker); r2-only = the committed R2 cutover flags"
+        description: "Frontend stages: match-live = carry exactly the ACTIVE Production version's media flags (fail closed); r2-only = the committed R2-only flags. No mode reopens Supabase Storage writes"
         type: choice
-        options: [legacy-hold, r2-only]
-        default: legacy-hold
+        options: [match-live, r2-only]
+        default: match-live
 
 concurrency:
   group: cloudflare-production
@@ -111,6 +113,9 @@ jobs:
           echo "Stage: $STAGE, upload: $UPLOAD" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Release flags (effective media flags must be exactly the chosen mode, before anything is built or uploaded)
         if: inputs.stage != 'backend'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: node frontend/scripts/check-cloudflare-production.mjs --verify-media-mode "$MEDIA_MODE" | tee -a "$GITHUB_STEP_SUMMARY"
       - run: pnpm install --frozen-lockfile
 
@@ -162,6 +167,9 @@ jobs:
       - name: Frontend bundle (dry run)
         if: inputs.stage != 'backend'
         working-directory: frontend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           source ../frontend/scripts/production-media-vars.sh
           pnpm exec wrangler deploy --env production --dry-run --outdir "$RUNNER_TEMP/frontend" "${MEDIA_VARS[@]}"
@@ -181,8 +189,18 @@ jobs:
           {
             echo "### Frontend version uploaded, NOT deployed (0% of traffic)"
             grep -i "version id" "$RUNNER_TEMP/upload.txt" || true
-            echo "Test with the header Cloudflare-Workers-Version-Overrides: aladdin-frontend-production=\"<version id>\"; promote with wrangler versions deploy <version id>@100% --env production (separate approval)."
+            echo "Test with the header Cloudflare-Workers-Version-Overrides: aladdin-frontend-production=\"<version id>\"; before promoting run node frontend/scripts/check-cloudflare-production.mjs --verify-version <version id>, then wrangler versions deploy <version id>@100% --env production (separate approval)."
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify the uploaded version carries the live media flags (fails the run otherwise; do NOT promote a version this step rejected)
+        if: inputs.stage == 'frontend-upload' && env.UPLOAD == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          version_id=$(grep -i "version id" "$RUNNER_TEMP/upload.txt" | grep -Eo '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -n 1)
+          [ -n "$version_id" ] || { echo "::error::could not read the uploaded version id from the wrangler output"; exit 1; }
+          node frontend/scripts/check-cloudflare-production.mjs --verify-version "$version_id" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Deploy aladdin-frontend-production
         if: inputs.stage == 'frontend' && env.UPLOAD == 'true'
         working-directory: frontend

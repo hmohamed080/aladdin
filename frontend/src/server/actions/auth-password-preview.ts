@@ -311,6 +311,7 @@ export async function requestPasswordSignUp(
   // data, not authorization. It is confirmed through profile_set_display_name
   // only after the OTP proves the email (verifyPasswordSignUp).
   const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
+  const callStart = Date.now();
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
@@ -344,6 +345,9 @@ export async function requestPasswordSignUp(
         return { ok: false, code: "authPasswordPreview.error.accountExists", email: parsed.data.email };
       }
       await rememberRegistrationEmail(parsed.data.email);
+      // Timing protection (restored): this degraded answer must not arrive faster than a genuine "code sent" (which waits for the mail send), or the
+      // difference would reopen the oracle the budget just closed. Both neutral outcomes are padded to the same floor.
+      await padToRegistrationFloor(callStart);
       return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
     }
     logSignUpSendFailure("sign_up", error as GoTrueError);
@@ -363,6 +367,7 @@ export async function requestPasswordSignUp(
   }
 
   await rememberRegistrationEmail(parsed.data.email);
+  await padToRegistrationFloor(callStart);
   return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
 }
 

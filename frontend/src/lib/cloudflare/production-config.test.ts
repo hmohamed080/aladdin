@@ -1,13 +1,20 @@
 import { readFileSync } from "node:fs";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
-import { spawnSync } from "node:child_process";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { execFile, spawnSync } from "node:child_process";
+import { promisify } from "node:util";
 import {
   checkBackend,
   checkCutoverStage,
   checkMediaMode,
+  checkVersionMatchesLive,
   effectiveMediaFlags,
-  LEGACY_HOLD_FLAGS,
+  fetchLiveMediaFlags,
+  fetchVersionMediaFlags,
+  mediaFlagsFromBindings,
+  MEDIA_MODES,
   mediaModeArgs,
   R2_ONLY_FLAGS,
   checkFrontend,
@@ -132,78 +139,247 @@ describe("Production build values", () => {
   });
 });
 
-describe("Production release media modes (R2 stays off for a UI release; the committed cutover config is preserved)", () => {
+const run = promisify(execFile);
+const LIVE_FLAGS = { R2_STORAGE_ENABLED: "true", R2_PRODUCTION_WRITES_APPROVED: "true", MEDIA_LEGACY_STORAGE_WRITES: "false" };
+const bindingsFor = (flags: Record<string, string | undefined>) =>
+  [
+    { name: "NEXT_PUBLIC_APP_ENV", type: "plain_text", text: "production" },
+    ...Object.entries(flags).filter(([, v]) => v !== undefined).map(([name, text]) => ({ name, type: "plain_text", text })),
+    { name: "SUPABASE_SERVICE_ROLE_KEY", type: "secret_text" },
+  ];
+
+/** A local stand-in for the Cloudflare Workers API (deployments + version detail), so the CLI and the sourced helper run for real. */
+function cloudflareStandIn() {
+  const state = {
+    status: 200,
+    deployments: [{ versions: [{ version_id: "11111111-1111-4111-8111-111111111111", percentage: 100 }] }] as unknown[],
+    versions: {
+      "11111111-1111-4111-8111-111111111111": LIVE_FLAGS,
+      "22222222-2222-4222-8222-222222222222": LIVE_FLAGS,
+    } as Record<string, Record<string, string | undefined>>,
+    seenAuth: [] as (string | undefined)[],
+  };
+  let server: Server;
+  const start = () =>
+    new Promise<string>((resolve) => {
+      server = createServer((req, res) => {
+        state.seenAuth.push(req.headers.authorization);
+        const send = (code: number, body: unknown) => {
+          res.writeHead(code, { "content-type": "application/json" });
+          res.end(JSON.stringify(body));
+        };
+        if (state.status !== 200) return send(state.status, { success: false });
+        const url = req.url ?? "";
+        if (/\/workers\/scripts\/aladdin-frontend-production\/deployments$/.test(url)) return send(200, { success: true, result: { deployments: state.deployments } });
+        const m = /\/workers\/scripts\/aladdin-frontend-production\/versions\/([0-9a-f-]+)$/.exec(url);
+        if (m && state.versions[m[1]!]) return send(200, { success: true, result: { resources: { bindings: bindingsFor(state.versions[m[1]!]!) } } });
+        return send(404, { success: false });
+      }).listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${(server.address() as AddressInfo).port}`));
+    });
+  return { state, start, stop: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+}
+
+describe("Production release media modes (match-live is fail-closed and never reopens Supabase Storage writes)", () => {
   const workflow = () => readFileSync(join(FRONTEND, "..", ".github", "workflows", "cloudflare-production.yml"), "utf8");
-
-  it("legacy-hold carries exactly the live Worker's media flags and nothing else", () => {
-    expect(LEGACY_HOLD_FLAGS).toEqual({ R2_STORAGE_ENABLED: "false", R2_PRODUCTION_WRITES_APPROVED: "false", MEDIA_LEGACY_STORAGE_WRITES: "true" });
-    expect(mediaModeArgs("legacy-hold")).toEqual([
-      "--var", "R2_STORAGE_ENABLED:false", "--var", "R2_PRODUCTION_WRITES_APPROVED:false", "--var", "MEDIA_LEGACY_STORAGE_WRITES:true",
-    ]);
-    expect(effectiveMediaFlags(frontendConfig(), "legacy-hold")).toEqual(LEGACY_HOLD_FLAGS);
-    expect(checkMediaMode(frontendConfig(), "legacy-hold")).toEqual([]);
+  const standIn = cloudflareStandIn();
+  let base = "";
+  beforeAll(async () => {
+    base = await standIn.start();
   });
+  afterAll(async () => {
+    await standIn.stop();
+  });
+  const reset = () => {
+    standIn.state.status = 200;
+    standIn.state.deployments = [{ versions: [{ version_id: "11111111-1111-4111-8111-111111111111", percentage: 100 }] }];
+    standIn.state.versions["11111111-1111-4111-8111-111111111111"] = LIVE_FLAGS;
+    standIn.state.versions["22222222-2222-4222-8222-222222222222"] = LIVE_FLAGS;
+    standIn.state.seenAuth.length = 0;
+  };
+  const params = () => ({ accountId: "acct", token: "tok", worker: "aladdin-frontend-production", base });
+  const env = (extra: Record<string, string> = {}) => ({
+    ...process.env,
+    CLOUDFLARE_ACCOUNT_ID: "acct",
+    CLOUDFLARE_API_TOKEN: "tok",
+    CLOUDFLARE_API_BASE: base,
+    ...extra,
+  });
+  const guard = (args: string[], e: NodeJS.ProcessEnv) =>
+    run("node", [join(FRONTEND, "scripts", "check-cloudflare-production.mjs"), ...args], { encoding: "utf8", env: e }).then(
+      (r) => ({ status: 0, stdout: r.stdout, stderr: r.stderr }),
+      (error: { code?: number; stdout?: string; stderr?: string }) => ({ status: error.code ?? 1, stdout: error.stdout ?? "", stderr: error.stderr ?? "" }),
+    );
 
-  it("r2-only adds no override: the committed R2-only flags are the cutover, and they stay committed", () => {
-    expect(mediaModeArgs("r2-only")).toEqual([]);
-    expect(effectiveMediaFlags(frontendConfig(), "r2-only")).toEqual(R2_ONLY_FLAGS);
-    expect(checkMediaMode(frontendConfig(), "r2-only")).toEqual([]);
-    expect(checkFrontend(frontendConfig())).toEqual([]);
+  it("there is no legacy-hold mode: the only modes are match-live and r2-only, and the committed config is R2-only", () => {
+    expect(MEDIA_MODES).toEqual(["match-live", "r2-only"]);
+    expect(checkMediaMode(frontendConfig(), "legacy-hold", LIVE_FLAGS)[0]).toMatch(/media_mode must be one of match-live, r2-only/);
+    expect(() => mediaModeArgs("legacy-hold")).toThrow(/unknown media mode/);
     const committed = frontendConfig().env.production.vars;
     for (const [flag, want] of Object.entries(R2_ONLY_FLAGS)) expect(committed[flag]).toBe(want);
+    expect(checkFrontend(frontendConfig())).toEqual([]);
   });
 
-  it("refuses an unknown mode and a config whose flags differ from the mode's promise", () => {
-    expect(checkMediaMode(frontendConfig(), "")[0]).toMatch(/media_mode must be one of/);
-    expect(checkMediaMode(frontendConfig(), "typo")[0]).toMatch(/got "typo"/);
-    expect(() => mediaModeArgs("typo")).toThrow(/unknown media mode/);
+  it("match-live carries exactly the live flags as --var pairs; r2-only adds none", () => {
+    expect(mediaModeArgs("match-live", LIVE_FLAGS)).toEqual([
+      "--var", "R2_STORAGE_ENABLED:true", "--var", "R2_PRODUCTION_WRITES_APPROVED:true", "--var", "MEDIA_LEGACY_STORAGE_WRITES:false",
+    ]);
+    expect(effectiveMediaFlags(frontendConfig(), "match-live", LIVE_FLAGS)).toEqual(LIVE_FLAGS);
+    expect(checkMediaMode(frontendConfig(), "match-live", LIVE_FLAGS)).toEqual([]);
+    expect(mediaModeArgs("r2-only")).toEqual([]);
+    expect(checkMediaMode(frontendConfig(), "r2-only")).toEqual([]);
+    expect(() => mediaModeArgs("match-live")).toThrow(/needs the live/);
+  });
+
+  it("match-live without readable live flags is refused, and NO mode may carry legacy storage writes", () => {
+    expect(checkMediaMode(frontendConfig(), "match-live", undefined)[0]).toMatch(/could not be read/);
+    const reopened = { ...LIVE_FLAGS, MEDIA_LEGACY_STORAGE_WRITES: "true" };
+    expect(checkMediaMode(frontendConfig(), "match-live", reopened).join()).toMatch(/never reopens Supabase Storage writes/);
     const tampered = frontendConfig();
+    tampered.env.production.vars.MEDIA_LEGACY_STORAGE_WRITES = "true";
+    expect(checkMediaMode(tampered, "r2-only").join()).toMatch(/never reopens Supabase Storage writes/);
     tampered.env.production.vars.R2_STORAGE_ENABLED = "false";
     expect(checkMediaMode(tampered, "r2-only").join()).toMatch(/R2_STORAGE_ENABLED would be "false"/);
   });
 
-  it("the workflow defaults to legacy-hold and every frontend wrangler command takes the mode's arguments", () => {
+  it("reads the media flags out of plain-text bindings only", () => {
+    expect(mediaFlagsFromBindings(bindingsFor(LIVE_FLAGS))).toEqual(LIVE_FLAGS);
+    expect(mediaFlagsFromBindings([{ name: "R2_STORAGE_ENABLED", type: "secret_text", text: "true" }])).toEqual({ R2_STORAGE_ENABLED: undefined, R2_PRODUCTION_WRITES_APPROVED: undefined, MEDIA_LEGACY_STORAGE_WRITES: undefined });
+    expect(mediaFlagsFromBindings(undefined).R2_STORAGE_ENABLED).toBeUndefined();
+  });
+
+  it("fetchLiveMediaFlags reads the active deployment's version and sends the bearer token", async () => {
+    reset();
+    const live = await fetchLiveMediaFlags(params());
+    expect(live).toEqual({ flags: LIVE_FLAGS, versionIds: ["11111111-1111-4111-8111-111111111111"] });
+    expect(standIn.state.seenAuth.every((h) => h === "Bearer tok")).toBe(true);
+  });
+
+  it("fetchLiveMediaFlags fails closed: no credentials, API error, no active version, a missing flag, or versions that disagree", async () => {
+    reset();
+    await expect(fetchLiveMediaFlags({ ...params(), token: "" })).rejects.toThrow(/required/);
+    standIn.state.status = 500;
+    await expect(fetchLiveMediaFlags(params())).rejects.toThrow(/HTTP 500/);
+    reset();
+    standIn.state.deployments = [];
+    await expect(fetchLiveMediaFlags(params())).rejects.toThrow(/no active deployment/);
+    standIn.state.deployments = [{ versions: [{ version_id: "11111111-1111-4111-8111-111111111111", percentage: 0 }] }];
+    await expect(fetchLiveMediaFlags(params())).rejects.toThrow(/no active deployment/);
+    reset();
+    standIn.state.versions["11111111-1111-4111-8111-111111111111"] = { R2_STORAGE_ENABLED: "true", R2_PRODUCTION_WRITES_APPROVED: "true" };
+    await expect(fetchLiveMediaFlags(params())).rejects.toThrow(/does not carry MEDIA_LEGACY_STORAGE_WRITES/);
+    reset();
+    standIn.state.deployments = [{ versions: [
+      { version_id: "11111111-1111-4111-8111-111111111111", percentage: 50 },
+      { version_id: "22222222-2222-4222-8222-222222222222", percentage: 50 },
+    ] }];
+    standIn.state.versions["22222222-2222-4222-8222-222222222222"] = { ...LIVE_FLAGS, MEDIA_LEGACY_STORAGE_WRITES: "true" };
+    await expect(fetchLiveMediaFlags(params())).rejects.toThrow(/disagree on MEDIA_LEGACY_STORAGE_WRITES/);
+    // A gradual rollout whose versions agree is fine.
+    standIn.state.versions["22222222-2222-4222-8222-222222222222"] = LIVE_FLAGS;
+    expect((await fetchLiveMediaFlags(params())).versionIds).toHaveLength(2);
+  });
+
+  it("an uploaded version must equal the live flags (and never carry legacy writes)", async () => {
+    reset();
+    expect(checkVersionMatchesLive(LIVE_FLAGS, LIVE_FLAGS)).toEqual([]);
+    expect(checkVersionMatchesLive({ ...LIVE_FLAGS, R2_STORAGE_ENABLED: "false" }, LIVE_FLAGS).join()).toMatch(/R2_STORAGE_ENABLED/);
+    expect(checkVersionMatchesLive({ ...LIVE_FLAGS, MEDIA_LEGACY_STORAGE_WRITES: undefined }, LIVE_FLAGS).join()).toMatch(/MEDIA_LEGACY_STORAGE_WRITES/);
+    expect(await fetchVersionMediaFlags({ ...params(), versionId: "22222222-2222-4222-8222-222222222222" })).toEqual(LIVE_FLAGS);
+  });
+
+  it("the CLI: --verify-version passes for a matching version and fails for a reverted or unreadable one", async () => {
+    reset();
+    const ok = await guard(["--verify-version", "22222222-2222-4222-8222-222222222222"], env());
+    expect(ok.status).toBe(0);
+    expect(ok.stdout).toMatch(/carries the live media flags/);
+    standIn.state.versions["22222222-2222-4222-8222-222222222222"] = { R2_STORAGE_ENABLED: "false", R2_PRODUCTION_WRITES_APPROVED: "false", MEDIA_LEGACY_STORAGE_WRITES: "true" };
+    const reverted = await guard(["--verify-version", "22222222-2222-4222-8222-222222222222"], env());
+    expect(reverted.status).toBe(1);
+    expect(reverted.stderr).toMatch(/R2_STORAGE_ENABLED is "false" on the version but "true" on the live Worker/);
+    expect(reverted.stderr).toMatch(/MEDIA_LEGACY_STORAGE_WRITES is "true" on the version/);
+    const unknown = await guard(["--verify-version", "33333333-3333-4333-8333-333333333333"], env());
+    expect(unknown.status).toBe(1);
+    expect(unknown.stderr).toMatch(/cannot read version/);
+    reset();
+    expect((await guard(["--verify-version", "22222222-2222-4222-8222-222222222222"], env({ CLOUDFLARE_API_TOKEN: "" }))).status).toBe(1);
+  });
+
+  it("the CLI: match-live prints the live flags as wrangler arguments and fails closed when the live Worker cannot be read", async () => {
+    reset();
+    const ok = await guard(["--media-var-args", "match-live"], env({ STAGE: "frontend-upload" }));
+    expect(ok.status).toBe(0);
+    expect(ok.stdout.trim().split("\n")).toEqual(["--var", "R2_STORAGE_ENABLED:true", "--var", "R2_PRODUCTION_WRITES_APPROVED:true", "--var", "MEDIA_LEGACY_STORAGE_WRITES:false"]);
+    standIn.state.status = 503;
+    const down = await guard(["--media-var-args", "match-live"], env({ STAGE: "frontend-upload" }));
+    expect(down.status).toBe(1);
+    expect(down.stdout).toBe("");
+    expect(down.stderr).toMatch(/cannot read the live Worker/);
+    reset();
+    standIn.state.versions["11111111-1111-4111-8111-111111111111"] = { ...LIVE_FLAGS, MEDIA_LEGACY_STORAGE_WRITES: "true" };
+    const legacyLive = await guard(["--media-var-args", "match-live"], env({ STAGE: "frontend-upload" }));
+    expect(legacyLive.status).toBe(1);
+    expect(legacyLive.stderr).toMatch(/never reopens Supabase Storage writes/);
+  });
+
+  it("the workflow defaults to match-live, drops legacy-hold, reads the live version in every step that builds, and verifies the upload", () => {
     const text = workflow();
-    expect(text).toMatch(/media_mode:[\s\S]*?options: \[legacy-hold, r2-only\][\s\S]*?default: legacy-hold/);
+    expect(text).toMatch(/media_mode:[\s\S]*?options: \[match-live, r2-only\][\s\S]*?default: match-live/);
+    expect(text).not.toMatch(/options: \[[^\]]*legacy-hold/);
+    expect(text).not.toContain("MEDIA_LEGACY_STORAGE_WRITES:true");
     expect(text).toContain('--verify-media-mode "$MEDIA_MODE"');
+    expect(text).toContain('--verify-version "$version_id"');
     const blocks = text.split("- name:").filter((block) => /working-directory: frontend\b/.test(block) && /wrangler (deploy|versions upload)/.test(block));
     // frontend dry run, upload and deploy
     expect(blocks.length).toBe(3);
     for (const block of blocks) {
       expect(block).toContain("source ../frontend/scripts/production-media-vars.sh");
       expect(block).toContain('"${MEDIA_VARS[@]}"');
+      expect(block).toContain("CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}");
     }
+    const releaseFlags = text.split("- name:").find((block) => block.startsWith(" Release flags"))!;
+    expect(releaseFlags).toContain("CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}");
+    // The API base override is for tests only: the workflow must never set it.
+    expect(text).not.toContain("CLOUDFLARE_API_BASE");
   });
 
-  it("the sourced helper fails closed (an unknown mode stops the step) and yields 6 args for legacy-hold, 0 for r2-only", () => {
-    const run = (mode: string) =>
-      spawnSync("bash", ["-e", "-c", `cd "${join(FRONTEND, "scripts")}" && export MEDIA_MODE=${mode} && source ./production-media-vars.sh && echo "n=\${#MEDIA_VARS[@]}"`], { encoding: "utf8" });
-    const hold = run("legacy-hold");
-    expect(hold.status).toBe(0);
-    expect(hold.stdout.trim()).toBe("n=6");
-    const cutover = run("r2-only");
+  it("the sourced helper yields 6 args for match-live, 0 for r2-only, and stops (no args) when the live Worker cannot be read or the mode is unknown", async () => {
+    reset();
+    const source = (mode: string, e: NodeJS.ProcessEnv) =>
+      run("bash", ["-e", "-c", `cd "${join(FRONTEND, "scripts")}" && export MEDIA_MODE=${mode} && source ./production-media-vars.sh && echo "n=\${#MEDIA_VARS[@]}"`], { encoding: "utf8", env: e }).then(
+        (r) => ({ status: 0, stdout: r.stdout }),
+        (error: { code?: number; stdout?: string }) => ({ status: error.code ?? 1, stdout: error.stdout ?? "" }),
+      );
+    const live = await source("match-live", env());
+    expect(live.status).toBe(0);
+    expect(live.stdout.trim()).toBe("n=6");
+    const cutover = await source("r2-only", env());
     expect(cutover.status).toBe(0);
     expect(cutover.stdout.trim()).toBe("n=0");
-    const bad = run("bogus");
+    standIn.state.status = 500;
+    const down = await source("match-live", env());
+    expect(down.status).not.toBe(0);
+    expect(down.stdout).not.toContain("n=");
+    const noToken = await source("match-live", env({ CLOUDFLARE_API_TOKEN: "" }));
+    expect(noToken.status).not.toBe(0);
+    const bad = await source("legacy-hold", env());
     expect(bad.status).not.toBe(0);
     expect(bad.stdout).not.toContain("n=");
+    reset();
   });
 
-  it("the cutover approval reaches every guard invocation: it is job-level env, and an approved stage=frontend passes in both modes", () => {
+  it("the cutover approval reaches every guard invocation: it is job-level env, and an approved stage=frontend passes in both modes", async () => {
+    reset();
     const text = workflow();
     const jobEnv = text.slice(text.indexOf("    env:\n      STAGE:"), text.indexOf("    steps:"));
     expect(jobEnv).toContain("R2_CUTOVER_APPROVED: ${{ vars.R2_CUTOVER_APPROVED }}");
     expect(text.match(/R2_CUTOVER_APPROVED: \$\{\{/g)?.length).toBe(1);
-    const guard = (args: string[], env: Record<string, string>) =>
-      spawnSync("node", [join(FRONTEND, "scripts", "check-cloudflare-production.mjs"), ...args], { encoding: "utf8", env: { ...process.env, ...env } });
-    for (const mode of ["legacy-hold", "r2-only"]) {
-      expect(guard(["--verify-media-mode", mode], { STAGE: "frontend", R2_CUTOVER_APPROVED: "true" }).status).toBe(0);
-      expect(guard(["--verify-media-mode", mode], { STAGE: "frontend", R2_CUTOVER_APPROVED: "" }).status).toBe(1);
-      expect(guard(["--verify-media-mode", mode], { STAGE: "frontend-upload", R2_CUTOVER_APPROVED: "" }).status).toBe(0);
+    for (const mode of MEDIA_MODES) {
+      expect((await guard(["--verify-media-mode", mode], env({ STAGE: "frontend", R2_CUTOVER_APPROVED: "true" }))).status).toBe(0);
+      expect((await guard(["--verify-media-mode", mode], env({ STAGE: "frontend", R2_CUTOVER_APPROVED: "" }))).status).toBe(1);
+      expect((await guard(["--verify-media-mode", mode], env({ STAGE: "frontend-upload", R2_CUTOVER_APPROVED: "" }))).status).toBe(0);
     }
     const helper = (approved: string) =>
-      spawnSync("bash", ["-e", "-c", `cd "${join(FRONTEND, "scripts")}" && export MEDIA_MODE=legacy-hold STAGE=frontend R2_CUTOVER_APPROVED=${approved} && source ./production-media-vars.sh && echo "n=\${#MEDIA_VARS[@]}"`], { encoding: "utf8" });
-    expect(helper("true").stdout.trim()).toBe("n=6");
-    expect(helper("").status).not.toBe(0);
+      spawnSync("bash", ["-e", "-c", `cd "${join(FRONTEND, "scripts")}" && export MEDIA_MODE=r2-only STAGE=frontend R2_CUTOVER_APPROVED=${approved} && source ./production-media-vars.sh && echo "n=\${#MEDIA_VARS[@]}"`], { encoding: "utf8" });
+    expect(helper("true").stdout.trim()).toBe("n=0");
   });
 });

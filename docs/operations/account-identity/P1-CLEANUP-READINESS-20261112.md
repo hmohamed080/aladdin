@@ -142,6 +142,8 @@ Per-environment gates for every database PR: aggregate before/after counts, perm
 
 Live today (re-read 2026-11-12): Worker version `32d08bff` at 100%, `R2_STORAGE_ENABLED=true`, `R2_PRODUCTION_WRITES_APPROVED=true`, `MEDIA_LEGACY_STORAGE_WRITES=false`.
 
+**UPDATE (follow-up PR, 2026-11-12): fixed.** `legacy-hold` was removed and `media_mode` now defaults to the fail-closed `match-live`, which carries exactly the active Production version's media flags and fails if the uploaded version differs (see `r2/PRODUCTION_R2_PROVISIONING_PREP_20261111.md`, "match-live"). The text below describes the hazard as it was before that fix.
+
 **Hazard.** The production workflow input `media_mode` (merged in #183) defaults to `legacy-hold`, which overrides the three media flags to R2 OFF and legacy writes ON. That default was right when the live Worker had R2 off; it is wrong now. A `frontend-upload` run with defaults followed by a promotion would silently reopen Supabase Storage writes and turn R2 off.
 
 **Rules until a follow-up PR (for example `media_mode=match-live`, which reads the live version's three flags from the Cloudflare API and fails if the new version would differ) is merged:**

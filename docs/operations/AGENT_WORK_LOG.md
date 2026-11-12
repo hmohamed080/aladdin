@@ -7564,3 +7564,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Permission contract `20261112090001.json` (755 functions); forward-fix `scripts/hosted-db/forward-fix/m3a-restore-previous.sql` pinned by sha256 as the new `m3a` plan in `acceptance-gate.mjs` (209 -> 210). Locally proven on a clean replay: M3a changes exactly 4 catalog objects, and the forward-fix restores the pre-M3a catalog fingerprint exactly.
 - pgTAP `127` added; `82`, `118`, `125` and the lease concurrency script updated (untyped 4-argument positional calls to `pending_registration_save` are now ambiguous, so they pass an explicit TTL; the deployed app binds by name and is unaffected).
 - Not applied to Acceptance or Production; no data, backup, R2, frontend or deployment change.
+
+## 2026-11-12 - Production release safety: match-live, timing floor (agent)
+
+- Owner request after #185: fix the unsafe `legacy-hold` default, keep Production R2-only, finish the skipped mobile auth E2E, verify email sign-up timing protection, test the warning in AR/EN light/dark, check migration compatibility, deploy and validate Acceptance first, prepare (not run) Production upload and promotion.
+- `media_mode` is now `match-live` (default, fail closed: reads the ACTIVE Production version's media flags from the Cloudflare API and carries exactly those) or `r2-only`; `legacy-hold` removed; every mode refuses `MEDIA_LEGACY_STORAGE_WRITES != false`. New `--verify-version <id>` check, run by the workflow after `frontend-upload` and by the owner before promoting. Tests use a local Cloudflare API stand-in (CLI and sourced helper run for real).
+- Email sign-up timing protection restored: `requestPasswordSignUp` pads BOTH neutral outcomes (genuine "code sent" and the budget-spent reply for an existing address) to the 500 ms floor; the explicit warning needs none. Unit test measures both.
+- No R2 resource, secret, migration or hosted database change.

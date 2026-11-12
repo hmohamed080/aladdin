@@ -90,13 +90,18 @@ Stop conditions: any new missing or size mismatch, any key outside `u/` or `o/`,
 
 `frontend/wrangler.jsonc` production now carries `R2_STORAGE_ENABLED="true"`, `R2_PRODUCTION_WRITES_APPROVED="true"` and `MEDIA_LEGACY_STORAGE_WRITES="false"`, and the production guard requires exactly that, so a routine redeploy cannot reopen Supabase Storage writes. Merging activates nothing: Production serves only the promoted Worker version. The `Cloudflare production` workflow refuses `stage=frontend` (immediate deploy) unless the GitHub variable `R2_CUTOVER_APPROVED` is `true`; `stage=frontend-upload` creates a 0%-traffic version and promoting stays a separate manual step. Rolling back to a version older than this change (for example 38d2db8a) reopens Supabase writes; do that only on purpose. `aladdin-site-media` has no application writer today (only key helpers exist), so it stays empty; any future site-media writer must not ship before that bucket is covered by the independent backup.
 
-## Update 2026-11-12 (release media mode: ship UI changes without moving media)
+## Update 2026-11-12 (release media mode: `match-live`, fail closed; supersedes the `legacy-hold` text of the same day)
 
-The committed production config stays the future R2 cutover state; it is not edited to ship an unrelated release. The `Cloudflare production` workflow now takes `media_mode` (frontend stages):
+Production is **R2-only** (live Worker `32d08bff`: `R2_STORAGE_ENABLED=true`, `R2_PRODUCTION_WRITES_APPROVED=true`, `MEDIA_LEGACY_STORAGE_WRITES=false`). A release must never move a media write path and must never reopen Supabase Storage writes. The `Cloudflare production` workflow therefore has two `media_mode` values (frontend stages) and the old `legacy-hold` was **removed**:
 
 | `media_mode` | Flags the version carries | Use |
 |---|---|---|
-| `legacy-hold` (default) | `R2_STORAGE_ENABLED=false`, `R2_PRODUCTION_WRITES_APPROVED=false`, `MEDIA_LEGACY_STORAGE_WRITES=true` (`--var` overrides on the wrangler command line) | Release registration/UI changes with exactly the media behaviour of the live Worker: no R2 write, Supabase Storage writes kept, existing media untouched. |
-| `r2-only` | none (the committed flags) | The R2 cutover. Promoting such a version still needs its own approval, and `stage=frontend` still needs `R2_CUTOVER_APPROVED=true`. |
+| `match-live` (default) | exactly the three flags of the ACTIVE Production version(s), read from the Cloudflare API (`workers/scripts/aladdin-frontend-production/deployments`, then `.../versions/<id>` bindings) and passed as `--var` overrides on every frontend wrangler command | Any release of registration/UI/other changes. **Fail closed:** no token, an API error, no active version serving traffic, a missing or non-boolean flag, or active versions that disagree stops the run before anything is built. |
+| `r2-only` | none (the committed R2-only flags) | The cutover config; promotion needs its own approval, and `stage=frontend` still needs `R2_CUTOVER_APPROVED=true`. |
 
-Before anything is built or uploaded, the "Release flags" step computes the effective flags and fails unless they are exactly the mode's promise; they are printed in the run summary. The dry run, the upload and the deploy all take their overrides from `frontend/scripts/production-media-vars.sh`, which fails closed (an unknown mode, or a `legacy-hold` that does not yield its three `--var` pairs, stops the step). After an upload, read the version's bindings back (Cloudflare API `workers/scripts/aladdin-frontend-production/versions/<id>`) and compare the three flags with the live version before testing or promoting.
+In **every** mode `MEDIA_LEGACY_STORAGE_WRITES` must be `false`; no mode reopens Supabase Storage writes. The "Release flags" step prints the effective flags and the live version ids in the run summary; the dry run, the upload and the deploy all take their overrides from `frontend/scripts/production-media-vars.sh` (which also fails closed). After `stage=frontend-upload`, the step "Verify the uploaded version carries the live media flags" reads the NEW version's bindings back and fails the run unless all three equal the live version's. **Before promoting**, run the same check again (the live version may have changed since the upload):
+
+```
+CLOUDFLARE_ACCOUNT_ID=<account> CLOUDFLARE_API_TOKEN=<read token> node frontend/scripts/check-cloudflare-production.mjs --verify-version <version id>
+```
+

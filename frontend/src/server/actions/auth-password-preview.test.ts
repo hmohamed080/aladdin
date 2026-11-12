@@ -134,6 +134,7 @@ import {
   changePassword,
 } from "./auth-password-preview";
 import { PASSWORD_MIN_LENGTH } from "@/features/auth-password-preview/password-policy";
+import { REGISTRATION_RESPONSE_FLOOR_MS } from "@/server/auth/signup-guards";
 
 // Genuinely strong: long, varied, no dictionary word, no repeated/sequential run, unrelated to any test email.
 const GOOD_PASSWORD = "Zq9$Kx4#WmT7!Pn2";
@@ -433,6 +434,26 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
       const res = await requestPasswordSignUp({ ok: false }, consented({ email: "taken@example.test", password: GOOD_PASSWORD }));
       expect(res).toMatchObject({ ok: true, code: "authPasswordPreview.info.codeSent" });
       expect(savePendingRegistration).not.toHaveBeenCalled();
+    });
+
+    it("timing protection: a genuine 'code sent' and the budget-spent neutral reply both wait for the same floor, and the explicit warning does not need to", async () => {
+      const elapsed = async (setup: () => void, email: string) => {
+        setup();
+        const start = Date.now();
+        const res = await requestPasswordSignUp({ ok: false }, consented({ email, password: GOOD_PASSWORD }));
+        return { ms: Date.now() - start, res };
+      };
+      const fresh = await elapsed(() => signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "u-timing" } } }), "new@example.test");
+      const degraded = await elapsed(() => {
+        phoneAuthLimit.mockResolvedValueOnce("limited");
+        signUp.mockResolvedValueOnce({ error: { code: "user_already_exists" } });
+      }, "taken@example.test");
+      expect(fresh.res.ok).toBe(true);
+      expect(degraded.res.ok).toBe(true);
+      // The GoTrue stand-ins answer instantly, so any wait is the floor: both outcomes are held to (about) REGISTRATION_RESPONSE_FLOOR_MS.
+      expect(fresh.ms).toBeGreaterThanOrEqual(REGISTRATION_RESPONSE_FLOOR_MS - 25);
+      expect(degraded.ms).toBeGreaterThanOrEqual(REGISTRATION_RESPONSE_FLOOR_MS - 25);
+      expect(Math.abs(fresh.ms - degraded.ms)).toBeLessThan(150);
     });
 
     it("a missing CAPTCHA token never reaches the limiter or GoTrue (no probe without a challenge)", async () => {
