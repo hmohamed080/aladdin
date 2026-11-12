@@ -303,14 +303,6 @@ export async function requestPasswordSignUp(
   const captcha = requireCaptcha(formData);
   if ("code" in captcha) return { ok: false, code: captcha.code, email: parsed.data.email };
 
-  // Because an already-registered email is now answered explicitly (below), this action can be used to probe which addresses have an account.
-  // The probe is bounded the same way the mobile sign-up's is: CAPTCHA first (above), then the durable per-IP (10) and per-address (5) budget
-  // for 15 minutes, keyed by HMAC only. A limiter that cannot answer fails closed. The key is namespaced so it never collides with a phone.
-  const limited = await phoneAuthLimit("sign-up", `email:${parsed.data.email.toLowerCase()}`, await headers());
-  if (limited !== "allowed") {
-    return { ok: false, code: limited === "limited" ? "authPasswordPreview.error.rateLimited" : "authPasswordPreview.error.sendFailed", email: parsed.data.email };
-  }
-
   const supabase = await getServerSupabase();
 
   // The Full Name rides in user METADATA (raw_user_meta_data), which
@@ -340,10 +332,19 @@ export async function requestPasswordSignUp(
     }
     // An email that already belongs to a CONFIRMED account is told so, with a way to log in instead (product decision, 2026-11-12: a person must
     // not wait for a code that will never arrive). Only this case is explicit: a still-UNCONFIRMED address is obfuscated by GoTrue itself
-    // (success, same user id, the code is re-sent), so an interrupted registration simply continues. Nothing is staged and no routing cookie
-    // is set for an existing account, so there is no pending-registration footing for another person's id.
+    // (success, same user id, the code is re-sent), so an interrupted registration simply continues.
+    // This answer is an existence signal, so it is BUDGETED, and the budget is only ever spent here: GoTrue has already judged the CAPTCHA
+    // (a garbage token fails above and never gets this far), so an unverified request can neither read the answer nor burn anyone's budget.
+    // The durable limiter allows 10 explicit answers per IP and 5 per address per 15 minutes (HMAC keys, `email:` namespaced). Once it is spent
+    // (or cannot answer) the reply DEGRADES to the neutral "code sent" response a new registration gets, never to a distinguishable
+    // "rate limited", so the budget really bounds what can be learned. Nothing is staged for an existing account.
     if (isAccountExistsError(error as GoTrueError)) {
-      return { ok: false, code: "authPasswordPreview.error.accountExists", email: parsed.data.email };
+      const budget = await phoneAuthLimit("sign-up", `email:${parsed.data.email.toLowerCase()}`, await headers());
+      if (budget === "allowed") {
+        return { ok: false, code: "authPasswordPreview.error.accountExists", email: parsed.data.email };
+      }
+      await rememberRegistrationEmail(parsed.data.email);
+      return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
     }
     logSignUpSendFailure("sign_up", error as GoTrueError);
     return { ok: false, code: "authPasswordPreview.error.sendFailed", email: parsed.data.email };

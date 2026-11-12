@@ -412,21 +412,27 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
       expect(res).toMatchObject({ ok: true, code: "authPasswordPreview.info.codeSent" });
     });
 
-    it("the existence answer sits behind CAPTCHA and the durable limiter (per-IP and per-address, HMAC keys), which runs BEFORE GoTrue", async () => {
+    it("the explicit answer is budgeted per IP/address (durable limiter) and spent ONLY on an existence answer, after GoTrue judged the CAPTCHA", async () => {
       signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1" } } });
-      await requestPasswordSignUp({ ok: false }, consented({ email: "Person@Example.test", password: GOOD_PASSWORD }));
-      expect(phoneAuthLimit).toHaveBeenCalledWith("sign-up", "email:person@example.test", expect.anything());
+      await requestPasswordSignUp({ ok: false }, consented({ email: "new@example.test", password: GOOD_PASSWORD }));
+      expect(phoneAuthLimit).not.toHaveBeenCalled();
 
-      phoneAuthLimit.mockResolvedValueOnce("limited");
-      signUp.mockClear();
-      const limited = await requestPasswordSignUp({ ok: false }, consented({ email: "taken@example.test", password: GOOD_PASSWORD }));
-      expect(limited.code).toBe("authPasswordPreview.error.rateLimited");
-      expect(signUp).not.toHaveBeenCalled();
+      signUp.mockResolvedValueOnce({ error: { code: "captcha_failed", status: 400 } });
+      await requestPasswordSignUp({ ok: false }, consented({ email: "victim@example.test", password: GOOD_PASSWORD }));
+      expect(phoneAuthLimit).not.toHaveBeenCalled();
 
-      phoneAuthLimit.mockResolvedValueOnce("unavailable");
-      const down = await requestPasswordSignUp({ ok: false }, consented({ email: "taken@example.test", password: GOOD_PASSWORD }));
-      expect(down.code).toBe("authPasswordPreview.error.sendFailed");
-      expect(signUp).not.toHaveBeenCalled();
+      signUp.mockResolvedValueOnce({ error: { code: "user_already_exists" } });
+      const res = await requestPasswordSignUp({ ok: false }, consented({ email: "Taken@Example.test", password: GOOD_PASSWORD }));
+      expect(phoneAuthLimit).toHaveBeenCalledWith("sign-up", "email:taken@example.test", expect.anything());
+      expect(res.code).toBe("authPasswordPreview.error.accountExists");
+    });
+
+    it.each(["limited", "unavailable"] as const)("once the budget is spent (%s) an existing account DEGRADES to the neutral 'code sent' reply - never to a distinguishable error", async (verdict) => {
+      phoneAuthLimit.mockResolvedValueOnce(verdict);
+      signUp.mockResolvedValueOnce({ error: { code: "user_already_exists" } });
+      const res = await requestPasswordSignUp({ ok: false }, consented({ email: "taken@example.test", password: GOOD_PASSWORD }));
+      expect(res).toMatchObject({ ok: true, code: "authPasswordPreview.info.codeSent" });
+      expect(savePendingRegistration).not.toHaveBeenCalled();
     });
 
     it("a missing CAPTCHA token never reaches the limiter or GoTrue (no probe without a challenge)", async () => {
