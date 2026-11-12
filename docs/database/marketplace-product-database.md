@@ -119,6 +119,8 @@ Full design, idempotency model, image matching and worker contract: [`marketplac
 
 ## Migration 06 — trusted seller product writes
 
+> **Image storage superseded by Migration 13:** there is no `marketplace-product-images` bucket and no storage policy any more; photos live in the central media system (R2). The image RPCs below keep their names and grants.
+
 `20261112100006_marketplace_seller_product_writes.sql`. The write layer the seller UI uses — no client gains a table write grant.
 
 | RPC (authenticated) | Purpose |
@@ -132,6 +134,8 @@ Full design, idempotency model, image matching and worker contract: [`marketplac
 Every write re-checks: authenticated caller, active member with `catalog.write` / `catalog.publish` / `org.manage`, enabled (approved, eligible) seller, ownership. Refusals are `mp:<code>[:detail]`. New private bucket `marketplace-product-images` (5 MB, jpeg/png/webp) with three storage policies; `marketplace_product_images.upload_state` added. Test `47_` updated for the three reviewed policies and ONE named exception to "no function reads storage.objects" (the upload confirmation). Tests: `95_` (76) + `marketplace_seller_stock_concurrency_test.sh`.
 
 ## Migration 07 — safe image removal lifecycle
+
+> **Storage steps superseded by Migration 13:** phase 2 is now `removeMedia` (R2 original + variants, records `cleaned_at`) and phase 3 checks that receipt instead of `storage.objects`. The two-phase design below still holds.
 
 `20261112100007_marketplace_image_removal_lifecycle.sql`. Fixes a defect found by the Migration 06 audit: `marketplace_seller_image_remove` deleted the image row at once, but Supabase Storage reads an object *as the caller* before deleting it, and that read (`marketplace_images_select_member`) needs the very row that had just been deleted — so the bytes were refused and stayed in the private bucket forever (and the app ignored the failure).
 
@@ -182,6 +186,20 @@ Tests: `126_marketplace_image_removal_lifecycle_test.sql` (73), `marketplace_ima
 Each new type has a required product-level field, a required variant-level field and one to three variant axes (the V1 limit): panels = colour + thickness; skirting = colour + bar length + height; doors = colour + width + handing (height required, not an axis); flooring = colour + thickness; curtains = colour + width + height; posters = width + height; paints = colour + pack size (`pack_volume`: 0.5 L … 18 L, an option field, so sellers pick a size instead of typing millilitres). Measurements stay canonical (length → mm); new fields: `height`, `wear_layer`, `coverage_per_liter` (number, m²/L), booleans (`includes_frame`, `fire_rated`, `sound_insulated`, `waterproof`, `underlay_attached`, `framed`). The colour catalogue gains yellow, orange, red, purple, turquoise (24 colours). Selling units stay within the existing set.
 
 The Arabic name for skirting is stored as **وزرة** (the standard word; the brief wrote "وزر") — a one-row `update` away if the platform prefers otherwise. Tests: `127_marketplace_product_type_expansion_test.sql` (38: catalogue, schema sanity, unchanged security, and a complete draft saved through the seller RPC for every new type); `90_` counts updated (7 categories, 15 types, 24 colours).
+## Migration 13 — product photos on the central media system (R2)
+
+`20261112100013_marketplace_media.sql`. Owner decision (2026-11-01): no application file bytes in Supabase Storage. Marketplace photos join the central media system the same way `20261107090005` brought purchase-request photos and verification documents in: a new namespace `marketplace`, and each central function (`media_metadata`, `media_storage_resolve`, `organization_media_resolve`, `media_storage_reserve`, `media_storage_attest`, `media_storage_key_for`, `media_cleanup_candidates`, `media_cleanup_retire`, `media_edge_authorize`) is re-created from its current definition with one added branch — no signature, owner, search_path or grant change, and the other namespaces behave exactly as before.
+
+| Step | Path |
+|---|---|
+| Upload | `marketplace_seller_image_request_upload` issues the pending row (now with `created_by`) and key `<org>/<product>/<id>.<ext>`; `authorizeMediaUpload` reserves it on R2 (ids-only key `o/<org>/marketplace/<product>/<id>/original.<ext>`) and returns the grant; the browser PUTs with `uploadWithGrant`. |
+| Confirm | `verifyPendingMedia` reads the bytes, checks signature + full decode + size, writes the variants and the receipt; `marketplace_seller_image_confirm_upload` (and the trigger `marketplace_image_verified_before_confirmed`) refuse without a fresh receipt. Content stays `pending` until moderation. |
+| Read | Members and media moderators through `/api/media/marketplace` (`app.marketplace_media_can_read`); the public shop only through `marketplace_public_image_ref` (service role) and `/marketplace/media/[imageId]`. |
+| Remove | phase 1 unchanged; phase 2 `removeMedia`; phase 3 `marketplace_seller_image_remove_finalize` requires `cleaned_at`. Withdrawn uploads are central cleanup candidates. |
+| Moderation | `admin_marketplace_media_record_validation` takes the size from the media receipt; the admin action reads the bytes from R2. |
+
+The five `app.marketplace_storage_*` predicates are dropped; no Marketplace function reads `storage.objects` (test `47_` is back to its reviewed 28 policies). **Bulk-import photos are paused** (`mp:import_images_unavailable`): an import takes the spreadsheet only; photos are added on each product page until import photos get their own media flow. Tests: `125_`, `126_` (media lifecycle), `128_` (moderation and import).
+
 ## Isolation
 
 1. **Git:** dedicated worktree and branch; the `main` working tree and the landing-page worktree are untouched.

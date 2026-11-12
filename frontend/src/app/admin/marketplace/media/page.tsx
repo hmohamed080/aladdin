@@ -4,7 +4,7 @@ import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { AdminHeader } from "@/features/admin/parts";
 import { StatePanel } from "@/components/ui/primitives";
-import { MARKETPLACE_IMAGE_BUCKET } from "@/features/marketplace-seller/errors";
+import { applicationMediaUrl } from "@/lib/storage/media-url";
 import { MediaModeration, type MediaItem, type MediaSettings } from "@/features/admin-marketplace/media-moderation";
 import { requireAdminRoute } from "@/server/authorization/admin";
 
@@ -15,8 +15,8 @@ const STATUSES = ["pending", "verified", "rejected"] as const;
 type Status = (typeof STATUSES)[number];
 
 /**
- * Media moderation queue. Previews are short-lived signed URLs minted under the
- * MODERATOR'S OWN session (storage policy marketplace_images_select_moderator);
+ * Media moderation queue. Previews are /api/media URLs read under the MODERATOR'S
+ * OWN session (the marketplace media resolver admits marketplace_media.moderate);
  * no service credential is involved and nothing here is public.
  */
 export default async function AdminMarketplaceMediaPage({
@@ -52,12 +52,8 @@ export default async function AdminMarketplaceMediaPage({
 
   const settings = settingsRes.data as unknown as MediaSettings;
   const queue = queueRes.data as unknown as { total: number; items: Omit<MediaItem, "previewUrl">[] };
-  const keys = queue.items.map((i) => i.object_key);
-  const signed = keys.length
-    ? (await supabase.storage.from(MARKETPLACE_IMAGE_BUCKET).createSignedUrls(keys, 600)).data ?? []
-    : [];
-  const urlByKey = new Map(signed.filter((s) => s.signedUrl && s.path).map((s) => [s.path as string, s.signedUrl]));
-  const items: MediaItem[] = queue.items.map((i) => ({ ...i, previewUrl: urlByKey.get(i.object_key) ?? null }));
+  // Previews go through /api/media, which re-checks the moderator permission on every read (R2, Migration 13).
+  const items: MediaItem[] = queue.items.map((i) => ({ ...i, previewUrl: applicationMediaUrl("marketplace", i.object_key) }));
 
   return (
     <div className="flex flex-col gap-lg">

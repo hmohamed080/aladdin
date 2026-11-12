@@ -38,18 +38,13 @@
 -- ===========================================================================
 
 -- ---------------------------------------------------------------------------
--- 1. Image upload state + private bucket
+-- 1. Image upload state (the bytes live in the central media system, Migration 13)
 -- ---------------------------------------------------------------------------
 alter table public.marketplace_product_images
   add column upload_state text not null default 'confirmed',
   add constraint ck_marketplace_images_upload_state check (upload_state in ('awaiting_upload', 'confirmed'));
 comment on column public.marketplace_product_images.upload_state is
   'awaiting_upload: a server-created key the seller may upload to, bytes not yet confirmed. confirmed: the object was found in storage by marketplace_seller_image_confirm_upload. Independent of `status` (pending / verified / rejected), which is the CONTENT review and is never set by an upload.';
-
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('marketplace-product-images', 'marketplace-product-images', false, 5242880,
-        array['image/jpeg', 'image/png', 'image/webp'])
-on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- 2. Authorisation helpers (internal)
@@ -670,16 +665,8 @@ as $$
                        and i.upload_state = 'confirmed');
 $$;
 
-create policy marketplace_images_insert_authorized on storage.objects
-  for insert to authenticated
-  with check (bucket_id = 'marketplace-product-images' and app.marketplace_storage_can_upload_image(name));
-create policy marketplace_images_select_member on storage.objects
-  for select to authenticated
-  using (bucket_id = 'marketplace-product-images' and app.marketplace_storage_owns_image(name));
-create policy marketplace_images_delete_unreferenced on storage.objects
-  for delete to authenticated
-  using (bucket_id = 'marketplace-product-images' and app.marketplace_storage_can_delete_image(name));
--- No UPDATE policy: an object key is immutable; a replacement is a new object.
+-- No storage.objects policy: Marketplace bytes never enter Supabase Storage. Migration 13
+-- moves the image lifecycle onto the central media system (R2) and replaces these predicates.
 
 create or replace function public.marketplace_seller_image_request_upload(
   p_product_id uuid, p_content_type text, p_variant_id uuid default null)

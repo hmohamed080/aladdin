@@ -2899,6 +2899,7 @@ export type Database = {
           content_format: string | null
           content_valid: boolean | null
           created_at: string
+          created_by: string | null
           height_px: number | null
           id: string
           is_primary: boolean
@@ -2926,6 +2927,7 @@ export type Database = {
           content_format?: string | null
           content_valid?: boolean | null
           created_at?: string
+          created_by?: string | null
           height_px?: number | null
           id?: string
           is_primary?: boolean
@@ -2937,8 +2939,8 @@ export type Database = {
           product_id: string
           sort_order?: number
           status?: string
-          storage_bucket: string
-          storage_provider: string
+          storage_bucket?: string
+          storage_provider?: string
           updated_at?: string
           upload_state?: string
           variant_id?: string | null
@@ -2953,6 +2955,7 @@ export type Database = {
           content_format?: string | null
           content_valid?: boolean | null
           created_at?: string
+          created_by?: string | null
           height_px?: number | null
           id?: string
           is_primary?: boolean
@@ -2985,6 +2988,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "marketplace_product_variants"
             referencedColumns: ["id", "product_id"]
+          },
+          {
+            foreignKeyName: "marketplace_product_images_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           },
         ]
       }

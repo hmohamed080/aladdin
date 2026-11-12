@@ -7473,6 +7473,7 @@ export const en = {
       col: { row: "Row", sku: "SKU", ref: "Product reference", name_ar: "Arabic name", price: "Price", quantity: "Stock" },
       step4: "4. Photos",
       step4Hint: "Choose JPG, PNG or WebP files, or a ZIP. Name each file after the product code or SKU, with an optional _1, _2 … for its order (e.g. 106-Jaguar-161-003_1.jpg). Every photo is checked by the Aladdin team before customers can see it.",
+      imagesPaused: "Photos are not imported for now. After the import, add each product's photos on its own product page; every photo is checked by the Aladdin team before customers can see it.",
       chooseImages: "Choose photos or a ZIP",
       clearImages: "Clear photos",
       imagesSummary: "{total} files · {matched} matched · {unmatched} not matched",

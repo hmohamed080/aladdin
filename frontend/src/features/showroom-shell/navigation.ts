@@ -51,9 +51,9 @@ export const SHOWROOM_GROUPS = [
   // Selling to consumers on the public Marketplace (B2C). Drawn ONLY for an organization a platform admin approved as a
   // seller - an entitlement the shell adds to the capability list (see ShowroomFrame) - and never unlocked by org.manage.
   { label: { ar: "الماركت", en: "Marketplace" }, items: [
-    legacy("marketplace-products", "/b2c/seller/products", "منتجات الماركت", "Marketplace products", StorefrontIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
-    legacy("marketplace-areas", "/b2c/seller/areas", "المناطق", "Delivery areas", MapPinIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
-    legacy("marketplace-delivery", "/b2c/seller/delivery", "توصيل المناطق", "Delivery prices", TruckIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
+    legacy("marketplace-products", "/showroom/marketplace/products", "منتجات الماركت", "Marketplace products", StorefrontIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
+    legacy("marketplace-areas", "/showroom/marketplace/areas", "المناطق", "Delivery areas", MapPinIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
+    legacy("marketplace-delivery", "/showroom/marketplace/delivery", "توصيل المناطق", "Delivery prices", TruckIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
   ] },
   { label: { ar: "الشبكة", en: "Network" }, items: [
     legacy("suppliers", `${LEGACY}/suppliers`, "الموردون", "Suppliers", StorefrontIcon),

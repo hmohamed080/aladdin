@@ -44,7 +44,7 @@ describe("delivery prices editor", () => {
   it("sends the showroom to the Areas page when it covers nowhere yet", () => {
     renderWithI18n(<DeliveryEditor organizationId={ORG} initialRates={[]} initialPickup={false} />, "en");
     expect(screen.getByText(/you have not added any delivery areas yet/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Add delivery areas" })).toHaveAttribute("href", "/b2c/seller/areas");
+    expect(screen.getByRole("link", { name: "Add delivery areas" })).toHaveAttribute("href", "/showroom/marketplace/areas");
     expect(screen.queryByRole("button", { name: "Save prices" })).not.toBeInTheDocument();
   });
 

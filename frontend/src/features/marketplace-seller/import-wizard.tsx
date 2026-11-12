@@ -10,19 +10,16 @@ import { Card, InlineError, InlineSuccess, ProgressMeter } from "@/components/ui
 import { Button, Input, LabeledField, Select, Textarea } from "@/components/ui/controls";
 import { UploadIcon } from "@/components/ui/icons";
 import { readSpreadsheet, type SheetGrid } from "@/lib/marketplace-import/spreadsheet";
-import { listZipEntries, readZipEntry } from "@/lib/marketplace-import/zip";
 import {
   TARGET_FIELDS,
   attributeColumns,
   buildPlan,
   chunk,
-  matchImages,
   type FieldSource,
-  type ImageMatch,
   type ImportConfig,
   type TargetField,
 } from "@/lib/marketplace-import/plan";
-import { MARKETPLACE_IMAGE_BUCKET, parseSellerError } from "./errors";
+import { parseSellerError } from "./errors";
 
 export type RecentJob = {
   id: string;
@@ -40,12 +37,8 @@ export type RecentJob = {
 
 type ReportRow = { row_number: number | null; external_ref: string | null; sku: string | null; file_name: string | null; severity: string; code: string; field: string | null; message: string };
 
-/** One image the run can upload: a picked file or an entry inside a picked ZIP. */
-type ImageSource = { fileName: string; size: number; read: () => Promise<Blob> };
-
 const SELLING_UNITS = ["piece", "roll", "board", "bar", "linear_meter", "square_meter", "pack"] as const;
 const OPEN_STATUSES = new Set(["created", "staging", "staged", "validating", "validated", "applying"]);
-const MIME: Record<ImageMatch["extension"], string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 
 async function sha256Hex(data: BufferSource | string): Promise<string> {
   const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
@@ -91,7 +84,6 @@ export function ImportWizard({
   const [file, setFile] = useState<{ name: string; bytes: Uint8Array; format: "csv" | "xlsx" } | null>(null);
   const [grid, setGrid] = useState<SheetGrid | null>(null);
   const [config, setConfig] = useState<ImportConfig | null>(null);
-  const [images, setImages] = useState<ImageSource[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ phase: string; done: number; total: number } | null>(null);
@@ -100,10 +92,6 @@ export function ImportWizard({
 
   const header = grid?.[config?.headerRow ?? 0] ?? [];
   const plan = useMemo(() => (grid && config ? buildPlan(grid, config) : null), [grid, config]);
-  const matches = useMemo(
-    () => (plan ? matchImages(images.map((i) => ({ fileName: i.fileName, size: i.size })), plan.rows) : null),
-    [images, plan],
-  );
 
   function errorText(e: unknown): string {
     const message = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : "";
@@ -131,34 +119,6 @@ export function ImportWizard({
     } catch {
       setError(tx("errors.unreadable"));
     }
-  }
-
-  async function onImages(list: FileList) {
-    setError(null);
-    const next: ImageSource[] = [];
-    for (const f of Array.from(list)) {
-      if (f.name.toLowerCase().endsWith(".zip")) {
-        try {
-          const data = new Uint8Array(await f.arrayBuffer());
-          for (const entry of listZipEntries(data)) {
-            if (entry.name.endsWith("/") || entry.name.split("/").pop()?.startsWith(".")) continue;
-            next.push({
-              fileName: entry.name,
-              size: entry.uncompressedSize,
-              read: async () => new Blob([(await readZipEntry(data, entry)) as Uint8Array<ArrayBuffer>]),
-            });
-          }
-        } catch {
-          setError(tx("errors.zip"));
-        }
-      } else {
-        next.push({ fileName: f.name, size: f.size, read: async () => f });
-      }
-    }
-    setImages((cur) => {
-      const seen = new Set(cur.map((c) => c.fileName));
-      return [...cur, ...next.filter((n) => !seen.has(n.fileName))];
-    });
   }
 
   function setField(field: TargetField, source: FieldSource) {
@@ -217,7 +177,6 @@ export function ImportWizard({
       const supabase = createBrowserSupabaseClient();
       const checksum = await sha256Hex(file.bytes as Uint8Array<ArrayBuffer>);
       const configHash = (await sha256Hex(JSON.stringify(config))).slice(0, 16);
-      const imageHash = mode === "apply" && matches ? (await sha256Hex(matches.matched.map((m) => `${m.fileName}>${m.registeredName}`).join("\n"))).slice(0, 12) : "none";
       const { data: jobId, error: createError } = await supabase.rpc("marketplace_import_job_create", {
         p_organization_id: organizationId,
         p_format: file.format,
@@ -225,44 +184,17 @@ export function ImportWizard({
         p_checksum: checksum,
         p_mode: mode,
         p_chunk_size: 500,
-        p_idempotency_key: `${mode}-${checksum.slice(0, 32)}-${configHash}-${imageHash}`,
+        p_idempotency_key: `${mode}-${checksum.slice(0, 32)}-${configHash}-none`,
       });
       if (createError || !jobId) throw createError ?? new Error("mp:unexpected");
       const { data: j } = await supabase.from("marketplace_import_jobs").select("status").eq("id", jobId).single();
 
       if (j && (j.status === "created" || j.status === "staging")) {
-        // 1) images (apply only) — uploaded to this job's own prefix, deterministic names, resumable
-        const toUpload = mode === "apply" && matches ? matches.matched : [];
-        const assets: Record<string, unknown>[] = [];
-        let done = 0;
-        for (const group of chunk(toUpload, 4)) {
-          if (cancelled.current) throw new Error("mp:cancelled");
-          await Promise.all(
-            group.map(async (m) => {
-              const index = toUpload.indexOf(m);
-              const objectKey = `imports/${organizationId}/${jobId}/${String(index + 1).padStart(5, "0")}.${m.extension}`;
-              const source = images.find((i) => i.fileName === m.fileName)!;
-              const blob = await source.read();
-              const { error: upError } = await supabase.storage
-                .from(MARKETPLACE_IMAGE_BUCKET)
-                .upload(objectKey, blob, { contentType: MIME[m.extension], upsert: false, cacheControl: "300" });
-              // an object that already exists is a resumed upload, not a failure
-              if (upError && !/exists|duplicate/i.test(upError.message)) throw upError;
-              assets.push({ file_name: m.registeredName, storage_bucket: MARKETPLACE_IMAGE_BUCKET, object_key: objectKey, mime_type: MIME[m.extension] });
-            }),
-          );
-          done += group.length;
-          setProgress({ phase: tx("phase.upload"), done, total: toUpload.length });
-        }
-        // 2) rows, then assets (both idempotent on replay)
+        // rows (idempotent on replay). Import photos are paused: photos are added on each product page.
         const rowChunks = chunk(plan.rows, 1000);
         for (const [i, rows] of rowChunks.entries()) {
           setProgress({ phase: tx("phase.stage"), done: i, total: rowChunks.length });
           const { error: e } = await supabase.rpc("marketplace_seller_import_step", { p_job: jobId, p_step: "stage_rows", p_payload: rows as never });
-          if (e) throw e;
-        }
-        for (const part of chunk(assets.sort((a, b) => String(a.file_name).localeCompare(String(b.file_name))), 500)) {
-          const { error: e } = await supabase.rpc("marketplace_seller_import_step", { p_job: jobId, p_step: "stage_assets", p_payload: part as never });
           if (e) throw e;
         }
       }
@@ -506,62 +438,11 @@ export function ImportWizard({
         </Card>
       ) : null}
 
-      {/* 4. images */}
+      {/* 4. images: paused until import photos have their own media flow (R2) */}
       {plan ? (
         <Card className="flex flex-col gap-sm">
           <h2 className="text-body-lg font-semibold text-fg">{tx("step4")}</h2>
-          <p className="text-label text-fg-secondary">{tx("step4Hint")}</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-sm border border-strong px-md py-2 text-label font-medium hover:bg-surface-2">
-              <UploadIcon size={16} />
-              {tx("chooseImages")}
-              <input
-                type="file"
-                multiple
-                accept=".jpg,.jpeg,.png,.webp,.zip"
-                className="sr-only"
-                disabled={busy}
-                onChange={(e) => {
-                  if (e.target.files?.length) void onImages(e.target.files);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-            {images.length ? (
-              <Button size="sm" variant="ghost" disabled={busy} onClick={() => setImages([])}>
-                {tx("clearImages")}
-              </Button>
-            ) : null}
-          </div>
-          {matches && images.length ? (
-            <div className="flex flex-col gap-1 text-label">
-              <p className="text-fg">
-                {tx("imagesSummary", {
-                  total: n(images.length),
-                  matched: n(matches.matched.length),
-                  unmatched: n(matches.unmatched.length + matches.unsupported.length + matches.tooLarge.length),
-                })}
-              </p>
-              <p className="text-fg-muted">
-                {tx("imagesCoverage", {
-                  products: n(new Set(matches.matched.map((m) => m.externalRef)).size),
-                  of: n(plan.products),
-                })}
-              </p>
-              {matches.unmatched.length + matches.unsupported.length + matches.tooLarge.length ? (
-                <details>
-                  <summary className="cursor-pointer text-warning">{tx("unmatchedList")}</summary>
-                  <ul className="max-h-40 overflow-auto font-mono" dir="ltr">
-                    {[...matches.unmatched, ...matches.unsupported, ...matches.tooLarge].map((f) => (
-                      <li key={f}>{f}</li>
-                    ))}
-                  </ul>
-                </details>
-              ) : null}
-            </div>
-          ) : (
-            <p className="text-label text-warning">{tx("noImages")}</p>
-          )}
+          <p className="text-label text-fg-secondary">{tx("imagesPaused")}</p>
         </Card>
       ) : null}
 

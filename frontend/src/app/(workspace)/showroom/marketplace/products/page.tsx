@@ -10,7 +10,7 @@ import { FilterBar } from "@/components/ui/filter-bar";
 import { ButtonLink } from "@/components/ui/controls";
 import { RowPublishToggle } from "@/features/marketplace-seller/row-publish";
 import { QuantityStepper } from "@/features/marketplace-seller/stock-editor";
-import { MARKETPLACE_IMAGE_BUCKET } from "@/features/marketplace-seller/errors";
+import { applicationMediaUrl } from "@/lib/storage/media-url";
 import {
   StorefrontIcon,
   PlusIcon,
@@ -54,7 +54,7 @@ const PILL: Record<DisplayState, { dot: string; chip: string }> = {
 };
 
 /**
- * /b2c/seller/products — the showroom's own shelf on the public B2C Marketplace.
+ * /showroom/marketplace/products — the showroom's own shelf on the public B2C Marketplace.
  *
  * B2C, NOT B2B. This is not part of the B2B Sales module or the B2B product
  * catalogue (/b2b/products): it lists canonical `marketplace_products` only and
@@ -71,7 +71,7 @@ const PILL: Record<DisplayState, { dot: string; chip: string }> = {
  * product form; the inline − / + changes stock through the ledger for a product
  * with ONE active variant at ONE location (otherwise "manage stock" opens the
  * product page, where the variant and location are explicit). Bulk upload opens
- * /b2c/seller/imports. The list is paged in the database (Migration 09). Thumbnails are short-lived signed URLs of the
+ * /showroom/marketplace/imports. The list is paged in the database (Migration 09). Thumbnails are authorized /api/media URLs of the
  * seller's own private images; customers do not see them before verification.
  */
 export default async function MarketplaceProductsPage({
@@ -141,13 +141,9 @@ export default async function MarketplaceProductsPage({
     lowStock: Number(paged.stats?.low_stock ?? 0),
   };
 
-  // Short-lived URLs for this page's thumbnails only (private bucket, member-scoped policy).
-  const thumbKeys = items.map((p) => p.primaryImageKey).filter((k): k is string => Boolean(k));
+  // Thumbnails go through /api/media, which re-checks the seller's membership on every read (R2, Migration 13).
   const thumbs = new Map<string, string>();
-  if (thumbKeys.length) {
-    const { data: signed } = await supabase.storage.from(MARKETPLACE_IMAGE_BUCKET).createSignedUrls(thumbKeys, 600);
-    for (const s of signed ?? []) if (s.path && s.signedUrl) thumbs.set(s.path, s.signedUrl);
-  }
+  for (const p of items) if (p.primaryImageKey) thumbs.set(p.primaryImageKey, applicationMediaUrl("marketplace", p.primaryImageKey));
   const isFiltered = Boolean(filters.q || filters.type || filters.status || filters.stock);
 
   const pageHref = (n: number) => {
@@ -157,7 +153,7 @@ export default async function MarketplaceProductsPage({
     }
     if (n > 1) qs.set("page", String(n));
     const s = qs.toString();
-    return s ? `/b2c/seller/products?${s}` : "/b2c/seller/products";
+    return s ? `/showroom/marketplace/products?${s}` : "/showroom/marketplace/products";
   };
 
   return (
@@ -169,15 +165,15 @@ export default async function MarketplaceProductsPage({
         subtitle={t.subtitle}
         toolbar={
           <div className="flex flex-wrap items-center gap-sm">
-            <ButtonLink href="/b2c/seller/delivery" variant="outline">
+            <ButtonLink href="/showroom/marketplace/delivery" variant="outline">
               <TruckIcon size={16} />
               {t.delivery.link}
             </ButtonLink>
-            <ButtonLink href="/b2c/seller/imports" variant="outline">
+            <ButtonLink href="/showroom/marketplace/imports" variant="outline">
               <UploadIcon size={16} />
               {t.bulkUpload}
             </ButtonLink>
-            <ButtonLink href="/b2c/seller/products/new" variant="accent">
+            <ButtonLink href="/showroom/marketplace/products/new" variant="accent">
               <PlusIcon size={16} />
               {t.addProduct}
             </ButtonLink>
@@ -198,14 +194,14 @@ export default async function MarketplaceProductsPage({
             value: stats.lowStock,
             Icon: AlertIcon,
             tone: stats.lowStock > 0 ? "warning" : "neutral",
-            href: stats.lowStock > 0 ? "/b2c/seller/products?stock=low" : undefined,
+            href: stats.lowStock > 0 ? "/showroom/marketplace/products?stock=low" : undefined,
           },
         ]}
       />
 
       <div>
         <FilterBar
-          basePath="/b2c/seller/products"
+          basePath="/showroom/marketplace/products"
           clearLabel={t.filter.clear}
           search={{ name: "q", value: filters.q ?? "", placeholder: t.searchPlaceholder }}
           selects={[
@@ -265,7 +261,7 @@ export default async function MarketplaceProductsPage({
                         <td className="px-md py-sm">
                           <div className="flex items-center gap-sm">
                             {p.primaryImageKey && thumbs.get(p.primaryImageKey) ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL of a private object
+                              // eslint-disable-next-line @next/next/no-img-element -- authorized /api/media URL of a private object
                               <img
                                 src={thumbs.get(p.primaryImageKey)}
                                 alt=""
@@ -329,7 +325,7 @@ export default async function MarketplaceProductsPage({
                                 {formatCount(p.quantity, locale)}
                               </span>
                               <Link
-                                href={`/b2c/seller/products/${p.id}/edit#variants`}
+                                href={`/showroom/marketplace/products/${p.id}/edit#variants`}
                                 className="text-label text-accent hover:underline"
                                 title={p.inlineStock ? undefined : t.stockEditor.multiHint}
                               >
@@ -347,7 +343,7 @@ export default async function MarketplaceProductsPage({
                         <td className="px-md py-sm">
                           <div className="flex items-center justify-center gap-1.5">
                             <Link
-                              href={`/b2c/seller/products/${p.id}/edit`}
+                              href={`/showroom/marketplace/products/${p.id}/edit`}
                               aria-label={t.action.edit}
                               title={t.action.edit}
                               className="grid h-9 w-9 place-items-center rounded-sm border text-fg-secondary transition-colors hover:bg-surface-2 hover:text-fg"

@@ -465,8 +465,9 @@ select is(
      ('marketplace_products', 'marketplace_product_variants', 'marketplace_product_attribute_values',
       'marketplace_variant_attribute_values', 'marketplace_product_images')
    join pg_class dst on dst.oid = c.confrelid
-   where c.contype = 'f' and dst.relname not like 'marketplace\_%' and dst.relname <> 'organizations'),
-  0, 'J2. the product-core tables reference no existing table except organizations');
+   where c.contype = 'f' and dst.relname not like 'marketplace\_%' and dst.relname <> 'organizations'
+     and not (src.relname = 'marketplace_product_images' and dst.relname = 'users')),
+  0, 'J2. the product-core tables reference no existing table except organizations (and the image uploader, Migration 13)');
 
 select * from finish();
 rollback;

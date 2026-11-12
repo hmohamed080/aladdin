@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { MARKETPLACE_IMAGE_BUCKET, parseSellerError, type SellerActionError } from "@/features/marketplace-seller/errors";
+import { parseSellerError, type SellerActionError } from "@/features/marketplace-seller/errors";
 import { removeImageLifecycle, type RemovalResult } from "@/features/marketplace-seller/image-removal";
-import { IMAGE_SIGNATURE_BYTES, matchesDeclaredType } from "@/features/marketplace-seller/image-signature";
+import { isMarketplaceImageKey, MARKETPLACE_IMAGE_MAX_BYTES } from "@/lib/storage/marketplace-images";
+import type { UploadGrant } from "@/lib/storage/provider-types";
+import { authorizeMediaUpload, removeMedia, resolveMedia, verifyPendingMedia } from "@/server/storage/media";
 import type { Json } from "@/types/database.types";
 
 /**
@@ -17,7 +19,7 @@ import type { Json } from "@/types/database.types";
  */
 export type SellerResult<T> = ({ ok: true } & T) | ({ ok: false } & SellerActionError);
 
-const PRODUCTS_PATH = "/b2c/seller/products";
+const PRODUCTS_PATH = "/showroom/marketplace/products";
 
 export type SavedProduct = {
   id: string;
@@ -102,11 +104,20 @@ export async function adjustStockAction(input: {
   return { ok: true, applied: r.applied, onHand: r.on_hand, reserved: r.reserved, available: r.available };
 }
 
+/**
+ * Upload ticket: the database issues the pending row and key, then the central media
+ * layer (`authorizeMediaUpload`) re-authorizes the caller, reserves the key on R2 and
+ * returns the upload grant. Bytes never pass through a Supabase Storage bucket.
+ */
 export async function requestImageUploadAction(
   productId: string,
   contentType: string,
+  expectedBytes: number,
   variantId?: string | null,
-): Promise<SellerResult<{ imageId: string; objectKey: string }>> {
+): Promise<SellerResult<{ imageId: string; objectKey: string; grant: UploadGrant }>> {
+  if (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > MARKETPLACE_IMAGE_MAX_BYTES) {
+    return { ok: false, code: "file_too_large" };
+  }
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("marketplace_seller_image_request_upload", {
     p_product_id: productId,
@@ -115,12 +126,19 @@ export async function requestImageUploadAction(
   });
   if (error || !data) return { ok: false, ...fail(error) };
   const r = data as { image_id: string; object_key: string };
-  return { ok: true, imageId: r.image_id, objectKey: r.object_key };
+  if (!isMarketplaceImageKey(r.object_key)) return { ok: false, code: "unexpected" };
+  try {
+    return { ok: true, imageId: r.image_id, objectKey: r.object_key,
+      grant: await authorizeMediaUpload(supabase, "marketplace", r.object_key, expectedBytes) };
+  } catch {
+    await runImageRemoval(supabase, r.image_id);
+    return { ok: false, code: "upload_failed" };
+  }
 }
 
 type Supabase = Awaited<ReturnType<typeof getServerSupabase>>;
 
-/** Phase 1 -> 2 -> 3 of the image removal (Migration 07), under the caller's own session. */
+/** Phase 1 -> 2 -> 3 of the image removal (Migration 07), on the central media system. */
 async function runImageRemoval(supabase: Supabase, imageId: string): Promise<RemovalResult> {
   return removeImageLifecycle(
     {
@@ -130,10 +148,15 @@ async function runImageRemoval(supabase: Supabase, imageId: string): Promise<Rem
         return { key: String(data) };
       },
       async deleteObject(key) {
-        // Storage answers 200 with an empty list when a policy filtered the object out, so a
-        // "successful" response proves nothing: the database confirms the bytes are gone in step 3.
-        const { error } = await supabase.storage.from(MARKETPLACE_IMAGE_BUCKET).remove([key]);
-        return error ? { error: error.message } : {};
+        try {
+          // A key that was issued but never reserved has no bytes anywhere: nothing to delete.
+          if (!(await resolveMedia(supabase, "marketplace", key, "delete")).reserved) return {};
+          // Deletes the original and its variants and records cleaned_at, which finalize checks.
+          await removeMedia(supabase, "marketplace", key);
+          return {};
+        } catch (error) {
+          return { error: error instanceof Error ? error.message : "delete failed" };
+        }
       },
       async finalize(id) {
         const { error } = await supabase.rpc("marketplace_seller_image_remove_finalize", { p_image_id: id });
@@ -144,43 +167,26 @@ async function runImageRemoval(supabase: Supabase, imageId: string): Promise<Rem
   );
 }
 
-/** The first bytes of a stored object, read with a short-lived signed URL and a Range request. */
-async function readHeadBytes(supabase: Supabase, key: string): Promise<Uint8Array | "missing" | "error"> {
-  const { data, error } = await supabase.storage.from(MARKETPLACE_IMAGE_BUCKET).createSignedUrl(key, 30);
-  if (error || !data?.signedUrl) return "missing";
-  try {
-    const res = await fetch(data.signedUrl, {
-      headers: { range: `bytes=0-${IMAGE_SIGNATURE_BYTES - 1}` },
-      cache: "no-store",
-    });
-    if (res.status === 404 || res.status === 400) return "missing";
-    if (!res.ok) return "error";
-    return new Uint8Array((await res.arrayBuffer()).slice(0, IMAGE_SIGNATURE_BYTES));
-  } catch {
-    return "error";
-  }
-}
-
 /**
- * Confirmed only if the database finds the bytes in storage AND the first bytes
- * really are the image type the file claims. A file whose content does not match
- * is withdrawn through the removal lifecycle and refused. (The database cannot read
- * file bytes; a direct RPC call skips this check, which is why uploads stay `pending`
- * and the content review that precedes any publication must re-validate every image.)
+ * Confirmed only after the central verifier (`verifyPendingMedia`) read the stored bytes,
+ * checked the signature against the declared type, fully decoded them with the runtime image
+ * engine and recorded the size + sha256 receipt; the database refuses the confirm without that
+ * receipt. Bytes that fail are withdrawn through the removal lifecycle and refused. Content
+ * stays `pending` until a moderator approves it.
  */
 export async function confirmImageUploadAction(imageId: string): Promise<SellerResult<{ isPrimary: boolean }>> {
   const supabase = await getServerSupabase();
 
   const { data: row } = await supabase
     .from("marketplace_product_images")
-    .select("object_key, mime_type, upload_state")
+    .select("object_key, upload_state")
     .eq("id", imageId)
     .maybeSingle();
   if (row && row.upload_state === "awaiting_upload") {
-    const head = await readHeadBytes(supabase, row.object_key);
-    if (head === "error") return { ok: false, code: "unexpected" };
-    if (head === "missing") return { ok: false, code: "upload_not_found" };
-    if (!matchesDeclaredType(head, row.mime_type)) {
+    if (!isMarketplaceImageKey(row.object_key)) return { ok: false, code: "unexpected" };
+    try {
+      await verifyPendingMedia(supabase, "marketplace", row.object_key);
+    } catch {
       await runImageRemoval(supabase, imageId);
       revalidatePath(PRODUCTS_PATH);
       return { ok: false, code: "image_content_invalid" };
@@ -192,6 +198,7 @@ export async function confirmImageUploadAction(imageId: string): Promise<SellerR
   revalidatePath(PRODUCTS_PATH);
   return { ok: true, isPrimary: Boolean((data as { is_primary?: boolean }).is_primary) };
 }
+
 export async function updateImagesAction(
   productId: string,
   images: { id: string; sort_order: number; is_primary: boolean; variant_id: string | null }[],
@@ -237,8 +244,8 @@ export async function finishPendingImageRemovalsAction(productId: string): Promi
 
 /* ---------- delivery areas, delivery prices and pickup (Migration 12) ---------- */
 
-const AREAS_PATH = "/b2c/seller/areas";
-const DELIVERY_PATH = "/b2c/seller/delivery";
+const AREAS_PATH = "/showroom/marketplace/areas";
+const DELIVERY_PATH = "/showroom/marketplace/delivery";
 
 /** A place a showroom delivers to: a governorate (`area_key` null) or one area inside it. */
 export type DeliveryPlace = { governorate_key: string; area_key: string | null };

@@ -7,7 +7,7 @@ import { loadProductTypeSchemas } from "@/server/queries/marketplace-seller-cata
 
 export const dynamic = "force-dynamic";
 
-/** /b2c/seller/products/new — create a Marketplace product as a draft. */
+/** /showroom/marketplace/products/new — create a Marketplace product as a draft. */
 export default async function NewMarketplaceProductPage() {
   const { supabase, org, locale } = await requireApprovedSeller();
   const t = getMessages(locale).marketplaceSeller;

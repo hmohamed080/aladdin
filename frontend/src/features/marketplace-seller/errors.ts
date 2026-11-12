@@ -1,6 +1,3 @@
-/** The private bucket product images are uploaded to (Migration 06). */
-export const MARKETPLACE_IMAGE_BUCKET = "marketplace-product-images";
-
 export type SellerActionError = { code: string; detail?: string };
 
 /**

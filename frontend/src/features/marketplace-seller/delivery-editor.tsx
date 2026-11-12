@@ -87,7 +87,7 @@ export function DeliveryEditor({
             <p className="mt-1 text-label text-fg-secondary">{t("marketplaceSeller.delivery.rules")}</p>
           </div>
           {rows.length > 0 ? (
-            <ButtonLink href="/b2c/seller/areas" variant="outline" size="sm">
+            <ButtonLink href="/showroom/marketplace/areas" variant="outline" size="sm">
               <MapPinIcon size={16} />
               {t("marketplaceSeller.delivery.editAreas")}
             </ButtonLink>
@@ -97,7 +97,7 @@ export function DeliveryEditor({
         {rows.length === 0 ? (
           <div className="mt-md flex flex-col items-start gap-sm rounded-sm border border-dashed p-md">
             <p className="text-body text-fg-secondary">{t("marketplaceSeller.delivery.empty")}</p>
-            <ButtonLink href="/b2c/seller/areas" variant="accent">
+            <ButtonLink href="/showroom/marketplace/areas" variant="accent">
               <MapPinIcon size={16} />
               {t("marketplaceSeller.delivery.addAreas")}
             </ButtonLink>

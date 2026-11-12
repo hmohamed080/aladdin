@@ -41,7 +41,7 @@ describe("delivery areas editor", () => {
   it("points to the prices page while places still have no price", () => {
     renderWithI18n(<AreasEditor organizationId={ORG} initialRates={[{ governorate_key: "cairo", area_key: null, fee_egp: null }]} unpriced={1} />, "en");
     expect(screen.getByText(/1 places have no price yet/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Set delivery prices" })).toHaveAttribute("href", "/b2c/seller/delivery");
+    expect(screen.getByRole("link", { name: "Set delivery prices" })).toHaveAttribute("href", "/showroom/marketplace/delivery");
   });
 
   it("saves the ticked governorates (no area) and then the single areas", async () => {

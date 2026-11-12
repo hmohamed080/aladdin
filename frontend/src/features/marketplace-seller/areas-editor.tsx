@@ -202,7 +202,7 @@ export function AreasEditor({
         {unpriced > 0 ? (
           <span className="text-label text-fg-secondary">
             {t("marketplaceSeller.areas.unpriced").replace("{n}", String(unpriced))}{" "}
-            <Link href="/b2c/seller/delivery" className="text-accent hover:underline">
+            <Link href="/showroom/marketplace/delivery" className="text-accent hover:underline">
               {t("marketplaceSeller.areas.setPrices")}
             </Link>
           </span>

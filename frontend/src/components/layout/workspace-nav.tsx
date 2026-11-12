@@ -77,9 +77,9 @@ const ITEMS: Record<NavKey, Item> = {
   leads: { href: "/b2b/leads", key: "nav.leads", exact: false, Icon: TargetIcon },
   followUps: { href: "/b2b/follow-ups", key: "nav.followUps", exact: false, Icon: CalendarCheckIcon },
   products: { href: "/b2b/products", key: "nav.products", exact: false, Icon: PackageIcon },
-  marketplaceProducts: { href: "/b2c/seller/products", key: "nav.marketplaceProducts", exact: false, Icon: StorefrontIcon },
-  marketplaceAreas: { href: "/b2c/seller/areas", key: "nav.marketplaceAreas", exact: false, Icon: MapPinIcon },
-  marketplaceDelivery: { href: "/b2c/seller/delivery", key: "nav.marketplaceDelivery", exact: false, Icon: TruckIcon },
+  marketplaceProducts: { href: "/showroom/marketplace/products", key: "nav.marketplaceProducts", exact: false, Icon: StorefrontIcon },
+  marketplaceAreas: { href: "/showroom/marketplace/areas", key: "nav.marketplaceAreas", exact: false, Icon: MapPinIcon },
+  marketplaceDelivery: { href: "/showroom/marketplace/delivery", key: "nav.marketplaceDelivery", exact: false, Icon: TruckIcon },
 
   points: { href: "/b2b/points", key: "nav.points", exact: false, Icon: GaugeIcon },
   projects: { href: "/b2b/projects", key: "nav.projects", exact: false, Icon: LayersIcon },

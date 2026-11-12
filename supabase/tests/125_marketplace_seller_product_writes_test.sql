@@ -1,15 +1,15 @@
 -- pgTAP: Marketplace Migration 06 — trusted seller product writes
 -- (20261112100006_marketplace_seller_product_writes.sql).
 --
---   A. SHAPE        — definer functions, authenticated-only EXECUTE, private bucket, no grants.
+--   A. SHAPE        — definer functions, authenticated-only EXECUTE, no storage bucket, no grants.
 --   B. CREATE       — an approved seller saves a draft with variants and dynamic attributes.
 --   C. VALIDATION   — SKU, price, unit, type, attributes, duplicates: precise refusals.
 --   D. UPDATE       — edits, variant removal = deactivation, type immutable.
 --   E. AUTHZ        — anon, outsiders, members without catalogue authority, other tenants.
 --   F. STOCK        — default location, initial / +/- through the ledger, idempotency,
 --                     reserved respected, optimistic check, ownership.
---   G. IMAGES       — server-created key, storage policy needs the pending row,
---                     confirm checks real bytes, upload != verified, arrange, remove.
+--   G. IMAGES       — server-created key, the media resolver needs the pending row,
+--                     confirm needs the verified media receipt, upload != verified, arrange, remove.
 --   H. SUSPENSION   — a suspended seller can read but not write.
 --   I. PUBLICATION  — still closed; readiness reports the blockers.
 --
@@ -19,7 +19,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(76);
+select plan(77);
 
 update auth.users set email_confirmed_at = now()
   where id in ('70000001-0000-4000-8000-000000000001', '70000002-0000-4000-8000-000000000002',
@@ -49,13 +49,12 @@ select is(
      and not has_function_privilege('service_role', p.oid, 'execute')),
   18, 'A2. ...executable by authenticated only (never anon, never a service credential)');
 select is(
-  (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'app' and p.proname like 'marketplace\_%' and has_function_privilege('authenticated', p.oid, 'execute')),
-  array['marketplace_storage_can_delete_image', 'marketplace_storage_can_upload_image', 'marketplace_storage_can_upload_import',
-        'marketplace_storage_moderator_can_read', 'marketplace_storage_owns_image'],
-  'A3. the only app.marketplace_* functions a client may run are the three storage-policy predicates');
-select is((select public from storage.buckets where id = 'marketplace-product-images'), false,
-  'A4. the product image bucket is private');
+  0, 'A3. no app.marketplace_* function is executable by a client (the media resolvers call them)');
+select ok(not exists (select 1 from storage.buckets where id = 'marketplace-product-images')
+          and not exists (select 1 from pg_policies where schemaname = 'storage' and policyname like 'marketplace\_%'),
+  'A4. no Supabase Storage bucket or policy: Marketplace photos live in the central media system (Migration 13)');
 select is(
   (select count(*)::int from information_schema.role_table_grants
    where table_schema = 'public' and grantee in ('anon', 'authenticated') and privilege_type <> 'SELECT'
@@ -273,29 +272,44 @@ select throws_ok($$ insert into public.marketplace_inventory_levels (variant_id,
 -- ===========================================================================
 -- G. Images
 -- ===========================================================================
-select throws_ok($$ insert into storage.objects (bucket_id, name, metadata)
-                    values ('marketplace-product-images', current_setting('t.a') || '/' || current_setting('t.p1') || '/forged.jpg', '{}') $$,
-  '42501', null, 'G1. bytes cannot be uploaded to a key the server did not issue');
+select is(public.media_storage_resolve('marketplace', current_setting('t.a') || '/' || current_setting('t.p1') || '/forged.jpg', 'upload'), null,
+  'G1. a key the server did not issue resolves to nothing (no upload grant)');
 select set_config('t.img', (public.marketplace_seller_image_request_upload(current_setting('t.p1')::uuid, 'image/webp')) ->> 'image_id', true);
 select set_config('t.key', (select object_key from public.marketplace_product_images where id = current_setting('t.img')::uuid), true);
 select ok(current_setting('t.key') like current_setting('t.a') || '/' || current_setting('t.p1') || '/%.webp',
   'G2. the server issues an org/product-scoped key');
 select throws_like($$ select public.marketplace_seller_image_confirm_upload(current_setting('t.img')::uuid) $$,
-  'mp:upload_not_found%', 'G3. confirming before the bytes exist is refused (no fake "uploaded")');
-select lives_ok($$ insert into storage.objects (bucket_id, name, metadata)
-                   values ('marketplace-product-images', current_setting('t.key'), '{"size": 1234, "mimetype": "image/webp"}') $$,
-  'G4. the issued key can be uploaded to');
+  'mp:upload_not_found%', 'G3. confirming before the bytes are verified is refused (no fake "uploaded")');
+select is(public.media_storage_resolve('marketplace', current_setting('t.key'), 'upload') ->> 'state', 'pending',
+  'G4. the issued key resolves for upload by the seller (the server then issues the R2 grant)');
+-- the backend reserves the key on R2 and attests the verified bytes (as verifyPendingMedia does)
+reset role;
+set local request.jwt.claims = '{"role":"service_role"}';
+select public.media_storage_reserve('marketplace', current_setting('t.key'), 'r2', '70000001-0000-4000-8000-000000000001');
+select public.media_storage_attest('marketplace', current_setting('t.key'), '70000001-0000-4000-8000-000000000001', 'r2',
+  1234, 'image/webp', repeat('a', 64));
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
 select is((public.marketplace_seller_image_confirm_upload(current_setting('t.img')::uuid) ->> 'upload_state'), 'confirmed',
-  'G5. confirm finds the real object');
+  'G5. confirm accepts the verified media receipt');
 reset role;
 select is((select status || '/' || is_primary::text || '/' || byte_size::text from public.marketplace_product_images
            where id = current_setting('t.img')::uuid), 'pending/true/1234',
-  'G6. uploaded = confirmed + primary + real size, but content is still PENDING (never auto-verified)');
+  'G6. uploaded = confirmed + primary + verified size, but content is still PENDING (never auto-verified)');
+select ok((select storage_key from public.media_storage_locations where namespace = 'marketplace' and object_key = current_setting('t.key'))
+          like 'o/' || current_setting('t.a') || '/marketplace/' || current_setting('t.p1') || '/%/original.webp',
+  'G6b. the R2 object key holds only ids: o/<org>/marketplace/<product>/<media id>/original.webp');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
 select set_config('t.img2', (public.marketplace_seller_image_request_upload(current_setting('t.p1')::uuid, 'image/png')) ->> 'image_id', true);
-insert into storage.objects (bucket_id, name, metadata)
-select 'marketplace-product-images', object_key, '{"size": 10}' from public.marketplace_product_images where id = current_setting('t.img2')::uuid;
+select set_config('t.key2', (select object_key from public.marketplace_product_images where id = current_setting('t.img2')::uuid), true);
+reset role;
+set local request.jwt.claims = '{"role":"service_role"}';
+select public.media_storage_reserve('marketplace', current_setting('t.key2'), 'r2', '70000001-0000-4000-8000-000000000001');
+select public.media_storage_attest('marketplace', current_setting('t.key2'), '70000001-0000-4000-8000-000000000001', 'r2',
+  10, 'image/png', repeat('b', 64));
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
 select public.marketplace_seller_image_confirm_upload(current_setting('t.img2')::uuid);
 select lives_ok(format($$ select public.marketplace_seller_images_update(%L::uuid, %L::jsonb) $$,
   current_setting('t.p1'),
@@ -315,11 +329,12 @@ select throws_like(format($$ select public.marketplace_seller_images_update(%L::
   'mp:one_primary_image%', 'G9. two primary images are refused');
 select is(public.marketplace_seller_image_remove(current_setting('t.img')::uuid), current_setting('t.key'),
   'G10. removing an image (phase 1) returns its key so the bytes can be deleted');
-select ok(app.marketplace_storage_can_delete_image(current_setting('t.key')),
-  'G11. ...and the storage policy lets the seller delete the bytes of that marked row (the real Storage call is proven in marketplace_image_removal_api_test.mjs; lifecycle in 96_)');
+select is(public.media_storage_resolve('marketplace', current_setting('t.key'), 'delete') ->> 'state', 'deleted',
+  'G11. ...and the media resolver lets the seller delete the bytes of that marked row');
 set local request.jwt.claims = '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
-select is((select count(*)::int from storage.objects where bucket_id = 'marketplace-product-images'), 0,
-  'G12. an outsider cannot see the seller''s image objects');
+select ok(public.media_storage_resolve('marketplace', current_setting('t.key2'), 'read') is null
+          and public.media_storage_resolve('marketplace', current_setting('t.key2'), 'delete') is null,
+  'G12. an outsider can neither read nor delete the seller''s image');
 set local request.jwt.claims = '{"sub":"71000005-0000-4000-8000-000000000005","role":"authenticated"}';
 select throws_like($$ select public.marketplace_seller_image_request_upload(current_setting('t.p1')::uuid, 'image/jpeg') $$,
   'mp:not_permitted%', 'G13. another showroom cannot add images to this product');

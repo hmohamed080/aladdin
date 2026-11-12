@@ -12,7 +12,7 @@
 --                    disappears on unpublish, suspension, rejection, flag off.
 --   G. PUBLIC PAGE   paging, totals, search, facets, seller name; anon sees only eligible products.
 --   H. SELLER PAGE   members only, other tenants refused, stats + filters.
---   I. IMPORT        dispatcher: writer re-check, own-prefix assets only, missing bytes rejected,
+--   I. IMPORT        dispatcher: writer re-check, import photos paused (refused with a code),
 --                    opening stock entered once through the ledger.
 --
 -- Fixtures (seed-pilot): showroom A 9c000000-…001 (owner 70000001), showroom B 91000005-…005
@@ -20,7 +20,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(74);
+select plan(71);
 
 update auth.users set email_confirmed_at = now()
   where id in ('70000001-0000-4000-8000-000000000001', '71000005-0000-4000-8000-000000000005',
@@ -35,6 +35,16 @@ select set_config('app.marketplace_seller_write', 'on', true);
 insert into public.marketplace_seller_accounts (organization_id, status, approved_at)
 values (current_setting('t.a')::uuid, 'approved', now());
 select set_config('app.marketplace_seller_write', 'off', true);
+
+-- the backend's steps for one uploaded key (as verifyPendingMedia): reserve on R2, attest the verified bytes
+create function pg_temp.backend_upload(p_key text, p_type text, p_size bigint) returns void
+language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  perform public.media_storage_reserve('marketplace', p_key, 'r2', '70000001-0000-4000-8000-000000000001');
+  perform public.media_storage_attest('marketplace', p_key, '70000001-0000-4000-8000-000000000001', 'r2', p_size, p_type, repeat('d', 64));
+end;
+$$;
 
 -- ===========================================================================
 -- A. Shape
@@ -73,11 +83,14 @@ select set_config('t.loc', public.marketplace_seller_default_location(current_se
 select public.marketplace_seller_stock_adjust(current_setting('t.v')::uuid, current_setting('t.loc')::uuid, 20, 'launch-stock-0001');
 select set_config('t.img', (public.marketplace_seller_image_request_upload(current_setting('t.p')::uuid, 'image/png')) ->> 'image_id', true);
 select set_config('t.key', (select object_key from public.marketplace_product_images where id = current_setting('t.img')::uuid), true);
-insert into storage.objects (bucket_id, name, metadata) values ('marketplace-product-images', current_setting('t.key'), '{"size": 2048, "mimetype": "image/png"}');
-select public.marketplace_seller_image_confirm_upload(current_setting('t.img')::uuid);
 select set_config('t.img2', (public.marketplace_seller_image_request_upload(current_setting('t.p')::uuid, 'image/png')) ->> 'image_id', true);
-insert into storage.objects (bucket_id, name, metadata)
-select 'marketplace-product-images', object_key, '{"size": 1024, "mimetype": "image/png"}' from public.marketplace_product_images where id = current_setting('t.img2')::uuid;
+select set_config('t.key2', (select object_key from public.marketplace_product_images where id = current_setting('t.img2')::uuid), true);
+reset role;
+select pg_temp.backend_upload(current_setting('t.key'), 'image/png', 2048);
+select pg_temp.backend_upload(current_setting('t.key2'), 'image/png', 1024);
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
+select public.marketplace_seller_image_confirm_upload(current_setting('t.img')::uuid);
 select public.marketplace_seller_image_confirm_upload(current_setting('t.img2')::uuid);
 reset role;
 
@@ -282,26 +295,14 @@ select is((public.marketplace_seller_import_step(current_setting('t.job')::uuid,
   2, 'I1. the seller stages rows through the dispatcher');
 select throws_like(format($$ select public.marketplace_seller_import_step(%L::uuid, 'stage_assets', %L::jsonb) $$,
   current_setting('t.job'),
-  jsonb_build_array(jsonb_build_object('file_name', 'IMP-1-A_01.png', 'storage_bucket', 'marketplace-product-images',
+  jsonb_build_array(jsonb_build_object('file_name', 'IMP-1-A_01.png', 'storage_bucket', 'marketplace',
                                        'object_key', current_setting('t.key')))),
-  'mp:asset_outside_job%', 'I2. an asset outside this job''s own prefix (e.g. another product''s object) is refused');
-select throws_ok(format($$ insert into storage.objects (bucket_id, name, metadata) values ('marketplace-product-images', %L, '{}') $$,
-  'imports/' || current_setting('t.b') || '/' || current_setting('t.job') || '/x.png'),
-  '42501', null, 'I3. bytes cannot be uploaded under another organization''s import prefix');
-select lives_ok(format($$ insert into storage.objects (bucket_id, name, metadata) values ('marketplace-product-images', %L, '{"size": 500, "mimetype": "image/png"}') $$,
-  'imports/' || current_setting('t.a') || '/' || current_setting('t.job') || '/1.png'),
-  'I4. the seller uploads under its own job prefix');
-select is((public.marketplace_seller_import_step(current_setting('t.job')::uuid, 'stage_assets', jsonb_build_array(
-  jsonb_build_object('file_name', 'IMP-1-A_01.png', 'storage_bucket', 'marketplace-product-images',
-                     'object_key', 'imports/' || current_setting('t.a') || '/' || current_setting('t.job') || '/1.png'),
-  jsonb_build_object('file_name', 'IMP-1-A_02.png', 'storage_bucket', 'marketplace-product-images',
-                     'object_key', 'imports/' || current_setting('t.a') || '/' || current_setting('t.job') || '/2.png'))) ->> 'added')::int,
-  2, 'I5. both assets are registered');
+  'mp:import_images_unavailable%', 'I2. import photos are paused: any asset is refused with a clear code (no storage bucket to stage into)');
+select is((public.marketplace_seller_import_step(current_setting('t.job')::uuid, 'stage_assets', '[]'::jsonb) ->> 'added')::int,
+  0, 'I3. an import without photos stages nothing and continues');
 reset role;
-select is((select array_agg(file_name || ':' || status order by file_name) from public.marketplace_import_assets where job_id = current_setting('t.job')::uuid),
-  array['IMP-1-A_01.png:pending', 'IMP-1-A_02.png:rejected'], 'I6. an asset whose bytes are missing is rejected, not trusted');
-select is((select byte_size::int from public.marketplace_import_assets where job_id = current_setting('t.job')::uuid and file_name = 'IMP-1-A_01.png'),
-  500, 'I7. the registered size is the TRUE stored size');
+select is((select count(*)::int from public.marketplace_import_assets where job_id = current_setting('t.job')::uuid),
+  0, 'I4. no import asset was registered');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"71000005-0000-4000-8000-000000000005","role":"authenticated"}';
 select throws_like($$ select public.marketplace_seller_import_step(current_setting('t.job')::uuid, 'seal', null) $$, 'mp:not_permitted%',
@@ -323,9 +324,9 @@ select is((select l.on_hand from public.marketplace_inventory_levels l join publ
   'I12. the opening stock was entered through the ledger');
 select is((select count(*)::int from public.marketplace_stock_movements m join public.marketplace_product_variants v on v.id = m.variant_id
            where v.sku = 'IMP-1-A' and m.source = 'import'), 1, 'I13. ...as exactly one import movement');
-select is((select i.status || '/' || i.upload_state from public.marketplace_product_images i join public.marketplace_products p on p.id = i.product_id
+select is((select count(*)::int from public.marketplace_product_images i join public.marketplace_products p on p.id = i.product_id
            where p.external_ref = 'IMP-1' and p.seller_organization_id = current_setting('t.a')::uuid),
-  'pending/confirmed', 'I14. the imported image is pending moderation, never auto-verified');
+  0, 'I14. the imported product has no image yet (photos are added on the product page)');
 select is((select status from public.marketplace_products where external_ref = 'IMP-1' and seller_organization_id = current_setting('t.a')::uuid),
   'draft', 'I15. the imported product is a draft');
 

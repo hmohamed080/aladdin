@@ -238,12 +238,7 @@ begin
 end;
 $$;
 
-create policy marketplace_images_select_moderator on storage.objects
-  for select to authenticated
-  using (bucket_id = 'marketplace-product-images' and app.marketplace_storage_moderator_can_read(name));
-create policy marketplace_import_assets_insert on storage.objects
-  for insert to authenticated
-  with check (bucket_id = 'marketplace-product-images' and app.marketplace_storage_can_upload_import(name));
+-- No storage.objects policy: Marketplace bytes never enter Supabase Storage (Migration 13).
 
 -- ---------------------------------------------------------------------------
 -- 6. Admin: media moderation

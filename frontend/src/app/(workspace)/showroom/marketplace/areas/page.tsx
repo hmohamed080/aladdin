@@ -9,8 +9,8 @@ import { unpricedCount, type StoredRate } from "@/features/marketplace-seller/de
 export const dynamic = "force-dynamic";
 
 /**
- * /b2c/seller/areas - WHERE this showroom delivers: whole governorates and/or single areas. Prices are
- * set per place on /b2c/seller/delivery. Read and written through the seller RPCs (Migration 12) under the
+ * /showroom/marketplace/areas - WHERE this showroom delivers: whole governorates and/or single areas. Prices are
+ * set per place on /showroom/marketplace/delivery. Read and written through the seller RPCs (Migration 12) under the
  * seller's own session; the database re-checks membership, catalogue authority and seller standing on save.
  */
 export default async function MarketplaceAreasPage() {
@@ -26,7 +26,7 @@ export default async function MarketplaceAreasPage() {
         title={t.title}
         subtitle={t.subtitle}
         toolbar={
-          <ButtonLink href="/b2c/seller/delivery" variant="outline">
+          <ButtonLink href="/showroom/marketplace/delivery" variant="outline">
             {locale === "ar" ? <ChevronLeftIcon size={16} /> : <ChevronRightIcon size={16} />}
             {t.setPrices}
           </ButtonLink>

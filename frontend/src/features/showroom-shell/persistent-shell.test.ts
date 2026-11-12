@@ -48,9 +48,8 @@ describe("Showroom navigation shares one persistent layout", () => {
     const trees = new Set(
       SHOWROOM_GROUPS.flatMap((group) => group.items.map((item) => treeOf(item.href))),
     );
-    // Only these trees may appear in the navigation; each has its own place under the group. /b2c is the
-    // Marketplace seller area (ADR-0028), moved under the group so the shell stays mounted there too.
-    expect([...trees].sort()).toEqual(["/b2b", "/b2c", "/showroom"]);
+    // Only these two trees may appear in the navigation; a third one would need its own place under the group.
+    expect([...trees].sort()).toEqual(["/b2b", "/showroom"]);
     for (const tree of trees) expect(existsSync(join(GROUP, tree.slice(1)))).toBe(true);
   });
 });

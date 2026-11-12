@@ -33,7 +33,7 @@ import {
   type VariantDraft,
 } from "./form-model";
 
-const LIST = "/b2c/seller/products";
+const LIST = "/showroom/marketplace/products";
 
 function draftFrom(detail: SellerProductDetail, schema: ProductTypeSchema | undefined): ProductDraft {
   const byKey = new Map((schema?.fields ?? []).map((f) => [f.key, f]));

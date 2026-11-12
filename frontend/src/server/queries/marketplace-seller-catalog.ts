@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
-import { MARKETPLACE_IMAGE_BUCKET } from "@/features/marketplace-seller/errors";
+import { applicationMediaUrl } from "@/lib/storage/media-url";
 import type { AttributeDataType, ProductTypeSchema } from "@/features/marketplace-seller/form-model";
 
 type Client = SupabaseClient<Database>;
@@ -122,9 +122,6 @@ export type SellerProductDetail = {
   pendingRemovals: { imageId: string; variantId: string | null }[];
 };
 
-/** Lifetime of the signed URLs shown to the seller. Short on purpose: see the note on deleted images in docs. */
-export const IMAGE_URL_TTL_SECONDS = 300;
-
 /** The seller''s own product for editing (the RPC enforces membership), with short-lived image URLs. */
 export async function loadSellerProduct(supabase: Client, productId: string): Promise<SellerProductDetail | null> {
   const { data, error } = await supabase.rpc("marketplace_seller_product_get", { p_product_id: productId });
@@ -140,11 +137,8 @@ export async function loadSellerProduct(supabase: Client, productId: string): Pr
     upload_state: SellerProductImage["uploadState"];
   }[];
   const confirmedKeys = rawImages.filter((i) => i.upload_state === "confirmed").map((i) => i.object_key);
-  const urls = new Map<string, string>();
-  if (confirmedKeys.length) {
-    const { data: signed } = await supabase.storage.from(MARKETPLACE_IMAGE_BUCKET).createSignedUrls(confirmedKeys, IMAGE_URL_TTL_SECONDS);
-    for (const s of signed ?? []) if (s.path && s.signedUrl) urls.set(s.path, s.signedUrl);
-  }
+  // Authorized /api/media URLs: every read re-checks the caller's membership (R2, Migration 13).
+  const urls = new Map<string, string>(confirmedKeys.map((key) => [key, applicationMediaUrl("marketplace", key)]));
   return {
     id: String(p.id),
     organizationId: String(p.organization_id),

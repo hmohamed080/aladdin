@@ -7,7 +7,7 @@ import { ImportWizard, type RecentJob } from "@/features/marketplace-seller/impo
 export const dynamic = "force-dynamic";
 
 /**
- * /b2c/seller/imports — bulk import of Marketplace products from a spreadsheet
+ * /showroom/marketplace/imports — bulk import of Marketplace products from a spreadsheet
  * (XLSX / CSV) plus images (files or a ZIP). Everything runs under the SELLER'S
  * own session: parsing in the browser, images uploaded to the job's own storage
  * prefix (policy marketplace_import_assets_insert), and every database step

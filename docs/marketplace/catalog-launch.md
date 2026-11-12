@@ -8,8 +8,8 @@ Status: **local only** (branch `feat/public-marketplace-20261011`, isolated Supa
 |---|---|---|---|
 | Seller management | `/admin/marketplace` | platform admin | `marketplace_sellers.read/manage` re-checked by every RPC |
 | Media moderation | `/admin/marketplace/media` | platform admin | `marketplace_media.moderate` |
-| Bulk import | `/b2c/seller/imports` | approved seller (catalogue manager) | `marketplace_seller_import_step` re-checks writer on every call |
-| Seller products (server-paged) | `/b2c/seller/products` | approved seller | `marketplace_seller_products_page` |
+| Bulk import | `/showroom/marketplace/imports` | approved seller (catalogue manager) | `marketplace_seller_import_step` re-checks writer on every call |
+| Seller products (server-paged) | `/showroom/marketplace/products` | approved seller | `marketplace_seller_products_page` |
 | Public catalog / product | `/marketplace`, `/marketplace/products/[slug]` | anyone (release flag `NEXT_PUBLIC_MARKETPLACE_PREVIEW`) | public RPCs return only published products of enabled sellers |
 | Public image bytes | `/marketplace/media/[imageId]` | anyone | `marketplace_public_image_ref` (service role only) |
 
@@ -65,6 +65,6 @@ Why nothing is published (publish-ready over 795 drafts): every product lacks a 
 - Real product photos and the missing attributes (material, colour, roll width/length) from Decore Store; then moderation, then the media flag, then publish-ready.
 - Better names/descriptions for the 786 products (currently generated from album + code).
 - Measurement values on the product page are shown in raw stored units (mm) without a unit label.
-- Sidebar entry for `/b2c/seller/imports` (reachable from the products page button today).
+- Sidebar entry for `/showroom/marketplace/imports` (reachable from the products page button today).
 - Checkout, payment, orders: out of scope for this sprint.
 - Staging/production: migrations 06–09 and this UI are not applied anywhere but the local stack.

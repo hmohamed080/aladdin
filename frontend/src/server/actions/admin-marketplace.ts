@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { MARKETPLACE_IMAGE_BUCKET, parseSellerError } from "@/features/marketplace-seller/errors";
+import { parseSellerError } from "@/features/marketplace-seller/errors";
+import { readMarketplaceImageBytes } from "@/server/media/marketplace-image-bytes";
 import { validateImageBytes } from "@/server/media/validate-image";
 
 /**
@@ -49,20 +50,21 @@ export async function sellerTransitionAction(
 }
 
 /**
- * Downloads one image under the moderator's session (moderator storage policy),
+ * Reads one image from the media system under the moderator's session (the marketplace media resolver),
  * decodes it on the server and records the verdict. The database refuses a VALID
  * verdict whose byte size differs from the stored object.
  */
 async function validateOne(supabase: Awaited<ReturnType<typeof getServerSupabase>>, imageId: string) {
   const { data: row } = await supabase
     .from("marketplace_product_images")
-    .select("id, object_key, storage_bucket")
+    .select("id, object_key")
     .eq("id", imageId)
     .maybeSingle();
   if (!row) return { id: imageId, valid: false, code: "image_not_found" };
-  const { data: blob, error } = await supabase.storage.from(row.storage_bucket || MARKETPLACE_IMAGE_BUCKET).download(row.object_key);
-  if (error || !blob) return { id: imageId, valid: false, code: "download_failed" };
-  const v = await validateImageBytes(await blob.arrayBuffer());
+  let bytes: Uint8Array;
+  try { bytes = await readMarketplaceImageBytes(supabase, row.object_key); }
+  catch { return { id: imageId, valid: false, code: "download_failed" }; }
+  const v = await validateImageBytes(bytes);
   const { error: recErr } = await supabase.rpc("admin_marketplace_media_record_validation", {
     p_image_id: imageId,
     p_valid: v.valid,

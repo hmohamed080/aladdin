@@ -9,8 +9,8 @@ import type { StoredRate } from "@/features/marketplace-seller/delivery-model";
 export const dynamic = "force-dynamic";
 
 /**
- * /b2c/seller/delivery - what this showroom charges to deliver to each place it covers (the places are
- * chosen on /b2c/seller/areas), and whether buyers may pick up from it. Buyers see these prices in their
+ * /showroom/marketplace/delivery - what this showroom charges to deliver to each place it covers (the places are
+ * chosen on /showroom/marketplace/areas), and whether buyers may pick up from it. Buyers see these prices in their
  * Marketplace cart. Read and written through the seller RPCs (Migration 12) under the seller's own
  * session; the database re-checks membership, catalogue authority and seller standing on every save.
  */
@@ -27,7 +27,7 @@ export default async function MarketplaceDeliveryPage() {
         title={t.delivery.title}
         subtitle={t.delivery.subtitle}
         toolbar={
-          <ButtonLink href="/b2c/seller/products" variant="outline">
+          <ButtonLink href="/showroom/marketplace/products" variant="outline">
             {locale === "ar" ? <ChevronRightIcon size={16} /> : <ChevronLeftIcon size={16} />}
             {t.delivery.back}
           </ButtonLink>

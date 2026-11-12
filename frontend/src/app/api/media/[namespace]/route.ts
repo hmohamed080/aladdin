@@ -6,6 +6,7 @@ import { isOrganizationMedia } from "@/lib/storage/media-policy";
 import { isProductImageKey } from "@/lib/storage/product-images";
 import { isRequestImageKey } from "@/lib/storage/request-images";
 import { isBvKey } from "@/lib/business-verification/contract";
+import { isMarketplaceImageKey } from "@/lib/storage/marketplace-images";
 import { consumeRateLimit } from "@/server/cache/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ name
   try {
     const { namespace } = await params;
     if (namespace !== "avatar" && namespace !== "portfolio" && namespace !== "certificate" && namespace !== "product" && namespace !== "organization"
-      && namespace !== "request" && namespace !== "verification") return mediaNotFound();
+      && namespace !== "request" && namespace !== "verification" && namespace !== "marketplace") return mediaNotFound();
     const keys = new URL(request.url).searchParams.getAll("key");
     const key = keys[0];
     if (keys.length !== 1 || !key || key.length > 256) return mediaNotFound();
@@ -34,7 +35,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ name
       const workspace = new URL(request.url).searchParams.getAll("workspace");
       if (workspace.length > 1 || (workspace[0] && !/^[0-9a-f-]{36}$/.test(workspace[0]))) return mediaNotFound();
       const validKey = namespace === "product" ? isProductImageKey(key) : namespace === "request" ? isRequestImageKey(key)
-        : namespace === "verification" ? isBvKey(key) : /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/.test(key);
+        : namespace === "verification" ? isBvKey(key) : namespace === "marketplace" ? isMarketplaceImageKey(key)
+        : /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/.test(key);
       if (!validKey) return mediaNotFound();
       return await deliverMedia(client, namespace, key, undefined, workspace[0] ?? null);
     }

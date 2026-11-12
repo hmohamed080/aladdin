@@ -13,7 +13,7 @@ describe("showroom phase 1 navigation", () => {
     expect(SHOWROOM_GROUPS.map((group) => group.label.ar)).toEqual(["", "المشتريات", "المبيعات", "المنتجات", "الماركت", "الشبكة", "الفريق", "إدارة النشاط"]);
     expect(items.map((item) => item.id)).toEqual(["home", "purchase-requests", "pricing-requests-sent", "quotes-received", "purchase-orders", "customer-rfqs", "customer-quotes", "customers", "leads", "follow-ups", "catalog", "offers", "saved", "my-products", "my-offers", "marketplace-products", "marketplace-areas", "marketplace-delivery", "suppliers", "craftsmen", "jobs", "sales-team", "projects", "reports", "activity", "points", "verification", "settings"]);
     // Suite pages live under the suite root; finished modules keep their existing routes inside the same shell.
-    for (const item of items) expect(item.href.startsWith(`${SHOWROOM_ROOT}/`) || item.href.startsWith("/b2b/") || item.href.startsWith("/b2c/seller/")).toBe(true);
+    for (const item of items) expect(item.href.startsWith(`${SHOWROOM_ROOT}/`) || item.href.startsWith("/b2b/")).toBe(true);
   });
   it("filters nav and direct-page authorization with the same capability rule", () => {
     const visible = showroomNavigation([]).flatMap((group) => group.items);
@@ -117,9 +117,9 @@ describe("Marketplace group in the showroom account", () => {
     const group = SHOWROOM_GROUPS.find((g) => g.label.en === "Marketplace")!;
     expect(group.label.ar).toBe("الماركت");
     expect(group.items.map((i) => [i.id, i.href, i.label.ar, i.label.en])).toEqual([
-      ["marketplace-products", "/b2c/seller/products", "منتجات الماركت", "Marketplace products"],
-      ["marketplace-areas", "/b2c/seller/areas", "المناطق", "Delivery areas"],
-      ["marketplace-delivery", "/b2c/seller/delivery", "توصيل المناطق", "Delivery prices"],
+      ["marketplace-products", "/showroom/marketplace/products", "منتجات الماركت", "Marketplace products"],
+      ["marketplace-areas", "/showroom/marketplace/areas", "المناطق", "Delivery areas"],
+      ["marketplace-delivery", "/showroom/marketplace/delivery", "توصيل المناطق", "Delivery prices"],
     ]);
   });
 
@@ -136,9 +136,9 @@ describe("Marketplace group in the showroom account", () => {
 
   it("highlights the item that owns each seller page, including its sub-pages", () => {
     const visible = showroomNavigation(["org.manage", MARKETPLACE_SELL_ENTITLEMENT]).flatMap((g) => g.items);
-    expect(activeShowroomItem("/b2c/seller/products", "", visible)?.id).toBe("marketplace-products");
-    expect(activeShowroomItem("/b2c/seller/products/new", "", visible)?.id).toBe("marketplace-products");
-    expect(activeShowroomItem("/b2c/seller/areas", "", visible)?.id).toBe("marketplace-areas");
-    expect(activeShowroomItem("/b2c/seller/delivery", "", visible)?.id).toBe("marketplace-delivery");
+    expect(activeShowroomItem("/showroom/marketplace/products", "", visible)?.id).toBe("marketplace-products");
+    expect(activeShowroomItem("/showroom/marketplace/products/new", "", visible)?.id).toBe("marketplace-products");
+    expect(activeShowroomItem("/showroom/marketplace/areas", "", visible)?.id).toBe("marketplace-areas");
+    expect(activeShowroomItem("/showroom/marketplace/delivery", "", visible)?.id).toBe("marketplace-delivery");
   });
 });

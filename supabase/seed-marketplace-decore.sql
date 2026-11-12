@@ -9,7 +9,7 @@
 -- approved as a Marketplace seller by the seeded admin@example.test, with test
 -- delivery prices (Cairo 80 / Nasr City 60 / Giza 120; Alexandria not covered)
 -- and pickup on. Products come from the real spreadsheet through the seller's
--- own import page (/b2c/seller/imports), not from this file. admin@example.test
+-- own import page (/showroom/marketplace/imports), not from this file. admin@example.test
 -- also gets the same password so the admin Marketplace pages can be opened.
 begin;
 
@@ -63,7 +63,7 @@ set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","r
 select public.admin_marketplace_seller_approve('7e100001-0000-4000-8000-000000000001', 'Local fixture: first Marketplace seller');
 set local request.jwt.claims = '{"sub":"7e000001-0000-4000-8000-000000000001","role":"authenticated"}';
 select public.record_consent(array['terms','privacy','pilot']::public.consent_type[], 'ar');
--- Delivery places and test prices through the seller's own RPCs (same path as /b2c/seller/areas and /delivery).
+-- Delivery places and test prices through the seller's own RPCs (same path as /showroom/marketplace/areas and /delivery).
 select public.marketplace_seller_delivery_areas_save('7e100001-0000-4000-8000-000000000001',
   '[{"governorate_key":"cairo"},{"governorate_key":"cairo","area_key":"nasr-city"},{"governorate_key":"giza"}]'::jsonb);
 select public.marketplace_seller_delivery_prices_save('7e100001-0000-4000-8000-000000000001',

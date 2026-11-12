@@ -20,7 +20,7 @@ const hrefs = () => Array.from(document.querySelectorAll("a")).map((a) => a.getA
 describe("Marketplace group in the B2B workspace sidebar", () => {
   it("shows Marketplace with products, delivery areas and delivery prices for an approved seller", () => {
     sidebar(["org.manage", MARKETPLACE_SELL_ENTITLEMENT]);
-    expect(hrefs()).toEqual(expect.arrayContaining(["/b2c/seller/products", "/b2c/seller/areas", "/b2c/seller/delivery"]));
+    expect(hrefs()).toEqual(expect.arrayContaining(["/showroom/marketplace/products", "/showroom/marketplace/areas", "/showroom/marketplace/delivery"]));
     const group = screen.getByText("Marketplace", { selector: "*" });
     expect(group).toBeInTheDocument();
     for (const name of ["Marketplace products", "Delivery areas", "Delivery prices"]) {
@@ -30,14 +30,14 @@ describe("Marketplace group in the B2B workspace sidebar", () => {
 
   it("names the group and the two new items in Arabic", () => {
     sidebar(["org.manage", MARKETPLACE_SELL_ENTITLEMENT], "ar");
-    expect(screen.getByRole("link", { name: "المناطق" })).toHaveAttribute("href", "/b2c/seller/areas");
-    expect(screen.getByRole("link", { name: "توصيل المناطق" })).toHaveAttribute("href", "/b2c/seller/delivery");
-    expect(screen.getByRole("link", { name: "منتجات الماركت" })).toHaveAttribute("href", "/b2c/seller/products");
+    expect(screen.getByRole("link", { name: "المناطق" })).toHaveAttribute("href", "/showroom/marketplace/areas");
+    expect(screen.getByRole("link", { name: "توصيل المناطق" })).toHaveAttribute("href", "/showroom/marketplace/delivery");
+    expect(screen.getByRole("link", { name: "منتجات الماركت" })).toHaveAttribute("href", "/showroom/marketplace/products");
   });
 
   it("is not drawn at all for a showroom that was never approved as a seller", () => {
     sidebar(["org.manage"]);
-    for (const path of ["/b2c/seller/products", "/b2c/seller/areas", "/b2c/seller/delivery"]) expect(hrefs()).not.toContain(path);
+    for (const path of ["/showroom/marketplace/products", "/showroom/marketplace/areas", "/showroom/marketplace/delivery"]) expect(hrefs()).not.toContain(path);
     expect(within(document.body).queryByRole("link", { name: "Delivery areas" })).not.toBeInTheDocument();
   });
 });

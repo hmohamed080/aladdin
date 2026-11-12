@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * /b2c/seller/products/[id]/edit — the same form as Add, filled from the seller's
+ * /showroom/marketplace/products/[id]/edit — the same form as Add, filled from the seller's
  * own product. The read RPC refuses another organization's product, and a product
  * of a business other than the ACTIVE one is treated as not found.
  */

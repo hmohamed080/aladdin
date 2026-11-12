@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadPublicMarketplaceImage } from "@/lib/supabase/admin-server";
+import { loadPublicMarketplaceImage } from "@/server/media/marketplace-image-bytes";
 
 export const dynamic = "force-dynamic";
 
