@@ -61,7 +61,6 @@ describe.skipIf(!target)("signup proof - real service + outbox + GoTrue + PostgR
       ["record_consent", { p_types: ["terms", "privacy", "pilot"], p_locale: "ar" }],
       ["onboarding_select_account_type", { p_track: "professional", p_account_type: "installer_technician" }],
       ["profile_set_phone", { p_country_iso2: p.iso2, p_national: p.national, p_e164: p.e164 }],
-      ["profile_set_username", { p_username: `r1s${tag}${randomUUID().slice(0, 6)}` }],
     ] as const) expect((await http.rpcAs(fn, args, token)).status).toBeLessThan(300);
   }
   const verifiedAt = (id: string) => sql(`select phone_verified_at is not null from public.profiles where user_id = '${id}';`);

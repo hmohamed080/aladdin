@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isUsernameWellFormed } from "@/lib/identity/username";
 import { checkNewPassword, parseFullName, parsePhone, toAsciiDigits } from "./validation";
-import { GENERATED_USERNAME_PREFIX, generateCraftsmanUsername } from "./username";
 
 describe("installer phone auth validation", () => {
   it("requires a name and collapses whitespace", () => {
@@ -52,30 +50,5 @@ describe("installer phone auth validation", () => {
 
   it("rejects passwords over the bcrypt 72-byte cap", () => {
     expect(checkNewPassword("ب".repeat(40))).toEqual({ ok: false, code: "temporaryCraftsman.error.passwordTooLong" });
-  });
-});
-
-describe("generated craftsman username", () => {
-  it("always satisfies the canonical username rules", () => {
-    for (let i = 0; i < 500; i += 1) {
-      const username = generateCraftsmanUsername();
-      expect(username.startsWith(GENERATED_USERNAME_PREFIX)).toBe(true);
-      expect(isUsernameWellFormed(username), username).toBe(true);
-    }
-  });
-
-  it("is random, not derived from the phone or name", () => {
-    const seen = new Set(Array.from({ length: 200 }, () => generateCraftsmanUsername()));
-    expect(seen.size).toBe(200);
-  });
-
-  it("uses only unbiased bytes from the random source", () => {
-    // 252+ are rejected; the rest map deterministically.
-    const bytes = [255, 254, 253, 252, 0, 1, 2, 3, 4, 5, 6, 7, 0, 0, 0, 0];
-    const username = generateCraftsmanUsername((buffer) => {
-      buffer.set(bytes.slice(0, buffer.length));
-      return buffer;
-    });
-    expect(username).toBe("craftsman.abcdefgh");
   });
 });

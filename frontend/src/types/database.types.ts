@@ -9633,16 +9633,26 @@ export type Database = {
           username: string | null
         }[]
       }
-      pending_registration_save: {
-        Args: {
-          p_audience_kind: Database["public"]["Enums"]["activity_audience_kind"]
-          p_audience_value: string
-          p_ttl_minutes?: number
-          p_user_id: string
-          p_username: string
-        }
-        Returns: boolean
-      }
+      pending_registration_save:
+        | {
+            Args: {
+              p_audience_kind: Database["public"]["Enums"]["activity_audience_kind"]
+              p_audience_value: string
+              p_ttl_minutes?: number
+              p_user_id: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_audience_kind: Database["public"]["Enums"]["activity_audience_kind"]
+              p_audience_value: string
+              p_ttl_minutes?: number
+              p_user_id: string
+              p_username: string
+            }
+            Returns: boolean
+          }
       phone_auth_consume_limit: {
         Args: { p_action: string; p_ip_key: string; p_phone_key: string }
         Returns: boolean
