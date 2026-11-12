@@ -393,7 +393,9 @@ canonical `server/actions/auth.ts`) already surfaces this correctly as the
 "expired" copy — there is no GoTrue signal available to show a more specific
 "that code is wrong" message instead.
 
-### Account enumeration — normalized (implemented, tested)
+### Account enumeration — normalized (implemented, tested) — SUPERSEDED for sign-up on 2026-11-12
+
+> **Superseded (owner decision, 2026-11-12).** Sign-up no longer hides an already-registered email or mobile number. A confirmed account's email now answers `authPasswordPreview.error.accountExists`, and a taken mobile number answers `phoneExists`, both **at once, under the field**, with a "Sign in" link that opens `/auth/sign-in` with the same email / number filled in. Reason: a person must not wait for a code that will never arrive. What stays: an UNCONFIRMED email is still obfuscated by GoTrue itself (success, same user id), so an interrupted registration simply continues; sign-in, forgot-password and resend are unchanged and stay neutral. What was added to bound the oracle: CAPTCHA first (GoTrue judges it inside `signUp()` for email, Siteverify for mobile). Mobile: the durable limiter (`phone_auth_consume_limit('sign-up')`, 10 per IP and 5 per number per 15 minutes, HMAC keys, fail closed) runs before the lookup and every outcome spends it. Email: the budget (same function, keys namespaced `email:`) is spent ONLY when GoTrue answers `user_already_exists`, i.e. after the CAPTCHA passed, so a garbage token can neither read the answer nor burn a victim's budget; once spent (or unavailable) an existing address degrades to the neutral "code sent" reply, never to a distinguishable error, so the budget really caps what can be learned; nothing is staged, sealed or sent for an existing account; the 500 ms response floor on sign-up was dropped (it only existed to hide this answer; resend keeps it). The "Sign in" hand-off carries the typed value in an httpOnly, `path=/auth`, 120-second cookie (`signin_prefill`), never the URL. The text below documents the previous neutral design and is kept for history.
 
 `signUp()`'s two sub-cases (revision 3's investigation, re-confirmed by
 direct `curl` probing this revision, same local GoTrue image the CLI
@@ -600,7 +602,7 @@ Evidence from Acceptance (`nxossqhdfltcqdwvbewi`) and Production (`kkpkgjrweysgv
 
 ### What changed
 
-* **`/auth/continue-registration`** — email + CAPTCHA → `resend({type:"signup"})` (never a second `signUp()`, so no password is asked for or re-sent) → the same `verifyPasswordSignUp`. Entry points: the sign-in and sign-up footers, plus a notice on `/auth/sign-up` when this browser has an unfinished registration. The code step says plainly that the password is the one chosen first, with a Forgot Password link.
+* **~~`/auth/continue-registration`~~ — retired 2026-11-12.** The page, its form, the footer links and the "didn't finish" notice are gone; the route redirects to `/auth/sign-up`. `/auth/sign-up` reopens the email code step by itself when this browser has the routing cookie (below), with Resend (GoTrue `resend()`, never a second `signUp()`) and "Use a different email" (forgets the cookie, shows a clean form).
 * **Routing cookie `reg_email`** — httpOnly, `path=/auth`, 30 minutes. It holds the email only, is set identically whether or not the address has an account, and is cleared on a successful verify. A refresh or a later visit lands on the code step. Never the password, the code or any token; nothing in the URL or browser storage.
 * **Server-side throttle** — `phone_auth_consume_limit('email-resend', …)`: 5 per email and 20 per IP per 15 minutes (HMAC keys), on top of GoTrue's own per-address interval and project limit. Fails closed. CAPTCHA is checked before the throttle is spent.
 * **Diagnostics** — a send failure that is not CAPTCHA or a rate limit (typically SMTP 535) is logged as `status` + GoTrue `code` only.

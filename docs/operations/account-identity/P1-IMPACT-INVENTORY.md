@@ -67,7 +67,7 @@ Hosted state: Production (`kkpkgjrweysgvhvkhzun`) and Acceptance (`nxossqhdfltcq
 | U1 | `features/auth-password-preview/sign-up-form.tsx` | remove username and DOB fields; add attestation | CONFIRMED |
 | U2 | `features/auth-password-preview/sign-in-form.tsx` | label "Mobile number or email"; fix `autoComplete` | CONFIRMED |
 | U3 | `features/auth-password-preview/{birth-date-select,username-check}.tsx` | delete (after imports) | CONFIRMED |
-| U4 | `features/auth-password-preview/{continue-registration-form,finish-registration-screen}.tsx`, `app/auth/finish-registration/page.tsx`, `app/preview/auth-password/finish-registration/page.tsx` | remove username/DOB; attestation for OAuth | CONFIRMED |
+| U4 | `features/auth-password-preview/finish-registration-screen.tsx` (`continue-registration-form.tsx` was removed 2026-11-12), `app/auth/finish-registration/page.tsx`, `app/preview/auth-password/finish-registration/page.tsx` | remove username/DOB; attestation for OAuth | CONFIRMED |
 | U5 | `features/staff-invitation/staff-register-form.tsx` | remove DOB; attestation | CONFIRMED |
 | U6 | `app/onboarding/{page,account-type,complete}`, `app/onboarding/username/page.tsx`, `features/onboarding/username-step.tsx` | remove username step; delete route and redirect | CONFIRMED |
 | U7 | `features/profile/complete-profile-card.tsx` | drop username item | CONFIRMED |

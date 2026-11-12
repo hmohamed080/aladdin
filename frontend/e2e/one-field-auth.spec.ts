@@ -9,7 +9,7 @@ import {
   stubTurnstileWhenOffline,
   waitForCaptchaToken,
 } from "./helpers/auth";
-import { deliveryViaRig, e164Of, readSignUpCode, rigClaims, rigFailNext, rigMessages, requestPhoneSignUp, sqlValue as sql, submitPhoneCode, uniquePhone, verifyPhoneSignUp } from "./helpers/phone-sign-up";
+import { deliveryViaRig, e164Of, readSignUpCode, rigClaims, rigFailNext, rigMessages, requestPhoneSignUp, sqlValue as sql, submitPhoneCode, submitPhoneSignUpForm, uniquePhone, verifyPhoneSignUp } from "./helpers/phone-sign-up";
 
 /**
  * One-field sign in and mobile-number sign up (ADR-0025), end to end against
@@ -144,7 +144,7 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     expect(sql(`select count(*) from public.profiles where phone_e164 = '${e164}' and phone_verified_at is not null;`)).toBe("1");
   });
 
-  test("an already registered number gets the same screen and no message, and no second account", async ({ page, browser }) => {
+  test("an already registered number is warned at once, offered 'Sign in', and gets no message and no second account", async ({ page, browser }) => {
     test.skip(!outbox, "needs PHONE_OTP_DELIVERY=outbox and E2E_NEXT_MODE=dev");
     const phone = uniquePhone();
     const e164 = e164Of(phone);
@@ -153,19 +153,21 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     const accountsBefore = sql(`select count(*) from auth.users where lower(email) like 'p${e164.slice(1)}@%';`);
     expect(accountsBefore).toBe("1");
 
-    // A second visitor asks for the SAME number: the page is identical (the heading appears), but nothing is delivered.
+    // A second visitor asks for the SAME number: they are told at once (no code screen), and nothing is delivered.
     const ctx = await browser.newContext();
     const other = await ctx.newPage();
     const ip = `10.${randomInt(256)}.${randomInt(256)}.${randomInt(1, 255)}`;
     await other.route("**/*", (route) => route.continue({ headers: { ...route.request().headers(), "x-forwarded-for": ip } }));
-    const since = await requestPhoneSignUp(other, { phone, name: "Someone Else" });
+    const since = await submitPhoneSignUpForm(other, { phone, name: "Someone Else" });
+    await expect(other.locator("[data-existing-account]")).toBeVisible({ timeout: 20_000 });
+    await expect(other.locator('[data-sign-up-step$="-code"]')).toHaveCount(0);
     expect(await readSignUpCode(e164, since, 4_000), "a registered number must receive no code").toBeNull();
-    // The code step always offers the way out for people who already have an account - for every number, so it reveals nothing.
-    await expect(other.locator('[data-sign-up-step="phone-code"]').locator('xpath=ancestor::main').getByRole("link", { name: /^(sign in|تسجيل الدخول)$/i }).first()).toHaveAttribute("href", "/auth/sign-in");
 
-    // Any code fails and still no second account appears.
-    await submitPhoneCode(other, "123456");
-    await expect(other.locator('[data-sign-up-step="phone-code"]').getByRole("alert").first()).toBeVisible({ timeout: 20_000 });
+    // One tap opens sign-in with the SAME number filled in (httpOnly cookie, never the URL); still no second account.
+    await other.locator("[data-existing-account]").getByRole("button", { name: /^(sign in|سجّل الدخول)$/i }).click();
+    await other.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
+    expect(other.url()).not.toContain(phone);
+    await expect(other.getByLabel(/mobile number or email|رقم الموبايل أو البريد الإلكتروني/i)).toHaveValue(phone);
     expect(sql(`select count(*) from auth.users where lower(email) like 'p${e164.slice(1)}@%';`)).toBe(accountsBefore);
     await ctx.close();
   });

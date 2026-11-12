@@ -267,9 +267,9 @@ async function registerAccount(page: import("@playwright/test").Page, request: i
   return email;
 }
 
-test.describe("Account enumeration normalization (§Account enumeration)", () => {
-  test("registering with an email that already belongs to a CONFIRMED account gets the SAME neutral response and the SAME OTP screen as a genuine new registration — never 'already exists'", async ({ page, request }) => {
-    const existingEmail = await registerAccount(page, request, "enum-existing");
+test.describe("Already-registered email on sign-up (explicit warning, 2026-11-12)", () => {
+  test("registering with an email that already belongs to a CONFIRMED account warns at once and offers 'Log in instead' with the email carried over - no code screen, nothing in the URL", async ({ page, request }) => {
+    const existingEmail = await registerAccount(page, request, "exists-warning");
     await signOutViaAccountMenu(page);
     await page.waitForURL(/\/sign-in/, { waitUntil: "commit" });
 
@@ -278,20 +278,30 @@ test.describe("Account enumeration normalization (§Account enumeration)", () =>
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
 
-    // Identical UI outcome to a genuine new signup — the neutral Step-2
-    // screen, never "user already exists" / "email already registered" or
-    // any equivalent.
+    // The warning appears under the field; the person is NOT sent to wait for a code that will never arrive.
+    await expect(page.locator("[data-existing-account]")).toContainText(/already registered|مسجّل بالفعل/i);
+    await expect(page.locator('[data-sign-up-step="email-code"]')).toHaveCount(0);
+
+    // One tap on "Log in instead" opens sign-in with the SAME email filled in; it travels in an httpOnly cookie, never the URL.
+    await expect(page.locator("[data-existing-account]").getByRole("link", { name: /recover your password|استعد كلمة المرور/i })).toHaveAttribute("href", "/auth/forgot-password");
+    await page.locator("[data-existing-account]").getByRole("button", { name: /^(sign in|سجّل الدخول)$/i }).click();
+    await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
+    expect(page.url()).not.toContain(encodeURIComponent(existingEmail));
+    expect(page.url()).not.toContain(existingEmail);
+    await expect(page.getByLabel(/mobile number or email|رقم الموبايل أو البريد الإلكتروني/i)).toHaveValue(existingEmail);
+  });
+
+  test("an interrupted (unconfirmed) email registration reopens on its code step after a refresh - there is no separate continue page", async ({ page }) => {
+    await page.goto("/auth/sign-up");
+    await fillSignUp(page, { email: uniqueEmail("restore"), password: "AnotherStrongPassword9!" });
+    await waitForCaptchaToken(page);
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
-    await expect(page.getByText(/already exists|already registered|موجود بالفعل|مسجل بالفعل/i)).toHaveCount(0);
 
-    // §5 — the neutral "no code hint" + a real way out (Forgot password) is
-    // visible right there, rather than leaving the caller waiting forever.
-    await expect(page.getByRole("link", { name: /forgot password|نسيت كلمة المرور/i })).toBeVisible();
-
-    // The original account's password is UNCHANGED — this never silently
-    // overwrote it or created a second identity.
-    await page.getByRole("link", { name: /forgot password|نسيت كلمة المرور/i }).click();
-    await page.waitForURL(/\/forgot-password$/, { waitUntil: "commit" });
+    await page.reload();
+    await expect(page.locator('[data-sign-up-step="email-code"]')).toBeVisible();
+    await page.goto("/auth/continue-registration");
+    await page.waitForURL(/\/auth\/sign-up/, { waitUntil: "commit" });
   });
 });
 
@@ -329,6 +339,7 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
     const email = uniqueEmail("session-guarantee");
     await page.goto("/auth/sign-up");
     await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
+    const seenBeforeSubmit = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
@@ -359,13 +370,10 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
     // so `readNewOtp` deterministically reads the code this resubmission
     // actually generates, not whichever of two pending messages happens to
     // sort first.
+    // Coming back, the sign-up page reopens on the code step by itself (the unverified registration is remembered in this browser).
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
-    const seenBeforeRetry = await messageIdsFor(request, email);
-    await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
-    await expectSignUpStep2(page);
-    const code = await readNewOtp(request, email, seenBeforeRetry);
+    await expect(page.locator('[data-sign-up-step="email-code"]')).toBeVisible();
+    const code = await readNewOtp(request, email, seenBeforeSubmit);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
 
@@ -377,10 +385,11 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
 });
 
 test.describe("Refresh / interruption behavior (§Refresh, back, interruption)", () => {
-  test("refreshing on the OTP step returns to Step 1 with no crash and no password anywhere in storage — resubmitting proceeds normally", async ({ page, request }) => {
+  test("refreshing on the OTP step reopens the code step with no crash and no password anywhere in storage — the same code still verifies", async ({ page, request }) => {
     const email = uniqueEmail("refresh");
     await page.goto("/auth/sign-up");
     await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
+    const seenBeforeSubmit = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
@@ -399,19 +408,13 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     // Wait for the reloaded page to finish loading: fields typed into the server-rendered HTML before React
     // hydrates are reset by hydration, which made this resubmission flaky (empty name and email).
     await page.reload({ waitUntil: "load" });
-    await expect(page.getByLabel(SIGN_UP_CONTACT_LABEL)).toBeVisible();
-    await expect(page.getByLabel(/one-time code|الرمز لمرة واحدة/i)).toHaveCount(0);
+    // The unverified email registration is remembered in an httpOnly routing cookie (email only), so the page reopens on the code step.
+    await expect(page.locator('[data-sign-up-step="email-code"]')).toBeVisible();
+    await expect(page.getByLabel(SIGN_UP_CONTACT_LABEL)).toHaveCount(0);
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
 
-    // Resubmitting the SAME email (still unconfirmed from the first attempt)
-    // is exactly GoTrue's own obfuscated re-signup case — succeeds again,
-    // re-sending a new usable code, no corruption.
-    await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
-    const seenBeforeResubmit = await messageIdsFor(request, email);
-    await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
-    await expectSignUpStep2(page);
-
-    const code = await readNewOtp(request, email, seenBeforeResubmit);
+    // The code sent before the refresh is still the one that verifies: nothing was re-sent, nothing was lost.
+    const code = await readNewOtp(request, email, seenBeforeSubmit);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
     await expectAppLanding(page);

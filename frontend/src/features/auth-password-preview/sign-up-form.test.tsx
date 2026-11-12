@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, screen, fireEvent } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { PasswordSignUpForm } from "./sign-up-form";
 import { ar } from "@/lib/i18n/messages/ar";
 import { en } from "@/lib/i18n/messages/en";
@@ -9,11 +10,14 @@ import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/acco
 vi.mock("@/server/actions/auth-password-preview", () => ({
   resendPasswordSignUpCode: vi.fn(),
   verifyPasswordSignUp: vi.fn(),
+  continueToSignIn: vi.fn(),
+  forgetPendingRegistration: vi.fn(),
 }));
 vi.mock("@/server/actions/sign-up", () => ({ requestSignUp: vi.fn(), resendPhoneSignUpCode: vi.fn(), verifyPhoneSignUp: vi.fn() }));
 vi.mock("@/server/actions/entry-oauth", () => ({ startEntryOAuth: vi.fn() }));
 
 import { requestSignUp } from "@/server/actions/sign-up";
+import { continueToSignIn } from "@/server/actions/auth-password-preview";
 
 describe("PasswordSignUpForm (Instagram style)", () => {
   it("asks for mobile number or email, password, full name, and account type, in that order", () => {
@@ -91,6 +95,79 @@ describe("PasswordSignUpForm (Instagram style)", () => {
     expect((google.closest("form")!.querySelector("input[name='accountType']") as HTMLInputElement).value).toBe("supplier");
     const separator = screen.getByRole("separator");
     expect(google.compareDocumentPosition(separator) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it.each([
+    ["authPasswordPreview.error.accountExists", "person@example.test", en.authPasswordPreview.error.accountExists],
+    ["authPasswordPreview.error.phoneExists", "01012345678", en.authPasswordPreview.error.phoneExists],
+  ])("%s: warns under the field and offers 'Sign in' carrying what was typed", async (code, contact, message) => {
+    vi.mocked(requestSignUp).mockResolvedValueOnce({ ok: false, code, email: contact, channel: contact.includes("@") ? "email" : "phone" });
+    renderWithI18n(<PasswordSignUpForm />, "en");
+    fireEvent.change(screen.getByLabelText(en.authPasswordPreview.signUp.contactLabel), { target: { value: contact } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: en.authPasswordPreview.signUp.submit }));
+    });
+    const warning = await screen.findByText((_, el) => Boolean(el?.hasAttribute("data-existing-account")) && (el?.textContent ?? "").includes(message));
+    const box = warning.closest("[data-existing-account]") as HTMLElement;
+    expect(box).not.toBeNull();
+    // Red field + pale-red notice: "<message> To access this account, Sign in [or Recover your password]" (recover only for an email).
+    expect(document.getElementById("contact")).toHaveAttribute("aria-invalid", "true");
+    expect(box.textContent).toContain(en.authPasswordPreview.error.existingAccountAccess);
+    const recover = screen.queryByRole("link", { name: en.authPasswordPreview.error.existingAccountRecover });
+    if (code.endsWith("accountExists")) expect(recover).toHaveAttribute("href", "/auth/forgot-password");
+    else expect(recover).toBeNull();
+    // "Sign in" hands ONLY what was typed (never the password) to the server action, and there is no nested <form>.
+    const button = screen.getByRole("button", { name: en.authPasswordPreview.error.existingAccountSignIn });
+    expect(button).toHaveAttribute("type", "button");
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    const sent = vi.mocked(continueToSignIn).mock.calls.at(-1)![0] as FormData;
+    expect(sent.get("contact")).toBe(contact);
+    expect([...sent.keys()]).toEqual(["contact"]);
+    expect(document.querySelectorAll("form form").length).toBe(0);
+    // The form stays on its details step: no code step, so nobody waits for a code.
+    expect(document.querySelector('[data-sign-up-step="details"]')).not.toBeNull();
+    expect(document.querySelector('[data-sign-up-step$="-code"]')).toBeNull();
+  });
+
+  it("has no \"continue registration\" link or notice anywhere", () => {
+    renderWithI18n(<PasswordSignUpForm />, "en");
+    expect(document.querySelector('a[href="/auth/continue-registration"]')).toBeNull();
+    expect(screen.queryByText(/continue registration|finish signing up/i)).toBeNull();
+  });
+
+  it("reopens the email code step for an unfinished registration, with no password field and a way to start clean", () => {
+    renderWithI18n(<PasswordSignUpForm pendingEmail="person@example.test" />, "en");
+    const step = document.querySelector('[data-sign-up-step="email-code"]')!;
+    expect(step).not.toBeNull();
+    expect((step.querySelector('input[name="email"]') as HTMLInputElement).value).toBe("person@example.test");
+    expect(document.querySelector('input[type="password"], input[name="password"]')).toBeNull();
+    expect(screen.getByRole("button", { name: en.authPasswordPreview.changeEmail })).toHaveAttribute("type", "submit");
+    expect(document.querySelector('[data-sign-up-step="details"]')).toBeNull();
+  });
+
+  it("a cookie that appears AFTER load (this form's own sign-up) never brings an older code step back when a replacement submission fails", async () => {
+    vi.mocked(requestSignUp).mockResolvedValueOnce({ ok: false, code: "authPasswordPreview.error.accountExists", email: "taken@example.test", channel: "email" });
+    const { rerender } = renderWithI18n(<PasswordSignUpForm pendingEmail={null} />, "en");
+    fireEvent.change(screen.getByLabelText(en.authPasswordPreview.signUp.contactLabel), { target: { value: "taken@example.test" } });
+    // The server action set a new reg_email and Next re-rendered the page with it.
+    rerender(
+      <I18nProvider locale="en" dir="ltr">
+        <PasswordSignUpForm pendingEmail="first@example.test" />
+      </I18nProvider>,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: en.authPasswordPreview.signUp.submit }));
+    });
+    expect(document.querySelector('[data-sign-up-step="email-code"]')).toBeNull();
+    expect(await screen.findByText((_, el) => Boolean(el?.hasAttribute("data-existing-account")) && (el?.textContent ?? "").includes(en.authPasswordPreview.error.accountExists))).toBeInTheDocument();
+  });
+
+  it("shows the plain details form when there is no unfinished registration", () => {
+    renderWithI18n(<PasswordSignUpForm pendingEmail={null} />, "en");
+    expect(document.querySelector('[data-sign-up-step="details"]')).not.toBeNull();
+    expect(document.querySelector('[data-sign-up-step="email-code"]')).toBeNull();
   });
 
   it("is fully localized in English with no Arabic leakage", () => {

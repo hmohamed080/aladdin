@@ -125,11 +125,33 @@ describe("requestPhoneSignUp", () => {
     expect(m.createUser).not.toHaveBeenCalled();
   });
 
-  it("never asks whether the number is registered: a taken number gets the same reply, so the form is not an existence oracle", async () => {
+  it("tells a taken number so (after Turnstile and the limiter) and sends, seals and stages nothing", async () => {
     m.phoneTaken.mockResolvedValue(true);
-    await startSignUp();
+    const res = await requestPhoneSignUp(form(), PHONE);
+    expect(res).toMatchObject({ ok: false, channel: "phone", code: "authPasswordPreview.error.phoneExists" });
+    expect(m.siteverify).toHaveBeenCalledTimes(1);
+    expect(m.limit).toHaveBeenCalledTimes(1);
+    expect(m.phoneTaken).toHaveBeenCalledWith("+201012345678");
+    expect(m.start).not.toHaveBeenCalled();
+    expect(cookieJar.has("psu")).toBe(false);
+  });
+
+  it("does not look the number up when Turnstile fails or the limiter says no (the existence answer sits behind both)", async () => {
+    m.siteverify.mockResolvedValueOnce({ ok: false, reason: "rejected" });
+    await requestPhoneSignUp(form(), PHONE);
+    m.limit.mockResolvedValueOnce("limited");
+    await requestPhoneSignUp(form(), PHONE);
     expect(m.phoneTaken).not.toHaveBeenCalled();
-    expect(m.start).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failed lookup never guesses 'free': it stops the sign-up before any code is requested", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    m.phoneTaken.mockRejectedValueOnce(new Error("canonical phone lookup failed (code 500)"));
+    const res = await requestPhoneSignUp(form(), PHONE);
+    expect(res.code).toBe("authPasswordPreview.error.sendFailed");
+    expect(m.start).not.toHaveBeenCalled();
+    expect(String(log.mock.calls[0]![0])).not.toMatch(/\+?2010/);
+    log.mockRestore();
   });
 
   it.each([

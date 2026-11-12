@@ -1,9 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
-import { resendPasswordSignUpCode, verifyPasswordSignUp, type PasswordAuthState } from "@/server/actions/auth-password-preview";
+import { continueToSignIn, forgetPendingRegistration, resendPasswordSignUpCode, verifyPasswordSignUp, type PasswordAuthState } from "@/server/actions/auth-password-preview";
 import { requestSignUp, resendPhoneSignUpCode, verifyPhoneSignUp } from "@/server/actions/sign-up";
 import type { PhoneSignUpState } from "@/server/auth/phone-sign-up";
 import type { OAuthAvailability } from "@/server/auth/entry-oauth";
@@ -30,7 +30,7 @@ type Field = "contact" | "password" | "displayName" | "accountType" | "form";
 /** Which field a server code belongs to, so the message renders under it. */
 function fieldFor(code: string | undefined): Field | null {
   if (!code) return null;
-  if (/error\.(contactInvalid|invalidEmail|phoneExists|whatsappNumberInvalid|whatsappUnavailable)$/.test(code)) return "contact";
+  if (/error\.(contactInvalid|invalidEmail|phoneExists|accountExists|whatsappNumberInvalid|whatsappUnavailable)$/.test(code)) return "contact";
   if (/error\.password/.test(code)) return "password";
   if (/error\.fullName/.test(code)) return "displayName";
   if (/error\.accountTypeRequired$/.test(code)) return "accountType";
@@ -43,9 +43,58 @@ const PHONE_RESTART_CODES = new Set([
   "authPasswordPreview.error.phoneExists",
 ]);
 
-function FieldError({ code }: { code?: string }) {
+/** The two answers that mean "this email / number already has an account" — they carry a way to log in instead. */
+const EXISTING_ACCOUNT_CODES = new Set([
+  "authPasswordPreview.error.accountExists",
+  "authPasswordPreview.error.phoneExists",
+]);
+
+/** The small red "!" at the end of a field that is in error (decorative: the message below is the accessible text). */
+function ErrorMark() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-danger" fill="currentColor">
+      <circle cx="8" cy="8" r="8" />
+      <rect x="7.25" y="3.5" width="1.5" height="5.5" rx="0.75" fill="white" />
+      <circle cx="8" cy="11.5" r="0.95" fill="white" />
+    </svg>
+  );
+}
+
+function FieldError({ code, contact }: { code?: string; contact?: string }) {
   const { t } = useI18n();
-  return code ? <p role="alert" className="text-label text-danger">{t(code)}</p> : null;
+  const [handingOff, startHandOff] = useTransition();
+  if (!code) return null;
+  if (EXISTING_ACCOUNT_CODES.has(code)) {
+    // A pale-red notice under the field (not a dead end): "<this is already registered>. To access this account, Sign in or Recover your password".
+    // "Sign in" calls the `continueToSignIn` server action with ONLY the typed email / number (the sign-up password never travels with it), which
+    // carries it to the sign-in field through an httpOnly cookie and navigates there. Only an email has a password to recover by email.
+    const handOff = () => {
+      const data = new FormData();
+      data.set("contact", contact ?? "");
+      startHandOff(async () => {
+        await continueToSignIn(data);
+      });
+    };
+    const link = "font-semibold text-fg underline underline-offset-2 hover:text-accent";
+    return (
+      <div role="alert" data-existing-account className="rounded-md bg-danger/10 px-md py-3 text-body leading-relaxed text-fg-secondary">
+        {t(code)} {t("authPasswordPreview.error.existingAccountAccess")}{" "}
+        {/* type=button + inline reset: the auth stage styles every submit button in a form as the big primary button. */}
+        <button type="button" onClick={handOff} disabled={handingOff} className={link} style={{ minHeight: 0, width: "auto", fontSize: "inherit", background: "none" }}>
+          {t("authPasswordPreview.error.existingAccountSignIn")}
+        </button>
+        {code.endsWith("accountExists") ? (
+          <>
+            {" "}{t("authPasswordPreview.error.existingAccountOr")}{" "}
+            <Link href="/auth/forgot-password" className={link}>
+              {t("authPasswordPreview.error.existingAccountRecover")}
+            </Link>
+          </>
+        ) : null}
+      </div>
+    );
+  }
+  return <p role="alert" className="text-label text-danger">{t(code)}</p>;
 }
 
 /**
@@ -64,9 +113,15 @@ function FieldError({ code }: { code?: string }) {
  * three consents are still recorded server-side: submitting the form under
  * the agreement line is the acceptance, and the hidden fields say so.
  *
- * The email code step keeps its NEUTRAL wording ("if this email can continue
- * registration…") and the "Forgot password?" way out, so the form never
- * reveals whether an email already has an account.
+ * An email or mobile number that already has an account is answered with a
+ * warning under the field and a "Log in instead" button (a server action that
+ * carries what was typed to /auth/sign-in through an httpOnly cookie, never the
+ * URL), so nobody waits for a code that will never come. The email code step
+ * keeps the "Forgot password?" way out for the other reasons a code can be late.
+ *
+ * An unfinished email registration in this browser (`pendingEmail`, the
+ * server-side routing cookie) reopens straight on the code step after a refresh
+ * or a closed tab; there is no separate "continue registration" page.
  *
  * `next` is set only when the person arrived from an employee invitation
  * (`/auth/invite/...`); it rides the email verify step so a brand-new user
@@ -76,8 +131,8 @@ export function PasswordSignUpForm({
   initialAccountType = "",
   next,
   providers = NO_PROVIDERS,
-  hasPendingRegistration = false,
-}: { initialAccountType?: string; next?: string; providers?: OAuthAvailability; hasPendingRegistration?: boolean } = {}) {
+  pendingEmail = null,
+}: { initialAccountType?: string; next?: string; providers?: OAuthAvailability; pendingEmail?: string | null } = {}) {
   const { t } = useI18n();
   const [sendState, dispatchSend] = useActionState(requestSignUp, initial);
   const [emailResendState, dispatchEmailResend] = useActionState(resendPasswordSignUpCode, initialEmail);
@@ -91,9 +146,15 @@ export function PasswordSignUpForm({
   const [password, setPassword] = useState("");
   const [restartCode, setRestartCode] = useState<string | undefined>();
 
-  const codeSent = sendState.ok && !editing;
-  const channel = sendState.channel ?? "email";
-  const contact = sendState.email ?? "";
+  // This browser started an email registration and has not verified it (refresh, closed tab, lost connection): reopen its code step.
+  // `pendingEmail` is the server-side httpOnly routing cookie, never the URL; it is only set when a code was really sent.
+  // Only for the address that was already pending when this page loaded: a sign-up submitted from this form sets a NEW cookie and the page re-renders
+  // with it, and that must never bring an older address's code step back after a failed replacement submission.
+  const [pendingAtLoad] = useState(pendingEmail);
+  const restoredEmail = pendingEmail && pendingEmail === pendingAtLoad && !sendState.ok ? pendingEmail : null;
+  const codeSent = restoredEmail !== null || (sendState.ok && !editing);
+  const channel = restoredEmail ? "email" : (sendState.channel ?? "email");
+  const contact = restoredEmail ?? sendState.email ?? "";
   const errorField = fieldFor(sendState.ok ? undefined : sendState.code);
   const errorFor = (field: Field) => (errorField === field ? sendState.code : undefined);
   const set = (key: keyof typeof values) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: e.target.value }));
@@ -129,20 +190,12 @@ export function PasswordSignUpForm({
   }, [cooldown]);
 
   const footer = (
-    <div className="flex flex-col gap-xs">
-      <p>
-        {t("authPasswordPreview.signUp.haveAccount")}{" "}
-        <Link href="/auth/sign-in" className="font-semibold text-accent hover:underline">
-          {t("authPasswordPreview.signUp.signInLink")}
-        </Link>
-      </p>
-      <p>
-        {t("authPasswordPreview.continueRegistration.entryPrompt")}{" "}
-        <Link href="/auth/continue-registration" className="font-semibold text-accent hover:underline">
-          {t("authPasswordPreview.continueRegistration.entryLink")}
-        </Link>
-      </p>
-    </div>
+    <p>
+      {t("authPasswordPreview.signUp.haveAccount")}{" "}
+      <Link href="/auth/sign-in" className="font-semibold text-accent hover:underline">
+        {t("authPasswordPreview.signUp.signInLink")}
+      </Link>
+    </p>
   );
   const badge = initialAccountType
     ? `${t("authPasswordPreview.accountTypeLocked")}: ${t(`onboarding.accountType.types.${initialAccountType}`)}`
@@ -200,9 +253,18 @@ export function PasswordSignUpForm({
                 <TurnstileWidget action="sign-up-resend" resetKey={emailResendState} />
                 <ResendButton cooldown={cooldown} />
               </form>
-              <Button type="button" variant="ghost" size="sm" className="whitespace-nowrap" onClick={() => setEditing(true)}>
-                {t("authPasswordPreview.changeEmail")}
-              </Button>
+              {restoredEmail ? (
+                /* Restored from the routing cookie: forget it and show a clean form (nothing server-side changes). */
+                <form action={forgetPendingRegistration}>
+                  <Button type="submit" variant="ghost" size="sm" className="whitespace-nowrap">
+                    {t("authPasswordPreview.changeEmail")}
+                  </Button>
+                </form>
+              ) : (
+                <Button type="button" variant="ghost" size="sm" className="whitespace-nowrap" onClick={() => setEditing(true)}>
+                  {t("authPasswordPreview.changeEmail")}
+                </Button>
+              )}
             </div>
             {/* Never leave the caller waiting on a code GoTrue never sent (an
                 already-confirmed email): a neutral way out. */}
@@ -220,16 +282,6 @@ export function PasswordSignUpForm({
 
   return (
     <AuthCard centered title={t("authPasswordPreview.signUp.title")} subtitle={t("authPasswordPreview.signUp.subtitle")} badge={badge} footer={footer}>
-      {/* This browser started an email registration and has not verified it
-          yet (refresh, closed tab): offer to pick it up instead of starting over. */}
-      {hasPendingRegistration ? (
-        <p role="status" className="rounded-md border border-strong/70 bg-surface-2/40 px-md py-2.5 text-body text-fg-secondary">
-          {t("authPasswordPreview.continueRegistration.entryPrompt")}{" "}
-          <Link href="/auth/continue-registration" className="font-semibold text-accent hover:underline">
-            {t("authPasswordPreview.continueRegistration.entryLink")}
-          </Link>
-        </p>
-      ) : null}
       {hasOAuthProvider(providers) ? (
         <>
           <EntryOAuthButtons next={next} accountType={initialAccountType || undefined} providers={providers} />
@@ -238,25 +290,29 @@ export function PasswordSignUpForm({
       ) : null}
 
       <form action={dispatchSend} className="flex flex-col gap-sm" noValidate data-sign-up-step="details">
-        <FieldError code={restartCode} />
+        <FieldError code={restartCode} contact={values.contact} />
 
         <label htmlFor="contact" className="sr-only">{t("authPasswordPreview.signUp.contactLabel")}</label>
-        <Input
-          id="contact"
-          name="contact"
-          type="text"
-          inputMode="email"
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
-          dir="ltr"
-          required
-          value={values.contact}
-          onChange={set("contact")}
-          placeholder={t("authPasswordPreview.signUp.contactLabel")}
-          aria-invalid={errorField === "contact" || undefined}
-        />
-        <FieldError code={errorFor("contact")} />
+        <div className="relative">
+          <Input
+            id="contact"
+            name="contact"
+            type="text"
+            inputMode="email"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            dir="ltr"
+            required
+            value={values.contact}
+            onChange={set("contact")}
+            placeholder={t("authPasswordPreview.signUp.contactLabel")}
+            aria-invalid={errorField === "contact" || undefined}
+            className={errorField === "contact" ? "pr-10" : undefined}
+          />
+          {errorField === "contact" ? <ErrorMark /> : null}
+        </div>
+        <FieldError code={errorFor("contact")} contact={values.contact} />
 
         <label htmlFor="password" className="sr-only">{t("authPasswordPreview.passwordLabel")}</label>
         <PasswordInput
