@@ -37,6 +37,19 @@ describe("PasswordSignInForm", () => {
     expect(hrefs.some((href) => /\/(installer|showroom)\/sign-in/.test(href ?? ""))).toBe(false);
   });
 
+  it("has no \"continue registration\" entry any more, and the sign-up link reads 'Sign up now'", () => {
+    renderWithI18n(<PasswordSignInForm next="/b2b" />, "en");
+    expect(screen.getByRole("link", { name: "Sign up now" })).toHaveAttribute("href", "/auth/sign-up");
+    expect(document.querySelector('a[href="/auth/continue-registration"]')).toBeNull();
+    expect(screen.queryByText(/continue registration|finish signing up/i)).toBeNull();
+    expect(ar.authPasswordPreview.signIn.signUpLink).toBe("سجّل الآن");
+  });
+
+  it("prefills the identifier carried from the sign-up warning", () => {
+    renderWithI18n(<PasswordSignInForm next="/b2b" defaultIdentifier="01012345678" />, "en");
+    expect((screen.getByLabelText(en.authPasswordPreview.signIn.identifierLabel) as HTMLInputElement).value).toBe("01012345678");
+  });
+
   it("shows Google and Facebook under an OR rule only when Supabase has them on", () => {
     const { unmount } = renderWithI18n(<PasswordSignInForm next="/b2b" />, "en");
     expect(screen.queryByRole("button", { name: en.entryAuth.continueWithGoogle })).toBeNull();

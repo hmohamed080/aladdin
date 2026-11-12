@@ -23,6 +23,8 @@
 | `frontend/e2e/helpers/auth.ts` | The specialty-step fix (separate Draft PR, see the report §7). |
 | `supabase/permissions/` | Regenerate once on the merged tree (`node supabase/tests/b1/permission_contract.mjs <container> generate`). |
 
+**RESOLVED 2026-11-12 (owner): keep an explicit warning.** `requestPhoneSignUp` now answers `phoneExists` at the first step (after Turnstile Siteverify and the durable per-IP / per-number limiter, before any challenge) with a "Log in instead" hand-off; the authority still suppresses delivery for a taken number as a second line. The existence oracle is accepted knowingly and bounded by those two guards. Original analysis follows.
+
 **Owner decision (UX vs enumeration):** the authority returns the same reply for a taken number so the form cannot reveal whether a number is registered. #113 today answers `phoneExists` at the first step. Removing it means a person whose number is already registered receives no code and no explanation; the usual mitigation is a neutral screen ("if this number is not registered you will receive a code; otherwise sign in") plus the sign-in link. Keeping `phoneExists` keeps a phone-number existence oracle (behind Turnstile and the durable limiter, but still an oracle). The authority supports either; the form must choose.
 
 ## PR #116 — interrupted-registration continuation

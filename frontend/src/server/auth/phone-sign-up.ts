@@ -28,8 +28,9 @@ import type { Database } from "@/types/database.types";
  *
  *   1. requestPhoneSignUp — validates every field, checks Turnstile with Siteverify (no GoTrue call happens here), applies the durable
  *      phone limiter, then asks the authority to open a challenge for a random REGISTRATION id. The authority generates and MACs the code,
- *      and the delivery adapter sends it AFTER this reply (Next `after`), so the reply never depends on delivery: a number that already
- *      belongs to an account gets the same screen, the same timing and simply no message. The registration fields ride a SEALED cookie
+ *      and the delivery adapter sends it AFTER this reply (Next `after`), so the reply never depends on delivery. A number that already
+ *      belongs to an account is answered with `phoneExists` BEFORE any challenge (after Turnstile and the limiter), so nobody waits for a code
+ *      that will never come; the authority still suppresses delivery for a taken number as a second line. The registration fields ride a SEALED cookie
  *      (AES-256-GCM, httpOnly, 10 minutes, /auth only) because nothing exists in Auth yet.
  *   2. verifyPhoneSignUp — the authority checks the code (attempt caps live there) and returns ONE single-use GRANT for exactly that phone
  *      alias. Only then is the Auth user created, through the Admin API with the grant in app_metadata (the database guard refuses a
@@ -123,8 +124,8 @@ async function callerIp(): Promise<string | null> {
 }
 
 /**
- * Opens (or, on resend, replaces) the challenge through the authority. The authority's reply is identical for a free and a taken
- * number; this function must not add any await on delivery or any branch that depends on whether the number is registered.
+ * Opens (or, on resend, replaces) the challenge through the authority. The authority's own reply is identical for a free and a taken
+ * number (it is the second line behind the explicit check in requestPhoneSignUp); this function adds no await on delivery.
  * `getPhoneSignupService()` is called here, inside the server action, because it wires Next `after()` to the request.
  */
 async function startChallenge(rid: string, phone: CanonicalPhone, locale: Locale): Promise<{ cid: string } | { code: string }> {
@@ -180,8 +181,18 @@ export async function requestPhoneSignUp(formData: FormData, phone: CanonicalPho
   const limited = await phoneAuthLimit("sign-up", phone.e164, await headers());
   if (limited !== "allowed") return fail(limited === "limited" ? E("rateLimited") : E("sendFailed"));
 
-  // There is deliberately NO "is this number registered?" check here: the answer would be a phone-number existence oracle. A number that
-  // already has an account goes through the same screens and simply receives no code (the authority suppresses delivery).
+  // A number that already has an account is told so, with a way to log in instead (product decision, 2026-11-12): the person must not wait for
+  // a WhatsApp code that will never arrive. This answer is an existence signal, so it sits BEHIND the same guards as everything else here:
+  // Turnstile (Siteverify, above), then the durable per-IP (10) and per-number (5) budget (above). Nothing is sent, sealed or staged for a
+  // taken number. A lookup that fails never guesses "free": it stops the sign-up. The authority still suppresses delivery for a taken number
+  // as a second line (a race between this check and the challenge, or a number that became taken meanwhile).
+  try {
+    if (await isCanonicalPhoneTaken(phone.e164)) return fail(E("phoneExists"));
+  } catch (error) {
+    logStepFailure("phone_precheck", error as { code?: string });
+    return fail(E("sendFailed"));
+  }
+
   // Fail closed BEFORE a code is requested: without the cookie secret the pending sign-up cannot be kept, so no message may be sent.
   try {
     cookieKey();

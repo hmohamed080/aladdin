@@ -40,10 +40,13 @@ export function PasswordSignInForm({
   next,
   providers = NO_PROVIDERS,
   oauthError,
+  defaultIdentifier,
 }: {
   next: string;
   providers?: OAuthAvailability;
   oauthError?: string;
+  /** The email / mobile number the person typed on the sign-up warning, so they do not retype it. */
+  defaultIdentifier?: string;
 }) {
   const { t } = useI18n();
   const [state, dispatch] = useActionState(passwordSignIn, initial);
@@ -54,20 +57,12 @@ export function PasswordSignInForm({
       title={t("authPasswordPreview.signIn.title")}
       subtitle={t("authPasswordPreview.signIn.subtitle")}
       footer={
-        <div className="flex flex-col gap-xs">
-          <p>
-            {t("authPasswordPreview.signIn.noAccount")}{" "}
-            <Link href="/auth/sign-up" className="font-semibold text-accent hover:underline">
-              {t("authPasswordPreview.signIn.signUpLink")}
-            </Link>
-          </p>
-          <p>
-            {t("authPasswordPreview.continueRegistration.entryPrompt")}{" "}
-            <Link href="/auth/continue-registration" className="font-semibold text-accent hover:underline">
-              {t("authPasswordPreview.continueRegistration.entryLink")}
-            </Link>
-          </p>
-        </div>
+        <p>
+          {t("authPasswordPreview.signIn.noAccount")}{" "}
+          <Link href="/auth/sign-up" className="font-semibold text-accent hover:underline">
+            {t("authPasswordPreview.signIn.signUpLink")}
+          </Link>
+        </p>
       }
     >
       <form action={dispatch} className="flex flex-col gap-sm" noValidate>
@@ -93,7 +88,7 @@ export function PasswordSignInForm({
           spellCheck={false}
           dir="ltr"
           required
-          defaultValue={state.email ?? ""}
+          defaultValue={state.email ?? defaultIdentifier ?? ""}
           placeholder={t("authPasswordPreview.signIn.identifierLabel")}
           aria-invalid={Boolean(state.code) || undefined}
         />

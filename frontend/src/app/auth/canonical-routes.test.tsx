@@ -8,6 +8,8 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+let pendingEmail: string | null = null;
+let signInPrefill: string | null = null;
 const recoveryFlowEmail = vi.fn<() => Promise<string | null>>();
 const requireRecoverySession = vi.fn<() => Promise<{ email: string } | null>>();
 const consumeRecoverySuccess = vi.fn<() => Promise<boolean>>();
@@ -15,7 +17,8 @@ vi.mock("@/server/actions/auth-password-preview", () => ({
   recoveryFlowEmail: () => recoveryFlowEmail(),
   requireRecoverySession: () => requireRecoverySession(),
   consumeRecoverySuccess: () => consumeRecoverySuccess(),
-  pendingRegistrationEmail: async () => null,
+  pendingRegistrationEmail: async () => pendingEmail,
+  signInPrefillIdentifier: async () => signInPrefill,
 }));
 
 // The canonical pages are thin route boundaries over the tested password
@@ -37,6 +40,7 @@ import { RecoverySuccess } from "@/features/auth-password-preview/recovery-succe
 
 import SignUpPage from "./sign-up/page";
 import SignInPage from "./sign-in/page";
+import ContinueRegistrationRetired from "./continue-registration/page";
 import ForgotPasswordPage from "./forgot-password/page";
 import RecoveryVerifyPage from "./forgot-password/verify/page";
 import RecoveryResetPage from "./forgot-password/reset/page";
@@ -59,6 +63,8 @@ const params = <T extends object>(value: T) => ({ searchParams: Promise.resolve(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  pendingEmail = null;
+  signInPrefill = null;
 });
 
 describe("canonical /auth/* routes render the tested password flow", () => {
@@ -87,6 +93,24 @@ describe("canonical /auth/* routes render the tested password flow", () => {
     expect(page.props.oauthError).toBe("oauth");
     expect(page.props).not.toHaveProperty("installerSignInHref");
     expect(page.props.providers).toEqual({ google: true, facebook: false });
+  });
+
+  it("/auth/sign-up hands the unfinished-registration email (server cookie) to the form, so it reopens on the code step", async () => {
+    pendingEmail = "person@example.test";
+    expect(element(await SignUpPage(params({}))).props.pendingEmail).toBe("person@example.test");
+    pendingEmail = null;
+    expect(element(await SignUpPage(params({}))).props.pendingEmail).toBeNull();
+  });
+
+  it("/auth/sign-in prefills the identifier carried from the sign-up warning, and nothing otherwise", async () => {
+    signInPrefill = "01012345678";
+    expect(element(await SignInPage(params({}))).props.defaultIdentifier).toBe("01012345678");
+    signInPrefill = null;
+    expect(element(await SignInPage(params({}))).props.defaultIdentifier).toBeUndefined();
+  });
+
+  it("the retired /auth/continue-registration page sends everyone to /auth/sign-up", () => {
+    expect(() => ContinueRegistrationRetired()).toThrow("REDIRECT:/auth/sign-up");
   });
 
   it("/auth/forgot-password → ForgotPasswordForm", () => {

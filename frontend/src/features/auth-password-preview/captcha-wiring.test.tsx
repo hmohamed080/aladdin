@@ -19,6 +19,8 @@ vi.mock("@/server/actions/auth-password-preview", () => ({
   requestPasswordSignUp: vi.fn(),
   resendPasswordSignUpCode: vi.fn(),
   verifyPasswordSignUp: vi.fn(),
+  continueToSignIn: vi.fn(),
+  forgetPendingRegistration: vi.fn(),
 }));
 vi.mock("@/server/actions/auth", () => ({ requestEmailOtp: vi.fn(), verifyEmailOtp: vi.fn(), requestSignUpOtp: vi.fn(), verifySignUpOtp: vi.fn() }));
 vi.mock("@/server/actions/sign-up", () => ({ requestSignUp: vi.fn(), resendPhoneSignUpCode: vi.fn(), verifyPhoneSignUp: vi.fn() }));
