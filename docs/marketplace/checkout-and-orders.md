@@ -25,11 +25,16 @@ Status: built 2026-11-14 on `feat/marketplace` (PR 190), local stack verified. M
    review (reject needs a reason), and the steps confirm → prepare → ship / ready → delivered →
    payment received, plus failed delivery → returned and cancel (reason required).
 
+## Return after sign-in
+
+`/marketplace/checkout` (with its simple query) and `/marketplace/orders[/<uuid>]` are accepted as `next`
+(`server/auth/next.ts`, exact shapes only) and survive the post-sign-in landing rule
+(`postAuthDestination`, used by password sign-in, OTP sign-in, OAuth entry and the account-basics step).
+Every other deep link still survives only inside the caller's own landing surface.
+
 ## Differences from `MARKETPLACE.md` §7–§10 (not built yet)
 
 - No tax lines or tax snapshots (DL-16): totals are products + delivery, like the cart.
 - No buyer account-type eligibility check (§9) and no DB `checkout_enabled` flag (§10); the release
   flag `NEXT_PUBLIC_MARKETPLACE_PREVIEW` still gates the pages.
-- After sign-in, the existing post-auth rule sends people to their own landing surface, not back to
-  `/marketplace/checkout`; the cart is kept, the buyer returns to it manually.
 - No online payment; no confirmation-by-order-number route (the success panel links to each order).
