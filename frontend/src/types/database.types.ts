@@ -7868,6 +7868,10 @@ export type Database = {
         Args: { p_subject_id: string; p_subject_type: string }
         Returns: Json
       }
+      admin_organization_edit: {
+        Args: { p_changes: Json; p_organization_id: string; p_reason: string }
+        Returns: Json
+      }
       admin_organization_detail: {
         Args: { p_organization_id: string }
         Returns: Json
@@ -8062,6 +8066,10 @@ export type Database = {
       admin_user_detail: { Args: { p_user_id: string }; Returns: Json }
       admin_user_restore: {
         Args: { p_reason?: string; p_user_id: string }
+        Returns: Json
+      }
+      admin_user_edit_profile: {
+        Args: { p_changes: Json; p_reason: string; p_user_id: string }
         Returns: Json
       }
       admin_user_suspend: {

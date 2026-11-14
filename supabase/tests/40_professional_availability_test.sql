@@ -339,7 +339,10 @@ select is(
       and p.proname <> '_profile_public_directory'
       -- app.job_match_rows READS it, to score availability in the Overall Match presentation signal (test 74).
       -- It is read-only, writes nothing, expires nothing, and gates nothing.
-      and p.proname <> 'job_match_rows'),
+      and p.proname <> 'job_match_rows'
+      -- public.admin_user_edit_profile (20261114090005) lets an Administrator correct the flag with a reason (Admin edit, Option A):
+      -- one allow-listed key, an audited and notified admin action, no expiry, no gate. The stamp trigger still stamps the change.
+      and p.proname <> 'admin_user_edit_profile'),
   0, 'no other function in app/public writes or reads available_for_work — no expiry job exists');
 
 -- ===========================================================================
