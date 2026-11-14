@@ -22,7 +22,7 @@ describe("homepage: one canonical Landing", () => {
     state.users = 1200;
     const { container } = render(await RootPage());
     const pills = container.querySelectorAll("ul li strong");
-    expect(Array.from(pills).map((n) => n.textContent)).toContain("+1 ألف");
+    expect(Array.from(pills).map((n) => n.textContent)).toContain("+1,200");
     expect(container.textContent).not.toContain("250");
   });
 
