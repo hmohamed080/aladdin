@@ -14,7 +14,7 @@ describe("homepage: one canonical Landing", () => {
     for (const id of ["top", "roles", "services", "market", "how", "why", "experience", "faq", "footer"]) {
       expect(container.querySelector(`#${id}`), id).not.toBeNull();
     }
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("علاء الدين");
+    expect(screen.getAllByRole("heading", { level: 1 })[0]).toHaveTextContent("علاء الدين");
     expect(container.textContent).not.toMatch(/English|\bEN\b/);
   });
 

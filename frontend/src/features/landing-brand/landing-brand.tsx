@@ -5,6 +5,7 @@ import { LandingBrandFaq } from "./landing-brand-faq";
 import { LandingBrandHeader } from "./landing-brand-header";
 import { BrandIcon, SocialIcon } from "./landing-brand-icons";
 import { LandingBrandVideo } from "./landing-brand-video";
+import { MobileCta, MobileExperience, MobileFooter, MobileHero, MobileHow, MobileRoles, MobileServices, MobileWhy } from "./landing-brand-mobile";
 import { LandingBrandMarket } from "./landing-brand-market";
 import { formatStat, type LandingStats } from "./landing-brand-stats";
 import styles from "./landing-brand.module.css";
@@ -22,6 +23,7 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
 
   return (
     <div id="top" className={`${styles.page} ${hurme.variable} ${bukra.variable}`}>
+      <div className={styles.onlyDesktop}>
       <section className={styles.heroWrap}>
         <div className={styles.hero}>
           <Image src="/landing-brand/hero.jpg" alt="" fill priority sizes="(max-width: 1280px) 100vw, 1232px" className={styles.heroImg} />
@@ -50,7 +52,10 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
           </div>
         </div>
       </section>
+      </div>
+      <div className={styles.onlyMobile}><MobileHero stats={stats} /></div>
 
+      <div className={styles.onlyDesktop}>
       <section id="roles" className={styles.section}>
         <p className={styles.eyebrow}>{c.roles.eyebrow}</p>
         <h2>{c.roles.title}</h2>
@@ -70,7 +75,10 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
           ))}
         </div>
       </section>
+      </div>
+      <div className={styles.onlyMobile}><MobileRoles /></div>
 
+      <div className={styles.onlyDesktop}>
       <section id="services" className={styles.servicesWrap}>
         <div className={styles.services}>
           <div className={styles.servicesCopy}>
@@ -86,8 +94,10 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
           <div className={styles.servicesImg}><Image src="/landing-brand/room.jpg" alt="" fill sizes="(max-width: 900px) 100vw, 480px" /></div>
         </div>
       </section>
+      </div>
+      <div className={styles.onlyMobile}><MobileServices /></div>
 
-      <section id="market" className={styles.section}>
+      <section id="market" className={`${styles.section} ${styles.market}`}>
         <div className={styles.marketHead}>
           <div>
             <p className={styles.eyebrow}>{c.market.eyebrow}</p>
@@ -99,6 +109,7 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
         <LandingBrandMarket />
       </section>
 
+      <div className={styles.onlyDesktop}>
       <section id="how" className={`${styles.section} ${styles.how}`}>
         <div><p className={styles.eyebrow}>{c.how.eyebrow}</p><h2>{c.how.title}</h2></div>
         <ol>
@@ -110,7 +121,10 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
           ))}
         </ol>
       </section>
+      </div>
+      <div className={styles.onlyMobile}><MobileHow /></div>
 
+      <div className={styles.onlyDesktop}>
       <section id="why" className={styles.whyWrap}>
         <div className={styles.why}>
           <div><p className={styles.eyebrow}>{c.why.eyebrow}</p><h2>{c.why.title}</h2></div>
@@ -121,7 +135,10 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
           </ul>
         </div>
       </section>
+      </div>
+      <div className={styles.onlyMobile}><MobileWhy /></div>
 
+      <div className={styles.onlyDesktop}>
       <section id="experience" className={`${styles.section} ${styles.experience}`}>
         <div>
           <p className={styles.eyebrow}>{c.experience.eyebrow}</p>
@@ -133,6 +150,8 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
         </div>
         <div className={styles.devices}><Image src="/landing-brand/devices.jpg" alt={c.experience.alt} width={1400} height={518} sizes="(max-width: 900px) 100vw, 640px" /></div>
       </section>
+      </div>
+      <div className={styles.onlyMobile}><MobileExperience /></div>
 
       <section className={styles.partnersWrap}>
         <div className={styles.partners}>
@@ -152,6 +171,7 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
         <LandingBrandFaq />
       </section>
 
+      <div className={styles.onlyDesktop}>
       <section className={styles.ctaWrap}>
         <div className={styles.cta}>
           <div>
@@ -165,7 +185,10 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
           <div className={styles.ctaImg}><Image src="/landing-brand/cta.jpg" alt="" fill sizes="(max-width: 900px) 100vw, 520px" /></div>
         </div>
       </section>
+      </div>
+      <div className={styles.onlyMobile}><MobileCta /></div>
 
+      <div className={styles.onlyDesktop}>
       <footer id="footer" className={styles.footer}>
         <div className={styles.footerGrid}>
           <div className={styles.footBrand}>
@@ -185,6 +208,8 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
         </div>
         <span className={styles.rights}>{c.footer.rights}</span>
       </footer>
+      </div>
+      <div className={styles.onlyMobile}><MobileFooter /></div>
     </div>
   );
 }
