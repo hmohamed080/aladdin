@@ -43,5 +43,7 @@ jobs:
         run: bash backup/restore-pin-test.sh
       - name: Media record validator
         run: python3 backup/media-record-test.py
+      - name: Final-acceptance preflight (hosted configuration checker, offline fixtures)
+        run: python3 backup/final-acceptance-preflight-test.py
       - name: Request photos and verification documents are always required
         run: python3 backup/r2-new-namespaces-test.py
