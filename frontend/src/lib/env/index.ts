@@ -28,6 +28,11 @@ export const publicEnvSchema = z.object({
   // [auth.captcha] stays OFF. Optional: unset locally falls back to
   // Cloudflare's published always-pass TEST site key.
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().trim().min(1).optional(),
+  // Release gate for the public Marketplace (ADR-0028). OPTIONAL and OFF by default:
+  // only the exact value "true" opens /marketplace and the seller pages' public side;
+  // anything else shows the "coming soon" page, so Production stays closed until it
+  // is set deliberately. A UI gate, not a security boundary — the database decides.
+  NEXT_PUBLIC_MARKETPLACE_PREVIEW: z.enum(["true", "false"]).optional(),
 });
 
 export const serverEnvSchema = z.object({
@@ -113,6 +118,15 @@ export function parseServerEnv(source: Record<string, string | undefined>): Serv
  * The single sanctioned read of `process.env` for public config. Application
  * code calls this (or the Supabase factory) instead of touching `process.env`.
  */
+/**
+ * Release flag of the public Marketplace (ADR-0028). Unlike `readPublicEnv` it reads only this one
+ * NEXT_PUBLIC_ value and never throws, so Client Components can use it. Only the exact value "true"
+ * turns the Marketplace on; anything else keeps it closed.
+ */
+export function isMarketplacePreviewEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_MARKETPLACE_PREVIEW === "true";
+}
+
 export function readPublicEnv(): PublicEnv {
   return parsePublicEnv({
     NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
@@ -120,6 +134,7 @@ export function readPublicEnv(): PublicEnv {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_SUPPORT_CONTACT: process.env.NEXT_PUBLIC_SUPPORT_CONTACT,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    NEXT_PUBLIC_MARKETPLACE_PREVIEW: process.env.NEXT_PUBLIC_MARKETPLACE_PREVIEW,
   });
 }
 

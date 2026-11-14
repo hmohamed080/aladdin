@@ -8,7 +8,12 @@ const state = vi.hoisted(() => ({ environment: "staging" as string | undefined }
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "ar" }) }) }));
 // If the page ever reads the public env again, this mock hands it the value under
 // test — which is exactly what these tests prove it no longer cares about.
-vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_APP_ENV: state.environment }) }));
+vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_APP_ENV: state.environment }), isMarketplacePreviewEnabled: () => false }));
+// The Marketplace is closed in these tests, so its server loaders are never called.
+vi.mock("server-only", () => ({}));
+vi.mock("@/server/queries/marketplace-public", () => ({ loadPublicCatalogPage: async () => null }));
+vi.mock("@/server/media/marketplace-public-images", () => ({ marketplacePublicImageUrls: async () => ({}) }));
+vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({}) }));
 
 const ENVIRONMENTS = ["staging", "production", "local", "preview", undefined] as const;
 

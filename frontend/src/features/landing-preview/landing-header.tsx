@@ -3,15 +3,16 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/controls";
-import { ArrowUpRightIcon, GlobeIcon, MenuIcon, XIcon } from "@/components/ui/icons";
+import { ArrowUpRightIcon, GlobeIcon, MenuIcon, ShoppingBagIcon, XIcon } from "@/components/ui/icons";
 import { LanguageSwitch } from "@/components/layout/switchers";
 import { useI18n } from "@/lib/i18n/context";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
+import { useLiveCart } from "@/features/marketplace/live/live-cart-store";
 import styles from "./landing-header.module.css";
 
 const content = {
   ar: {
-    navigation: "التنقل الرئيسي", menu: "القائمة", signIn: "تسجيل الدخول", register: "إنشاء حساب", registerTitle: "اختر نوع حسابك", soon: "قريبًا", marketplace: "السوق",
+    navigation: "التنقل الرئيسي", menu: "القائمة", signIn: "تسجيل الدخول", register: "إنشاء حساب", registerTitle: "اختر نوع حسابك", soon: "قريبًا", cart: "السلة", marketplace: "السوق",
     links: [["الرئيسية", "#landing-top"], ["عن المنصة", "#how-it-works"], ["المميزات", "#audience"], ["الشركاء", "#brands"], ["فيديوهات ومنتجات", "#platform"]],
     faq: "الأسئلة الشائعة", contact: "تواصل معنا",
     answers: [
@@ -21,7 +22,7 @@ const content = {
     ],
   },
   en: {
-    navigation: "Primary navigation", menu: "Menu", signIn: "Sign in", register: "Create account", registerTitle: "Choose your account type", soon: "Coming soon", marketplace: "Marketplace",
+    navigation: "Primary navigation", menu: "Menu", signIn: "Sign in", register: "Create account", registerTitle: "Choose your account type", soon: "Coming soon", cart: "Cart", marketplace: "Marketplace",
     links: [["Home", "#landing-top"], ["About", "#how-it-works"], ["Features", "#audience"], ["Partners", "#brands"], ["Videos & products", "#platform"]],
     faq: "FAQ", contact: "Contact us",
     answers: [
@@ -36,9 +37,23 @@ const content = {
  * `anchorBase` lets other pages (e.g. the /marketplace coming-soon page) reuse the
  * same navigation: the in-page anchors become `/#section` links back to the home page.
  */
-export function LandingHeader({ anchorBase = "", active = "home" }: { anchorBase?: string; active?: "home" | "marketplace" } = {}) {
+export function LandingHeader({ anchorBase = "", showCart = false, cartCount = 0, active = "home" }: { anchorBase?: string; showCart?: boolean; cartCount?: number; active?: "home" | "marketplace" } = {}) {
   const { locale, dir, t: tr } = useI18n();
   const t = content[locale];
+  // The browser cart (same store the Marketplace pages write), so "Add to cart" anywhere updates this at once.
+  const liveCart = useLiveCart();
+  const count = showCart ? Math.max(cartCount, liveCart.count) : 0;
+  const lastCount = useRef<number | null>(null);
+  const [bump, setBump] = useState(false);
+  useEffect(() => {
+    if (!liveCart.ready) return;
+    const before = lastCount.current;
+    lastCount.current = count;
+    if (before === null || count <= before) return;
+    setBump(true);
+    const id = window.setTimeout(() => setBump(false), 650);
+    return () => window.clearTimeout(id);
+  }, [count, liveCart.ready]);
   // The Marketplace link opens the coming-soon page until the Marketplace ships; absolute paths are never prefixed.
   const links: [string, string][] = t.links.map(([label, href]) => [label, href]);
   links.splice(1, 0, [t.marketplace, "/marketplace"]);
@@ -85,6 +100,13 @@ export function LandingHeader({ anchorBase = "", active = "home" }: { anchorBase
         <a href="/auth/support">{t.contact}</a>
       </nav>
       <div className={styles.actions}>
+        {/* Shown while the Marketplace is open (release flag on): on its pages and on the home page. */}
+        {showCart ? (
+          <a className={`${styles.cart} ${bump ? styles.cartBump : ""}`} href="/marketplace/cart" aria-label={count > 0 ? `${t.cart} (${count})` : t.cart}>
+            <ShoppingBagIcon size={20} aria-hidden="true" />
+            {count > 0 ? <span className={styles.cartBadge} aria-hidden="true">{count > 99 ? "99+" : count}</span> : null}
+          </a>
+        ) : null}
         <span className={styles.language}><LanguageSwitch /><GlobeIcon size={14} aria-hidden="true" /></span>
         <a className={styles.signIn} href="/auth/sign-in" dir={dir}>{t.signIn}</a>
         <div className={styles.registerWrap} ref={signup}>

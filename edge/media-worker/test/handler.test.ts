@@ -14,7 +14,8 @@ const BYTES = new TextEncoder().encode("%PDF-1.7 private certificate bytes");
 const SHA = "b".repeat(64);
 
 /** In-memory stand-in for the database's current state; tests mutate it to revoke. */
-type Db = { deleted: boolean; suspended: boolean; sessionRevoked: boolean; published: boolean; key?: string; grant: Record<string, unknown> | null };
+type Db = { deleted: boolean; suspended: boolean; sessionRevoked: boolean; published: boolean; key?: string; grant: Record<string, unknown> | null;
+  publicGrant?: Record<string, unknown> };
 let db: Db;
 let calls: { private: number; public: number; closed: number };
 
@@ -30,7 +31,7 @@ function fakeAuthority(): MediaAuthority {
     async authorizePublic(r) {
       calls.public++;
       if (!db.published || db.deleted || db.suspended || r.id !== ITEM) return null;
-      return { object: "portfolio/e9100000-0000-4000-8000-000000000001.png", contentType: "image/png", size: 4, sha256: "a".repeat(64) };
+      return db.publicGrant ?? { object: "portfolio/e9100000-0000-4000-8000-000000000001.png", contentType: "image/png", size: 4, sha256: "a".repeat(64) };
     },
     async authorizeVideo() { return null; },
     async close() { calls.closed++; },
@@ -263,6 +264,44 @@ describe("Mode C: conditional public delivery", () => {
     expect(calls.public).toBe(0);
     env.PUBLIC_ROUTES = "off";
     expect((await get(url)).status).toBe(404);
+  });
+});
+
+describe("Mode C: Marketplace product photos", () => {
+  const ORG = "9c000000-cccc-4ccc-8ccc-000000000001";
+  const PRODUCT = "e9200000-0000-4000-8000-000000000001";
+  const object = `o/${ORG}/products/${PRODUCT}/${ITEM}/original.png`;
+
+  it("serves a deliverable Marketplace photo by image id from the organization products/ folder, and only that shape", async () => {
+    db.publicGrant = { object, contentType: "image/png", size: 4, sha256: "a".repeat(64) };
+    env.MEDIA_BUCKET = bucket({ [object]: new Uint8Array([137, 80, 78, 71]) });
+    const res = await get(`https://media.example.test/c/marketplace/${ITEM}/original`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    db.publicGrant = { ...db.publicGrant, object: `u/${VIEWER}/portfolio/${ITEM}/original.png` };
+    expect((await get(`https://media.example.test/c/marketplace/${ITEM}/original`)).status).toBe(404);
+    db.published = false;
+    expect((await get(`https://media.example.test/c/marketplace/${ITEM}/original`)).status).toBe(404);
+  });
+});
+
+describe("Mode P: Marketplace payment receipts", () => {
+  it("serves an InstaPay receipt from the buyer's documents folder, and never a receipt stored anywhere else", async () => {
+    const ORDER = "e9200000-0000-4000-8000-000000000011";
+    const id = "e9200000-0000-4000-8000-000000000012";
+    const key = `proofs/${ORDER}/${id}.png`;
+    const object = `u/${VIEWER}/certificates/${id}/original.png`;
+    env.MEDIA_BUCKET = bucket({ [object]: BYTES });
+    const g = (o: string, contentType = "image/png") => ({ object: o, contentType, size: BYTES.length, sha256: SHA });
+    db.grant = g(object); db.key = key;
+    const res = await get(await privateUrl({ ns: "marketplace", k: key }, "/m/marketplace/original"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+    for (const grant of [g(`u/${VIEWER}/portfolio/${id}/original.png`), g(`o/${VIEWER}/certificates/${id}/original.png`),
+      g(object, "application/pdf")]) {
+      db.grant = grant;
+      expect((await get(await privateUrl({ ns: "marketplace", k: key }, "/m/marketplace/original"))).status).toBe(404);
+    }
   });
 });
 
