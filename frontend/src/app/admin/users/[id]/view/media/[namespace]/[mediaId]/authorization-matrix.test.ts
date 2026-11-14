@@ -94,7 +94,7 @@ const fetchMock = vi.fn();
 const storeFetch = async (url: string) => {
   const key = decodeURIComponent(new URL(url).pathname.replace("/signed/", ""));
   const body = BYTES[key];
-  return body ? new Response(body, { status: 200, headers: { etag: "e", "set-cookie": "s=1" } }) : new Response(null, { status: 404 });
+  return body ? new Response(body as unknown as BodyInit, { status: 200, headers: { etag: "e", "set-cookie": "s=1" } }) : new Response(null, { status: 404 });
 };
 
 beforeEach(() => {
@@ -192,7 +192,7 @@ describe("every refusal is the SAME generic response (no existence or ownership 
       () => new Response(null, { status: 301, headers: { location: "https://evil.example/x" } }),
       () => new Response(null, { status: 302, headers: { location: "https://evil.example/x" } }),
       () => new Response(null, { status: 307, headers: { location: "https://evil.example/x" } }),
-      () => new Response(PDF, { status: 200, headers: { "content-length": String(10 * 1024 * 1024 * 1024) } }),
+      () => new Response(PDF as unknown as BodyInit, { status: 200, headers: { "content-length": String(10 * 1024 * 1024 * 1024) } }),
     ]) {
       seed();
       fetchMock.mockImplementation(async () => upstream());
