@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { isViewAsEnabled } from "@/lib/env/view-as";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { sanitizeNext } from "@/server/auth/next";
 import { resolveActiveLanding } from "@/server/queries/landing";
@@ -214,6 +215,15 @@ export async function verifySignUpOtp(_prev: AuthState, formData: FormData): Pro
 /** Sign out and return to the one sign-in page (it takes a mobile number, username or email). */
 export async function signOut(): Promise<void> {
   const supabase = await getServerSupabase();
+  // Admin View-As: a sign-out closes every live view session of this admin (audited). Best effort, and only when the
+  // feature is switched on, so a normal sign-out is byte-for-byte what it was.
+  if (isViewAsEnabled()) {
+    try {
+      await supabase.rpc("admin_view_as_end_all");
+    } catch {
+      /* never block a sign-out; the session also expires on its own after 30 minutes */
+    }
+  }
   await supabase.auth.signOut();
   redirect("/auth/sign-in");
 }

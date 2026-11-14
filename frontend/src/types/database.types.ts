@@ -7868,6 +7868,10 @@ export type Database = {
         Args: { p_subject_id: string; p_subject_type: string }
         Returns: Json
       }
+      admin_organization_edit: {
+        Args: { p_changes: Json; p_organization_id: string; p_reason: string }
+        Returns: Json
+      }
       admin_organization_detail: {
         Args: { p_organization_id: string }
         Returns: Json
@@ -8064,6 +8068,10 @@ export type Database = {
         Args: { p_reason?: string; p_user_id: string }
         Returns: Json
       }
+      admin_user_edit_profile: {
+        Args: { p_changes: Json; p_reason: string; p_user_id: string }
+        Returns: Json
+      }
       admin_user_suspend: {
         Args: { p_reason: string; p_user_id: string }
         Returns: Json
@@ -8094,6 +8102,26 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_view_as_begin: {
+        Args: { p_kind?: string; p_subject: string }
+        Returns: Json
+      }
+      admin_view_as_current: {
+        Args: { p_kind?: string; p_subject: string }
+        Returns: Json
+      }
+      admin_view_as_end: {
+        Args: { p_kind?: string; p_subject: string }
+        Returns: boolean
+      }
+      admin_view_as_end_all: { Args: never; Returns: number }
+      admin_view_as_media_open: { Args: { p_media_id: string; p_namespace: string; p_subject: string }; Returns: Json }
+      admin_view_craftsman_dashboard: { Args: { p_subject: string }; Returns: Json }
+      admin_view_craftsman_points: { Args: { p_limit?: number; p_subject: string }; Returns: Json }
+      admin_view_craftsman_portfolio: { Args: { p_subject: string }; Returns: Json }
+      admin_view_craftsman_profile: { Args: { p_subject: string }; Returns: Json }
+      admin_view_craftsman_reviews: { Args: { p_limit?: number; p_subject: string }; Returns: Json }
+      admin_view_craftsman_work: { Args: { p_limit?: number; p_subject: string }; Returns: Json }
       apply_account_upgrade: {
         Args: { p_verification_id: string }
         Returns: undefined

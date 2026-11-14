@@ -15,16 +15,21 @@ import { AdminHeader, StatusBadge } from "@/features/admin/parts";
 import { Card, Badge, Field, SectionTitle, StatePanel } from "@/components/ui/primitives";
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
+import { UserVerificationControls } from "@/features/admin/user-verification-controls";
+import { isOpenVerificationStatus } from "@/lib/admin/verification-status";
 import { FollowUpPanel } from "@/features/admin-preview/follow-up-panel";
 import { loadCases, loadFollowUpAssignees, loadFollowUps, loadNotes, loadSuspension, loadTimeline } from "@/server/queries/admin-operations";
 import { SuspensionAction, SuspensionBanner } from "@/features/admin-ops/suspension";
 import { CasesPanel, NotesPanel, TimelineList } from "@/features/admin-ops/panels";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
 import { EyeIcon } from "@/components/ui/icons";
-import { LabeledField, Textarea, Select, Input } from "@/components/ui/controls";
+import { LabeledField, Textarea, Select, Input, ButtonLink } from "@/components/ui/controls";
 import { requireAdminRoute } from "@/server/authorization/admin";
 import { loadStaffRanks } from "@/server/queries/admin-rbac";
-import { canSuspendUser, staffRankOf } from "@/features/admin-rbac/eligibility";
+import { canEditUser, canSuspendUser, canViewAsUser, staffRankOf } from "@/features/admin-rbac/eligibility";
+import { ViewAsEye } from "@/features/admin-view-as/view-as-eye";
+import { viewKindForAccountType } from "@/lib/admin/view-as/registry";
+import { isViewAsEnabled } from "@/lib/env/view-as";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +86,11 @@ export default async function PreviewUserDetailPage({
   const user = loaded.data;
   if (!user) notFound();
 
+  // The newest open request (the detail RPC returns them newest first); business verification has its own queue.
+  const openRequest = user.verifications.find((v) => isOpenVerificationStatus(v.status) && v.verificationType !== "business");
+  const pendingVerification = openRequest
+    ? { id: openRequest.id, status: openRequest.status, verificationType: openRequest.verificationType }
+    : null;
   const canPoints = can(access, "points.read");
   const canAudit = can(access, "audit.read");
   const typeLabels = m.accountType as Record<string, string>;
@@ -150,6 +160,9 @@ export default async function PreviewUserDetailPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-sm">
+          {isViewAsEnabled() && canViewAsUser(access, caller?.id ?? "", { userId: user.id, staffRank: staffRankOf(staffRanks, user.id), accountKind: viewKindForAccountType(user.accountType) }) ? (
+            <ViewAsEye userId={user.id} variant="button" />
+          ) : null}
           {platformHref ? (
             <a
               href={platformHref}
@@ -171,11 +184,11 @@ export default async function PreviewUserDetailPage({
               {platform.viewOnPlatform}
             </span>
           )}
-          {user.status === "pending_verification" ? (
-            <>
-              <PreviewActionDialog trigger={ov.verify} triggerVariant="accent" title={ov.verify} confirmLabel={ov.verify} confirmVariant="accent" />
-              <PreviewActionDialog trigger={ov.reject} triggerVariant="danger" title={m.admin.preview.review.rejectTitle} body={m.admin.preview.review.rejectBody} confirmLabel={ov.reject} confirmVariant="danger" />
-            </>
+          {can(access, "users.verify") && (user.status === "pending_verification" || pendingVerification) ? (
+            <UserVerificationControls userId={user.id} pending={pendingVerification} />
+          ) : null}
+          {canEditUser(access, caller?.id ?? "", { userId: user.id, staffRank: staffRankOf(staffRanks, user.id) }) ? (
+            <ButtonLink href={`/admin/users/${user.id}/edit`} variant="outline">{m.admin.profileEdit.editButton}</ButtonLink>
           ) : null}
           {canSuspend && user.status !== "deactivated" ? (
             <SuspensionAction m={m} subjectType="user" subjectId={user.id} suspended={user.status === "suspended"} />
