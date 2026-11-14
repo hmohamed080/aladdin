@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { LanguageSwitch } from "@/components/layout/switchers";
 import { MenuIcon, XIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
@@ -10,7 +9,7 @@ import { brandContent } from "./landing-brand-content";
 import { BrandIcon } from "./landing-brand-icons";
 import styles from "./landing-brand.module.css";
 
-/** Brand header: logo, anchor navigation, language switch, sign in, and the account-type dropdown (opens under its button). */
+/** Brand header: logo, anchor navigation, sign in, and the account-type dropdown (opens under its button). */
 export function LandingBrandHeader() {
   const { locale, dir, t: tr } = useI18n();
   const t = brandContent[locale].nav;
@@ -50,7 +49,6 @@ export function LandingBrandHeader() {
         ))}
       </nav>
       <div className={styles.actions}>
-        <span className={styles.lang}><LanguageSwitch /></span>
         <div className={styles.registerWrap} ref={wrap}>
           <button ref={trigger} type="button" className={styles.register} aria-haspopup="true" aria-expanded={signupOpen} aria-controls="brand-register" onClick={() => setSignupOpen(!signupOpen)}>
             <BrandIcon name="user-plus" size={18} /><span>{t.register}</span>
