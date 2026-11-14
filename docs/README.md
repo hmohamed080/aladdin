@@ -95,6 +95,7 @@ The five files above are **persistent project memory and part of the core archit
 ## Admin
 
 - [`admin/ADMIN_FEATURE_MATRIX.md`](admin/ADMIN_FEATURE_MATRIX.md) — Admin gap analysis: Aladdin vs. the `talent-project` reference implementation
+- [`admin/ADMIN_EDIT_DECISION_BRIEF.md`](admin/ADMIN_EDIT_DECISION_BRIEF.md) — Decision brief (nothing built): editable fields, audit policy, options and recommendation for Admin edit of users and organizations
 - [`admin/PRODUCT_DECISIONS_REGISTER.md`](admin/PRODUCT_DECISIONS_REGISTER.md) — the business-rule decisions the gap analysis surfaced (PD-001–006, PD-008, PD-010–015 **APPROVED**; PD-007, PD-009 **DEFERRED**)
 - [`admin/ADMIN_IMPLEMENTATION_BACKLOG.md`](admin/ADMIN_IMPLEMENTATION_BACKLOG.md) — admin backlog in phases; Phase 0/0B/0C (frontend preview) delivered, Phase 0D in delivery, Phase 1+ not yet implemented
 - [`admin/POSTGREST_PRE_REQUEST_HOOK.md`](admin/POSTGREST_PRE_REQUEST_HOOK.md) — the suspension pre-request hook: architecture, the 2026-10-01 Production incident (hook currently disabled), the `pgrst_hooks` fix and its regression proof
