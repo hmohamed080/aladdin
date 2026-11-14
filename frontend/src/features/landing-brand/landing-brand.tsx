@@ -33,8 +33,8 @@ export function LandingBrand({ locale, stats }: { locale: Locale; stats: Landing
               <h1>{c.hero.title} <span>{c.hero.accent}</span> {c.hero.titleTail}</h1>
               <p>{c.hero.body}</p>
               <div className={styles.heroButtons}>
-                <a className={styles.btnLight} href="#market"><BrandIcon name="grid" size={22} />{c.hero.discover}</a>
-                <a className={styles.btnOutline} href="/auth/sign-up"><BrandIcon name="user-plus" size={22} />{c.hero.create}</a>
+                <a className={styles.btnLight} href="#market"><BrandIcon name="grid" size={25} />{c.hero.discover}</a>
+                <a className={styles.btnOutline} href="/auth/sign-up"><BrandIcon name="user-plus" size={25} />{c.hero.create}</a>
               </div>
             </div>
             <div className={styles.videoSlot}><LandingBrandVideo /></div>

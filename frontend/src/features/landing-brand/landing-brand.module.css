@@ -34,12 +34,12 @@
 .heroWrap { padding: 20px 24px 0; }
 .hero { position: relative; isolation: isolate; max-width: 1232px; margin: 0 auto; border-radius: 30px; overflow: hidden; background: var(--lb-navy); color: #fff; }
 .heroImg { object-fit: cover; z-index: -2; }
-.heroShade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(270deg, rgba(7, 26, 45, 0.04) 0%, rgba(7, 26, 45, 0.4) 42%, rgba(7, 26, 45, 0.78) 100%); }
-:global([dir="ltr"]) .heroShade { background: linear-gradient(90deg, rgba(7, 26, 45, 0.04) 0%, rgba(7, 26, 45, 0.4) 42%, rgba(7, 26, 45, 0.78) 100%); }
-.header { position: relative; display: flex; align-items: center; gap: 28px; min-height: 68px; padding: 0 40px; background: rgba(7, 26, 45, 0.87); }
+.heroShade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(7, 26, 45, 0.04) 0%, rgba(7, 26, 45, 0.38) 42%, rgba(7, 26, 45, 0.72) 100%); }
+:global([dir="ltr"]) .heroShade { background: linear-gradient(270deg, rgba(7, 26, 45, 0.04) 0%, rgba(7, 26, 45, 0.38) 42%, rgba(7, 26, 45, 0.72) 100%); }
+.header { position: relative; display: flex; align-items: center; gap: 32px; min-height: 68px; padding: 0 40px; background: rgba(7, 26, 45, 0.87); }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 24px; color: #fff; }
 .brand img { height: 44px; width: auto; }
-.nav { display: flex; flex: 1; justify-content: center; flex-wrap: wrap; gap: 28px; font-size: 15px; color: var(--lb-cream); }
+.nav { display: flex; flex: 1; justify-content: center; flex-wrap: wrap; gap: 30px; font-size: 15px; color: var(--lb-cream); }
 .nav a { padding: 8px 0; transition: color 0.2s; }
 .nav a:hover { color: var(--lb-sand); }
 .navActive { color: #fff; font-weight: 700; border-bottom: 2px solid var(--lb-sand); }
@@ -47,7 +47,7 @@
 .actions { display: flex; align-items: center; gap: 10px; }
 .lang { color: var(--lb-cream); font-size: 14px; }
 .register, .signIn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 999px; font-size: 14px; font-weight: 700; }
-.register { background: var(--lb-navy-2); color: var(--lb-cream); border: 1px solid var(--lb-navy-3); }
+.register { background: var(--lb-navy-2); color: var(--lb-cream); border: 0; }
 .signIn { border: 1px solid var(--lb-sand); color: var(--lb-cream); }
 .registerWrap { position: relative; }
 .registerMenu { position: absolute; inset-block-start: calc(100% + 12px); inset-inline-end: 0; z-index: 60; width: min(400px, calc(100vw - 48px)); max-height: calc(100vh - 140px); overflow: auto; padding: 14px 12px 12px; background: var(--lb-cream); color: var(--lb-ink); border: 1px solid var(--lb-sand); border-radius: 20px; box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28); text-align: start; }
@@ -60,13 +60,13 @@ a.registerItem:hover { background: rgba(255, 255, 255, 0.6); }
 .registerDesc { font-size: 14px; line-height: 1.7; color: var(--lb-ink-2); }
 
 .heroBody { display: flex; flex-wrap: wrap; gap: 36px; justify-content: space-between; align-items: center; padding: 64px 56px 76px; }
-.heroCopy { flex: 0 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+.heroCopy { flex: 0 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 22px; }
 .heroCopy h1 { font-size: clamp(32px, 3.3vw, 44px); line-height: 1.4; font-weight: 800; }
 .heroCopy h1 span, .cta h2 span { color: var(--lb-sand); }
 .heroCopy p { font-size: 16px; line-height: 2; color: var(--lb-cream); }
-.heroButtons { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+.heroButtons { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
 .btnLight, .btnOutline, .btnDark { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 28px; border-radius: 999px; font-size: 15px; font-weight: 800; transition: transform 0.2s, box-shadow 0.2s; }
-.btnLight { background: var(--lb-cream); color: var(--lb-navy); }
+.btnLight { background: var(--lb-cream); color: var(--lb-navy); border: 1px solid rgba(255, 255, 255, 0.55); padding: 0 30px; }
 .btnOutline { border: 1px solid var(--lb-sand); color: var(--lb-cream); background: rgba(7, 26, 45, 0.85); font-weight: 700; }
 .btnDark { background: var(--lb-navy); color: var(--lb-cream); }
 .btnLight:hover, .btnOutline:hover, .btnDark:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2); }
