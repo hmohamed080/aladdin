@@ -12,6 +12,7 @@ import type { Locale } from "../marketplace-types";
 import { fmtEgp, fmtNum, liveCopy } from "./live-copy";
 import { ALL_PRODUCTS_TYPES, HERO_TYPES, typeCover } from "./type-covers";
 import { useMarketplaceImageSrc } from "./image-urls";
+import { CartAddButton } from "./cart-add-button";
 import styles from "../marketplace.module.css";
 import store from "../marketplace-store.module.css";
 
@@ -95,6 +96,7 @@ function Card({ item, locale }: { item: PublicCard; locale: Locale }) {
         ) : null}
         <p className={`${styles.stock} ${item.in_stock ? styles.stockIn : styles.stockOut}`}>{item.in_stock ? t.inStock : t.outOfStock}</p>
         <p className={styles.cardMeta}>{t.soldBy(item.seller_name)}</p>
+        <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} className={styles.cardCart} doneClassName={styles.cardCartDone} />
       </div>
     </article>
   );

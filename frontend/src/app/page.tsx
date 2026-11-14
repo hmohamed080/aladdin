@@ -6,6 +6,11 @@ import { LandingEcosystem } from "@/features/landing-preview/landing-ecosystem";
 import { LandingMarketplaceSection } from "@/features/landing-marketplace/landing-marketplace-section";
 import { LandingMotion } from "@/features/landing-preview/landing-motion";
 import { landingMessages } from "@/features/landing-preview/landing-messages";
+import { MarketplaceImagesProvider } from "@/features/marketplace/live/image-urls";
+import { isMarketplacePreviewEnabled } from "@/lib/env";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { marketplacePublicImageUrls } from "@/server/media/marketplace-public-images";
+import { loadPublicCatalogPage } from "@/server/queries/marketplace-public";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +29,11 @@ export const dynamic = "force-dynamic";
 export default async function RootPage() {
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
+  // While the Marketplace is open (release flag), the header shows the cart and the Marketplace section
+  // shows the newest real products with a working "Add to cart". Closed: the sample preview, no cart.
+  const marketplaceOpen = isMarketplacePreviewEnabled();
+  const live = marketplaceOpen ? ((await loadPublicCatalogPage({ sort: "newest", page: 1 }))?.items ?? []).slice(0, 8) : [];
+  const images = live.length > 0 ? await marketplacePublicImageUrls(await getServerSupabase(), live.map((item) => item.image_id)) : {};
 
   return (
     <I18nMessagesProvider
@@ -32,8 +42,14 @@ export default async function RootPage() {
       messages={landingMessages(locale)}
     >
       <LandingMotion>
-        <LandingHero />
-        <LandingEcosystem marketplaceSlot={<LandingMarketplaceSection />} />
+        <LandingHero showCart={marketplaceOpen} />
+        <LandingEcosystem
+          marketplaceSlot={
+            <MarketplaceImagesProvider images={images}>
+              <LandingMarketplaceSection live={live} />
+            </MarketplaceImagesProvider>
+          }
+        />
       </LandingMotion>
     </I18nMessagesProvider>
   );

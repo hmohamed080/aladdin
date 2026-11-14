@@ -123,6 +123,12 @@
 .qty { display: inline-flex; align-items: center; gap: 12px; font-size: .875rem; }
 .qty input { width: 110px; min-height: 40px; padding: 6px 10px; border: 1px solid var(--quartz-line); border-radius: 8px; background: var(--plaster); color: var(--ink); font: inherit; }
 .addToCart { min-height: 48px; border: 0; border-radius: 10px; background: var(--lumen); color: var(--on-accent); font: inherit; font-weight: 700; cursor: pointer; box-shadow: 0 0 0 1px var(--accent-edge); }
+.cardCart { margin-block-start: auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--lumen); color: var(--on-accent); box-shadow: 0 0 0 1px var(--accent-edge); font: inherit; font-size: .875rem; font-weight: 700; cursor: pointer; text-decoration: none; transition: background .15s, transform .15s; }
+.cardCart:hover { filter: brightness(1.08); }
+.cardCart:active { transform: scale(.97); }
+.cardCart:focus-visible { outline: 2px solid var(--shell-deep); outline-offset: 2px; }
+.cardCart:disabled { background: var(--sand); color: var(--stone); cursor: not-allowed; }
+.cardCartDone { background: #2f7d4f; color: #fff; }
 .addToCart:disabled { background: var(--sand); color: var(--stone); cursor: not-allowed; }
 .notice { margin: 0; min-height: 1.2em; font-size: .8125rem; color: var(--stone); }
 .specs dl { margin: 12px 0 0; display: grid; gap: 0; border: 1px solid var(--quartz-line); border-radius: 12px; overflow: hidden; background: var(--quartz-raised); }

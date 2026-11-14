@@ -7,6 +7,7 @@ import { ArrowUpRightIcon, GlobeIcon, MenuIcon, ShoppingBagIcon, XIcon } from "@
 import { LanguageSwitch } from "@/components/layout/switchers";
 import { useI18n } from "@/lib/i18n/context";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
+import { useLiveCart } from "@/features/marketplace/live/live-cart-store";
 import styles from "./landing-header.module.css";
 
 const content = {
@@ -39,6 +40,20 @@ const content = {
 export function LandingHeader({ anchorBase = "", showCart = false, cartCount = 0, active = "home" }: { anchorBase?: string; showCart?: boolean; cartCount?: number; active?: "home" | "marketplace" } = {}) {
   const { locale, dir, t: tr } = useI18n();
   const t = content[locale];
+  // The browser cart (same store the Marketplace pages write), so "Add to cart" anywhere updates this at once.
+  const liveCart = useLiveCart();
+  const count = showCart ? Math.max(cartCount, liveCart.count) : 0;
+  const lastCount = useRef<number | null>(null);
+  const [bump, setBump] = useState(false);
+  useEffect(() => {
+    if (!liveCart.ready) return;
+    const before = lastCount.current;
+    lastCount.current = count;
+    if (before === null || count <= before) return;
+    setBump(true);
+    const id = window.setTimeout(() => setBump(false), 650);
+    return () => window.clearTimeout(id);
+  }, [count, liveCart.ready]);
   // The Marketplace link opens the coming-soon page until the Marketplace ships; absolute paths are never prefixed.
   const links: [string, string][] = t.links.map(([label, href]) => [label, href]);
   links.splice(1, 0, [t.marketplace, "/marketplace"]);
@@ -85,11 +100,11 @@ export function LandingHeader({ anchorBase = "", showCart = false, cartCount = 0
         <a href="/auth/support">{t.contact}</a>
       </nav>
       <div className={styles.actions}>
-        {/* The open Marketplace (release flag on) shows its cart; the landing page never does. */}
+        {/* Shown while the Marketplace is open (release flag on): on its pages and on the home page. */}
         {showCart ? (
-          <a className={styles.cart} href="/marketplace/cart" aria-label={cartCount > 0 ? `${t.cart} (${cartCount})` : t.cart}>
+          <a className={`${styles.cart} ${bump ? styles.cartBump : ""}`} href="/marketplace/cart" aria-label={count > 0 ? `${t.cart} (${count})` : t.cart}>
             <ShoppingBagIcon size={20} aria-hidden="true" />
-            {cartCount > 0 ? <span className={styles.cartBadge} aria-hidden="true">{cartCount > 99 ? "99+" : cartCount}</span> : null}
+            {count > 0 ? <span className={styles.cartBadge} aria-hidden="true">{count > 99 ? "99+" : count}</span> : null}
           </a>
         ) : null}
         <span className={styles.language}><LanguageSwitch /><GlobeIcon size={14} aria-hidden="true" /></span>

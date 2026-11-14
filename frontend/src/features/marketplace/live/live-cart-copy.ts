@@ -27,6 +27,7 @@ type LiveCartCopy = {
   chooseArea: string;
   cartFull: string;
   addToCart: string;
+  chooseOptions: string;
   inCart: string;
   addedToCart: string;
   viewCart: string;
@@ -60,6 +61,7 @@ export const liveCartCopy = {
     chooseArea: "اختر المنطقة",
     cartFull: "السلة وصلت للحد الأقصى من المنتجات.",
     addToCart: "أضف إلى السلة",
+    chooseOptions: "اختر المواصفات",
     inCart: "في السلة",
     addedToCart: "تمت الإضافة إلى السلة",
     viewCart: "عرض السلة",
@@ -91,6 +93,7 @@ export const liveCartCopy = {
     chooseArea: "Choose area",
     cartFull: "The cart has reached its maximum number of products.",
     addToCart: "Add to cart",
+    chooseOptions: "Choose options",
     inCart: "In cart",
     addedToCart: "Added to cart",
     viewCart: "View cart",

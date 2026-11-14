@@ -102,6 +102,9 @@ as $$
                'in_stock', exists (select 1 from public.marketplace_product_variants v
                                    where v.product_id = x.id and v.status = 'active' and app.marketplace_variant_available(v.id) > 0),
                'variant_count', (select count(*) from public.marketplace_product_variants v where v.product_id = x.id and v.status = 'active'),
+               -- a single active variant can go straight to the cart from a card; several need the product page
+               'cart_sku', (select min(v.sku) from public.marketplace_product_variants v
+                            where v.product_id = x.id and v.status = 'active' having count(*) = 1),
                'colors', coalesce((select jsonb_agg(distinct op.swatch_hex)
                                    from public.marketplace_product_variants v
                                    join public.marketplace_variant_attribute_values vv on vv.variant_id = v.id

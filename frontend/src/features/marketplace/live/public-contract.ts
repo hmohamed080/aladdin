@@ -18,6 +18,8 @@ export type PublicCard = {
   from_price_egp: number | null;
   in_stock: boolean;
   variant_count: number;
+  /** the SKU of the only active variant (one-click add to cart from a card); null when there are several */
+  cart_sku?: string | null;
   image_id: string | null;
   /** distinct swatch colours of the active variants */
   colors: string[];

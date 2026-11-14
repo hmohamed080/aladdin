@@ -12,6 +12,8 @@ import {
 } from "./landing-marketplace-content";
 import { ArrowIcon, CategoryIcon } from "./landing-marketplace-icons";
 import { LandingMarketplaceProductCard } from "./landing-marketplace-product-card";
+import { LandingLiveProductCard } from "./landing-live-product-card";
+import type { PublicCard } from "@/features/marketplace/live/public-contract";
 import styles from "./landing-marketplace.module.css";
 
 /** Preview-only: a sample flash window so the countdown UI can be reviewed. */
@@ -24,7 +26,7 @@ const DEMO_FLASH_MS = ((12 * 60 + 45) * 60 + 30) * 1000;
  * has no cart and does not talk to payments or inventory; "Add to cart" and the
  * CTA both open /marketplace, which says the Marketplace is coming soon.
  */
-export function LandingMarketplaceSection() {
+export function LandingMarketplaceSection({ live }: { live?: PublicCard[] } = {}) {
   const { locale, dir } = useI18n();
   const t = landingMarketplaceContent[locale];
   const [filter, setFilter] = useState<CategoryFilter>("all");
@@ -39,6 +41,8 @@ export function LandingMarketplaceSection() {
   }, [filter, demoEnd]);
 
   const filters: CategoryFilter[] = ["all", ...categoryOrder];
+  // While the Marketplace is open the home page shows real products with a working cart instead of the samples.
+  const showLive = Boolean(live && live.length > 0);
 
   return (
     <section id="marketplace" className={styles.section} dir={dir} aria-labelledby="marketplace-heading" data-landing-preview-part="Marketplace">
@@ -48,9 +52,18 @@ export function LandingMarketplaceSection() {
           <span>{t.headingLead}</span> <span className={styles.accent}>{t.headingAccent}</span>
         </h2>
         <p className={styles.description}>{t.description}</p>
-        <p className={styles.previewChip}>{t.preview}</p>
+        {showLive ? null : <p className={styles.previewChip}>{t.preview}</p>}
       </header>
 
+      {showLive ? (
+        <ul className={styles.grid}>
+          {live!.map((item) => (
+            <li key={item.slug} className={styles.gridItem}>
+              <LandingLiveProductCard item={item} />
+            </li>
+          ))}
+        </ul>
+      ) : (<>
       <div className={styles.tabs} role="group" aria-label={t.filterLabel}>
         {filters.map((key) => (
           <button key={key} type="button" className={`${styles.tab} ${filter === key ? styles.tabActive : ""}`}
@@ -74,13 +87,15 @@ export function LandingMarketplaceSection() {
         </ul>
       )}
 
+      </>)}
+
       <div className={styles.moreWrap}>
         <Link href="/marketplace" className={styles.more}>
           <span>{t.moreProducts}</span>
           <span className={styles.moreIcon} aria-hidden="true"><ArrowIcon /></span>
         </Link>
       </div>
-      <p className={styles.previewNote}>{t.previewNote}</p>
+      {showLive ? null : <p className={styles.previewNote}>{t.previewNote}</p>}
     </section>
   );
 }

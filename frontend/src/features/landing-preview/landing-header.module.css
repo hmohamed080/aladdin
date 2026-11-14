@@ -21,9 +21,13 @@
 .home::after { content: ""; position: absolute; bottom: 0; inset-inline: 0; height: 2px; background: var(--lumen); box-shadow: 0 0 0 1px var(--accent-edge); }
 .actions { display: flex; align-items: center; gap: 16px; }
 .language { display: inline-flex; align-items: center; gap: 4px; padding-inline-end: 8px; border-inline-end: 1px solid var(--line-light); }
-.cart { position: relative; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--ink); cursor: pointer; }
-.cartBadge { position: absolute; inset-block-start: 2px; inset-inline-end: 0; display: grid; place-items: center; min-width: 18px; height: 18px; padding-inline: 4px; border-radius: 999px; background: var(--brand-terracotta); color: var(--plaster); font-size: .6875rem; font-weight: 700; line-height: 1; }
-.cart:hover { color: var(--brand-terracotta); }
+.cart { position: relative; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 999px; background: var(--brand-terracotta, #b96f52); color: var(--brand-cream, #f2e9d8); cursor: pointer; box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-cream, #f2e9d8) 35%, transparent), 0 6px 16px -6px color-mix(in srgb, var(--brand-terracotta, #b96f52) 80%, transparent); transition: transform .15s, background .15s; }
+.cartBadge { position: absolute; inset-block-start: -4px; inset-inline-end: -4px; display: grid; place-items: center; min-width: 20px; height: 20px; padding-inline: 5px; border-radius: 999px; background: var(--brand-cream, #f2e9d8); color: var(--brand-navy, #071a2d); border: 2px solid var(--brand-terracotta, #b96f52); font-size: .6875rem; font-weight: 800; line-height: 1; }
+.cart:hover { background: var(--brand-terracotta-deep, #9c5a40); transform: translateY(-1px); color: var(--brand-cream, #f2e9d8); }
+.cart:focus-visible { outline: 2px solid var(--brand-cream, #f2e9d8); outline-offset: 2px; }
+.cartBump { animation: cart-bump .6s ease-out; }
+@keyframes cart-bump { 0% { transform: scale(1); } 30% { transform: scale(1.22); } 60% { transform: scale(.94); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .cartBump { animation: none; } }
 .language button { padding: 0; min-height: 44px; color: var(--ink); }
 .register { min-height: 44px; padding: 8px; gap: 8px; border-radius: 999px; background: var(--lumen); box-shadow: 0 0 0 1px var(--accent-edge); color: var(--basalt); white-space: nowrap; }
 .arrow { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: var(--plaster); color: var(--ink); }

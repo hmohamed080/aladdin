@@ -67,7 +67,7 @@ const copyItem = {
   },
 };
 
-export function LandingHero() {
+export function LandingHero({ showCart = false }: { showCart?: boolean } = {}) {
   const { locale, dir } = useI18n();
   const copy = content[locale];
   const isArabic = locale === "ar";
@@ -84,7 +84,7 @@ export function LandingHero() {
       id="landing-top"
       data-landing-preview-part="Hero"
     >
-      <LandingHeader />
+      <LandingHeader showCart={showCart} />
       <div
         className={`${styles.heroFrame} ${headerStyles.stage}`}
         dir="ltr"
