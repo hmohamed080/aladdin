@@ -11,7 +11,7 @@ import { NextRequest } from "next/server";
  * is ever followed; no service-role client is reachable.
  *
  * What this file CANNOT prove (needs Acceptance with real R2 bytes + a real Auth session): that the SQL function really makes
- * these decisions (pgTAP 131 + 132 prove that locally against a real database), that the signed R2 URL really serves the
+ * these decisions (pgTAP 131 + 134 prove that locally against a real database), that the signed R2 URL really serves the
  * object, and that a real Auth session expires/revokes. See docs/admin/ADMIN_VIEW_AS_ACCEPTANCE_VALIDATION.md.
  */
 vi.mock("server-only", () => ({}));

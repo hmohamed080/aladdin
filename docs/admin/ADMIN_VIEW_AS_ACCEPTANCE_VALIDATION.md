@@ -42,8 +42,8 @@ real R2 bytes.
 | 7 | Refusals are byte-identical (status, headers, empty body) incl. upstream 404/5xx/3xx/oversize/type | **L** | matrix test "byte-identical" |
 | 8 | No service-role client, no shared resolver, exactly one RPC | **L** | `view-as-read-only.test.ts` import guard + matrix runtime Proxy trap |
 | 9 | Redirects never followed (`redirect: "manual"`, one storage request) | **L** / **A** (cannot be forced on real R2; code-path proof only) | matrix test |
-| 10 | Strictly read-only: no mutating RPC/route reachable from view-as; live session confers no write on the subject | **L** | `view-as-read-only.test.ts` (import graph, RPC allow-list), pgTAP 132 (exact gate-caller list; RLS refuses all writes during a live view; subject data unchanged) |
-| 11 | Shared resolvers (`media_storage_resolve`, `/api/media`, edge ticket) still refuse an admin inside a view | **L** pgTAP 131 E, 132 C / **A** (spot check) | pgTAP |
+| 10 | Strictly read-only: no mutating RPC/route reachable from view-as; live session confers no write on the subject | **L** | `view-as-read-only.test.ts` (import graph, RPC allow-list), pgTAP 134 (exact gate-caller list; RLS refuses all writes during a live view; subject data unchanged) |
+| 11 | Shared resolvers (`media_storage_resolve`, `/api/media`, edge ticket) still refuse an admin inside a view | **L** pgTAP 131 E, 134 C / **A** (spot check) | pgTAP |
 | 12 | One audit row per session+media, never the key | **L** pgTAP 131 C / **A** (query `audit_log`) | pgTAP |
 | 13 | Migrations apply cleanly in order on Acceptance's real history, permission contracts match | **A** (owner approval) | preflight + `migration-permission-gate.mjs` |
 | 14 | Real signed R2 URL serves the object; `Sec-Fetch-Site` same-origin from a real browser `<img>`/`<a>` | **A** | step 4 |
@@ -79,7 +79,7 @@ Run against a scratch database `c2_viewas` created by restoring the local stack'
 | pgTAP 129 foundation | 64 ok, 0 not ok |
 | pgTAP 130 craftsman sections | 32 ok, 0 not ok |
 | pgTAP 131 private media | 23 ok, 0 not ok |
-| pgTAP 132 strictly read-only (new) | 10 ok, 0 not ok |
+| pgTAP 134 strictly read-only (new) | 10 ok, 0 not ok |
 
-CI: `supabase-rls` already runs every file under `supabase/tests` (`supabase test db`), so 132 is wired automatically; the frontend job runs the
+CI: `supabase-rls` already runs every file under `supabase/tests` (`supabase test db`), so 134 is wired automatically; the frontend job runs the
 vitest suite. `supabase-rls` triggers on PRs to `main`; for the stacked #193 use `workflow_dispatch`.
