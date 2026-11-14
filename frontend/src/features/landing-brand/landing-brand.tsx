@@ -1,3 +1,4 @@
+import { FOOTER_LINKS, SOCIAL_LINKS } from "./landing-brand-links";
 import Image from "next/image";
 import { brandContent, PARTNER_NAMES } from "./landing-brand-content";
 import { bukra, hurme } from "./landing-brand-fonts";
@@ -197,12 +198,12 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
           </div>
           <p>{c.footer.about}</p>
           {([[c.footer.quick, c.footer.quickLinks], [c.footer.platform, c.footer.platformLinks], [c.footer.support, c.footer.supportLinks]] as const).map(([title, links]) => (
-            <div key={title} className={styles.footCol}><strong>{title}</strong>{links.map((l) => <a key={l} href="#top">{l}</a>)}</div>
+            <div key={title} className={styles.footCol}><strong>{title}</strong>{links.map((l) => <a key={l} href={FOOTER_LINKS[l] ?? "#top"}>{l}</a>)}</div>
           ))}
           <div className={styles.footCol}>
             <strong>{c.footer.follow}</strong>
             <div className={styles.social}>
-              {(["facebook", "instagram", "tiktok"] as const).map((n) => <a key={n} href="#top" aria-label={n}><SocialIcon name={n} /></a>)}
+              {(["facebook", "tiktok"] as const).map((n) => <a key={n} href={SOCIAL_LINKS[n]} target="_blank" rel="noopener noreferrer" aria-label={n}><SocialIcon name={n} /></a>)}
             </div>
           </div>
         </div>

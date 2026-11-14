@@ -65,18 +65,20 @@ a.registerItem:hover { background: rgba(255, 255, 255, 0.6); }
 
 .heroBody { flex: 1; display: flex; flex-wrap: wrap; gap: 36px; justify-content: space-between; align-items: center; padding: 64px 56px 76px; }
 .heroCopy { flex: 0 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 22px; }
-.heroCopy h1 { font-size: clamp(32px, 3.3vw, 44px); line-height: 1.4; font-weight: 800; }
+.heroCopy h1 { font-size: clamp(32px, 3.3vw, 44px); line-height: 1.4; font-weight: 800; animation: fadeUp 0.8s both; }
 .heroCopy h1 span, .cta h2 span { color: var(--lb-sand); }
-.heroCopy p { font-size: 16px; line-height: 2; color: var(--lb-cream); }
-.heroButtons { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
+.heroCopy p { font-size: 16px; line-height: 2; color: var(--lb-cream); animation: fadeUp 0.8s 0.15s both; }
+.heroButtons { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; animation: fadeUp 0.8s 0.3s both; }
 .btnLight, .btnOutline, .btnDark { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 28px; border-radius: 999px; font-size: 15px; font-weight: 800; transition: transform 0.2s, box-shadow 0.2s; }
 .btnLight { background: var(--lb-cream); color: var(--lb-navy); border: 1px solid rgba(255, 255, 255, 0.55); padding: 0 30px; }
 .btnOutline { border: 1px solid var(--lb-sand); color: var(--lb-cream); background: rgba(7, 26, 45, 0.85); font-weight: 700; }
 .btnDark { background: var(--lb-navy); color: var(--lb-cream); }
 .btnLight:hover, .btnOutline:hover, .btnDark:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2); }
 .videoSlot { flex: 1 1 200px; display: flex; justify-content: center; }
-.videoBtn { display: inline-flex; align-items: center; gap: 14px; padding: 6px 24px 6px 6px; border: 0; border-radius: 999px; background: var(--lb-navy-2); color: #fff; font-size: 15px; font-weight: 700; }
+.videoBtn { display: inline-flex; align-items: center; gap: 14px; padding: 6px 24px 6px 6px; border: 0; border-radius: 999px; background: var(--lb-navy-2); border: 1px solid var(--lb-sand); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.videoBtn:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2); }
 .videoBtn i { width: 56px; height: 56px; border-radius: 50%; background: var(--lb-cream); border: 3px solid #fff; outline: 1px solid var(--lb-sand); color: var(--lb-navy); display: flex; align-items: center; justify-content: center; font-style: normal; animation: pulse 2s infinite; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.55); } 100% { box-shadow: 0 0 0 18px rgba(255, 255, 255, 0); } }
 .videoDialog { width: min(760px, calc(100vw - 32px)); padding: 16px; border: 0; border-radius: 20px; background: var(--lb-navy); color: var(--lb-cream); }
 .videoDialog::backdrop { background: rgba(7, 26, 45, 0.7); }
@@ -211,7 +213,7 @@ a.registerItem:hover { background: rgba(255, 255, 255, 0.6); }
 .footCol { flex: 1 1 130px; display: flex; flex-direction: column; gap: 10px; }
 .footCol strong { font-size: 15px; }
 .footCol a { font-size: 14px; color: var(--lb-ink-2); }
-.footCol a:hover { color: var(--lb-terra-deep); }
+.footCol a:hover { color: var(--lb-terra); }
 .social { display: flex; gap: 8px; }
 .social a { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--lb-sand); border-radius: 12px; background: #fff; color: var(--lb-ink); }
 .rights { padding-top: 16px; border-top: 1px solid var(--lb-sand-line); font-size: 13px; color: var(--lb-ink-2); }
@@ -287,3 +289,15 @@ a.registerItem:hover { background: rgba(255, 255, 255, 0.6); }
   .track, .videoBtn i { animation: none; }
   .role, .btnLight, .btnOutline, .btnDark { transition: none; }
 }
+
+/* ---- interaction (mockup parity) ---- */
+.role img, .card .cardImg img { transition: transform 0.6s ease; }
+.role:hover img, .card:hover .cardImg img { transform: scale(1.07); }
+.card { transition: transform 0.3s ease, box-shadow 0.3s ease; animation: fadeUp 0.4s both; }
+.card:hover { transform: translateY(-6px); box-shadow: 0 22px 44px rgba(7, 26, 45, 0.16); }
+.more svg { transition: transform 0.25s; }
+.more:hover svg { transform: translateX(-5px); }
+.faqItem p { animation: fadeUp 0.3s both; }
+.social a { transition: transform 0.2s ease, background 0.2s ease; }
+.social a:hover { transform: translateY(-2px); background: var(--lb-sand-soft); }
+@media (prefers-reduced-motion: reduce) { .page *, .page *::before, .page *::after { animation: none !important; transition: none !important; } }
