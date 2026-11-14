@@ -203,7 +203,7 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
           <div className={styles.footCol}>
             <strong>{c.footer.follow}</strong>
             <div className={styles.social}>
-              {(["facebook", "tiktok"] as const).map((n) => <a key={n} href={SOCIAL_LINKS[n]} target="_blank" rel="noopener noreferrer" aria-label={n}><SocialIcon name={n} /></a>)}
+              {(["facebook", "instagram", "tiktok"] as const).map((n) => <a key={n} href={SOCIAL_LINKS[n]} target="_blank" rel="noopener noreferrer" aria-label={n}><SocialIcon name={n} /></a>)}
             </div>
           </div>
         </div>

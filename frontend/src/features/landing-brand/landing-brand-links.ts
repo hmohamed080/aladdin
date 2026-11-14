@@ -16,5 +16,6 @@ export const FOOTER_LINKS: Record<string, string> = {
 
 export const SOCIAL_LINKS = {
   facebook: "https://www.facebook.com/Aladdin.com.eg",
+  instagram: "https://www.instagram.com/aladdin.com.eg",
   tiktok: "https://www.tiktok.com/@aladdin.com.eg?is_from_webapp=1&sender_device=pc",
 } as const;
