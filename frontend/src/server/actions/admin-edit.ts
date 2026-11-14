@@ -5,6 +5,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import type { FormState } from "@/server/actions/sales-forms";
 import {
   buildEditPatch,
+  mapEditError,
   ORG_EDIT_FIELDS,
   ORG_REMOVABLE_MEDIA,
   USER_EDIT_FIELDS,
@@ -21,20 +22,6 @@ import {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const K = "admin.profileEdit.error";
-
-type PgLikeError = { code?: string; message?: string };
-export function mapEditError(error: unknown): string {
-  const e = (error ?? {}) as PgLikeError;
-  const msg = (e.message ?? "").toLowerCase();
-  if (msg.includes("a reason is required") || msg.includes("reason is too long")) return `${K}.reasonRequired`;
-  if (msg.includes("field not editable") || msg.includes("media can only be removed")) return `${K}.notEditable`;
-  if (msg.includes("your own account")) return `${K}.self`;
-  if (msg.includes("at or above your own rank")) return `${K}.rank`;
-  if (msg.includes("not found")) return `${K}.notFound`;
-  if (e.code === "22023") return `${K}.invalid`;
-  if (e.code === "42501") return `${K}.denied`;
-  return "states.genericRetry";
-}
 
 function field(fd: FormData, key: string): string {
   const v = fd.get(key);

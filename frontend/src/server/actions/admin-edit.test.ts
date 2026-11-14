@@ -9,7 +9,8 @@ const from = vi.fn();
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: vi.fn(async () => ({ rpc, from })) }));
 
-const { editUserProfileAction, editOrganizationAction, mapEditError } = await import("./admin-edit");
+const { editUserProfileAction, editOrganizationAction } = await import("./admin-edit");
+const { mapEditError } = await import("@/lib/admin/edit/fields");
 
 const USER = "70000001-0000-4000-8000-000000000001";
 const ORG = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
