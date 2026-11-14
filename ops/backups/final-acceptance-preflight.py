@@ -26,20 +26,25 @@ SPEC = {  # env prefix -> (variables that must exist, secrets that must exist, e
 
 
 def gh(repo, path):
-    out = subprocess.run(["gh", "api", f"repos/{repo}/{path}", "--paginate"], capture_output=True, text=True)
+    # --slurp wraps the pages in one JSON array, so lists longer than one page are not read as concatenated documents
+    out = subprocess.run(["gh", "api", f"repos/{repo}/{path}", "--paginate", "--slurp"], capture_output=True, text=True)
     if out.returncode:
         raise SystemExit("gh api failed: " + out.stderr.strip()[:200])
     return json.loads(out.stdout)
+
+
+def items(repo, path, key):
+    return [x for page in gh(repo, path) for x in page[key]]
 
 
 def load(args):
     if args.fixture:
         rd = lambda n: json.load(open(f"{args.fixture}/{n}.json"))
         return rd("repo"), lambda env: rd(f"env-{env}")
-    repo = {"variables": gh(args.repo, "actions/variables")["variables"], "environments": [e["name"] for e in gh(args.repo, "environments")["environments"]]}
+    repo = {"variables": items(args.repo, "actions/variables", "variables"), "environments": [e["name"] for e in items(args.repo, "environments", "environments")]}
 
     def env(name):
-        return {"variables": gh(args.repo, f"environments/{name}/variables")["variables"], "secrets": [s["name"] for s in gh(args.repo, f"environments/{name}/secrets")["secrets"]]}
+        return {"variables": items(args.repo, f"environments/{name}/variables", "variables"), "secrets": [s["name"] for s in items(args.repo, f"environments/{name}/secrets", "secrets")]}
     return repo, env
 
 
@@ -85,8 +90,6 @@ def main():
         # The backup job holds no service-role key and the legacy step needs one, so the switch can only fail the run.
         if v.get("LEGACY_MEDIA_BACKUP") == "1":
             fails.append(f"{name}: LEGACY_MEDIA_BACKUP=1 can never succeed here (the legacy step needs SUPABASE_SERVICE_ROLE_KEY, which only backup-control-{label} holds); remove it once the Supabase Storage cleanup has deleted the legacy objects")
-        if "R2_SITE_BACKUP" not in v and "R2_SITE_BACKUP" in vars_need:
-            pass  # already reported as not set above
 
     for line in fails:
         print("FAIL  " + line)
