@@ -1,5 +1,7 @@
 "use client";
 
+import { marketplaceImageSrc } from "@/lib/storage/marketplace-images";
+import { useMarketplaceImageSrc } from "./image-urls";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Select } from "@/components/ui/controls";
@@ -23,6 +25,7 @@ import styles from "../marketplace-cart.module.css";
 type QuoteStatus = "idle" | "loading" | "ready" | "failed";
 
 function Suggestion({ card, locale }: { card: PublicCard; locale: Locale }) {
+  const imageSrc = useMarketplaceImageSrc();
   const t = liveCopy[locale];
   const name = labelOf(card, locale);
   const price = card.from_price_egp;
@@ -31,7 +34,7 @@ function Suggestion({ card, locale }: { card: PublicCard; locale: Locale }) {
       <Link href={`/marketplace/products/${card.slug}`} className={styles.suggMedia} aria-label={name}>
         {card.image_id ? (
           // eslint-disable-next-line @next/next/no-img-element -- no-store media proxy
-          <img src={`/marketplace/media/${card.image_id}`} alt="" loading="lazy" className={styles.cover} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img src={imageSrc(card.image_id, "card")} alt="" loading="lazy" className={styles.cover} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : null}
       </Link>
       <div className={styles.suggBody}>
@@ -93,7 +96,7 @@ function LineRow({ line, locale, onQty, onRemove }: {
         <Link href={href} className={styles.thumb} aria-label={name}>
           {line.image_id ? (
             // eslint-disable-next-line @next/next/no-img-element -- no-store media proxy
-            <img src={`/marketplace/media/${line.image_id}`} alt="" loading="lazy" className={styles.cover} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img src={marketplaceImageSrc(undefined, line.image_id, "thumb")} alt="" loading="lazy" className={styles.cover} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : null}
         </Link>
         <div className={styles.info}>

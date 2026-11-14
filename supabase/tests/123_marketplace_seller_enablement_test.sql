@@ -291,9 +291,9 @@ insert into public.marketplace_stock_locations (id, organization_id, key, name_a
 values ('b3200000-0000-4000-8000-000000000001', current_setting('t.b')::uuid, 'sel_main', 'مخزن', 'main');
 select applied from public.marketplace_stock_apply(current_setting('t.b')::uuid, 'b3100000-0000-4000-8000-000000000001',
   'b3200000-0000-4000-8000-000000000001', 'initial', 20, 'sel-b-initial-0001', 'opening balance', 'manual');
-insert into public.marketplace_product_images (id, product_id, storage_provider, storage_bucket, object_key, sort_order, is_primary, status)
-values ('b3f00000-0000-4000-8000-000000000001', 'b3000000-0000-4000-8000-000000000001', 'supabase_storage',
-        'marketplace-products', 'orgs/b/products/b1/main.webp', 0, true, 'verified');
+insert into public.marketplace_product_images (id, product_id, object_key, sort_order, is_primary, status)
+values ('b3f00000-0000-4000-8000-000000000001', 'b3000000-0000-4000-8000-000000000001',
+        'orgs/b/products/b1/main.webp', 0, true, 'verified');
 
 select is(app.marketplace_publication_blockers('b3000000-0000-4000-8000-000000000001'),
   array['media_verification_not_available'],

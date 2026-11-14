@@ -11,6 +11,7 @@ import { PUBLIC_PAGE_SIZE, PUBLIC_SORTS } from "./public-contract";
 import type { Locale } from "../marketplace-types";
 import { fmtEgp, fmtNum, liveCopy } from "./live-copy";
 import { ALL_PRODUCTS_TYPES, HERO_TYPES, typeCover } from "./type-covers";
+import { useMarketplaceImageSrc } from "./image-urls";
 import styles from "../marketplace.module.css";
 import store from "../marketplace-store.module.css";
 
@@ -60,12 +61,13 @@ function Section({ title, open, count, children }: { title: string; open: boolea
 function Card({ item, locale }: { item: PublicCard; locale: Locale }) {
   const t = liveCopy[locale];
   const title = name(item, locale);
+  const imageSrc = useMarketplaceImageSrc();
   return (
     <article className={styles.card} data-product-type={item.product_type_key}>
       <Link href={`/marketplace/products/${item.slug}`} className={styles.cardMedia} aria-label={title}>
         {item.image_id ? (
-          // eslint-disable-next-line @next/next/no-img-element -- no-store proxy; next/image would re-cache it
-          <img src={`/marketplace/media/${item.image_id}`} alt="" loading="lazy" className={styles.cardImage} style={{ width: "100%", height: "100%" }} />
+          // eslint-disable-next-line @next/next/no-img-element -- media Worker / no-store proxy; next/image would re-cache it
+          <img src={imageSrc(item.image_id, "card")} alt="" loading="lazy" className={styles.cardImage} style={{ width: "100%", height: "100%" }} />
         ) : (
           <span className="grid h-full place-items-center px-3 text-center text-[.8125rem] text-[var(--stone)]">{t.noImage}</span>
         )}

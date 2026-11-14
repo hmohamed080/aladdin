@@ -6,7 +6,7 @@
 -- media system as every other namespace, exactly the way 20261107090005 brought
 -- purchase-request photos and business-verification documents in:
 --
---   marketplace   o/<org>/marketplace/<product>/<media id>/original.<ext>
+--   marketplace   o/<org>/products/<product>/<media id>/original.<ext>   (the organization's products/ folder)
 --
 -- One new namespace, 'marketplace', reuses the existing reservation, verification
 -- receipt, resolver, ids-only key, edge and cleanup functions. Each central function
@@ -29,9 +29,6 @@ alter table public.marketplace_product_images
   add column created_by uuid references public.users(id) on delete set null;
 comment on column public.marketplace_product_images.created_by is
   'The user who requested the upload: the owner of its central media record (media_storage_locations).';
-alter table public.marketplace_product_images
-  alter column storage_provider set default 'cloudflare_r2',
-  alter column storage_bucket set default 'marketplace';
 
 -- ---------------------------------------------------------------------------
 -- 2. The namespace in the central location table
@@ -40,10 +37,8 @@ alter table public.media_storage_locations drop constraint media_storage_locatio
 alter table public.media_storage_locations add constraint media_storage_locations_namespace_check
   check (namespace in ('avatar','portfolio','certificate','product','organization','request','verification','marketplace'));
 
-alter table public.media_storage_locations drop constraint media_storage_locations_storage_key_check;
-alter table public.media_storage_locations add constraint media_storage_locations_storage_key_check
-  check (storage_key is null or (provider = 'r2' and storage_key !~ '\.\.' and storage_key ~
-    '^(u|o)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/(profile|portfolio|certificates|products|requests|verification|marketplace)/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/){1,2}original\.[a-z0-9]{2,5}$'));
+-- The physical R2 key uses the organization's existing products/ folder (media architecture v3:
+-- o/<org>/products/<product>/<media id>/original.<ext>), so the storage_key check is unchanged.
 
 -- ---------------------------------------------------------------------------
 -- 3. Marketplace predicates (internal)
@@ -347,10 +342,11 @@ begin
       if p_org is null then raise exception 'unexpected media key' using errcode='22023'; end if;
       return 'o/'||p_org||'/verification/'||f[1]||'/original.'||f[2];
     when 'marketplace' then
-      -- <org>/<product>/<media id>.<ext>, issued by marketplace_seller_image_request_upload
+      -- <org>/<product>/<media id>.<ext>, issued by marketplace_seller_image_request_upload; stored in the
+      -- organization's products/ folder like every other product photo (ids are UUIDs: no collision).
       v_product := (regexp_match(p_key,'^'||u||'/('||u||')/'||u||'\.[a-z0-9]{2,5}$'))[1];
       if v_product is null or p_org is null then raise exception 'unexpected media key' using errcode='22023'; end if;
-      return 'o/'||p_org||'/marketplace/'||v_product||'/'||f[1]||'/original.'||f[2];
+      return 'o/'||p_org||'/products/'||v_product||'/'||f[1]||'/original.'||f[2];
     else raise exception 'invalid namespace' using errcode='22023';
   end case;
 end;
@@ -523,9 +519,8 @@ begin
   select coalesce(max(sort_order) + 1, 0) into v_sort from public.marketplace_product_images
    where product_id = p_product_id and variant_id is not distinct from p_variant_id;
   insert into public.marketplace_product_images
-    (id, product_id, variant_id, storage_provider, storage_bucket, object_key, sort_order, is_primary, status, mime_type,
-     upload_state, created_by)
-  values (v_id, p_product_id, p_variant_id, 'cloudflare_r2', 'marketplace', v_key, v_sort, false,
+    (id, product_id, variant_id, object_key, sort_order, is_primary, status, mime_type, upload_state, created_by)
+  values (v_id, p_product_id, p_variant_id, v_key, v_sort, false,
           'pending', p_content_type, 'awaiting_upload', v_uid);
   return jsonb_build_object('image_id', v_id, 'object_key', v_key);
 end;
@@ -679,7 +674,311 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 6. The Supabase Storage predicates of Migrations 06/07/09 are no longer used
+-- 6. Public delivery: the image id is the public handle (Worker Mode C + app fallback)
+-- ---------------------------------------------------------------------------
+-- The object key of a Marketplace image the PUBLIC shop may show, or null: media flag on,
+-- verified + byte-validated image, published product of an enabled seller, active type,
+-- category and variant. One rule for the Worker (media_edge_public) and the app fallback.
+create or replace function app.marketplace_public_image_key(p_image_id uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select i.object_key
+  from public.marketplace_product_images i
+  join public.marketplace_products p on p.id = i.product_id
+  join public.marketplace_product_types t on t.id = p.product_type_id and t.is_active
+  join public.marketplace_categories c on c.id = t.category_id and c.is_active
+  left join public.marketplace_product_variants v on v.id = i.variant_id
+  where i.id = p_image_id
+    and app.marketplace_media_verification_ready()
+    and i.status = 'verified' and i.upload_state = 'confirmed' and i.content_valid is true
+    and (i.variant_id is null or v.status = 'active')
+    and p.status = 'published'
+    and app.marketplace_seller_is_enabled(p.seller_organization_id);
+$$;
+
+-- Same contract as Migration 09 without the bucket column (bytes are in the media system).
+drop function public.marketplace_public_image_ref(uuid);
+create function public.marketplace_public_image_ref(p_image_id uuid)
+returns table (object_key text, mime_type text, checksum_sha256 text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select i.object_key, i.mime_type, i.checksum_sha256
+  from public.marketplace_product_images i
+  where i.id = p_image_id and i.object_key = app.marketplace_public_image_key(p_image_id);
+$$;
+revoke all on function public.marketplace_public_image_ref(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.marketplace_public_image_ref(uuid) to service_role;
+
+-- Central public edge function: current definition + the 'marketplace' branch (Mode C by image id).
+CREATE OR REPLACE FUNCTION public.media_edge_public(p_namespace text, p_id uuid, p_variant text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_claims text := current_setting('request.jwt.claims',true);
+  v_sub text := current_setting('request.jwt.claim.sub',true);
+  v_role text := current_setting('request.jwt.claim.role',true);
+  v_key text;
+begin
+  if p_id is null or p_variant is null or p_namespace is null or p_namespace not in ('portfolio','avatar','marketplace') then return null; end if;
+  perform set_config('request.jwt.claims','',true);
+  perform set_config('request.jwt.claim.sub','',true);
+  perform set_config('request.jwt.claim.role','anon',true);
+  if p_namespace='portfolio' then
+    v_key := public.public_portfolio_media_key(p_id);
+    if v_key is not null and not app.is_published_portfolio_object(v_key) then v_key := null; end if;
+  elsif p_namespace='marketplace' then
+    -- A Marketplace image only while EVERY public condition holds (same rule as marketplace_public_image_ref).
+    v_key := app.marketplace_public_image_key(p_id);
+  else
+    -- Current avatar only while its profile is listed (active, not deleted, professional).
+    select au.object_key into v_key from public.profile_public_directory d
+      join public.avatar_uploads au on au.id=d.avatar_media_id
+      where d.id=p_id and au.state='ready' and app.is_current_avatar_object(au.object_key);
+  end if;
+  perform set_config('request.jwt.claims',coalesce(v_claims,''),true);
+  perform set_config('request.jwt.claim.sub',coalesce(v_sub,''),true);
+  perform set_config('request.jwt.claim.role',coalesce(v_role,''),true);
+  if v_key is null then return null; end if;
+  return app.media_edge_grant(p_namespace,v_key,p_variant);
+end;
+$function$;
+
+-- ---------------------------------------------------------------------------
+-- 7. The storage location columns are retired: the media system is the authority
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.marketplace_seller_product_get(p_product_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  p public.marketplace_products;
+  v jsonb;
+begin
+  select * into p from public.marketplace_products where id = p_product_id;
+  if not found then
+    raise exception 'mp:not_found' using errcode = '42501';
+  end if;
+  perform app.marketplace_assert_seller_reader(p.seller_organization_id);
+
+  select jsonb_build_object(
+    'id', p.id,
+    'organization_id', p.seller_organization_id,
+    'product_type_key', t.key,
+    'category_key', c.key,
+    'name_ar', p.name_ar, 'name_en', p.name_en,
+    'description_ar', p.description_ar, 'description_en', p.description_en,
+    'brand', p.brand, 'external_ref', p.external_ref, 'slug', p.slug,
+    'status', p.status, 'published_at', p.published_at, 'updated_at', p.updated_at,
+    'attributes', coalesce((
+      select jsonb_object_agg(x.key, x.val) from (
+        select d.key,
+               case when d.data_type = 'multi_option'
+                    then jsonb_agg(o.key order by o.sort_order)
+                    else (array_agg(app.marketplace_attribute_json(d.data_type, o.key, av.value_number, av.value_boolean, av.value_text)))[1]
+               end as val
+        from public.marketplace_product_attribute_values av
+        join public.marketplace_attribute_definitions d on d.id = av.attribute_id
+        left join public.marketplace_attribute_options o on o.id = av.option_id
+        where av.product_id = p.id
+        group by d.key, d.data_type) x), '{}'::jsonb),
+    'variants', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', pv.id, 'sku', pv.sku, 'selling_unit', pv.selling_unit, 'price_egp', pv.price_egp,
+               'status', pv.status,
+               'attributes', coalesce((
+                 select jsonb_object_agg(x.key, x.val) from (
+                   select d.key,
+                          case when d.data_type = 'multi_option'
+                               then jsonb_agg(o.key order by o.sort_order)
+                               else (array_agg(app.marketplace_attribute_json(d.data_type, o.key, vv.value_number, vv.value_boolean, vv.value_text)))[1]
+                          end as val
+                   from public.marketplace_variant_attribute_values vv
+                   join public.marketplace_attribute_definitions d on d.id = vv.attribute_id
+                   left join public.marketplace_attribute_options o on o.id = vv.option_id
+                   where vv.variant_id = pv.id
+                   group by d.key, d.data_type) x), '{}'::jsonb),
+               'stock', coalesce((
+                 select jsonb_agg(jsonb_build_object(
+                          'location_id', l.id, 'location_name_ar', l.name_ar, 'location_name_en', l.name_en,
+                          'location_active', l.is_active,
+                          'on_hand', il.on_hand, 'reserved', il.reserved, 'available', il.available)
+                        order by l.name_en)
+                 from public.marketplace_inventory_levels il
+                 join public.marketplace_stock_locations l on l.id = il.location_id
+                 where il.variant_id = pv.id), '[]'::jsonb))
+             order by pv.created_at, pv.sku)
+      from public.marketplace_product_variants pv where pv.product_id = p.id), '[]'::jsonb),
+    'images', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', i.id, 'variant_id', i.variant_id, 'object_key', i.object_key,
+               'sort_order', i.sort_order, 'is_primary', i.is_primary, 'status', i.status,
+               'upload_state', i.upload_state, 'mime_type', i.mime_type, 'byte_size', i.byte_size,
+               'alt_text_ar', i.alt_text_ar, 'alt_text_en', i.alt_text_en)
+             order by (i.variant_id is not null), i.sort_order)
+      from public.marketplace_product_images i where i.product_id = p.id and i.status <> 'rejected'), '[]'::jsonb),
+    'blockers', to_jsonb(app.marketplace_publication_blockers(p.id))
+  ) into v
+  from public.marketplace_product_types t
+  join public.marketplace_categories c on c.id = t.category_id
+  where t.id = p.product_type_id;
+  return v;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION app.marketplace_import_apply_row(p_row_id uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare
+  v_loc     uuid;
+  v_qty     integer;
+  r         public.marketplace_import_rows;
+  m         public.marketplace_import_rows;
+  v_type_id uuid;
+  v_master  boolean;
+  v_product uuid;
+  v_ptype   uuid;
+  v_variant uuid;
+  v_vprod   uuid;
+  v_unit    text;
+  v_price   numeric;
+  v_created boolean := false;
+  v_changed boolean := false;
+  v_n       integer;
+  a         record;
+  img       record;
+  v_img     record;
+  v_sort    integer;
+  v_var_for_img uuid;
+  v_primary boolean;
+begin
+  select * into r from public.marketplace_import_rows where id = p_row_id;
+  select t.id into v_type_id
+  from public.marketplace_product_types t join public.marketplace_categories c on c.id = t.category_id
+  where t.key = r.product_type_key and t.is_active and c.is_active;
+  if v_type_id is null then
+    raise exception 'product type is not available' using errcode = '23514';
+  end if;
+  if not app.marketplace_seller_is_enabled(r.organization_id) then
+    raise exception 'the seller is not enabled for the Marketplace' using errcode = '23514';
+  end if;
+
+  select * into m from public.marketplace_import_rows
+   where job_id = r.job_id and external_ref = r.external_ref order by row_number limit 1;
+  v_master := m.id = r.id;
+
+  -- product (identified by seller + external_ref)
+  select p.id, p.product_type_id into v_product, v_ptype from public.marketplace_products p
+   where p.seller_organization_id = r.organization_id and p.external_ref = r.external_ref for update;
+  if v_product is null then
+    insert into public.marketplace_products
+      (seller_organization_id, product_type_id, slug, name_ar, name_en, description_ar, description_en, brand, external_ref, status)
+    values (r.organization_id, v_type_id, app.marketplace_import_slug(m.name_en, r.organization_id, r.external_ref),
+            m.name_ar, m.name_en, m.description_ar, m.description_en, m.brand, r.external_ref, 'draft')
+    returning id into v_product;
+    v_created := true;
+  else
+    if v_ptype is distinct from v_type_id then
+      raise exception 'an existing product''s type cannot be changed by import' using errcode = '23514';
+    end if;
+    if v_master then
+      update public.marketplace_products p set
+        name_ar = m.name_ar, name_en = m.name_en, description_ar = m.description_ar,
+        description_en = m.description_en, brand = m.brand
+      where p.id = v_product
+        and (p.name_ar, p.name_en, p.description_ar, p.description_en, p.brand)
+            is distinct from (m.name_ar, m.name_en, m.description_ar, m.description_en, m.brand);
+      get diagnostics v_n = row_count;
+      v_changed := v_changed or v_n > 0;      -- status / seller / type are never touched
+    end if;
+  end if;
+
+  -- variant (identified by seller + sku)
+  select v.id, v.product_id, v.selling_unit, v.price_egp into v_variant, v_vprod, v_unit, v_price
+  from public.marketplace_product_variants v
+  where v.seller_organization_id = r.organization_id and v.sku = r.sku for update;
+  if v_variant is null then
+    insert into public.marketplace_product_variants (product_id, seller_organization_id, sku, selling_unit, price_egp)
+    values (v_product, r.organization_id, r.sku, r.selling_unit, r.price_egp)
+    returning id into v_variant;
+    v_created := true;
+  else
+    if v_vprod <> v_product then
+      raise exception 'this SKU belongs to a different product' using errcode = '23514';
+    end if;
+    if v_unit <> r.selling_unit then
+      raise exception 'the selling unit of an existing variant cannot be changed by import' using errcode = '23514';
+    end if;
+    if v_price is distinct from r.price_egp then
+      update public.marketplace_product_variants set price_egp = r.price_egp where id = v_variant;
+      v_changed := true;
+    end if;
+  end if;
+
+  -- attribute values (product-level ones come from the product's first row only)
+  for a in
+    select d.id as def_id, d.key, d.data_type, ta.level
+    from public.marketplace_product_type_attributes ta
+    join public.marketplace_attribute_definitions d on d.id = ta.attribute_id
+    where ta.product_type_id = v_type_id and ta.is_active and d.is_active and r.attributes ? d.key
+  loop
+    if a.level = 'product' then
+      continue when not v_master;
+      v_changed := app.marketplace_import_apply_attribute('product', v_product, a.def_id, a.data_type, r.attributes -> a.key) or v_changed;
+    else
+      v_changed := app.marketplace_import_apply_attribute('variant', v_variant, a.def_id, a.data_type, r.attributes -> a.key) or v_changed;
+    end if;
+  end loop;
+
+  -- images: import photos are paused (Migration 13); photos are added on each product page.
+
+  -- initial stock (Migration 09): an import row may carry a quantity. It is entered
+  -- ONCE, through the ledger, and only for a variant that has no stock row yet —
+  -- re-importing never overwrites stock the seller has since changed.
+  if coalesce(r.raw ->> 'quantity', '') ~ '^[0-9]{1,6}$' then
+    v_qty := (r.raw ->> 'quantity')::integer;
+    if v_qty > 0 and not exists (select 1 from public.marketplace_inventory_levels l where l.variant_id = v_variant) then
+      select id into v_loc from public.marketplace_stock_locations
+       where organization_id = r.organization_id and is_active order by (key = 'main') desc, created_at limit 1;
+      if v_loc is null then
+        insert into public.marketplace_stock_locations (organization_id, key, name_ar, name_en, kind, supports_pickup)
+        values (r.organization_id, 'main', 'المخزن الرئيسي', 'Main stock', 'warehouse', false)
+        on conflict (organization_id, key) do update set is_active = true
+        returning id into v_loc;
+      end if;
+      perform * from public.marketplace_stock_apply(
+        r.organization_id, v_variant, v_loc, 'initial', v_qty,
+        'import:' || r.job_id::text || ':' || r.row_number::text, 'bulk import opening stock', 'import',
+        'import_job', r.job_id::text,
+        (select j.created_by from public.marketplace_import_jobs j where j.id = r.job_id));
+      v_changed := true;
+    end if;
+  end if;
+
+  update public.marketplace_import_rows set product_id = v_product, variant_id = v_variant where id = r.id;
+  return case when v_created then 'create' when v_changed then 'update' else 'unchanged' end;
+end;
+$function$;
+
+alter table public.marketplace_product_images drop column storage_provider, drop column storage_bucket;
+-- The location's uniqueness index included the two dropped columns; an image key is still registered once.
+create unique index ux_marketplace_product_images_object_key on public.marketplace_product_images (object_key);
+
+-- ---------------------------------------------------------------------------
+-- 8. The Supabase Storage predicates of Migrations 06/07/09 are no longer used
 -- ---------------------------------------------------------------------------
 drop function app.marketplace_storage_can_upload_image(text);
 drop function app.marketplace_storage_owns_image(text);
@@ -688,9 +987,10 @@ drop function app.marketplace_storage_moderator_can_read(text);
 drop function app.marketplace_storage_can_upload_import(text);
 
 -- ---------------------------------------------------------------------------
--- 7. Grants: the new app.marketplace_* helpers are internal (no client role)
+-- 9. Grants: the new app.marketplace_* helpers are internal (no client role)
 -- ---------------------------------------------------------------------------
 revoke all on function
+  app.marketplace_public_image_key(uuid),
   app.marketplace_media_can_upload(text),
   app.marketplace_media_can_read(text),
   app.marketplace_media_can_delete(text),

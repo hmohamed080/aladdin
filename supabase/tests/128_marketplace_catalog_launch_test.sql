@@ -20,7 +20,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(71);
+select plan(74);
 
 update auth.users set email_confirmed_at = now()
   where id in ('70000001-0000-4000-8000-000000000001', '71000005-0000-4000-8000-000000000005',
@@ -199,11 +199,19 @@ select is((select object_key from public.marketplace_public_image_ref(current_se
 select is((select count(*)::int from public.marketplace_public_image_ref(current_setting('t.img2')::uuid)), 0,
   'F2. a rejected image is never deliverable');
 reset role;
+-- The media Worker's public path (Mode C, by image id) uses the same rule.
+select ok(public.media_edge_public('marketplace', current_setting('t.img')::uuid, 'original') ->> 'object'
+            like 'o/' || current_setting('t.a') || '/products/%/original.png',
+  'F2b. the Worker receives the R2 object of a deliverable image (organization products/ folder)');
+select is(public.media_edge_public('marketplace', current_setting('t.img2')::uuid, 'original'), null,
+  'F2c. ...and nothing for a rejected image');
 update public.marketplace_platform_settings set media_verification_ready = false;
 set local role service_role;
 select is((select count(*)::int from public.marketplace_public_image_ref(current_setting('t.img')::uuid)), 0,
   'F3. with the media switch off nothing is deliverable');
 reset role;
+select is(public.media_edge_public('marketplace', current_setting('t.img')::uuid, 'original'), null,
+  'F3b. ...not through the Worker either');
 update public.marketplace_platform_settings set media_verification_ready = true;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';

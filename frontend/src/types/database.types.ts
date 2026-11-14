@@ -2911,8 +2911,6 @@ export type Database = {
           product_id: string
           sort_order: number
           status: string
-          storage_bucket: string
-          storage_provider: string
           updated_at: string
           upload_state: string
           variant_id: string | null
@@ -2939,8 +2937,6 @@ export type Database = {
           product_id: string
           sort_order?: number
           status?: string
-          storage_bucket?: string
-          storage_provider?: string
           updated_at?: string
           upload_state?: string
           variant_id?: string | null
@@ -2967,8 +2963,6 @@ export type Database = {
           product_id?: string
           sort_order?: number
           status?: string
-          storage_bucket?: string
-          storage_provider?: string
           updated_at?: string
           upload_state?: string
           variant_id?: string | null
@@ -10620,7 +10614,6 @@ export type Database = {
           checksum_sha256: string
           mime_type: string
           object_key: string
-          storage_bucket: string
         }[]
       }
       marketplace_public_product: { Args: { p_slug: string }; Returns: Json }

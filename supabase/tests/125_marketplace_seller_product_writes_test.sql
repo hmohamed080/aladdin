@@ -297,8 +297,8 @@ select is((select status || '/' || is_primary::text || '/' || byte_size::text fr
            where id = current_setting('t.img')::uuid), 'pending/true/1234',
   'G6. uploaded = confirmed + primary + verified size, but content is still PENDING (never auto-verified)');
 select ok((select storage_key from public.media_storage_locations where namespace = 'marketplace' and object_key = current_setting('t.key'))
-          like 'o/' || current_setting('t.a') || '/marketplace/' || current_setting('t.p1') || '/%/original.webp',
-  'G6b. the R2 object key holds only ids: o/<org>/marketplace/<product>/<media id>/original.webp');
+          like 'o/' || current_setting('t.a') || '/products/' || current_setting('t.p1') || '/%/original.webp',
+  'G6b. the R2 object key holds only ids, in the organization products/ folder: o/<org>/products/<product>/<media id>/original.webp');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
 select set_config('t.img2', (public.marketplace_seller_image_request_upload(current_setting('t.p1')::uuid, 'image/png')) ->> 'image_id', true);

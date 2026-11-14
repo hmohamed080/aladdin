@@ -21,7 +21,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(99);
+select plan(98);
 
 update auth.users set email_confirmed_at = now()
   where id in ('70000001-0000-4000-8000-000000000001', '71000005-0000-4000-8000-000000000005',
@@ -310,47 +310,44 @@ select isnt((select option_signature from public.marketplace_product_variants wh
 -- ===========================================================================
 -- F. Images (metadata only)
 -- ===========================================================================
-insert into public.marketplace_product_images (id, product_id, storage_provider, storage_bucket, object_key, sort_order, is_primary, status)
-values ('a1f00000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000001', 'supabase_storage', 'marketplace-products',
+insert into public.marketplace_product_images (id, product_id, object_key, sort_order, is_primary, status)
+values ('a1f00000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000001', 
         'orgs/a/products/a1/main.webp', 0, true, 'verified');
 
-select throws_ok($$ insert into public.marketplace_product_images (product_id, variant_id, storage_provider, storage_bucket, object_key, sort_order)
+select throws_ok($$ insert into public.marketplace_product_images (product_id, variant_id, object_key, sort_order)
                     values ('a1000000-0000-4000-8000-000000000001', 'b1100000-0000-4000-8000-000000000001',
-                            'supabase_storage', 'marketplace-products', 'orgs/a/cross.webp', 5) $$,
+                            'orgs/a/cross.webp', 5) $$,
   '23503', null, 'F1. an image cannot reference a variant of ANOTHER product');
-select lives_ok($$ insert into public.marketplace_product_images (product_id, variant_id, storage_provider, storage_bucket, object_key, sort_order)
+select lives_ok($$ insert into public.marketplace_product_images (product_id, variant_id, object_key, sort_order)
                    values ('a1000000-0000-4000-8000-000000000001', 'a1100000-0000-4000-8000-000000000001',
-                           'supabase_storage', 'marketplace-products', 'orgs/a/products/a1/v1.webp', 0) $$,
+                           'orgs/a/products/a1/v1.webp', 0) $$,
   'F2. an image may belong to a variant of the same product');
-select throws_ok($$ insert into public.marketplace_product_images (product_id, storage_provider, storage_bucket, object_key, sort_order, is_primary)
-                    values ('a1000000-0000-4000-8000-000000000001', 'supabase_storage', 'marketplace-products', 'orgs/a/second-primary.webp', 1, true) $$,
+select throws_ok($$ insert into public.marketplace_product_images (product_id, object_key, sort_order, is_primary)
+                    values ('a1000000-0000-4000-8000-000000000001', 'orgs/a/second-primary.webp', 1, true) $$,
   '23505', null, 'F3. a second ACTIVE primary product image is rejected');
 update public.marketplace_product_images set status = 'rejected' where id = 'a1f00000-0000-4000-8000-000000000001';
-select lives_ok($$ insert into public.marketplace_product_images (product_id, storage_provider, storage_bucket, object_key, sort_order, is_primary)
-                   values ('a1000000-0000-4000-8000-000000000001', 'supabase_storage', 'marketplace-products', 'orgs/a/second-primary.webp', 1, true) $$,
+select lives_ok($$ insert into public.marketplace_product_images (product_id, object_key, sort_order, is_primary)
+                   values ('a1000000-0000-4000-8000-000000000001', 'orgs/a/second-primary.webp', 1, true) $$,
   'F4. a rejected image no longer holds the primary slot');
-select throws_ok($$ insert into public.marketplace_product_images (product_id, storage_provider, storage_bucket, object_key, sort_order)
-                    values ('a1000000-0000-4000-8000-000000000001', 'supabase_storage', 'marketplace-products', 'orgs/a/dup-order.webp', 1) $$,
+select throws_ok($$ insert into public.marketplace_product_images (product_id, object_key, sort_order)
+                    values ('a1000000-0000-4000-8000-000000000001', 'orgs/a/dup-order.webp', 1) $$,
   '23505', null, 'F5. two product-level images cannot share a sort position');
-select throws_ok($$ insert into public.marketplace_product_images (product_id, storage_provider, storage_bucket, object_key, sort_order)
-                    values ('a1000000-0000-4000-8000-000000000001', 'supabase_storage', 'marketplace-products', 'orgs/a/products/a1/v1.webp', 9) $$,
+select throws_ok($$ insert into public.marketplace_product_images (product_id, object_key, sort_order)
+                    values ('a1000000-0000-4000-8000-000000000001', 'orgs/a/products/a1/v1.webp', 9) $$,
   '23505', null, 'F6. an object location can be registered only once');
-select throws_ok($$ insert into public.marketplace_product_images (product_id, storage_provider, storage_bucket, object_key, sort_order)
-                    values ('a1000000-0000-4000-8000-000000000001', 'supabase_storage', 'marketplace-products',
+select throws_ok($$ insert into public.marketplace_product_images (product_id, object_key, sort_order)
+                    values ('a1000000-0000-4000-8000-000000000001', 
                             'https://cdn.example.com/a.webp?token=abc', 9) $$,
   '23514', null, 'F7. a URL (signed or public) is rejected as an object key');
-select throws_ok($$ insert into public.marketplace_product_images (product_id, storage_provider, storage_bucket, object_key, sort_order)
-                    values ('a1000000-0000-4000-8000-000000000001', 'supabase_storage', 'marketplace-products', 'orgs/a/x.webp?X-Amz-Signature=1', 9) $$,
+select throws_ok($$ insert into public.marketplace_product_images (product_id, object_key, sort_order)
+                    values ('a1000000-0000-4000-8000-000000000001', 'orgs/a/x.webp?X-Amz-Signature=1', 9) $$,
   '23514', null, 'F8. a key carrying a query string is rejected');
-select throws_ok($$ insert into public.marketplace_product_images (product_id, storage_provider, storage_bucket, object_key, sort_order)
-                    values ('a1000000-0000-4000-8000-000000000001', 'supabase_storage', 'marketplace-products', 'orgs/../secrets/x.webp', 9) $$,
+select throws_ok($$ insert into public.marketplace_product_images (product_id, object_key, sort_order)
+                    values ('a1000000-0000-4000-8000-000000000001', 'orgs/../secrets/x.webp', 9) $$,
   '23514', null, 'F9. a key with path traversal is rejected');
-select throws_ok($$ insert into public.marketplace_product_images (product_id, storage_provider, storage_bucket, object_key, sort_order)
-                    values ('a1000000-0000-4000-8000-000000000001', 'supabase_storage', 'marketplace-products', '/abs/path.webp', 9) $$,
+select throws_ok($$ insert into public.marketplace_product_images (product_id, object_key, sort_order)
+                    values ('a1000000-0000-4000-8000-000000000001', '/abs/path.webp', 9) $$,
   '23514', null, 'F10. an absolute path is rejected');
-select throws_ok($$ insert into public.marketplace_product_images (product_id, storage_provider, storage_bucket, object_key, sort_order)
-                    values ('a1000000-0000-4000-8000-000000000001', 'ftp', 'marketplace-products', 'orgs/a/y.webp', 9) $$,
-  '23514', null, 'F11. an unknown storage provider is rejected');
 
 -- ===========================================================================
 -- G. Publication fails closed
@@ -384,7 +381,7 @@ set local role anon;
 select throws_ok($$ select count(*) from public.marketplace_products $$, '42501', null,
   'H1. anon cannot read the products table at all');
 select throws_ok($$ select count(*) from public.marketplace_product_images $$, '42501', null,
-  'H2. anon cannot read image metadata (bucket / key stay private)');
+  'H2. anon cannot read image metadata (keys stay private)');
 reset role;
 
 set local role authenticated;

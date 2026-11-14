@@ -1,3 +1,6 @@
+import { getServerSupabase } from "@/lib/supabase/server";
+import { MarketplaceImagesProvider } from "@/features/marketplace/live/image-urls";
+import { marketplacePublicImageUrls } from "@/server/media/marketplace-public-images";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -28,10 +31,14 @@ export default async function MarketplaceCartRoute() {
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   // a few newest published products for the "you may also like" shelf (already-in-cart ones are hidden client-side)
   const page = await loadPublicCatalogPage({ sort: "newest", page: 1 });
+  const suggestions = (page?.items ?? []).slice(0, 12);
+  const images = await marketplacePublicImageUrls(await getServerSupabase(), suggestions.map((item) => item.image_id));
   return (
     <I18nProvider locale={locale} dir={directionFor(locale)}>
-      <MarketplaceShell live showTitle={false}>
-        <LiveCartPage suggestions={(page?.items ?? []).slice(0, 12)} />
+      <MarketplaceShell showTitle={false}>
+        <MarketplaceImagesProvider images={images}>
+          <LiveCartPage suggestions={suggestions} />
+        </MarketplaceImagesProvider>
       </MarketplaceShell>
     </I18nProvider>
   );

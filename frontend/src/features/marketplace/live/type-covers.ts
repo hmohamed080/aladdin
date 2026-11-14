@@ -1,10 +1,10 @@
 /**
- * The cover photo of each Marketplace product type, shipped with the frontend (public/preview/landing/marketplace).
+ * The cover photo of each Marketplace product type, shipped with the frontend (public/assets/pages/marketplace).
  * The storefront's type strip and hero art read ONLY this table — never the database and never the sample
  * catalogue — so they look the same with or without a database connection. Keys are the database
  * product-type keys. Photos are square webp (≈20–110 KB).
  */
-const BASE = "/preview/landing/marketplace";
+const BASE = "/assets/pages/marketplace";
 
 const COVERS: Record<string, string> = {
   wallpaper: `${BASE}/type-wallpaper.webp`,

@@ -192,9 +192,10 @@ The Arabic name for skirting is stored as **وزرة** (the standard word; the b
 
 | Step | Path |
 |---|---|
-| Upload | `marketplace_seller_image_request_upload` issues the pending row (now with `created_by`) and key `<org>/<product>/<id>.<ext>`; `authorizeMediaUpload` reserves it on R2 (ids-only key `o/<org>/marketplace/<product>/<id>/original.<ext>`) and returns the grant; the browser PUTs with `uploadWithGrant`. |
+| Upload | `marketplace_seller_image_request_upload` issues the pending row (now with `created_by`) and key `<org>/<product>/<id>.<ext>`; `authorizeMediaUpload` reserves it on R2 (ids-only key in the organization's products/ folder, media architecture v3: `o/<org>/products/<product>/<id>/original.<ext>`) and returns the grant; the browser PUTs with `uploadWithGrant`. |
 | Confirm | `verifyPendingMedia` reads the bytes, checks signature + full decode + size, writes the variants and the receipt; `marketplace_seller_image_confirm_upload` (and the trigger `marketplace_image_verified_before_confirmed`) refuse without a fresh receipt. Content stays `pending` until moderation. |
-| Read | Members and media moderators through `/api/media/marketplace` (`app.marketplace_media_can_read`); the public shop only through `marketplace_public_image_ref` (service role) and `/marketplace/media/[imageId]`. |
+| Read | Members and media moderators: `privateMediaUrl` (ticketed media Worker with the recorded `thumb`/`card` size while edge delivery is on, `/api/media/marketplace` otherwise; `app.marketplace_media_can_read`). The public shop: the media Worker in Mode C by image id (`media_edge_public` → `app.marketplace_public_image_key`, CDN-cached, `card`/`full`/`thumb`) while public edge delivery is on, otherwise `/marketplace/media/[imageId]` (service-role `marketplace_public_image_ref`), which also redirects `?v=<size>` to the Worker. |
+| Columns | `storage_provider` / `storage_bucket` are dropped (the media system is the authority); `object_key` stays unique (`ux_marketplace_product_images_object_key`). |
 | Remove | phase 1 unchanged; phase 2 `removeMedia`; phase 3 `marketplace_seller_image_remove_finalize` requires `cleaned_at`. Withdrawn uploads are central cleanup candidates. |
 | Moderation | `admin_marketplace_media_record_validation` takes the size from the media receipt; the admin action reads the bytes from R2. |
 

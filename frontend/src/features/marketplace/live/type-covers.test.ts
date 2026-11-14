@@ -20,7 +20,7 @@ describe("storefront type covers ship with the frontend", () => {
   it("each cover is a small webp file that exists in /public (no database, no sample catalogue, no heavy png)", () => {
     for (const key of PRODUCT_TYPES) {
       const url = typeCover(key)!;
-      expect(url, key).toMatch(/^\/preview\/landing\/marketplace\/type-[a-z-]+\.webp$/);
+      expect(url, key).toMatch(/^\/assets\/pages\/marketplace\/type-[a-z-]+\.webp$/);
       const file = publicFile(url);
       expect(existsSync(file), `${key}: ${file}`).toBe(true);
       expect(statSync(file).size, key).toBeLessThan(200 * 1024);

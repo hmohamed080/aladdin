@@ -366,22 +366,21 @@ select is((select count(*)::int from public.marketplace_variant_attribute_values
   'G11. variant-level attributes (colour, width, length) were written for both variants');
 select ok((select option_signature is not null from public.marketplace_product_variants where seller_organization_id = current_setting('t.a')::uuid and sku = 'S1-B'),
   'G12. the canonical option signature trigger ran for the imported variant');
-select is((select array_agg(sort_order || ':' || is_primary::text || ':' || status order by sort_order)
-           from public.marketplace_product_images where variant_id is null
+-- Import photos are paused (Migration 13): applying a row never creates an image record, even for
+-- matched assets; photos are added on each product page through the central media lifecycle.
+select is((select count(*)::int from public.marketplace_product_images where variant_id is null
              and product_id = (select id from public.marketplace_products where seller_organization_id = current_setting('t.a')::uuid and external_ref = 'P1')),
-  array['0:true:pending', '1:false:pending'],
-  'G13. product-level images: P1_01 is primary (order 0), P1_02 follows; both PENDING, never verified');
-select is((select array_agg(substring(i.object_key from '[^/]+$') order by i.sort_order)
+  0, 'G13. import photos are paused: no product-level image is created by an import');
+select is((select count(*)::int
            from public.marketplace_product_images i join public.marketplace_product_variants v on v.id = i.variant_id
            where v.seller_organization_id = current_setting('t.a')::uuid and v.sku = 'S1-A'),
-  array['S1-A_01.jpg', 'S1-A_02.jpg', 'S1-A_03.jpg'],
-  'G14. SKU_01 / SKU_02 / SKU_03 become the variant''s images in that order');
+  0, 'G14. ...nor a variant image');
 select is((select count(*)::int from public.marketplace_product_images i
            join public.marketplace_products p on p.id = i.product_id
            where p.seller_organization_id = current_setting('t.a')::uuid and i.status <> 'pending'), 0,
   'G15. no imported image is anything but pending');
 select is((select count(*)::int from public.marketplace_import_assets where job_id = current_setting('t.j2')::uuid and status = 'applied' and image_id is not null),
-  5, 'G16. every matched asset is linked to its image record');
+  0, 'G16. no asset is linked to an image record (import photos paused)');
 select is((select slug from public.marketplace_products where seller_organization_id = current_setting('t.a')::uuid and external_ref = 'P1'),
   app.marketplace_import_slug('Wallpaper One', current_setting('t.a')::uuid, 'P1'),
   'G17. the slug is deterministic (name + hash of organization and reference)');
@@ -419,8 +418,8 @@ select is((select count(*)::int from public.marketplace_products where seller_or
   'H3. no duplicate product was created');
 select is((select count(*)::int from public.marketplace_product_variants where seller_organization_id = current_setting('t.a')::uuid and sku in ('S1-A', 'S1-B', 'S13')), 3,
   'H4. no duplicate variant was created');
-select is((select count(*)::int from public.marketplace_product_images where object_key like 'orgs/a/imports/j2/S1-A_01.jpg'), 1,
-  'H5. a re-registered image object is reused, not duplicated');
+select is((select count(*)::int from public.marketplace_product_images where object_key like 'orgs/a/imports/j2/S1-A_01.jpg'), 0,
+  'H5. a re-import creates no image record either (import photos paused)');
 select is((select status from public.marketplace_products where seller_organization_id = current_setting('t.a')::uuid and external_ref = 'P1'), 'draft',
   'H6. an update never changes publication status');
 

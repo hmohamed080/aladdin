@@ -1,3 +1,6 @@
+import { getServerSupabase } from "@/lib/supabase/server";
+import { MarketplaceImagesProvider } from "@/features/marketplace/live/image-urls";
+import { marketplacePublicImageUrls } from "@/server/media/marketplace-public-images";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -25,10 +28,13 @@ export default async function MarketplaceProductPage({ params }: { params: Promi
   if (!product) notFound();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
+  const images = await marketplacePublicImageUrls(await getServerSupabase(), product.images.map((image) => image.image_id));
   return (
     <I18nProvider locale={locale} dir={directionFor(locale)}>
-      <MarketplaceShell live showTitle={false}>
-        <LiveProduct product={product} />
+      <MarketplaceShell showTitle={false}>
+        <MarketplaceImagesProvider images={images}>
+          <LiveProduct product={product} />
+        </MarketplaceImagesProvider>
       </MarketplaceShell>
     </I18nProvider>
   );

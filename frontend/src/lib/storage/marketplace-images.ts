@@ -18,3 +18,16 @@ const KEY_SHAPE =
 export function isMarketplaceImageKey(value: unknown): value is string {
   return typeof value === "string" && KEY_SHAPE.test(value);
 }
+
+/**
+ * Public URLs of one shop image: the Worker (Mode C, by image id) with its recorded sizes while public
+ * edge delivery is on, otherwise the application route. Built on the server; rendered anywhere.
+ */
+export type MarketplaceImageUrls = { src: string; thumb?: string; card?: string; full?: string };
+export type MarketplaceImageMap = Readonly<Record<string, MarketplaceImageUrls>>;
+
+/** The best URL for `size`: that size when recorded, else the original; the app route when the map has no entry. */
+export function marketplaceImageSrc(map: MarketplaceImageMap | undefined, imageId: string, size: "thumb" | "card" | "full"): string {
+  const urls = map?.[imageId];
+  return urls ? urls[size] ?? urls.src : `/marketplace/media/${imageId}?v=${size}`;
+}

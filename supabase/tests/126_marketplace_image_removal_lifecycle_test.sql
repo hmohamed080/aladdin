@@ -308,8 +308,8 @@ select throws_like($$ select public.marketplace_seller_image_request_upload(curr
   'mp:too_many_pending_uploads%', 'H4. at most 10 un-uploaded keys per product at once');
 reset role;
 -- hourly cap per organization: 200 withdrawn rows created in the last hour
-insert into public.marketplace_product_images (product_id, storage_provider, storage_bucket, object_key, sort_order, is_primary, status, upload_state)
-select current_setting('t.p')::uuid, 'cloudflare_r2', 'marketplace',
+insert into public.marketplace_product_images (product_id, object_key, sort_order, is_primary, status, upload_state)
+select current_setting('t.p')::uuid, 
        current_setting('t.a') || '/bulk/' || g || '.png', 5000 + g, false, 'rejected', 'deleting'
 from generate_series(1, 200) g;
 update public.marketplace_product_images set upload_state = 'deleting', status = 'rejected'

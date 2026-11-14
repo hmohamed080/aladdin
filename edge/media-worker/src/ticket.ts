@@ -7,7 +7,7 @@ export const TICKET_PREFIX = "aladdin.media-edge.v1.";
 export const MAX_TICKET_TTL_SECONDS = 120;
 export const CLOCK_SKEW_SECONDS = 5;
 
-export const NAMESPACES = ["avatar", "portfolio", "certificate", "product", "organization", "request", "verification"] as const;
+export const NAMESPACES = ["avatar", "portfolio", "certificate", "product", "organization", "request", "verification", "marketplace"] as const;
 export const VARIANTS = ["original", "thumb", "card", "full"] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 export type Variant = (typeof VARIANTS)[number];

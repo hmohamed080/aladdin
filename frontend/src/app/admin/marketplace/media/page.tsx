@@ -4,7 +4,7 @@ import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { AdminHeader } from "@/features/admin/parts";
 import { StatePanel } from "@/components/ui/primitives";
-import { applicationMediaUrl } from "@/lib/storage/media-url";
+import { marketplacePrivateImageUrls } from "@/server/media/marketplace-public-images";
 import { MediaModeration, type MediaItem, type MediaSettings } from "@/features/admin-marketplace/media-moderation";
 import { requireAdminRoute } from "@/server/authorization/admin";
 
@@ -52,8 +52,9 @@ export default async function AdminMarketplaceMediaPage({
 
   const settings = settingsRes.data as unknown as MediaSettings;
   const queue = queueRes.data as unknown as { total: number; items: Omit<MediaItem, "previewUrl">[] };
-  // Previews go through /api/media, which re-checks the moderator permission on every read (R2, Migration 13).
-  const items: MediaItem[] = queue.items.map((i) => ({ ...i, previewUrl: applicationMediaUrl("marketplace", i.object_key) }));
+  // Card-size previews through the media Worker (or /api/media), re-checking the moderator permission on every read.
+  const previews = await marketplacePrivateImageUrls(supabase, queue.items.map((i) => i.object_key), "card");
+  const items: MediaItem[] = queue.items.map((i) => ({ ...i, previewUrl: previews.get(i.object_key) ?? null }));
 
   return (
     <div className="flex flex-col gap-lg">

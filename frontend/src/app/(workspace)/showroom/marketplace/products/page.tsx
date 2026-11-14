@@ -10,7 +10,7 @@ import { FilterBar } from "@/components/ui/filter-bar";
 import { ButtonLink } from "@/components/ui/controls";
 import { RowPublishToggle } from "@/features/marketplace-seller/row-publish";
 import { QuantityStepper } from "@/features/marketplace-seller/stock-editor";
-import { applicationMediaUrl } from "@/lib/storage/media-url";
+import { marketplacePrivateImageUrls } from "@/server/media/marketplace-public-images";
 import {
   StorefrontIcon,
   PlusIcon,
@@ -141,9 +141,8 @@ export default async function MarketplaceProductsPage({
     lowStock: Number(paged.stats?.low_stock ?? 0),
   };
 
-  // Thumbnails go through /api/media, which re-checks the seller's membership on every read (R2, Migration 13).
-  const thumbs = new Map<string, string>();
-  for (const p of items) if (p.primaryImageKey) thumbs.set(p.primaryImageKey, applicationMediaUrl("marketplace", p.primaryImageKey));
+  // Thumbnail size through the media Worker (or /api/media), re-checking the seller's membership on every read.
+  const thumbs = await marketplacePrivateImageUrls(supabase, items.map((p) => p.primaryImageKey).filter((k): k is string => Boolean(k)), "thumb");
   const isFiltered = Boolean(filters.q || filters.type || filters.status || filters.stock);
 
   const pageHref = (n: number) => {

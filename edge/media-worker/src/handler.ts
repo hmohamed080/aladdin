@@ -11,10 +11,12 @@ const TYPES: Record<string, readonly string[]> = {
   organization: ["image/jpeg", "image/png", "image/webp"],
   request: ["image/jpeg", "image/png", "image/webp"],
   verification: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
+  marketplace: ["image/jpeg", "image/png", "image/webp"],
 };
 // Compliance documents are never stored in the shared edge byte cache (folder segment of the ids-only key).
 const NEVER_EDGE_CACHED = new Set(["verification"]);
-const PUBLIC_NAMESPACES = ["portfolio", "avatar"];
+// Marketplace product photos are public by image id while the database names them deliverable (ADR-0028).
+const PUBLIC_NAMESPACES = ["portfolio", "avatar", "marketplace"];
 
 const SECURITY = {
   "x-content-type-options": "nosniff",
@@ -48,6 +50,8 @@ const ID_KEY_FOLDERS: Record<string, string> = {
   organization: `o/${ID}/profile/${ID}`,
   request: `[uo]/${ID}/requests/${ID}/${ID}`,
   verification: `o/${ID}/verification/${ID}`,
+  // Marketplace photos live in the organization's products/ folder (media architecture v3).
+  marketplace: `o/${ID}/products/${ID}/${ID}`,
 };
 const ID_KEYS = Object.fromEntries(Object.entries(ID_KEY_FOLDERS).map(([namespace, folder]) =>
   [namespace, new RegExp(`^${folder}/(original\\.[a-z0-9]{2,5}|v/(thumb|card|full)\\.webp)$`)]));

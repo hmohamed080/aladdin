@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { liveCartCopy } from "./live-cart-copy";
 import { useLiveCart } from "./live-cart-store";
+import { useMarketplaceImageSrc } from "./image-urls";
 import type { PublicProduct } from "./public-contract";
 import { fmtEgp, liveCopy } from "./live-copy";
 import { attributeText as valueText, labelOf as label } from "./live-format";
@@ -12,6 +13,7 @@ import styles from "../marketplace.module.css";
 
 /** Live product page: real gallery (approved images only), variant choice, honest non-purchasable state. */
 export function LiveProduct({ product }: { product: PublicProduct }) {
+  const imageSrc = useMarketplaceImageSrc();
   const { locale, t: tr } = useI18n();
   const t = liveCopy[locale];
   const c = liveCartCopy[locale];
@@ -55,7 +57,7 @@ export function LiveProduct({ product }: { product: PublicProduct }) {
             {current ? (
               // eslint-disable-next-line @next/next/no-img-element -- no-store proxy
               <img
-                src={`/marketplace/media/${current.image_id}`}
+                src={imageSrc(current.image_id, "full")}
                 alt={(locale === "ar" ? current.alt_text_ar : current.alt_text_en) || title}
                 style={{ width: "100%", height: "100%", objectFit: "contain" }}
               />
@@ -75,7 +77,7 @@ export function LiveProduct({ product }: { product: PublicProduct }) {
                     onClick={() => setIndex(i)}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element -- no-store proxy */}
-                    <img src={`/marketplace/media/${img.image_id}`} alt="" loading="lazy" />
+                    <img src={imageSrc(img.image_id, "thumb")} alt="" loading="lazy" />
                   </button>
                 </li>
               ))}

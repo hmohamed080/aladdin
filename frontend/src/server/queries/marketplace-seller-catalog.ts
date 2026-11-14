@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
-import { applicationMediaUrl } from "@/lib/storage/media-url";
+import { marketplacePrivateImageUrls } from "@/server/media/marketplace-public-images";
 import type { AttributeDataType, ProductTypeSchema } from "@/features/marketplace-seller/form-model";
 
 type Client = SupabaseClient<Database>;
@@ -137,8 +137,8 @@ export async function loadSellerProduct(supabase: Client, productId: string): Pr
     upload_state: SellerProductImage["uploadState"];
   }[];
   const confirmedKeys = rawImages.filter((i) => i.upload_state === "confirmed").map((i) => i.object_key);
-  // Authorized /api/media URLs: every read re-checks the caller's membership (R2, Migration 13).
-  const urls = new Map<string, string>(confirmedKeys.map((key) => [key, applicationMediaUrl("marketplace", key)]));
+  // Card size through the media Worker (or /api/media): every read re-checks the caller's membership.
+  const urls = await marketplacePrivateImageUrls(supabase, confirmedKeys, "card");
   return {
     id: String(p.id),
     organizationId: String(p.organization_id),

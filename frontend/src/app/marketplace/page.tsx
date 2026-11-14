@@ -1,3 +1,6 @@
+import { getServerSupabase } from "@/lib/supabase/server";
+import { MarketplaceImagesProvider } from "@/features/marketplace/live/image-urls";
+import { marketplacePublicImageUrls } from "@/server/media/marketplace-public-images";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { LiveCatalog, type CatalogParams } from "@/features/marketplace/live/live-catalog";
@@ -63,10 +66,13 @@ export default async function MarketplacePage({ searchParams }: { searchParams: 
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const dir = directionFor(locale);
+  const images = await marketplacePublicImageUrls(await getServerSupabase(), (page?.items ?? []).map((item) => item.image_id));
   return (
     <I18nProvider locale={locale} dir={dir}>
-      <MarketplaceShell live>
-        <LiveCatalog locale={locale} dir={dir} params={params} page={page} facets={facets} />
+      <MarketplaceShell>
+        <MarketplaceImagesProvider images={images}>
+          <LiveCatalog locale={locale} dir={dir} params={params} page={page} facets={facets} />
+        </MarketplaceImagesProvider>
       </MarketplaceShell>
     </I18nProvider>
   );
