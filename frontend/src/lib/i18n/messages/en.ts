@@ -880,7 +880,6 @@ export const en = {
         reviews: "Reviews",
         average: "Average",
         verification: "Latest verification",
-        username: "Username",
         headline: "Headline",
         bio: "About",
         phone: "Primary phone",

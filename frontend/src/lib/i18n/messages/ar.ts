@@ -845,7 +845,6 @@ export const ar: Messages = {
         reviews: "التقييمات",
         average: "المتوسط",
         verification: "آخر طلب توثيق",
-        username: "اسم المستخدم",
         headline: "العنوان",
         bio: "نبذة",
         phone: "الهاتف الأساسي",

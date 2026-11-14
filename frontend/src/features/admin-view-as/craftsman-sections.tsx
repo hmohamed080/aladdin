@@ -143,7 +143,6 @@ export function ProfileSection({ data }: { data: ProfileData }) {
       </Card>
       <Card>
         <dl className="grid grid-cols-1 gap-md tablet:grid-cols-3">
-          <Field label={t("admin.viewAs.f.username")}>{data.username ?? dash(t)}</Field>
           <Field label={t("admin.viewAs.f.phone")}>
             <span dir="ltr">{data.phone ?? dash(t)}</span>
             {data.phone ? <span className="ms-2 text-label text-fg-muted">{yesNo(t, data.phoneVerified)}</span> : null}

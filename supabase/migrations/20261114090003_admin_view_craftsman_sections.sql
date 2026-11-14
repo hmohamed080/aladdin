@@ -60,7 +60,6 @@ begin
     'display_name', p.display_name,
     'display_name_ar', p.display_name_ar,
     'display_name_en', p.display_name_en,
-    'username', p.username,
     'headline', p.headline,
     'bio', p.bio,
     'phone', p.phone_e164,                       -- primary phone: shown as the admin directory already shows it (users.read)

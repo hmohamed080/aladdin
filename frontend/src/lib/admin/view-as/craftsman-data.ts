@@ -61,7 +61,6 @@ export function parseDashboard(raw: unknown): DashboardData {
 
 export type ProfileData = {
   displayName: string | null;
-  username: string | null;
   headline: string | null;
   bio: string | null;
   phone: string | null;
@@ -83,7 +82,6 @@ export function parseProfile(raw: unknown): ProfileData {
   const o = obj(raw);
   return {
     displayName: str(o.display_name),
-    username: str(o.username),
     headline: str(o.headline),
     bio: str(o.bio),
     phone: str(o.phone),

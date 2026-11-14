@@ -11,7 +11,7 @@ const wrap = (node: React.ReactNode, locale: "en" | "ar" = "en") =>
 afterEach(cleanup);
 
 const profile = parseProfile({
-  display_name: "Sayed Abdel-Rahman", username: "sayed", phone: "+201000000001", phone_verified: true, secondary_phone_masked: "•••999",
+  display_name: "Sayed Abdel-Rahman", phone: "+201000000001", phone_verified: true, secondary_phone_masked: "•••999",
   has_avatar: true, has_cover: false, account_status: "suspended", public_profile_status: "hidden", years_experience: 8, availability: "full_time",
   trades: [{ key: "tiling", is_primary: true }], service_areas: [{ governorate: "cairo", city: "new_cairo", is_primary: true }],
   completion: { percent: 60, missing: ["portfolio"] }, bio: "Tiler.",
