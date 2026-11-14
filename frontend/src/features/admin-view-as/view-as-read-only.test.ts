@@ -13,6 +13,10 @@ import path from "node:path";
  *     the route handler that owns it);
  *   - no `/home` link, every page re-establishes the gate, everything is dynamic and uncached.
  * The writes in the tree are exactly the session POSTs: start (opens the audited session) and exit (ends it).
+ *
+ * The private-media route (stage 4, `view/media/…/route.ts`) streams bytes from storage, so it is NOT part of that closure:
+ * it has its own targeted guard at the bottom (what it may import and call, exactly one RPC, no service role), and the main
+ * closure additionally proves that no page, component or reader can reach storage or that route.
  */
 const SRC = path.resolve(__dirname, "../..");
 const rel = (f: string) => path.relative(SRC, f).replaceAll("\\", "/");
@@ -27,8 +31,9 @@ function walk(dir: string): string[] {
 const isSource = (f: string) => /\.(ts|tsx)$/.test(f) && !/\.test\.(ts|tsx)$/.test(f);
 
 const VIEW_DIR = path.join(SRC, "app/admin/users/[id]/view");
+const MEDIA_ROUTE = path.join(VIEW_DIR, "media/[namespace]/[mediaId]/route.ts");
 const ENTRY = [
-  ...walk(VIEW_DIR).filter(isSource),
+  ...walk(VIEW_DIR).filter(isSource).filter((f) => f !== MEDIA_ROUTE),
   ...walk(path.join(SRC, "features/admin-view-as")).filter(isSource),
   path.join(SRC, "server/view-as/guard.ts"),
   path.join(SRC, "server/view-as/readers.ts"),
@@ -87,6 +92,12 @@ describe("Admin View-As is read-only (transitive)", () => {
     expect(files.some((f) => rel(f) === "server/authorization/admin.ts")).toBe(true);
   });
 
+  it("cannot reach storage or the media route: private files are only ever an <img>/<a> pointing at the route", () => {
+    for (const f of files) {
+      expect(rel(f), `${rel(f)} (imported by ${graph.get(f)})`).not.toMatch(/^server\/storage\/|\/view\/media\//);
+    }
+  });
+
   it("reaches no server action and no 'use server' module", () => {
     for (const f of files) {
       expect(rel(f), `${rel(f)} (imported by ${graph.get(f)})`).not.toMatch(/^server\/actions\//);
@@ -125,7 +136,9 @@ describe("Admin View-As is read-only (transitive)", () => {
   });
 
   it("makes no network write from the browser (no client fetch / XHR in the closure's view components)", () => {
-    for (const f of files.filter((x) => rel(x).startsWith("features/admin-view-as/") || rel(x).startsWith("app/admin/users/[id]/view/"))) {
+    // Route handlers run on the server; pages and components are what the browser runs.
+    const browserSide = (x: string) => (rel(x).startsWith("features/admin-view-as/") || rel(x).startsWith("app/admin/users/[id]/view/")) && !/\/route\.ts$/.test(rel(x));
+    for (const f of files.filter(browserSide)) {
       expect(read(f), rel(f)).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|navigator\.sendBeacon/);
     }
   });
@@ -151,5 +164,43 @@ describe("Admin View-As is read-only (transitive)", () => {
       expect(src, rel(f)).not.toMatch(/unstable_cache|revalidate\s*=\s*[1-9]|cacheLife|"use cache"/);
     }
     for (const f of files) expect(read(f), rel(f)).not.toMatch(/unstable_cache|cacheTag|"use cache"/);
+  });
+});
+
+describe("Admin View-As private media route (stage 4): what it may import and call", () => {
+  const src = read(MEDIA_ROUTE);
+  const imports = [...src.matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]);
+
+  it("imports only the audited gate, the permission model, the R2 read provider and the rate limit: no shared resolver, no service role", () => {
+    expect([...imports].sort()).toEqual([
+      "@/lib/env/view-as",
+      "@/lib/permissions/admin",
+      "@/lib/storage/media-policy",
+      "@/lib/supabase/server",
+      "@/server/authorization/admin",
+      "@/server/cache/rate-limit",
+      "@/server/storage/r2-provider",
+      "next/server",
+    ]);
+    expect(src).not.toMatch(/server\/storage\/(media|delivery)|admin-server|SUPABASE_SERVICE_ROLE_KEY|privilegedStorageClient|createAdminClient/);
+    expect(imports.some((i) => i?.startsWith("@/server/actions/"))).toBe(false);
+  });
+
+  it("calls exactly ONE RPC, the audited open function, and writes nothing through the Supabase client or storage", () => {
+    const rpcs = [...src.matchAll(/\.rpc\(\s*["']([a-z0-9_]+)["']/g)].map((m) => m[1]);
+    expect(rpcs).toEqual(["admin_view_as_media_open"]);
+    expect(src).not.toMatch(/\.(insert|update|upsert|delete)\s*\(|\.storage\s*\.|PutObject|DeleteObject|createUploadUrl|commitVerifiedObject/);
+  });
+
+  it("is a same-origin-only, uncached, GET-only handler that never follows a redirect", () => {
+    expect(src).toMatch(/export const dynamic = "force-dynamic"/);
+    expect(src).toMatch(/get\("sec-fetch-site"\) !== "same-origin"/);
+    expect(src).toMatch(/redirect: "manual"/);
+    expect(src).not.toMatch(/export (async )?function (POST|PUT|PATCH|DELETE)\b/);
+    expect(src).not.toMatch(/unstable_cache|cacheTag|"use cache"|public, max-age/);
+  });
+
+  it("repeats the authorization after the fetch (Exit, expiry or revocation cuts a file in flight)", () => {
+    expect(src.match(/await open\(\)/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });

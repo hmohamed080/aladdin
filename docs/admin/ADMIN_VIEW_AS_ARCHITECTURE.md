@@ -37,7 +37,7 @@ Decided with the owner (2026-10-31):
 | Admin edits *their own* data believing it is the target's | View-as routes cannot reach mutating code: import-graph test + no server actions in the tree (§7). |
 | Direct RPC / URL guessing by an unprivileged user | Functions are `revoke … from public, anon`; internal authorization; `invalid id` and `not permitted` are indistinguishable to the caller (§4.4). |
 | Private response cached by a CDN / browser | `dynamic`, `Cache-Control: private, no-store`, no shared cache tags (§9). |
-| Private media leaked via a public URL or raw key | Existing private-media ticket architecture, extended with a view-as branch; nothing becomes public (§10). |
+| Private media leaked via a public URL or raw key | A dedicated, audited door (`admin_view_as_media_open` + one same-origin route, opaque media ids only); the shared resolvers and the edge ticket path stay owner-only; nothing becomes public (§10). |
 | Secrets exposure | Credentials, OTPs, tokens and auth metadata are not in any section's projection; enforced by an explicit column allow-list per reader + a test (§6.3). |
 
 ## 4. Permission model
@@ -193,11 +193,11 @@ AccountViewDefinition {
 
 The existing architecture stays the only delivery path (Postgres is the single authority; Worker calls `media_edge_authorize`; HMAC tickets; R2 private bucket; `Cache-Control: private, no-store`).
 
-Extension (**a separate, later slice, §13 step 4 — needs its own security review**):
+**Built (stage 4, migration `20261114090004`, own security review).** The shared resolvers (`media_storage_resolve`, `media_edge_authorize`, `organization_media_resolve`) are **not changed**: an admin, with or without a view session, still cannot read another user's private media through them, through `/api/media` or through the edge ticket path. The view has its own door instead of a widened shared one:
 
-* `media_edge_authorize` / `media_storage_resolve` gain one branch: viewer is an Admin with `users.view_as` **and** a live view session for the object's *owner*, **and** the namespace is in an allow-list (`portfolio`, `certificate`, `avatar`). The ticket carries the session id (`vas`) so the check is re-evaluated on **every** request; ending the session or revoking the permission cuts access immediately (same 0 s revocation bound as the owner path).
-* No raw object key reaches the browser (the ticket URL is opaque, as today); no object becomes public; nothing is copied.
-* Until that slice ships, the view shows public media normally and a neutral "private file" placeholder for the rest — **the view is still useful and nothing leaks**.
+* `public.admin_view_as_media_open(subject, namespace, media id)` runs `app.require_view_as` (permission, eligibility and rank, a view session that is unexpired, not ended and bound to the caller's Auth session), then requires a **ready** object owned by the **subject** in the allow-list (`avatar`, `portfolio`, `certificate`) with a **verified R2 location** (legacy Supabase-provider objects, videos and the cover keep the neutral placeholder). Every refusal is the same generic error (no existence oracle). It writes **one audit row** `admin.view_as.media_read` per (view session, namespace, media id) that never holds the object key, and returns the physical key and verified content type **to the server only**.
+* `GET /admin/users/[id]/view/media/[namespace]/[mediaId]` is the only delivery route. The browser only ever holds the opaque media id. Same-origin only (`Sec-Fetch-Site: same-origin`, missing header fails closed), behind `ADMIN_VIEW_AS_ENABLED`, `users.view_as`, a fresh Auth check and the per-admin media rate limit. It signs a 30 s R2 read, never follows a redirect, checks the type against the namespace policy, streams size-bounded with `private, no-store`, nosniff and no upstream headers, and **repeats the database authorization after the fetch** (same key and type required), so Exit, expiry, sign-out or a permission change cuts a file in flight. It uses no service-role client and none of the shared media modules; a dedicated guard in `view-as-read-only.test.ts` pins its imports and its single RPC, and proves no page, component or reader can reach storage or the route.
+* No object becomes public, nothing is copied or cached. Ticket-based edge delivery for views is intentionally not added: the application path is enough for an admin's low-volume read, and it keeps the edge authorization owner-only.
 
 ## 11. Migration impact
 
@@ -227,7 +227,7 @@ Extension (**a separate, later slice, §13 step 4 — needs its own security rev
 1. **Design (this document)** — review/approve permission model and defaults.
 2. **Foundation (built):** permission, session table, audit actions, `require_view_as`, begin/current/end/end_all, `ADMIN_VIEW_AS_ENABLED`, guard + banner shell with an empty section list + tests. Migration `20261114090002_admin_view_as_foundation.sql`; pgTAP `117_admin_view_as_foundation_test.sql`.
 3. **Craftsman sections** (§6.4) with readers, read-only components, `LinkScope`, import-graph test; wire the **eye** (craftsman rows → view-as; other kinds keep `/p/<id>`).
-4. **Private media branch** (§10) — separate security review.
+4. **Private media** (§10) — **built** (`20261114090004`, one route, own guard test); the hosted Acceptance check below is still to run.
 
 Each slice documents its migration impact and regression results here before it is marked ready.
 

@@ -67,6 +67,8 @@ export type ProfileData = {
   phoneVerified: boolean;
   secondaryPhoneMasked: string | null;
   hasAvatar: boolean;
+  /** The avatar's opaque media id (never a storage key); null when there is none. */
+  avatarId: string | null;
   hasCover: boolean;
   publicProfileStatus: string | null;
   accountStatus: string | null;
@@ -88,6 +90,7 @@ export function parseProfile(raw: unknown): ProfileData {
     phoneVerified: bool(o.phone_verified),
     secondaryPhoneMasked: str(o.secondary_phone_masked),
     hasAvatar: bool(o.has_avatar),
+    avatarId: str(o.avatar_id),
     hasCover: bool(o.has_cover),
     publicProfileStatus: str(o.public_profile_status),
     accountStatus: str(o.account_status),

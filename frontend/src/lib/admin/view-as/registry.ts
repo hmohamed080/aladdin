@@ -62,6 +62,14 @@ export function viewAsBasePath(userId: string): string {
  * The link scope: the ONLY way a view-as component builds an internal link. Every href lands under the view's own base
  * path, so navigation can never reach the Admin's own craftsman area (`/home/...`).
  */
+/** The private-media namespaces a view may deliver (the database enforces the same list). */
+export type ViewAsMediaNamespace = "avatar" | "portfolio" | "certificate";
+
+/** The ONE URL shape for a viewed account's private file: an opaque media id on the view's own route, never a storage key. */
+export function viewAsMediaHref(userId: string, namespace: ViewAsMediaNamespace, mediaId: string): string {
+  return `${viewAsBasePath(userId)}/media/${namespace}/${mediaId}`;
+}
+
 export function viewAsHref(userId: string, segment: string): string {
   const base = viewAsBasePath(userId);
   return segment ? `${base}/${segment}` : base;

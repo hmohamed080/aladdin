@@ -67,7 +67,8 @@ begin
     'secondary_phone_masked', (
       select '•••' || right(r.phone_e164, 3) from public.secondary_phone_reservations r
        where r.user_id = p_subject and r.status = 'active' and r.expires_at > now() limit 1),
-    'has_avatar', p.avatar_media_id is not null,   -- media delivery is the private-media stage
+    'has_avatar', p.avatar_media_id is not null,
+    'avatar_id', p.avatar_media_id,                -- an opaque id, never a storage key; delivered by 20261114090004
     'has_cover', p.cover_media_id is not null,
     'public_profile_status', p.public_profile_status::text,
     'account_status', u.status::text,

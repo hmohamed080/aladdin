@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import { tradeLabel } from "@/lib/i18n/trade-label";
 import { formatDate, formatMoney, formatNumber } from "@/lib/ui/format";
 import { Badge, Card, Field, ProgressMeter, SectionTitle, StatePanel } from "@/components/ui/primitives";
-import { ACCOUNT_VIEWS, viewAsHref, type ViewAsKind } from "@/lib/admin/view-as/registry";
+import { ACCOUNT_VIEWS, viewAsHref, viewAsMediaHref, type ViewAsKind, type ViewAsMediaNamespace } from "@/lib/admin/view-as/registry";
 import type { DashboardData, PointsData, PortfolioData, ProfileData, ReviewsData, WorkData } from "@/lib/admin/view-as/craftsman-data";
 
 /**
@@ -16,8 +16,9 @@ import type { DashboardData, PointsData, PortfolioData, ProfileData, ReviewsData
  * (see server/view-as/readers.ts) and reuse the product's own primitives, formatters and label catalogs; they import no
  * editor, no form and no server action, and every link is built by `viewAsHref`, so none can leave the view.
  *
- * Private files (avatar, cover, portfolio media, certificate files) are NOT displayed here: this stage shows their
- * metadata and a neutral placeholder. Delivering them is the separately reviewed private-media stage.
+ * Private files (avatar, portfolio images, certificate files) are delivered ONLY through `viewAsMediaHref`: an opaque media id
+ * on this view's own route, authorized by the database on every request (live view session) and audited. No storage key ever
+ * reaches the page. Videos and the cover keep the neutral placeholder (not in the approved namespace allow-list).
  */
 
 /** A catalog label, or the supplied fallback when the key has no translation (never a raw message path). */
@@ -41,6 +42,26 @@ export function MediaPlaceholder({ label }: { label?: string }) {
     >
       <span aria-hidden>🔒</span>
     </div>
+  );
+}
+
+/** A private image of the viewed account. Falls back to the neutral placeholder if the file cannot be delivered (session ended, not ready). */
+export function ViewAsImage({ userId, namespace, mediaId, label, className }: {
+  userId: string; namespace: ViewAsMediaNamespace; mediaId: string; label: string; className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <MediaPlaceholder label={label} />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- a private, per-request authorized stream; the image optimizer must never cache or proxy it
+    <img
+      src={viewAsMediaHref(userId, namespace, mediaId)}
+      alt={label}
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="same-origin"
+      onError={() => setFailed(true)}
+      className={className ?? "h-16 w-16 shrink-0 rounded-md border object-cover"}
+    />
   );
 }
 
@@ -125,7 +146,7 @@ export function DashboardSection({ data }: { data: DashboardData }) {
   );
 }
 
-export function ProfileSection({ data }: { data: ProfileData }) {
+export function ProfileSection({ userId, data }: { userId: string; data: ProfileData }) {
   const { t, locale } = useI18n();
   const gov = (k: string) => lbl(t, `onboarding.consumer.governorates.${k}`, k);
   const city = (k: string) => lbl(t, `onboarding.consumer.cities.${k}`, k);
@@ -133,11 +154,14 @@ export function ProfileSection({ data }: { data: ProfileData }) {
     <div className="flex flex-col gap-lg">
       <Card>
         <div className="flex items-start gap-md">
-          <MediaPlaceholder label={t("admin.viewAs.f.avatar")} />
+          {data.avatarId ? (
+            <ViewAsImage userId={userId} namespace="avatar" mediaId={data.avatarId} label={t("admin.viewAs.f.avatar")} />
+          ) : (
+            <MediaPlaceholder label={t("admin.viewAs.f.avatar")} />
+          )}
           <div className="min-w-0">
             <h2 className="text-title font-semibold text-fg">{data.displayName ?? dash(t)}</h2>
             <p className="text-label text-fg-muted">{data.headline ?? ""}</p>
-            <p className="mt-1 text-label text-fg-muted">{t("admin.viewAs.mediaPlaceholderHint")}</p>
           </div>
         </div>
       </Card>
@@ -194,11 +218,10 @@ export function ProfileSection({ data }: { data: ProfileData }) {
   );
 }
 
-export function PortfolioSection({ data }: { data: PortfolioData }) {
+export function PortfolioSection({ userId, data }: { userId: string; data: PortfolioData }) {
   const { t, locale } = useI18n();
   return (
     <div className="flex flex-col gap-lg">
-      <p className="text-label text-fg-muted">{t("admin.viewAs.mediaPlaceholderHint")}</p>
       <section className="flex flex-col gap-md">
         <SectionTitle>{t("admin.viewAs.f.projects")}</SectionTitle>
         {data.projects.length === 0 ? <StatePanel title={t("admin.viewAs.empty")} /> : null}
@@ -213,7 +236,11 @@ export function PortfolioSection({ data }: { data: PortfolioData }) {
             <div className="mt-2 flex flex-wrap gap-2" aria-label={t("admin.viewAs.f.items")}>
               {p.items.map((i) => (
                 <div key={i.id} className="flex items-center gap-2 rounded-md border px-2 py-1">
-                  <MediaPlaceholder />
+                  {i.kind === "image" && i.state === "ready" ? (
+                    <ViewAsImage userId={userId} namespace="portfolio" mediaId={i.id} label={i.title ?? t("admin.viewAs.f.image")} />
+                  ) : (
+                    <MediaPlaceholder />
+                  )}
                   <span className="text-label text-fg-muted">{i.kind === "video" ? t("admin.viewAs.f.video") : t("admin.viewAs.f.image")}{i.title ? ` · ${i.title}` : ""}</span>
                 </div>
               ))}
@@ -227,12 +254,23 @@ export function PortfolioSection({ data }: { data: PortfolioData }) {
         {data.certificates.map((c) => (
           <Card key={c.id}>
             <div className="flex items-start gap-md">
-              <MediaPlaceholder />
+              {c.kind === "image" && c.state === "ready" ? (
+                <ViewAsImage userId={userId} namespace="certificate" mediaId={c.id} label={c.title} />
+              ) : (
+                <MediaPlaceholder />
+              )}
               <dl className="grid min-w-0 flex-1 grid-cols-1 gap-md tablet:grid-cols-4">
                 <Field label={t("admin.viewAs.f.certificates")}>{c.title}</Field>
                 <Field label={t("admin.viewAs.f.issuer")}>{c.issuer ?? dash(t)}</Field>
                 <Field label={t("admin.viewAs.f.issued")}>{formatDate(c.issuedOn, locale)}</Field>
                 <Field label={t("admin.viewAs.f.expires")}>{formatDate(c.expiresOn, locale)}</Field>
+                {c.kind === "pdf" && c.state === "ready" ? (
+                  <Field label={t("admin.viewAs.f.file")}>
+                    <a href={viewAsMediaHref(userId, "certificate", c.id)} target="_blank" rel="noreferrer" className="text-accent underline">
+                      {t("admin.viewAs.f.openFile")}
+                    </a>
+                  </Field>
+                ) : null}
               </dl>
             </div>
           </Card>

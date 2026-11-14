@@ -851,6 +851,8 @@ export const ar: Messages = {
         phoneVerified: "تم توثيق الهاتف",
         secondaryPhone: "الهاتف الإضافي",
         avatar: "صورة الملف",
+        file: "الملف",
+        openFile: "فتح الملف",
         cover: "صورة الغلاف",
         present: "مضافة",
         absent: "غير مضافة",

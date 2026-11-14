@@ -886,6 +886,8 @@ export const en = {
         phoneVerified: "Phone verified",
         secondaryPhone: "Secondary phone",
         avatar: "Profile photo",
+        file: "File",
+        openFile: "Open file",
         cover: "Cover photo",
         present: "Set",
         absent: "Not set",

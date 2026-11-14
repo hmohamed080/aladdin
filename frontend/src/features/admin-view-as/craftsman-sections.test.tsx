@@ -12,14 +12,23 @@ afterEach(cleanup);
 
 const profile = parseProfile({
   display_name: "Sayed Abdel-Rahman", phone: "+201000000001", phone_verified: true, secondary_phone_masked: "•••999",
-  has_avatar: true, has_cover: false, account_status: "suspended", public_profile_status: "hidden", years_experience: 8, availability: "full_time",
+  has_avatar: true, avatar_id: "a1000000-0000-4000-8000-000000000001", has_cover: false, account_status: "suspended", public_profile_status: "hidden", years_experience: 8, availability: "full_time",
   trades: [{ key: "tiling", is_primary: true }], service_areas: [{ governorate: "cairo", city: "new_cairo", is_primary: true }],
   completion: { percent: 60, missing: ["portfolio"] }, bio: "Tiler.",
 });
 const portfolio = parsePortfolio({
-  projects: [{ id: "p", title: "Villa kitchen", items: [{ id: "i", kind: "image" }, { id: "v", kind: "video" }] }],
-  certificates: [{ id: "c", title: "Electrical safety", issuer: "Board", kind: "pdf" }],
+  projects: [{ id: "p", title: "Villa kitchen", items: [
+    { id: "d1000000-0000-4000-8000-000000000001", kind: "image", state: "ready" },
+    { id: "d2000000-0000-4000-8000-000000000002", kind: "image", state: "pending" },
+    { id: "v", kind: "video", state: "ready" },
+  ] }],
+  certificates: [
+    { id: "c1000000-0000-4000-8000-000000000001", title: "Electrical safety", issuer: "Board", kind: "pdf", state: "ready" },
+    { id: "c3000000-0000-4000-8000-000000000003", title: "Scanned diploma", issuer: "Board", kind: "image", state: "ready" },
+    { id: "c4000000-0000-4000-8000-000000000004", title: "Pending PDF", issuer: "Board", kind: "pdf", state: "pending" },
+  ],
 });
+const BASE = "/admin/users/u1/view/media";
 
 describe("craftsman read-only sections", () => {
   it("dashboard shows the subject's numbers", () => {
@@ -28,21 +37,43 @@ describe("craftsman read-only sections", () => {
     expect(screen.getByText("120")).toBeTruthy();
   });
 
-  it("profile shows primary phone, MASKS the secondary, and never renders media (placeholder only)", () => {
-    const { container } = wrap(<ProfileSection data={profile} />);
+  it("profile shows primary phone, MASKS the secondary, and shows the avatar only through the view's media route (opaque id)", () => {
+    const { container } = wrap(<ProfileSection userId="u1" data={profile} />);
     expect(screen.getByText("+201000000001")).toBeTruthy();
     expect(screen.getByText("•••999")).toBeTruthy();
     expect(container.textContent).not.toMatch(/\+201000000999/);
-    expect(container.querySelector("img, video, source")).toBeNull();
-    expect(screen.getAllByRole("img", { name: /Profile photo|Private file/ }).length).toBeGreaterThan(0);
+    expect(container.querySelector("video, source, iframe")).toBeNull();
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("src")).toBe(`${BASE}/avatar/a1000000-0000-4000-8000-000000000001`);
+    expect(img?.getAttribute("referrerpolicy")).toBe("same-origin");
   });
 
-  it("portfolio lists projects and certificates as details + placeholders, never <img>/<video>/<a href=file>", () => {
-    const { container } = wrap(<PortfolioSection data={portfolio} />);
+  it("profile without an avatar keeps the neutral placeholder (no <img>)", () => {
+    const { container } = wrap(<ProfileSection userId="u1" data={{ ...profile, avatarId: null }} />);
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getAllByRole("img", { name: /Profile photo/ }).length).toBe(1);
+  });
+
+  it("portfolio: ready images and certificates load through the media route; videos, pending files keep the placeholder; a PDF is a link, never embedded", () => {
+    const { container } = wrap(<PortfolioSection userId="u1" data={portfolio} />);
     expect(screen.getByText("Villa kitchen")).toBeTruthy();
     expect(screen.getByText("Electrical safety")).toBeTruthy();
-    expect(container.querySelector("img, video, source, iframe, embed, object, a[href]")).toBeNull();
-    expect(screen.getAllByRole("img", { name: "Private file — not shown in this view" }).length).toBe(3);
+    expect(container.querySelector("video, source, iframe, embed, object")).toBeNull();
+    const srcs = [...container.querySelectorAll("img")].map((i) => i.getAttribute("src"));
+    expect(srcs.sort()).toEqual([
+      `${BASE}/certificate/c3000000-0000-4000-8000-000000000003`,
+      `${BASE}/portfolio/d1000000-0000-4000-8000-000000000001`,
+    ]);
+    const links = [...container.querySelectorAll("a[href]")].map((a) => a.getAttribute("href"));
+    expect(links).toEqual([`${BASE}/certificate/c1000000-0000-4000-8000-000000000001`]);
+    expect(container.querySelector("a[href]")?.getAttribute("rel")).toBe("noreferrer");
+    // the video, the pending image, the pending PDF and the (link-only) ready PDF show the neutral tile
+    expect(screen.getAllByRole("img", { name: "Private file — not shown in this view" }).length).toBe(4);
+  });
+
+  it("no storage key, bucket path, file extension or signed URL appears anywhere in the rendered markup", () => {
+    const { container } = wrap(<PortfolioSection userId="u1" data={portfolio} />);
+    expect(container.innerHTML).not.toMatch(/\.(jpe?g|png|webp|pdf)|token=|X-Amz|supabase|r2\.|\/storage\//i);
   });
 
   it("work, points and reviews render the subject's rows", () => {
@@ -58,7 +89,7 @@ describe("craftsman read-only sections", () => {
 
   it("renders every section in Arabic without throwing", () => {
     for (const node of [
-      <DashboardSection key="d" data={parseDashboard({})} />, <ProfileSection key="p" data={profile} />, <PortfolioSection key="o" data={portfolio} />,
+      <DashboardSection key="d" data={parseDashboard({})} />, <ProfileSection key="p" userId="u1" data={profile} />, <PortfolioSection key="o" userId="u1" data={portfolio} />,
       <WorkSection key="w" data={parseWork({})} />, <PointsSection key="s" data={parsePoints({})} />, <ReviewsSection key="r" data={parseReviews({})} />,
     ]) {
       wrap(node, "ar");

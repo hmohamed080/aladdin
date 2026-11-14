@@ -13,5 +13,5 @@ export default async function ViewAsProfilePage({ params }: { params: Promise<{ 
   const { id } = await params;
   const session = await requireViewAs(id);
   const reader = craftsmanViewAsReader(await getServerSupabase(), session.subjectUserId);
-  return <ProfileSection data={await reader.profile()} />;
+  return <ProfileSection userId={session.subjectUserId} data={await reader.profile()} />;
 }

@@ -13,5 +13,5 @@ export default async function ViewAsPortfolioPage({ params }: { params: Promise<
   const { id } = await params;
   const session = await requireViewAs(id);
   const reader = craftsmanViewAsReader(await getServerSupabase(), session.subjectUserId);
-  return <PortfolioSection data={await reader.portfolio()} />;
+  return <PortfolioSection userId={session.subjectUserId} data={await reader.portfolio()} />;
 }
