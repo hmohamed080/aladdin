@@ -11,7 +11,7 @@ import styles from "./landing-brand.module.css";
 
 const MAX_CARDS = 6;
 
-/** Category chips + a horizontally scrolling row of at most six preview products (sample data, labelled as such). */
+/** Category chips + a horizontally scrolling row of at most six preview products (preview product data). */
 export function LandingBrandMarket() {
   const { locale } = useI18n();
   const t = brandContent[locale].market;
@@ -30,7 +30,7 @@ export function LandingBrandMarket() {
     const card = (el.firstElementChild as HTMLElement | null)?.offsetWidth ?? 240;
     el.scrollBy({ left: dir * (locale === "ar" ? -1 : 1) * (card + 20), behavior: "smooth" });
   };
-  const nf = new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-EG");
+  const nf = new Intl.NumberFormat("en-US");
 
   return (
     <>
@@ -65,7 +65,6 @@ export function LandingBrandMarket() {
       </ul>
       <button type="button" className={styles.arrow} aria-label={locale === "ar" ? "التالي" : "Next"} onClick={() => step(1)}><BrandIcon name="chevron" size={18} className={styles.chevNext} /></button>
       </div>
-      <p className={styles.sample}>{t.sample}</p>
     </>
   );
 }

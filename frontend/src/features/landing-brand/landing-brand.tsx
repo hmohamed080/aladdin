@@ -7,7 +7,7 @@ import { LandingBrandHeader } from "./landing-brand-header";
 import { BrandIcon, SocialIcon } from "./landing-brand-icons";
 import { LandingBrandVideo } from "./landing-brand-video";
 import { LandingBrandMarket } from "./landing-brand-market";
-import { formatStat, toLocaleDigits, type LandingStats } from "./landing-brand-stats";
+import { formatStat, type LandingStats } from "./landing-brand-stats";
 import styles from "./landing-brand.module.css";
 
 /** The public Landing page (brand identity, design-system v1.1.0). Server component; interactive parts are the header, product chips and FAQ. */
@@ -42,7 +42,7 @@ export function LandingBrand({ locale, stats }: { locale: Locale; stats: Landing
               <ul className={styles.pills}>
                 {pills.map(([icon, n, label]) => (
                   <li key={label}>
-                    <span><strong>{toLocaleDigits(formatStat(n as number, locale), locale)}</strong><small>{label}</small></span>
+                    <span><strong>{formatStat(n as number, locale)}</strong><small>{label}</small></span>
                     <i><BrandIcon name={icon} size={22} /></i>
                   </li>
                 ))}
@@ -105,7 +105,7 @@ export function LandingBrand({ locale, stats }: { locale: Locale; stats: Landing
         <ol>
           {c.how.steps.map((s, i) => (
             <li key={s.title}>
-              <div><b>{toLocaleDigits(String(i + 1), locale)}</b><BrandIcon name={s.icon} size={30} /></div>
+              <div><b>{i + 1}</b><BrandIcon name={s.icon} size={30} /></div>
               <strong>{s.title}</strong><span>{s.body}</span>
             </li>
           ))}

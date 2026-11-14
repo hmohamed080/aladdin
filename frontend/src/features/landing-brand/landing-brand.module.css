@@ -84,7 +84,7 @@ a.registerItem:hover { background: rgba(255, 255, 255, 0.6); }
 .videoDialog ul { display: flex; flex-wrap: wrap; gap: 8px; }
 .videoDialog li button { display: inline-flex; gap: 8px; align-items: center; }
 .videoDialog li button[aria-pressed="true"] { background: var(--lb-sand); color: var(--lb-navy); }
-.pills { display: flex; flex-direction: column; gap: 18px; }
+.pills { display: flex; flex-direction: column; gap: 20px; }
 .pills li { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-width: 210px; padding: 8px 10px 8px 26px; border-radius: 999px; border: 1px solid var(--lb-sand); background: linear-gradient(110deg, var(--lb-navy-2), var(--lb-navy-3)); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); }
 .pills span { display: flex; flex-direction: column; flex: 1; text-align: center; line-height: 1.3; }
 .pills strong { font-size: 20px; }
