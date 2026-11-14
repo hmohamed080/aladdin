@@ -23,7 +23,7 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
   ).filter(([, n]) => n !== null && n > 0);
 
   return (
-    <div id="top" className={`${styles.page} ${hurme.variable} ${bukra.variable}`}>
+    <div id="top" lang="ar" dir="rtl" className={`${styles.page} ${hurme.variable} ${bukra.variable}`}>
       <div className={styles.onlyDesktop}>
       <section className={styles.heroWrap}>
         <div className={styles.hero}>
