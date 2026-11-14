@@ -11,8 +11,8 @@ import styles from "./landing-brand.module.css";
 
 /** Brand header: logo, anchor navigation, sign in, and the account-type dropdown (opens under its button). */
 export function LandingBrandHeader() {
-  const { locale, dir, t: tr } = useI18n();
-  const t = brandContent[locale].nav;
+  const { dir, t: tr } = useI18n();
+  const t = brandContent.nav;
   const [menuOpen, setMenuOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
@@ -38,7 +38,7 @@ export function LandingBrandHeader() {
     >
       <a className={styles.brand} href="#top" aria-label="Aladdin | علاء الدين">
         <Image src="/landing-brand/mark-cream.png" alt="" width={34} height={52} sizes="34px" priority />
-        <span>{locale === "ar" ? "علاء الدين" : "Aladdin"}</span>
+        <span>علاء الدين</span>
       </a>
       <button type="button" className={styles.burger} aria-label={t.menu} aria-expanded={menuOpen} aria-controls="brand-nav" onClick={() => setMenuOpen(!menuOpen)}>
         {menuOpen ? <XIcon size={22} /> : <MenuIcon size={22} />}

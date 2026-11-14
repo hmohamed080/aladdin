@@ -1,5 +1,3 @@
-import { cookies } from "next/headers";
-import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { I18nMessagesProvider } from "@/lib/i18n/context";
 import { LandingBrand } from "@/features/landing-brand/landing-brand";
 import { readLandingStats } from "@/features/landing-brand/landing-brand-stats.server";
@@ -17,16 +15,10 @@ export const dynamic = "force-dynamic";
  * `landing-v2` components stay in the repo as reference only and are no longer mounted anywhere.
  */
 export default async function RootPage() {
-  const store = await cookies();
-  const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
-
+  // The landing page is Arabic-only: no language switch, no cookie lookup.
   return (
-    <I18nMessagesProvider
-      locale={locale}
-      dir={directionFor(locale)}
-      messages={landingMessages(locale)}
-    >
-      <LandingBrand locale={locale} stats={await readLandingStats()} />
+    <I18nMessagesProvider locale="ar" dir="rtl" messages={landingMessages("ar")}>
+      <LandingBrand stats={await readLandingStats()} />
     </I18nMessagesProvider>
   );
 }

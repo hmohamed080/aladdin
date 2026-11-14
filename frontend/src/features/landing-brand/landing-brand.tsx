@@ -1,5 +1,4 @@
 import Image from "next/image";
-import type { Locale } from "@/lib/i18n/locales";
 import { brandContent, PARTNER_NAMES } from "./landing-brand-content";
 import { bukra, hurme } from "./landing-brand-fonts";
 import { LandingBrandFaq } from "./landing-brand-faq";
@@ -11,8 +10,8 @@ import { formatStat, type LandingStats } from "./landing-brand-stats";
 import styles from "./landing-brand.module.css";
 
 /** The public Landing page (brand identity, design-system v1.1.0). Server component; interactive parts are the header, product chips and FAQ. */
-export function LandingBrand({ locale, stats }: { locale: Locale; stats: LandingStats }) {
-  const c = brandContent[locale];
+export function LandingBrand({ stats }: { stats: LandingStats }) {
+  const c = brandContent;
   const pills = (
     [
       ["users", stats.users, c.hero.stats.users],
@@ -42,7 +41,7 @@ export function LandingBrand({ locale, stats }: { locale: Locale; stats: Landing
               <ul className={styles.pills}>
                 {pills.map(([icon, n, label]) => (
                   <li key={label}>
-                    <span><strong>{formatStat(n as number, locale)}</strong><small>{label}</small></span>
+                    <span><strong>{formatStat(n as number)}</strong><small>{label}</small></span>
                     <i><BrandIcon name={icon} size={22} /></i>
                   </li>
                 ))}
@@ -170,7 +169,7 @@ export function LandingBrand({ locale, stats }: { locale: Locale; stats: Landing
       <footer id="footer" className={styles.footer}>
         <div className={styles.footerGrid}>
           <div className={styles.footBrand}>
-            <a href="#top" className={styles.footLogo}><Image src="/landing-brand/mark-navy.png" alt="" width={34} height={52} /><span>{locale === "ar" ? "علاء الدين" : "Aladdin"}</span></a>
+            <a href="#top" className={styles.footLogo}><Image src="/landing-brand/mark-navy.png" alt="" width={34} height={52} /><span>علاء الدين</span></a>
             <small>{c.footer.tagline}</small>
           </div>
           <p>{c.footer.about}</p>

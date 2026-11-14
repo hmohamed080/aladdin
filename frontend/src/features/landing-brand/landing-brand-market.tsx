@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
-import { useI18n } from "@/lib/i18n/context";
 import { categoryOrder, landingMarketplaceContent, previewProducts, type CategoryFilter } from "../landing-marketplace/landing-marketplace-content";
 import { CategoryIcon } from "../landing-marketplace/landing-marketplace-icons";
 import { brandContent } from "./landing-brand-content";
@@ -13,9 +12,8 @@ const MAX_CARDS = 6;
 
 /** Category chips + a horizontally scrolling row of at most six preview products (preview product data). */
 export function LandingBrandMarket() {
-  const { locale } = useI18n();
-  const t = brandContent[locale].market;
-  const cat = landingMarketplaceContent[locale];
+  const t = brandContent.market;
+  const cat = landingMarketplaceContent.ar;
   const [filter, setFilter] = useState<CategoryFilter>("all");
   const [favs, setFavs] = useState<Record<string, boolean>>({});
   const products = useMemo(
@@ -28,7 +26,7 @@ export function LandingBrandMarket() {
     const el = row.current;
     if (!el) return;
     const card = (el.firstElementChild as HTMLElement | null)?.offsetWidth ?? 240;
-    el.scrollBy({ left: dir * (locale === "ar" ? -1 : 1) * (card + 20), behavior: "smooth" });
+    el.scrollBy({ left: dir * -1 * (card + 20), behavior: "smooth" });
   };
   const nf = new Intl.NumberFormat("en-US");
 
@@ -42,10 +40,10 @@ export function LandingBrandMarket() {
         ))}
       </div>
       <div className={styles.carousel}>
-      <button type="button" className={styles.arrow} aria-label={locale === "ar" ? "السابق" : "Previous"} onClick={() => step(-1)}><BrandIcon name="chevron" size={18} className={styles.chevPrev} /></button>
+      <button type="button" className={styles.arrow} aria-label="السابق" onClick={() => step(-1)}><BrandIcon name="chevron" size={18} className={styles.chevPrev} /></button>
       <ul className={styles.cards} ref={row}>
         {products.map((p) => {
-          const copy = p.copy[locale];
+          const copy = p.copy.ar;
           const on = !!favs[p.id];
           return (
             <li key={p.id} className={styles.card}>
@@ -63,7 +61,7 @@ export function LandingBrandMarket() {
           );
         })}
       </ul>
-      <button type="button" className={styles.arrow} aria-label={locale === "ar" ? "التالي" : "Next"} onClick={() => step(1)}><BrandIcon name="chevron" size={18} className={styles.chevNext} /></button>
+      <button type="button" className={styles.arrow} aria-label="التالي" onClick={() => step(1)}><BrandIcon name="chevron" size={18} className={styles.chevNext} /></button>
       </div>
     </>
   );
