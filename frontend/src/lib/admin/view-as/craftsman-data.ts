@@ -1,6 +1,6 @@
 /**
  * Typed shapes + defensive parsers for the six Admin View-As craftsman sections
- * (`admin_view_craftsman_*`, 20261101090003). Pure and client-safe.
+ * (`admin_view_craftsman_*`, 20261114090003). Pure and client-safe.
  *
  * The database already projects an explicit allow-list; these parsers are the second wall. They COPY only the fields the
  * read-only components render (so an unexpected new column can never reach the page), coerce types, and never throw: a

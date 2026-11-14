@@ -71,7 +71,7 @@ export function canSuspendUser(
 /**
  * The actor may open a read-only VIEW of this user's account area (Admin View-As).
  *
- * Mirrors `app.view_as_subject_ok` (20261101090002): needs `users.view_as`; never one's own account; unless the actor
+ * Mirrors `app.view_as_subject_ok` (20261114090002): needs `users.view_as`; never one's own account; unless the actor
  * is a Super Admin, never Admin Staff at or above their own rank; and the subject must be of the account kind the view
  * supports. Suspended / deactivated / unverified accounts ARE viewable. `staffRank` unknown (`null`) means the actor
  * cannot see staff ranks, so the control is drawn and the database stays the only judge. Presentation only.

@@ -12,7 +12,7 @@ Read with the official CLI (`supabase migration list --linked`, temporary login 
 | Repository `main` | 193 | latest `20261027090001` |
 | Acceptance | 197 | = all of `main` + 4 Registration migrations |
 | Registration-only versions already on Acceptance | 4 | `20261028090001`, `20261028090003`, `20261029090001`, `20261029090002` (in `claude/registration-resume`, not in `main`) |
-| View-As stack, not on Acceptance | 3 | `20261101090001`, `…090002`, `…090003` |
+| View-As stack, not on Acceptance | 3 | `20261114090001`, `…090002`, `…090003` |
 | On `main`, missing on Acceptance | 0 | |
 
 **Correction to the earlier report:** `20261026090001` and `20261027090001` are NOT pending. They are on `main`, on Acceptance, and (per the work log) already pushed to Production. Nothing from `main` is missing anywhere.
@@ -23,9 +23,9 @@ But the View-As branch does not contain the four Registration migrations, so `su
 "remote-only" history drift. They must therefore be applied from a branch that contains both stacks (section 3). Migration history is never edited by hand.
 
 ### Dependency order and compatibility
-1. `20261101090001_verification_apply_reviewer_gate` — replaces the verification apply RPCs, adds the internal `app.assert_assigned_reviewer`, default listing opt-in to false. Independent of View-As.
-2. `20261101090002_admin_view_as_foundation` — permission `users.view_as`, audit actions, `admin_view_sessions`, gate functions, begin/current/end/end_all. Needs the admin RBAC tables (present).
-3. `20261101090003_admin_view_craftsman_sections` — six readers. Needs 2.
+1. `20261114090001_verification_apply_reviewer_gate` — replaces the verification apply RPCs, adds the internal `app.assert_assigned_reviewer`, default listing opt-in to false. Independent of View-As.
+2. `20261114090002_admin_view_as_foundation` — permission `users.view_as`, audit actions, `admin_view_sessions`, gate functions, begin/current/end/end_all. Needs the admin RBAC tables (present).
+3. `20261114090003_admin_view_craftsman_sections` — six readers. Needs 2.
 
 Compatibility with the four Registration migrations: none of my migrations reference their objects (no `account_basics`, `user_specialties`, `pending_registrations`, username-lease), and they redefine none of my functions. Registration alters `public.users`/`public.profiles`; the View-As readers use explicit column allow-lists, so added columns are not exposed.
 Trial merge of `claude/registration-resume` into the View-As stack: 3 mechanical conflicts only — `server/actions/auth.ts` (keep Registration's body plus the `admin_view_as_end_all` call), its test `auth-sign-out.test.ts`, and the pgTAP `41_trade_taxonomy_test.sql` allow-list (union of both lists). The throwaway worktree was deleted.

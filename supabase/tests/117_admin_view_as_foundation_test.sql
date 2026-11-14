@@ -1,4 +1,4 @@
--- pgTAP: Admin "View as account" — foundation (20261101090002_admin_view_as_foundation.sql;
+-- pgTAP: Admin "View as account" — foundation (20261114090002_admin_view_as_foundation.sql;
 -- docs/admin/ADMIN_VIEW_AS_ARCHITECTURE.md §4–§5).
 --
 -- Every check calls the database as a hostile client would: `authenticated` / `anon` Postgres roles with a forged-but-valid

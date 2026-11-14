@@ -226,7 +226,7 @@ insert into stack_actions values
   ('secondary_phone.converted'),
   ('secondary_phone.renewed'),
   ('secondary_phone.reserved'),
-  -- Admin View-As foundation (20261101090002).
+  -- Admin View-As foundation (20261114090002).
   ('admin.view_as.ended'),
   ('admin.view_as.started');
 create temp table live_actions(a text) on commit drop;

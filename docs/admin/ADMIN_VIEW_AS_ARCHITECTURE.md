@@ -225,7 +225,7 @@ Extension (**a separate, later slice, §13 step 4 — needs its own security rev
 ## 13. Delivery slices (stacked, each reviewable)
 
 1. **Design (this document)** — review/approve permission model and defaults.
-2. **Foundation (built):** permission, session table, audit actions, `require_view_as`, begin/current/end/end_all, `ADMIN_VIEW_AS_ENABLED`, guard + banner shell with an empty section list + tests. Migration `20261101090002_admin_view_as_foundation.sql`; pgTAP `117_admin_view_as_foundation_test.sql`.
+2. **Foundation (built):** permission, session table, audit actions, `require_view_as`, begin/current/end/end_all, `ADMIN_VIEW_AS_ENABLED`, guard + banner shell with an empty section list + tests. Migration `20261114090002_admin_view_as_foundation.sql`; pgTAP `117_admin_view_as_foundation_test.sql`.
 3. **Craftsman sections** (§6.4) with readers, read-only components, `LinkScope`, import-graph test; wire the **eye** (craftsman rows → view-as; other kinds keep `/p/<id>`).
 4. **Private media branch** (§10) — separate security review.
 

@@ -1,4 +1,4 @@
--- pgTAP: Admin View-As — the six read-only Craftsman sections (20261101090003_admin_view_craftsman_sections.sql).
+-- pgTAP: Admin View-As — the six read-only Craftsman sections (20261114090003_admin_view_craftsman_sections.sql).
 --
 -- Called as a hostile client would: `authenticated` / `anon` roles with a forged-but-valid JWT (including the Auth `session_id`
 -- claim a view is bound to), invoking the functions DIRECTLY.
