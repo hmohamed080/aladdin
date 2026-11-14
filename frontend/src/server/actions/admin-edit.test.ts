@@ -76,7 +76,7 @@ describe("editUserProfileAction", () => {
 
   it("rejects an empty submission, an over-long value, a blank required name and malformed ids without calling the database", async () => {
     expect((await editUserProfileAction(initial, form({ subjectId: USER, reason: "x" }))).ok).toBe(false);
-    expect((await editUserProfileAction(initial, form({ subjectId: USER, reason: "x", f_bio: "b".repeat(1001) }))).ok).toBe(false);
+    expect((await editUserProfileAction(initial, form({ subjectId: USER, reason: "x", f_bio: "b".repeat(251) }))).ok).toBe(false);
     expect((await editUserProfileAction(initial, form({ subjectId: USER, reason: "x", f_display_name: "  " }))).ok).toBe(false);
     expect((await editUserProfileAction(initial, form({ subjectId: USER, reason: "x", f_languages: "arabic-egyptian" }))).ok).toBe(false);
     expect((await editUserProfileAction(initial, form({ subjectId: "not-a-uuid", reason: "x", f_headline: "x" }))).ok).toBe(false);

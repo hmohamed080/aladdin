@@ -196,6 +196,22 @@ select throws_ok(format($$select public.admin_organization_edit(%L, '{"descripti
 select is((select public.admin_organization_edit(:'org', '{"description":"Reach us at sales@nile.example or +20 2 2345 6789"}', 'same again') ->> 'changed'), 'false', 'G: a no-op edit reports changed=false');
 
 -- ===========================================================================
+-- I. Audit masking is not bypassed by script, e-mail shape or the 200-character cut
+-- ===========================================================================
+select pg_temp.act_as(:'adminA');
+select lives_ok(format($$select public.admin_user_edit_profile(%L, jsonb_build_object('bio', %L), 'masking probe')$$, :'target',
+  'Arabic digits ' || U&'\0660\0661\0660\0661\0662\0663\0664\0665\0666\0667\0668' || ' persian ' || U&'\06F0\06F1\06F0\06F1\06F2\06F3\06F4\06F5\06F6\06F7\06F8'
+  || ' fullwidth ' || U&'\FF10\FF11\FF10\FF11\FF12\FF13\FF14\FF15\FF16\FF17\FF18' || ' mail ' || U&'\0645\062D\0645\062F' || '@example.org'
+  || ' ' || repeat('x', 100) || ' tail mona.tail@example.net'), 'I: a bio with non-Latin digits, a non-ASCII e-mail and a contact at the 200-character cut is accepted');
+select pg_temp.as_dba();
+select ok((select metadata::text from public.audit_log where action = 'admin.user.edited' and metadata -> 'changes' ? 'bio' order by created_at desc limit 1)
+  !~ (U&'[\0660-\0669\06F0-\06F9\FF10-\FF19]{4}' || '|example\.org|mona|\.net'),
+  'I: no Arabic-Indic, Persian or fullwidth digits, no non-ASCII e-mail local part, no fragment of a contact at the cut');
+select is(app.admin_edit_mask(repeat('a', 197) || ' 0101234567'), repeat('a', 197) || ' [n', 'I: masking happens BEFORE the 200-character cut');
+select is(app.admin_edit_mask('write to sam@example.com now'), 'write to ***@example.com now', 'I: an ordinary e-mail keeps only its domain');
+select is(app.admin_edit_mask('خالد 12 سنة'), 'خالد 12 سنة', 'I: short numbers (an age) are kept');
+
+-- ===========================================================================
 -- H. Audit immutability
 -- ===========================================================================
 select pg_temp.act_as(:'adminA');

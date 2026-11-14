@@ -64,10 +64,14 @@ language sql
 immutable
 set search_path = ''
 as $$
+  -- Mask FIRST, truncate after (a contact cut in half at the 200-character boundary must not survive as a fragment).
+  -- Digits of every script (Latin, Arabic-Indic, Persian, fullwidth) and e-mail addresses with a non-ASCII local part count.
   select case when p_value is null then null else
-    regexp_replace(
-      regexp_replace(left(p_value, 200), '[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+)', '***@\1', 'g'),
-      '\+?[0-9][0-9 ()._-]{5,}[0-9]', '[number]', 'g')
+    left(
+      regexp_replace(
+        regexp_replace(p_value, '[^[:space:]@<>"]+@([^[:space:]@<>"]+)', '***@\1', 'g'),
+        '\+?[0-9\u0660-\u0669\u06F0-\u06F9\uFF10-\uFF19][0-9\u0660-\u0669\u06F0-\u06F9\uFF10-\uFF19 ()._-]{5,}[0-9\u0660-\u0669\u06F0-\u06F9\uFF10-\uFF19]', '[number]', 'g'),
+      200)
   end;
 $$;
 revoke all on function app.admin_edit_mask(text) from public, anon, authenticated, service_role;

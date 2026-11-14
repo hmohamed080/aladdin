@@ -15,7 +15,7 @@ export const USER_EDIT_FIELDS: readonly EditField[] = [
   { key: "display_name_ar", kind: "text", max: 80 },
   { key: "display_name_en", kind: "text", max: 80 },
   { key: "headline", kind: "text", max: 120 },
-  { key: "bio", kind: "textarea", max: 1000 },
+  { key: "bio", kind: "textarea", max: 250 },
   { key: "languages", kind: "languages", max: 40 },
   { key: "governorate_key", kind: "text", max: 40 },
   { key: "city_key", kind: "text", max: 40 },
