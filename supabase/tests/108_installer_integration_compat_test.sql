@@ -225,7 +225,12 @@ insert into stack_actions values
   ('secondary_phone.changed'),
   ('secondary_phone.converted'),
   ('secondary_phone.renewed'),
-  ('secondary_phone.reserved');
+  ('secondary_phone.reserved'),
+  -- Admin View-As foundation (20261114090002).
+  ('admin.view_as.ended'),
+  ('admin.view_as.started'),
+  -- Admin View-As private media (20261114090004).
+  ('admin.view_as.media_read');
 create temp table live_actions(a text) on commit drop;
 insert into live_actions
 select unnest(regexp_split_to_array(substring(pg_get_constraintdef(oid) from 'ARRAY\[(.*)\]'), ', ')) from pg_constraint

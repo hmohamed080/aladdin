@@ -22,7 +22,10 @@ import { TablePagination } from "@/features/admin-preview/table-pagination";
 import { EyeIcon, SettingsIcon, WhatsAppIcon } from "@/components/ui/icons";
 import { requireAdminRoute } from "@/server/authorization/admin";
 import { loadStaffRanks } from "@/server/queries/admin-rbac";
-import { canSuspendUser, staffRankOf } from "@/features/admin-rbac/eligibility";
+import { canSuspendUser, canViewAsUser, staffRankOf } from "@/features/admin-rbac/eligibility";
+import { ViewAsEye } from "@/features/admin-view-as/view-as-eye";
+import { viewKindForAccountType } from "@/lib/admin/view-as/registry";
+import { isViewAsEnabled } from "@/lib/env/view-as";
 import { SuspensionAction } from "@/features/admin-ops/suspension";
 
 export const dynamic = "force-dynamic";
@@ -270,7 +273,9 @@ export default async function PreviewUsersPage({
 
         return (
           <span className="flex items-center justify-end gap-0.5">
-            {u.profileId && u.publicProfileAvailable ? (
+            {isViewAsEnabled() && canViewAsUser(access, caller?.id ?? "", { userId: u.id, staffRank: staffRankOf(staffRanks, u.id), accountKind: viewKindForAccountType(u.accountType) }) ? (
+              <ViewAsEye userId={u.id} />
+            ) : u.profileId && u.publicProfileAvailable ? (
               <RowIconLink href={`/p/${u.profileId}`} label={platform.viewOnPlatform} Icon={EyeIcon} external />
             ) : (
               <RowIconDisabled label={platform.viewOnPlatform} reason={platform.notListed} Icon={EyeIcon} />
