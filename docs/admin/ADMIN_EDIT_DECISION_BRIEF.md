@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Decision brief for the owner. **Nothing is implemented.** |
+| **Status** | **DECIDED 2026-11-14: Option A** (owner). Implementation: PR #196 (stacked on #193), migration `20261114090005`. Options B and C are **not** approved and must not be built. |
 | **Date** | 2026-11-14 |
 | **Scope** | Whether and how platform staff may change a user's or an organization's record. Not View-As (read-only by design, `ADMIN_VIEW_AS_ARCHITECTURE.md`). |
 | **Evidence** | Admin writes on `main` today: verify/reject, suspend/restore (reason required), notes, follow-ups, cases, duplicate resolution, roles/staff, points adjust/reverse. **No admin RPC edits a profile or an organization** (`docs/admin/ADMIN_FEATURE_MATRIX.md` audited the idea; it was never built). Schema read from the local database at `20261112090001`. |
@@ -66,4 +66,24 @@ Risk tiers: **L** = presentation/moderation, **M** = identity-adjacent, **H** = 
 6. Audit privacy: masked contact values (recommended) versus full old and new.
 7. Confirm that View-As stays strictly read-only and edits live on their own, explicit, separate page.
 
-*Migration numbers, if approved: after `20261114090004` (the View-As stack), allocated with the other tracks.*
+*Migration number as built: `20261114090005`, after `20261114090004` (the View-As stack).*
+
+## 5. Decided scope (owner decision, Option A)
+
+This section is authoritative; sections 1 to 4 remain as the rationale.
+
+| Decision | Outcome |
+|---|---|
+| 1. Option | **A: moderation / presentation fields only.** |
+| 2. Who may edit | **Administrator and above** (Super Admin locked, Administrator by default). Not Moderator or Support. Permissions `users.edit_profile`, `organizations.edit`. |
+| 3. Re-verification triggers | Not applicable to A for legal fields (they are not editable). A display-name change clears `display_name_confirmed_at` (re-confirmation). |
+| 4. Reason | **Required**, free text, trimmed, at most 500 characters. A fixed code list stays tied to PD-005 and is not part of A. |
+| 5. Notify | **Yes**: the affected user (or the organization's owners) is told which fields changed (names and a count), never the reason or the values. |
+| 6. Audit privacy | **Masked**, immutable: old and new values with phone-like numbers and emails masked, at most 200 characters per value; media recorded only as "removed". |
+| 7. View-As | **Strictly read-only.** Edits live on their own explicit pages (`/admin/users/[id]/edit`, `/admin/organizations/[id]/edit`), never inside a view; a guard test proves a view cannot reach them. |
+
+**Editable (allow-list):** user `display_name`, `display_name_ar`, `display_name_en`, `headline`, `bio`, `languages`, `governorate_key`, `city_key`, `city_custom_name`, `available_for_work`, avatar and cover **remove-only**; organization `name`, `name_ar`, `name_en`, `description`, `facebook_url`, `instagram_url`, `tiktok_url`, `website_url`, `primary_locale`, `timezone`, logo **remove-only**.
+
+**Never editable by an admin (refused server-side by an allow-list, with tests):** phone, email, organization contact phone and email, legal name, national id, bank details, tax id, username, birth date, organization type, account type, verification state, status, slug, ownership and memberships, ids, points, credentials. Contact and legal changes stay with the owner's own flows (phone/email change with OTP, business re-verification) or a support-assisted request. Revisit B only on a concrete need with the step-up design agreed first; C is not to be built.
+
+Rank rule: never yourself; never Admin Staff at or above your own rank (a suspended peer stays protected), Super Admin excepted. No edit with no effective change writes anything.
