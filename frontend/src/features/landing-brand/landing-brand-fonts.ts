@@ -13,6 +13,8 @@ export const hurme = localFont({
     { path: "./fonts/Hurme-Bold.woff2", weight: "700 900", style: "normal" },
   ],
   variable: "--font-hurme",
+  // No metric-adjusted Arial fallback: it has Arabic glyphs, so it would shadow Bukra for Arabic text.
+  adjustFontFallback: false,
   display: "swap",
 });
 
@@ -22,5 +24,6 @@ export const bukra = localFont({
     { path: "./fonts/Bukra-Bold.woff2", weight: "600 900", style: "normal" },
   ],
   variable: "--font-bukra",
+  adjustFontFallback: false,
   display: "swap",
 });
