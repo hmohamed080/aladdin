@@ -90,3 +90,22 @@ export function canViewAsUser(
   return target.staffRank < access.rank;
 }
 
+
+/**
+ * The actor may edit this USER's presentation details (Admin edit, Option A: `admin_user_edit_profile`).
+ *
+ * Mirrors the RPC: needs `users.edit_profile`; never one's own account; unless the actor is a Super Admin, never Admin
+ * Staff at or above the actor's own rank (a suspended peer stays protected). `staffRank` unknown (`null`) draws the control
+ * and leaves the database as the only judge. Presentation only: the RPC re-checks every rule.
+ */
+export function canEditUser(
+  access: AdminAccess,
+  callerId: string,
+  target: { userId: string; staffRank: number | null },
+): boolean {
+  if (!can(access, "users.edit_profile")) return false;
+  if (target.userId === callerId) return false;
+  if (isSuper(access)) return true;
+  if (target.staffRank === null) return true;
+  return target.staffRank < access.rank;
+}

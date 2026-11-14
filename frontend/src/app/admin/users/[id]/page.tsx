@@ -23,10 +23,10 @@ import { SuspensionAction, SuspensionBanner } from "@/features/admin-ops/suspens
 import { CasesPanel, NotesPanel, TimelineList } from "@/features/admin-ops/panels";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
 import { EyeIcon } from "@/components/ui/icons";
-import { LabeledField, Textarea, Select, Input } from "@/components/ui/controls";
+import { LabeledField, Textarea, Select, Input, ButtonLink } from "@/components/ui/controls";
 import { requireAdminRoute } from "@/server/authorization/admin";
 import { loadStaffRanks } from "@/server/queries/admin-rbac";
-import { canSuspendUser, canViewAsUser, staffRankOf } from "@/features/admin-rbac/eligibility";
+import { canEditUser, canSuspendUser, canViewAsUser, staffRankOf } from "@/features/admin-rbac/eligibility";
 import { ViewAsEye } from "@/features/admin-view-as/view-as-eye";
 import { viewKindForAccountType } from "@/lib/admin/view-as/registry";
 import { isViewAsEnabled } from "@/lib/env/view-as";
@@ -186,6 +186,9 @@ export default async function PreviewUserDetailPage({
           )}
           {can(access, "users.verify") && (user.status === "pending_verification" || pendingVerification) ? (
             <UserVerificationControls userId={user.id} pending={pendingVerification} />
+          ) : null}
+          {canEditUser(access, caller?.id ?? "", { userId: user.id, staffRank: staffRankOf(staffRanks, user.id) }) ? (
+            <ButtonLink href={`/admin/users/${user.id}/edit`} variant="outline">{m.admin.profileEdit.editButton}</ButtonLink>
           ) : null}
           {canSuspend && user.status !== "deactivated" ? (
             <SuspensionAction m={m} subjectType="user" subjectId={user.id} suspended={user.status === "suspended"} />

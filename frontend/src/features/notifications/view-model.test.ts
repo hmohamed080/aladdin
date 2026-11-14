@@ -144,6 +144,9 @@ describe("every approved event type has real bilingual copy", () => {
       // The version number only; no actor, value or reason is ever placed in a notification.
       "whatsapp_otp.audit_unmatched": { version: 7 },
       "whatsapp_otp.delivery_unmatched": { version: 7 },
+      // Field names and a count only; never the reason or any value.
+      "admin.profile_edited": { field_count: 2, fields: "bio, headline" },
+      "admin.organization_edited": { field_count: 1, fields: "description" },
     };
 
     const unfilled: string[] = [];
