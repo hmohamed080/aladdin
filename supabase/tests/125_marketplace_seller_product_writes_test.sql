@@ -40,14 +40,14 @@ select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname like 'marketplace\_seller\_%'
      and p.prosecdef and exists (select 1 from unnest(p.proconfig) c where c = 'search_path=""')),
-  18, 'A1. the eighteen seller RPCs (nine from Migration 06, two from 07, three from 09, four from 12) are SECURITY DEFINER with an empty search_path');
+  24, 'A1. the twenty-four seller RPCs (nine from Migration 06, two from 07, three from 09, four from 12, six from 14) are SECURITY DEFINER with an empty search_path');
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname like 'marketplace\_seller\_%'
      and has_function_privilege('authenticated', p.oid, 'execute')
      and not has_function_privilege('anon', p.oid, 'execute')
      and not has_function_privilege('service_role', p.oid, 'execute')),
-  18, 'A2. ...executable by authenticated only (never anon, never a service credential)');
+  24, 'A2. ...executable by authenticated only (never anon, never a service credential)');
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'app' and p.proname like 'marketplace\_%' and has_function_privilege('authenticated', p.oid, 'execute')),

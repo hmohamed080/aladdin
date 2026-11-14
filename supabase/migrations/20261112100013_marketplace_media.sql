@@ -114,6 +114,71 @@ $$;
 create trigger marketplace_image_verified_before_confirmed before update on public.marketplace_product_images
   for each row execute function app.marketplace_require_verified_media();
 
+-- The four questions the central functions ask about a 'marketplace' key. Each central function
+-- below has ONE delegating branch, so later Marketplace media kinds (e.g. order documents) only
+-- re-create these helpers and never touch a central function again.
+
+-- Ownership, organization, content type, normalized state and age of a key (null when unknown).
+create or replace function app.marketplace_media_metadata(p_key text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('owner', i.created_by, 'organization', p.seller_organization_id, 'contentType', i.mime_type,
+    'state', case i.upload_state when 'awaiting_upload' then 'pending' when 'confirmed' then 'ready' else 'deleted' end,
+    'createdAt', i.created_at)
+  from public.marketplace_product_images i join public.marketplace_products p on p.id = i.product_id
+  where i.object_key = p_key;
+$$;
+
+-- The physical R2 key. Product photos: <org>/<product>/<media id>.<ext> -> the organization's
+-- products/ folder like every other product photo (ids are UUIDs: no collision).
+create or replace function app.marketplace_media_storage_key(p_key text, p_owner uuid, p_org uuid)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  u constant text := '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+  f text[];
+begin
+  f := regexp_match(p_key, '^' || u || '/(' || u || ')/(' || u || ')\.([a-z0-9]{2,5})$');
+  if f is null or p_org is null then raise exception 'unexpected media key' using errcode = '22023'; end if;
+  return 'o/' || p_org || '/products/' || f[1] || '/' || f[2] || '/original.' || f[3];
+end;
+$$;
+
+-- Keys whose bytes the central cleanup may delete: withdrawn, or never uploaded within a day.
+create or replace function app.marketplace_media_cleanup_rows()
+returns table (key text, owner uuid, created_at timestamptz)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select i.object_key, i.created_by, i.created_at from public.marketplace_product_images i
+  where i.created_by is not null
+    and (i.upload_state = 'deleting' or (i.upload_state = 'awaiting_upload' and i.created_at < now() - interval '24 hours'));
+$$;
+
+-- Marks a cleanup candidate withdrawn; false when the snapshot no longer matches.
+create or replace function app.marketplace_media_retire(p_key text, p_owner uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.marketplace_product_images set upload_state = 'deleting', status = 'rejected', is_primary = false
+   where object_key = p_key and created_by = p_owner
+     and (upload_state = 'deleting' or (upload_state = 'awaiting_upload' and created_at < now() - interval '24 hours'));
+  return found;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- 4. Central media functions: current definitions + the 'marketplace' branch
 -- ---------------------------------------------------------------------------
@@ -141,11 +206,7 @@ returns jsonb language sql stable security definer set search_path='' as $$
   select jsonb_build_object('owner',created_by,'organization',organization_id,'contentType',content_type,'state',state,'createdAt',created_at)
   from public.business_verification_documents where p_namespace='verification' and object_key=p_key
   union all
-  select jsonb_build_object('owner',i.created_by,'organization',p.seller_organization_id,'contentType',i.mime_type,
-    'state',case i.upload_state when 'awaiting_upload' then 'pending' when 'confirmed' then 'ready' else 'deleted' end,
-    'createdAt',i.created_at)
-  from public.marketplace_product_images i join public.marketplace_products p on p.id=i.product_id
-  where p_namespace='marketplace' and i.object_key=p_key;
+  select m.v from (select app.marketplace_media_metadata(p_key) v) m where p_namespace='marketplace' and m.v is not null;
 $$;
 
 create or replace function public.media_storage_resolve(p_namespace text,p_key text,p_operation text)
@@ -343,11 +404,8 @@ begin
       if p_org is null then raise exception 'unexpected media key' using errcode='22023'; end if;
       return 'o/'||p_org||'/verification/'||f[1]||'/original.'||f[2];
     when 'marketplace' then
-      -- <org>/<product>/<media id>.<ext>, issued by marketplace_seller_image_request_upload; stored in the
-      -- organization's products/ folder like every other product photo (ids are UUIDs: no collision).
-      v_product := (regexp_match(p_key,'^'||u||'/('||u||')/'||u||'\.[a-z0-9]{2,5}$'))[1];
-      if v_product is null or p_org is null then raise exception 'unexpected media key' using errcode='22023'; end if;
-      return 'o/'||p_org||'/products/'||v_product||'/'||f[1]||'/original.'||f[2];
+      -- The Marketplace decides its own physical layout (app.marketplace_media_storage_key).
+      return app.marketplace_media_storage_key(p_key,p_owner,p_org);
     else raise exception 'invalid namespace' using errcode='22023';
   end case;
 end;
@@ -371,8 +429,7 @@ language sql stable security definer set search_path='' as $$
       where state='deleted' or (state='pending' and created_at<now()-interval '24 hours')
     union all select 'verification',object_key,created_by,created_at from public.business_verification_documents
       where submission_id is null and (state='deleted' or (state='pending' and created_at<now()-interval '24 hours'))
-    union all select 'marketplace',object_key,created_by,created_at from public.marketplace_product_images
-      where created_by is not null and (upload_state='deleting' or (upload_state='awaiting_upload' and created_at<now()-interval '24 hours'))
+    union all select 'marketplace',r.key,r.owner,r.created_at from app.marketplace_media_cleanup_rows() r
   ) select c.ns,c.key,c.owner,coalesce(l.provider,'supabase') from candidates c
     join public.media_storage_locations l on l.namespace=c.ns and l.object_key=c.key
     where l.provider='r2' and l.cleaned_at is null
@@ -404,9 +461,10 @@ begin
     update public.business_verification_documents set state='deleted' where object_key=p_key and created_by=p_owner
       and submission_id is null and (state='deleted' or (state='pending' and created_at<now()-interval '24 hours'));
   elsif p_namespace='marketplace' then
-    update public.marketplace_product_images set upload_state='deleting', status='rejected', is_primary=false
-      where object_key=p_key and created_by=p_owner
-      and (upload_state='deleting' or (upload_state='awaiting_upload' and created_at<now()-interval '24 hours'));
+    if not app.marketplace_media_retire(p_key,p_owner) then
+      raise exception 'cleanup snapshot is stale' using errcode='42501';
+    end if;
+    return;
   else raise exception 'invalid namespace' using errcode='22023'; end if;
   if not found then raise exception 'cleanup snapshot is stale' using errcode='42501'; end if;
 end;
@@ -992,6 +1050,10 @@ drop function app.marketplace_storage_can_upload_import(text);
 -- ---------------------------------------------------------------------------
 revoke all on function
   app.marketplace_public_image_key(uuid),
+  app.marketplace_media_metadata(text),
+  app.marketplace_media_storage_key(text, uuid, uuid),
+  app.marketplace_media_cleanup_rows(),
+  app.marketplace_media_retire(text, uuid),
   app.marketplace_media_can_upload(text),
   app.marketplace_media_can_read(text),
   app.marketplace_media_can_delete(text),
