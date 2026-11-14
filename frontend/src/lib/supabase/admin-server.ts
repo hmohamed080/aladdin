@@ -55,6 +55,22 @@ function getAdminClient(timeoutMs?: number): SupabaseClient<Database> {
   });
 }
 
+/**
+ * The Landing page's public platform counts (users, businesses, published products). Service-role, read-only, `head`
+ * count queries on three tables, called only by `features/landing-brand/landing-brand-stats.ts`. It returns bare
+ * integers — no rows, no identifiers. Use it for nothing else.
+ */
+export async function countLandingPublicStats(): Promise<{ users: number; organizations: number; products: number }> {
+  const db = getAdminClient(5_000);
+  const [users, organizations, products] = await Promise.all([
+    db.from("users").select("id", { count: "exact", head: true }).eq("status", "active"),
+    db.from("organizations").select("id", { count: "exact", head: true }).eq("status", "active").is("deleted_at", null),
+    db.from("products").select("id", { count: "exact", head: true }).eq("status", "published").is("deleted_at", null),
+  ]);
+  for (const r of [users, organizations, products]) if (r.error || r.count === null) throw new Error("landing stats unavailable");
+  return { users: users.count ?? 0, organizations: organizations.count ?? 0, products: products.count ?? 0 };
+}
+
 /** How long one Auth Admin API call of an installer security change may take before its outcome is treated as unknown. */
 export const INSTALLER_SECURITY_ADMIN_TIMEOUT_MS = 15_000;
 
