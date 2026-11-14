@@ -126,6 +126,30 @@
 .suggPrice del { font-size: .75rem; color: var(--stone); }
 .suggCartOn { background: var(--shell-deep); }
 
+/* ---------- container-sized cart rows ----------
+   The rows follow the width of the cart column, not the window: below 1100px the summary moves under
+   the items and the column can be anywhere from phone to wide, so a fixed 5-column table would
+   squeeze the product name into the price. */
+.main { container-type: inline-size; container-name: cart-main; }
+.price { white-space: nowrap; }
+@container cart-main (max-width: 720px) {
+  .tableHead { display: none; }
+  .line { grid-template-columns: 1fr auto; gap: 10px 12px; }
+  .product { grid-column: 1 / -1; }
+  .thumb { width: 88px; }
+  .cell[data-label]::before { content: attr(data-label) ": "; margin-inline-end: 6px; font-size: .75rem; color: var(--stone); }
+  .perks { grid-template-columns: 1fr 1fr; }
+  .perks li:nth-child(odd) { border-inline-start: 0; }
+  .perks li:nth-child(n + 3) { border-block-start: 1px solid var(--quartz-line); }
+}
+@container cart-main (max-width: 420px) {
+  .line { grid-template-columns: 1fr; }
+  .cell { justify-content: space-between; }
+  .cell[data-label]::before { flex: 1; }
+  .perks { grid-template-columns: 1fr; }
+  .perks li + li { border-inline-start: 0; border-block-start: 1px solid var(--quartz-line); }
+}
+
 /* ---------- live cart additions ---------- */
 .lineOff { opacity: .72; }
 .lineNote { margin: 0; font-weight: 600; color: var(--lumen-deep); }
