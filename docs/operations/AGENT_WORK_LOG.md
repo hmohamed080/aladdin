@@ -7581,3 +7581,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 
 - Finding: the "account already registered" warning only handled GoTrue's error `user_already_exists` (local stack). Hosted Supabase returns an obfuscated user with empty `identities` instead, so a confirmed email went to the OTP step with no code.
 - Fix: `requestPasswordSignUp` also treats `identities.length === 0` as an existing confirmed account (same budget, same degrade to neutral, nothing staged). Missing `identities` is treated as a new registration. Unit tests cover empty, populated and missing. No migration, no R2/secret/hosted-DB change.
+
+## 2026-11-14 - Brand landing page replaces `/` (agent)
+
+- `/` now renders `features/landing-brand` (hero with video dialog, roles, services, product market carousel, how, why, experience, partners marquee, FAQ, CTA, footer) in the owner's brand identity (navy/sand/terracotta/cream; 29LT Bukra + Hurme Geometric Sans via `next/font/local`, files in `features/landing-brand/fonts`, committed on owner approval). Brand colours/fonts are scoped to the landing wrapper only (`--lb-*`); they are NOT yet in `design/tokens` - the design-system governance update (tokens JSON, DESIGN.md, CHANGELOG version bump) is still open.
+- Hero stat pills show real counts only (active users, active organizations, published products) via the new `countLandingPublicStats()` in `lib/supabase/admin-server.ts` (head counts, 10 min per-isolate cache, hidden when unavailable or zero). This is a new narrow service-role use.
+- Market cards use the existing `previewProducts` sample data and are labelled as samples. Partner names (JOTUN, GROHE, Roca, KOHLER, PORCELANOSA) are kept per owner decision.
+- `next.config.ts` gains `landing-brand` in `images.localPatterns`. No migration, secret, R2 or deployment change; merge and production deploy left to the owner.
