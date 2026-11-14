@@ -1,4 +1,5 @@
 -- ===========================================================================
+-- migration-policy: destructive-reviewed - every dropped object (marketplace_public_image_ref signature, the image storage_provider/storage_bucket columns and the five app.marketplace_storage_* predicates) was created by Migrations 06/07/09 of this same Marketplace release, never applied to Acceptance or Production; no promoted application uses them
 -- Marketplace — Migration 13: product photos join the central media system (R2)
 -- ===========================================================================
 -- Owner decision (2026-11-01, see 20261107090005): no application file bytes in

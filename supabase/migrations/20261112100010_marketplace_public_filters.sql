@@ -1,4 +1,5 @@
 -- =============================================================================
+-- migration-policy: destructive-reviewed - marketplace_public_catalog_page and marketplace_public_facets were created by Migration 09 of this same Marketplace release (20261112100009, never applied to Acceptance or Production); no promoted application calls the old signatures, and both are replaced in one transaction
 -- Marketplace Migration 10 — public catalog filters
 --
 -- The public catalog (Migration 09) could only filter by category, type and a
