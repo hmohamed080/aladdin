@@ -11,6 +11,7 @@ type LiveCartCopy = {
   checkoutSoon: string;
   soon: string;
   checkoutSoonNote: string;
+  checkoutNote: string;
   quoteFailed: string;
   retry: string;
   loading: string;
@@ -43,6 +44,7 @@ export const liveCartCopy = {
     checkoutSoon: "إتمام الطلب",
     soon: "قريبًا",
     checkoutSoonNote: "إتمام الطلب والدفع الإلكتروني سيتوفران قريبًا. تواصل مع المعرض لطلب المنتجات الآن.",
+    checkoutNote: "في الخطوة التالية تسجّل الدخول وتختار طريقة الاستلام والدفع لكل معرض.",
     quoteFailed: "تعذّر تحديث الأسعار الآن. حاول مرة أخرى.",
     retry: "إعادة المحاولة",
     loading: "جارٍ تحديث الأسعار…",
@@ -73,6 +75,7 @@ export const liveCartCopy = {
     checkoutSoon: "Place order",
     soon: "Coming soon",
     checkoutSoonNote: "Placing the order and paying online are coming soon. Contact the showroom to order these products now.",
+    checkoutNote: "Next you sign in and choose how to receive and pay for each showroom.",
     quoteFailed: "Prices could not be updated right now. Try again.",
     retry: "Try again",
     loading: "Updating prices…",

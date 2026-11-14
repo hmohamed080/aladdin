@@ -150,7 +150,7 @@ function LineRow({ line, locale, onQty, onRemove }: {
  * The live guest cart. What is in it (slug + SKU + quantity) comes from this browser; every price,
  * stock level and showroom delivery fee comes from the database through a read-only quote, so the
  * page never shows a number the showrooms did not set. Checkout is not open yet: the button is
- * disabled and says so.
+ * open once every showroom can serve the chosen way of receiving.
  */
 export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
   const { locale, dir } = useI18n();
@@ -211,6 +211,9 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
   const names = (list: { name: string }[]) => list.map((s) => s.name).join(locale === "ar" ? "، " : ", ");
   const itemCount = totals ? totals.lines.length + totals.unavailable.length : cart.lines.length;
   const pricesUnknown = method === "delivery" && totals?.deliveryEgp === null;
+  // Checkout opens once every showroom can serve the chosen way of receiving and something is in stock.
+  const canCheckout = Boolean(totals && totals.state === "ok" && totals.lines.some((x) => !x.outOfStock));
+  const checkoutHref = `/marketplace/checkout?${new URLSearchParams({ method, ...(gov ? { gov } : {}), ...(area ? { area } : {}) }).toString()}`;
 
   return (
     <div className={styles.page}>
@@ -384,10 +387,16 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
             </section>
 
             <div className={styles.actions}>
-              <button type="button" className={styles.checkout} disabled aria-disabled="true">
-                <ShieldIcon size={18} aria-hidden="true" />{l.checkoutSoon}<span className={styles.soon}>{l.soon}</span>
-              </button>
-              <p className={styles.hint}>{l.checkoutSoonNote}</p>
+              {canCheckout ? (
+                <Link href={checkoutHref} className={styles.checkout}>
+                  <ShieldIcon size={18} aria-hidden="true" />{l.checkoutSoon}
+                </Link>
+              ) : (
+                <button type="button" className={styles.checkout} disabled aria-disabled="true">
+                  <ShieldIcon size={18} aria-hidden="true" />{l.checkoutSoon}
+                </button>
+              )}
+              <p className={styles.hint}>{l.checkoutNote}</p>
               <Link href="/marketplace" className={styles.secondary}>
                 {dir === "rtl" ? <ChevronRightIcon size={18} aria-hidden="true" /> : <ChevronLeftIcon size={18} aria-hidden="true" />}
                 {t.continueShopping}

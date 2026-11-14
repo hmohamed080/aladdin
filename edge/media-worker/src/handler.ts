@@ -50,8 +50,9 @@ const ID_KEY_FOLDERS: Record<string, string> = {
   organization: `o/${ID}/profile/${ID}`,
   request: `[uo]/${ID}/requests/${ID}/${ID}`,
   verification: `o/${ID}/verification/${ID}`,
-  // Marketplace photos live in the organization's products/ folder (media architecture v3).
-  marketplace: `o/${ID}/products/${ID}/${ID}`,
+  // Marketplace photos live in the organization's products/ folder; InstaPay receipts in the
+  // buyer's documents folder (media architecture v3).
+  marketplace: `(?:o/${ID}/products/${ID}/${ID}|u/${ID}/certificates/${ID})`,
 };
 const ID_KEYS = Object.fromEntries(Object.entries(ID_KEY_FOLDERS).map(([namespace, folder]) =>
   [namespace, new RegExp(`^${folder}/(original\\.[a-z0-9]{2,5}|v/(thumb|card|full)\\.webp)$`)]));

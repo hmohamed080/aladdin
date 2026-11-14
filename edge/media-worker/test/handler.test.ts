@@ -285,6 +285,26 @@ describe("Mode C: Marketplace product photos", () => {
   });
 });
 
+describe("Mode P: Marketplace payment receipts", () => {
+  it("serves an InstaPay receipt from the buyer's documents folder, and never a receipt stored anywhere else", async () => {
+    const ORDER = "e9200000-0000-4000-8000-000000000011";
+    const id = "e9200000-0000-4000-8000-000000000012";
+    const key = `proofs/${ORDER}/${id}.png`;
+    const object = `u/${VIEWER}/certificates/${id}/original.png`;
+    env.MEDIA_BUCKET = bucket({ [object]: BYTES });
+    const g = (o: string, contentType = "image/png") => ({ object: o, contentType, size: BYTES.length, sha256: SHA });
+    db.grant = g(object); db.key = key;
+    const res = await get(await privateUrl({ ns: "marketplace", k: key }, "/m/marketplace/original"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+    for (const grant of [g(`u/${VIEWER}/portfolio/${id}/original.png`), g(`o/${VIEWER}/certificates/${id}/original.png`),
+      g(object, "application/pdf")]) {
+      db.grant = grant;
+      expect((await get(await privateUrl({ ns: "marketplace", k: key }, "/m/marketplace/original"))).status).toBe(404);
+    }
+  });
+});
+
 describe("parseRange", () => {
   it("handles open, suffix, clamped and invalid ranges", () => {
     expect(parseRange("bytes=2-", 10)).toEqual({ offset: 2, length: 8 });

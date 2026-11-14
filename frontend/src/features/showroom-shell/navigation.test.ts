@@ -11,7 +11,7 @@ describe("showroom phase 1 navigation", () => {
   const items = SHOWROOM_GROUPS.flatMap((group) => group.items);
   it("has the agreed group order, directional commerce and no institutions", () => {
     expect(SHOWROOM_GROUPS.map((group) => group.label.ar)).toEqual(["", "المشتريات", "المبيعات", "المنتجات", "الماركت", "الشبكة", "الفريق", "إدارة النشاط"]);
-    expect(items.map((item) => item.id)).toEqual(["home", "purchase-requests", "pricing-requests-sent", "quotes-received", "purchase-orders", "customer-rfqs", "customer-quotes", "customers", "leads", "follow-ups", "catalog", "offers", "saved", "my-products", "my-offers", "marketplace-products", "marketplace-areas", "marketplace-delivery", "suppliers", "craftsmen", "jobs", "sales-team", "projects", "reports", "activity", "points", "verification", "settings"]);
+    expect(items.map((item) => item.id)).toEqual(["home", "purchase-requests", "pricing-requests-sent", "quotes-received", "purchase-orders", "customer-rfqs", "customer-quotes", "customers", "leads", "follow-ups", "catalog", "offers", "saved", "my-products", "my-offers", "marketplace-products", "marketplace-orders", "marketplace-areas", "marketplace-delivery", "marketplace-payments", "suppliers", "craftsmen", "jobs", "sales-team", "projects", "reports", "activity", "points", "verification", "settings"]);
     // Suite pages live under the suite root; finished modules keep their existing routes inside the same shell.
     for (const item of items) expect(item.href.startsWith(`${SHOWROOM_ROOT}/`) || item.href.startsWith("/b2b/")).toBe(true);
   });
@@ -111,15 +111,17 @@ describe("a pending application's limited workspace (rc2 product decision)", () 
 
 describe("Marketplace group in the showroom account", () => {
   const ids = (caps: string[]) => showroomNavigation(caps).flatMap((g) => g.items).map((i) => i.id);
-  const MARKETPLACE = ["marketplace-products", "marketplace-areas", "marketplace-delivery"];
+  const MARKETPLACE = ["marketplace-products", "marketplace-orders", "marketplace-areas", "marketplace-delivery", "marketplace-payments"];
 
-  it("lists products, delivery areas and delivery prices, in that order, under الماركت / Marketplace", () => {
+  it("lists products, orders, delivery areas, delivery prices and payment methods, in that order, under الماركت / Marketplace", () => {
     const group = SHOWROOM_GROUPS.find((g) => g.label.en === "Marketplace")!;
     expect(group.label.ar).toBe("الماركت");
     expect(group.items.map((i) => [i.id, i.href, i.label.ar, i.label.en])).toEqual([
       ["marketplace-products", "/showroom/marketplace/products", "منتجات الماركت", "Marketplace products"],
+      ["marketplace-orders", "/showroom/marketplace/orders", "طلبات الماركت", "Marketplace orders"],
       ["marketplace-areas", "/showroom/marketplace/areas", "المناطق", "Delivery areas"],
       ["marketplace-delivery", "/showroom/marketplace/delivery", "توصيل المناطق", "Delivery prices"],
+      ["marketplace-payments", "/showroom/marketplace/payments", "طرق الدفع", "Payment methods"],
     ]);
   });
 

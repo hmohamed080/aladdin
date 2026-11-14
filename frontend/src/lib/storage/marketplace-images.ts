@@ -19,6 +19,19 @@ export function isMarketplaceImageKey(value: unknown): value is string {
   return typeof value === "string" && KEY_SHAPE.test(value);
 }
 
+/** `proofs/<order>/<receipt>.<ext>` — an InstaPay receipt the buyer uploads (Migration 14). */
+const PROOF_SHAPE =
+  /^proofs\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/;
+
+export function isMarketplaceProofKey(value: unknown): value is string {
+  return typeof value === "string" && PROOF_SHAPE.test(value);
+}
+
+/** Any key of the `marketplace` media namespace: a product photo or a payment receipt. */
+export function isMarketplaceMediaKey(value: unknown): value is string {
+  return isMarketplaceImageKey(value) || isMarketplaceProofKey(value);
+}
+
 /**
  * Public URLs of one shop image: the Worker (Mode C, by image id) with its recorded sizes while public
  * edge delivery is on, otherwise the application route. Built on the server; rendered anywhere.

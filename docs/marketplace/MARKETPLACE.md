@@ -260,7 +260,7 @@ Key choices (unchanged): price on the variant (`numeric(14,2)`, EGP-only check) 
 ## 8. Commerce rules
 
 ### Cart (DL-01)
-> **Implemented 2026-10-19 (local, unpushed): the guest cart page, per-showroom delivery prices by governorate/area, pickup switch and a total of products + delivery (no tax line) — see [`cart-and-delivery.md`](cart-and-delivery.md).** The built cart differs from the bullets below in two stated ways: it opens without sign-in, and it stores `{slug, sku, qty}` because the public API exposes no variant ids. Checkout is not built.
+> **Implemented 2026-10-19 (local, unpushed): the guest cart page, per-showroom delivery prices by governorate/area, pickup switch and a total of products + delivery (no tax line) — see [`cart-and-delivery.md`](cart-and-delivery.md).** The built cart differs from the bullets below in two stated ways: it opens without sign-in, and it stores `{slug, sku, qty}` because the public API exposes no variant ids. **Checkout, orders and showroom payment methods are built (2026-11-14) — see [`checkout-and-orders.md`](checkout-and-orders.md), including what differs from the bullets below.**
 - Guest cart in local storage: `{variantId, qty}[]`, schema-versioned, **no prices**, no anonymous server writes.
 - Opening the cart requires sign-in/sign-up; the local cart is untouched during sign-in/OTP (same origin).
 - **Merge RPC** after auth: sums duplicate variants (clamped to `qty_step`/limits/stock), drops unpublished or invalid variants, re-prices expired offers, returns a **merge report** (kept / adjusted / removed + reason). Local copy is cleared only after a successful merge.

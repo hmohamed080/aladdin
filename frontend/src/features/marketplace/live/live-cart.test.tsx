@@ -150,14 +150,15 @@ describe("live cart page", () => {
     expect(JSON.parse(window.localStorage.getItem(LIVE_CART_KEY)!)).toEqual([{ slug: "p-a", sku: "A", qty: 1 }]);
   });
 
-  it("keeps checkout closed: disabled and labelled coming soon", async () => {
+  it("opens checkout only once every showroom can serve the chosen area, carrying the place along", async () => {
     store([{ slug: "p-a", sku: "A", qty: 1 }]);
     quoteAction.mockImplementation(answer([ok("A", 1, 100, 9)], [showroom(1, "Decore Store", { cairo: 0 })]));
     render(wrap(<LiveCartPage suggestions={suggestions} />));
     await screen.findByText("Product A");
-    const button = screen.getByRole("button", { name: /Place order/ });
-    expect(button).toBeDisabled();
-    expect(button).toHaveTextContent("Coming soon");
+    expect(screen.getByRole("button", { name: /Place order/ })).toBeDisabled();
+    choose("mp-gov", "cairo");
+    const link = await screen.findByRole("link", { name: /Place order/ });
+    expect(link.getAttribute("href")).toBe("/marketplace/checkout?method=delivery&gov=cairo");
   });
 
   it("says so, and offers a retry, when prices cannot be loaded", async () => {

@@ -2783,6 +2783,320 @@ export type Database = {
           },
         ]
       }
+      marketplace_order_events: {
+        Row: {
+          action: string
+          actor_role: string
+          actor_user_id: string | null
+          created_at: string
+          from_payment: string | null
+          from_status: string | null
+          id: string
+          note: string | null
+          order_id: string
+          sequence: number
+          to_payment: string | null
+          to_status: string | null
+        }
+        Insert: {
+          action: string
+          actor_role: string
+          actor_user_id?: string | null
+          created_at?: string
+          from_payment?: string | null
+          from_status?: string | null
+          id?: string
+          note?: string | null
+          order_id: string
+          sequence?: never
+          to_payment?: string | null
+          to_status?: string | null
+        }
+        Update: {
+          action?: string
+          actor_role?: string
+          actor_user_id?: string | null
+          created_at?: string
+          from_payment?: string | null
+          from_status?: string | null
+          id?: string
+          note?: string | null
+          order_id?: string
+          sequence?: never
+          to_payment?: string | null
+          to_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_order_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_order_items: {
+        Row: {
+          created_at: string
+          id: string
+          line_total_egp: number | null
+          location_id: string
+          name_ar: string
+          name_en: string
+          order_id: string
+          product_id: string
+          quantity: number
+          selling_unit: string
+          sku: string
+          unit_price_egp: number
+          variant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_total_egp?: number | null
+          location_id: string
+          name_ar: string
+          name_en: string
+          order_id: string
+          product_id: string
+          quantity: number
+          selling_unit: string
+          sku: string
+          unit_price_egp: number
+          variant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_total_egp?: number | null
+          location_id?: string
+          name_ar?: string
+          name_en?: string
+          order_id?: string
+          product_id?: string
+          quantity?: number
+          selling_unit?: string
+          sku?: string
+          unit_price_egp?: number
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_order_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_order_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_orders: {
+        Row: {
+          address_text: string | null
+          area_key: string | null
+          buyer_name: string
+          buyer_note: string | null
+          buyer_phone: string
+          buyer_user_id: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          checkout_id: string
+          confirmed_at: string | null
+          created_at: string
+          delivered_at: string | null
+          delivery_fee_egp: number
+          deposit_egp: number | null
+          deposit_percent: number | null
+          fulfilment: string
+          governorate_key: string | null
+          id: string
+          idempotency_key: string
+          instapay_account_name: string | null
+          instapay_address: string | null
+          order_number: string
+          payment_method: string
+          payment_status: string
+          seller_organization_id: string
+          status: string
+          subtotal_egp: number
+          total_egp: number
+          updated_at: string
+        }
+        Insert: {
+          address_text?: string | null
+          area_key?: string | null
+          buyer_name: string
+          buyer_note?: string | null
+          buyer_phone: string
+          buyer_user_id: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          checkout_id: string
+          confirmed_at?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          delivery_fee_egp?: number
+          deposit_egp?: number | null
+          deposit_percent?: number | null
+          fulfilment: string
+          governorate_key?: string | null
+          id?: string
+          idempotency_key: string
+          instapay_account_name?: string | null
+          instapay_address?: string | null
+          order_number?: string
+          payment_method: string
+          payment_status: string
+          seller_organization_id: string
+          status?: string
+          subtotal_egp: number
+          total_egp: number
+          updated_at?: string
+        }
+        Update: {
+          address_text?: string | null
+          area_key?: string | null
+          buyer_name?: string
+          buyer_note?: string | null
+          buyer_phone?: string
+          buyer_user_id?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          checkout_id?: string
+          confirmed_at?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          delivery_fee_egp?: number
+          deposit_egp?: number | null
+          deposit_percent?: number | null
+          fulfilment?: string
+          governorate_key?: string | null
+          id?: string
+          idempotency_key?: string
+          instapay_account_name?: string | null
+          instapay_address?: string | null
+          order_number?: string
+          payment_method?: string
+          payment_status?: string
+          seller_organization_id?: string
+          status?: string
+          subtotal_egp?: number
+          total_egp?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_orders_buyer_user_id_fkey"
+            columns: ["buyer_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_orders_seller_organization_id_fkey"
+            columns: ["seller_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_payment_proofs: {
+        Row: {
+          byte_size: number | null
+          checksum_sha256: string | null
+          created_at: string
+          created_by: string
+          id: string
+          mime_type: string
+          object_key: string
+          order_id: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          upload_state: string
+        }
+        Insert: {
+          byte_size?: number | null
+          checksum_sha256?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          mime_type: string
+          object_key: string
+          order_id: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          upload_state?: string
+        }
+        Update: {
+          byte_size?: number | null
+          checksum_sha256?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          mime_type?: string
+          object_key?: string
+          order_id?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          upload_state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_payment_proofs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_payment_proofs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_payment_proofs_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketplace_platform_events: {
         Row: {
           action: string
@@ -3355,6 +3669,57 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: true
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_seller_payment_settings: {
+        Row: {
+          cod_enabled: boolean
+          created_at: string
+          instapay_account_name: string | null
+          instapay_address: string | null
+          instapay_deposit_percent: number | null
+          instapay_enabled: boolean
+          seller_organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cod_enabled?: boolean
+          created_at?: string
+          instapay_account_name?: string | null
+          instapay_address?: string | null
+          instapay_deposit_percent?: number | null
+          instapay_enabled?: boolean
+          seller_organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cod_enabled?: boolean
+          created_at?: string
+          instapay_account_name?: string | null
+          instapay_address?: string | null
+          instapay_deposit_percent?: number | null
+          instapay_enabled?: boolean
+          seller_organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_seller_payment_settings_seller_organization_id_fkey"
+            columns: ["seller_organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_seller_payment_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -10467,6 +10832,35 @@ export type Database = {
         Returns: undefined
       }
       mark_notification_read: { Args: { p_id: string }; Returns: undefined }
+      marketplace_buyer_order_cancel: {
+        Args: { p_order_id: string; p_reason?: string }
+        Returns: Json
+      }
+      marketplace_buyer_order_get: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
+      marketplace_buyer_orders: {
+        Args: { p_limit?: number; p_offset?: number }
+        Returns: Json
+      }
+      marketplace_buyer_proof_confirm: {
+        Args: { p_proof_id: string }
+        Returns: Json
+      }
+      marketplace_buyer_proof_request_upload: {
+        Args: { p_content_type: string; p_order_id: string }
+        Returns: Json
+      }
+      marketplace_checkout_place: {
+        Args: {
+          p_contact: Json
+          p_idempotency_key: string
+          p_lines: Json
+          p_sellers: Json
+        }
+        Returns: Json
+      }
       marketplace_import_apply_next: {
         Args: { p_job: string; p_worker: string }
         Returns: {
@@ -10665,6 +11059,31 @@ export type Database = {
         Args: { p_job: string; p_payload?: Json; p_step: string }
         Returns: Json
       }
+      marketplace_seller_order_get: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
+      marketplace_seller_order_transition: {
+        Args: { p_action: string; p_note?: string; p_order_id: string }
+        Returns: Json
+      }
+      marketplace_seller_orders_page: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_organization_id: string
+          p_status?: string
+        }
+        Returns: Json
+      }
+      marketplace_seller_payment_settings_get: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      marketplace_seller_payment_settings_save: {
+        Args: { p_organization_id: string; p_settings: Json }
+        Returns: Json
+      }
       marketplace_seller_pickup_set: {
         Args: { p_enabled: boolean; p_organization_id: string }
         Returns: Json
@@ -10691,6 +11110,10 @@ export type Database = {
           p_stock?: string
           p_type?: string
         }
+        Returns: Json
+      }
+      marketplace_seller_proof_review: {
+        Args: { p_accept: boolean; p_note?: string; p_proof_id: string }
         Returns: Json
       }
       marketplace_seller_publish_ready: {

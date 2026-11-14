@@ -1,4 +1,4 @@
-import { HomeIcon, ClipboardIcon, StorefrontIcon, UserIcon, UsersIcon, BriefcaseIcon, GiftIcon, SettingsIcon, StarIcon, ScrollIcon, TagIcon, BarChartIcon, ActivityIcon, LayersIcon, BadgeCheckIcon, MapPinIcon, TruckIcon } from "@/components/ui/icons";
+import { HomeIcon, ClipboardIcon, StorefrontIcon, UserIcon, UsersIcon, BriefcaseIcon, GiftIcon, SettingsIcon, StarIcon, ScrollIcon, TagIcon, BarChartIcon, ActivityIcon, LayersIcon, BadgeCheckIcon, MapPinIcon, TruckIcon, MoneyIcon, ReceiptIcon } from "@/components/ui/icons";
 import type { InstallerNavItem } from "@/features/installer-dashboard-preview/installer-nav";
 import { MARKETPLACE_SELL_ENTITLEMENT, NAV_CAPS } from "@/lib/nav/modules";
 
@@ -52,8 +52,10 @@ export const SHOWROOM_GROUPS = [
   // seller - an entitlement the shell adds to the capability list (see ShowroomFrame) - and never unlocked by org.manage.
   { label: { ar: "الماركت", en: "Marketplace" }, items: [
     legacy("marketplace-products", "/showroom/marketplace/products", "منتجات الماركت", "Marketplace products", StorefrontIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
+    legacy("marketplace-orders", "/showroom/marketplace/orders", "طلبات الماركت", "Marketplace orders", ReceiptIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
     legacy("marketplace-areas", "/showroom/marketplace/areas", "المناطق", "Delivery areas", MapPinIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
     legacy("marketplace-delivery", "/showroom/marketplace/delivery", "توصيل المناطق", "Delivery prices", TruckIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
+    legacy("marketplace-payments", "/showroom/marketplace/payments", "طرق الدفع", "Payment methods", MoneyIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
   ] },
   { label: { ar: "الشبكة", en: "Network" }, items: [
     legacy("suppliers", `${LEGACY}/suppliers`, "الموردون", "Suppliers", StorefrontIcon),

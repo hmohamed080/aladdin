@@ -485,7 +485,7 @@ begin
   create temporary table if not exists pg_temp.mp_checkout_lines (
     ord int, seller_id uuid, product_id uuid, variant_id uuid, sku text, name_ar text, name_en text,
     selling_unit text, price numeric(14,2), qty int) on commit drop;
-  delete from pg_temp.mp_checkout_lines;
+  delete from pg_temp.mp_checkout_lines where true;  -- PostgREST safeupdate refuses an unqualified DELETE
   insert into pg_temp.mp_checkout_lines
   select t.ord::int, p.seller_organization_id, p.id, pv.id, pv.sku, p.name_ar, p.name_en, pv.selling_unit, pv.price_egp,
          (t.x ->> 'qty')::int

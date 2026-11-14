@@ -354,5 +354,11 @@ select throws_like($$ select public.marketplace_seller_orders_page('9c000000-ccc
   'mp:not_found%', 'H8. the buyer cannot open the showroom''s order list');
 reset role;
 
+-- I. PostgREST runs RPCs with pg-safeupdate, which refuses DELETE / UPDATE without WHERE (psql here does not).
+select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname in ('public', 'app') and p.proname like 'marketplace%'
+             and p.prosrc ~* '(delete\s+from|update)\s+[a-z_.]+\s*;'), 0,
+  'I1. no marketplace function has a DELETE or UPDATE without WHERE (PostgREST safeupdate)');
+
 select * from finish();
 rollback;

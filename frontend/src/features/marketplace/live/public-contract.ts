@@ -114,6 +114,16 @@ export type CartDelivery =
   | { status: "not_available" }
   | { status: "needs_area" };
 
-export type CartSeller = { index: number; name: string; pickup_available: boolean; delivery: CartDelivery };
+/** How a showroom can be paid (Migration 14); `instapay` is null when it does not take InstaPay deposits. */
+export type CartPaymentMethods = { cod: boolean; instapay: { deposit_percent: number } | null };
+
+export type CartSeller = {
+  index: number;
+  name: string;
+  pickup_available: boolean;
+  delivery: CartDelivery;
+  /** absent in quotes from before Migration 14 */
+  payment_methods?: CartPaymentMethods;
+};
 
 export type CartQuote = { lines: CartQuoteLine[]; sellers: CartSeller[] };
