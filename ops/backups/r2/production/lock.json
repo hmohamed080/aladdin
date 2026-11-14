@@ -26,6 +26,22 @@
         "type": "Age",
         "maxAgeSeconds": 31536000
       }
+    },
+    {
+      "id": "preserve-archive-20261111",
+      "enabled": true,
+      "prefix": "source-preservation/20261111-archive/",
+      "condition": {
+        "type": "Indefinite"
+      }
+    },
+    {
+      "id": "preserve-delta-enc-20261112",
+      "enabled": true,
+      "prefix": "source-preservation/20261112/storage/",
+      "condition": {
+        "type": "Indefinite"
+      }
     }
   ]
 }

@@ -204,6 +204,14 @@ Part A is read-only preparation and changes nothing hosted. Part B changes hoste
 10. Run *Daily backup* with label `production` and the confirmation `back up production`.
 11. Run the restore test with label `production`.
 
+### Production lock rules replace, they do not merge
+
+`wrangler r2 bucket lock set --file r2/production/lock.json` replaces every rule on the bucket. The file therefore carries, besides the three database rules, the two live indefinite **source-preservation** locks (`source-preservation/20261111-archive/`, `source-preservation/20261112/storage/`), and `retention-test.sh` fails if either is missing or if any lifecycle rule could expire `source-preservation/` or `phase-a/`. Run `wrangler r2 bucket lock list aladdin-production-db-backups` first and compare it with the file before applying.
+
+### Final acceptance (one exercise, at the end of Backup setup)
+
+Individual components are tested offline and on Acceptance during implementation; the full backup-and-restore exercise runs ONCE, immediately before Production activation, never repeatedly. `python3 ops/backups/final-acceptance-preflight.py --label production` is read-only (variable values of non-secret settings, secret names only): it checks the four environments, the bucket pins, `R2_MEDIA_BACKUP=1` and `R2_SITE_BACKUP=1`, credential isolation of the control environment, and that `LEGACY_MEDIA_BACKUP` is not set (the backup job holds no service-role key, so the legacy step can only fail it; remove the variable after the Supabase Storage cleanup). On PASS it prints the manual runs, in order, each needing its own owner GO: *Daily backup* (label `production`, typed confirmation), then *Monthly restore test* (label `production`, newest snapshot). The exercise passes only if the `backup` and `restore` data jobs conclude `success` and the restore prints `RESULT: PASS`. Only then is the console schedule (Admin, `/admin/backups`) enabled. `final-acceptance-preflight-test.py` covers the checker offline.
+
 ## Acceptance validation and rollback
 
 Each check below must pass:
