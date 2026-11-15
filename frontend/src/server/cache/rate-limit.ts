@@ -31,6 +31,10 @@ export const RATE_LIMITS = {
   "media-read": { limit: 1_200, windowSeconds: 60 },
   // Video: signed multipart part URLs (a 2 GB upload at 16 MB parts is 128).
   "video-part": { limit: 600, windowSeconds: 600 },
+  // Public Marketplace, counted per CLIENT (hashed IP; visitors have no account). The image route is only the
+  // fallback for photos the page did not already hand over as Worker URLs; the quote is one read RPC per call.
+  "market-media": { limit: 600, windowSeconds: 60 },
+  "market-quote": { limit: 40, windowSeconds: 60 },
 } as const;
 
 const WINDOW_SCRIPT = "local n = redis.call('INCR', KEYS[1]) if n == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end return n";
@@ -83,16 +87,29 @@ function rememberBlocked(key: string, untilMs: number) {
 }
 
 export async function consumeRateLimit(rule: RateLimitRule, userId: string): Promise<RateLimitResult> {
+  return consume(rule, userId, { user: userId });
+}
+
+/**
+ * The same window for callers without an account. `clientId` is an already-hashed client identifier (never a
+ * raw IP); its Redis key sits under the global scope with the identifier hashed into the digest like every
+ * other parameter.
+ */
+export async function consumeClientRateLimit(rule: RateLimitRule, clientId: string): Promise<RateLimitResult> {
+  return consume(rule, clientId, "global");
+}
+
+async function consume(rule: RateLimitRule, id: string, scope: "global" | { user: string }): Promise<RateLimitResult> {
   const { limit, windowSeconds } = RATE_LIMITS[rule];
   const window = Math.floor(Date.now() / 1000 / windowSeconds);
   const retryAfterSeconds = (window + 1) * windowSeconds - Math.floor(Date.now() / 1000);
-  const localKey = `${rule}:${userId}`;
+  const localKey = `${rule}:${id}`;
   const blockedUntil = blocked.get(localKey);
   if (blockedUntil !== undefined && blockedUntil > Date.now()) {
     count("rl", "limited");
     return { outcome: "limited", source: "memory", retryAfterSeconds };
   }
-  const key = cacheKey("rl", { user: userId }, rule, String(window));
+  const key = scope === "global" ? cacheKey("rl", scope, rule, id, String(window)) : cacheKey("rl", scope, rule, String(window));
   const reply = await withRedis("rl", (redis) =>
     redis.eval(WINDOW_SCRIPT, [key], [String(windowSeconds)]));
   let used = typeof reply === "number" ? reply : Number.NaN;

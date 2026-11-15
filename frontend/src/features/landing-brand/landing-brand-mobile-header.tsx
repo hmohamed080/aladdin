@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { LandingBrandCart } from "./landing-brand-cart";
 import { brandContent } from "./landing-brand-content";
 
 const link = { padding: "13px 4px", fontSize: "16px", color: "var(--lb-cream)", borderBottom: "1px solid color-mix(in srgb, var(--lb-cream) 10%, transparent)" } as const;
 
 /** Mobile header from the approved mockup: logo at the inline start, burger at the end, links and the two account buttons in the opened menu. */
-export function LandingBrandMobileHeader() {
+export function LandingBrandMobileHeader({ showCart = false }: { showCart?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const t = brandContent.nav;
   const items: [string, string][] = t.items.map(([label, href]) => [label, href === "#top" ? "#top" : href === "#market" ? "#market" : href === "#roles" ? "#m-roles" : href === "#why" ? "#m-why" : "#m-footer"]);
@@ -17,6 +18,7 @@ export function LandingBrandMobileHeader() {
         <button type="button" onClick={() => setOpen(!open)} aria-label={t.menu} aria-expanded={open} aria-controls="m-nav" style={{ width: "48px", height: "48px", border: 0, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--lb-cream)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: "none" }}><path d={open ? "M6 6l12 12M18 6L6 18" : "M4 7h16M4 12h16M4 17h16"}></path></svg>
         </button>
+        {showCart ? <LandingBrandCart /> : null}
         <a href="#top" style={{ display: "flex", alignItems: "center", gap: "10px", color: "inherit", textDecoration: "none" }}>
           <Image src="/landing-brand/mark-cream.png" width={340} height={525} sizes="34px" priority alt="" style={{ height: "44px", width: "auto", flex: "none", display: "block" }} />
           <span style={{ fontWeight: 800, fontSize: "24px", color: "var(--lb-cream)" }}>علاء الدين</span>

@@ -34,6 +34,9 @@
       "version_metadata": { "binding": "CF_VERSION_METADATA" },
       "vars": {
         "NEXT_PUBLIC_APP_ENV": "staging",
+        // Public Marketplace (ADR-0028) is open on this isolated preview ONLY: acceptance data, no custom domain.
+        // Production deliberately has no such variable, so it keeps serving the "coming soon" page until a separate approval.
+        "NEXT_PUBLIC_MARKETPLACE_PREVIEW": "true",
         "REDIS_CACHE_ENABLED": "true",
         "REDIS_REST_URL": "https://alert-bedbug-148148.upstash.io",
         "REDIS_KEY_ENV": "cf-preview",
@@ -84,7 +87,9 @@
         // flags reach Production only through a Worker version that is promoted by hand, and the manual workflow
         // refuses `stage=frontend` (immediate deploy) until the GitHub variable R2_CUTOVER_APPROVED is "true".
         // Rolling back to a version older than this change reopens Supabase writes: do that only on purpose.
-        // Redis stays off; it has its own approval.
+        // Redis (ADR-0019) is ON, owner-approved 2026-11-15: reference cache + rate limits (incl. the public Marketplace's per-client ones).
+        // Same Upstash database as the preview, kept apart by REDIS_KEY_ENV. REDIS_REST_TOKEN is a Worker secret (listed below, so a
+        // deploy without it is refused). Redis is only an accelerator: if it is down the app falls back to Postgres and per-instance counts.
         "R2_STORAGE_ENABLED": "true",
         "R2_PRODUCTION_WRITES_APPROVED": "true",
         "MEDIA_LEGACY_STORAGE_WRITES": "false",
@@ -93,11 +98,13 @@
         "R2_ACCOUNT_ID": "a4c2b7ac45e58a81691b9165492ce6a2",
         "R2_PRIVATE_BUCKET": "aladdin-media-private",
         "R2_SITE_BUCKET": "aladdin-site-media",
-        "REDIS_CACHE_ENABLED": "false"
+        "REDIS_CACHE_ENABLED": "true",
+        "REDIS_REST_URL": "https://alert-bedbug-148148.upstash.io",
+        "REDIS_KEY_ENV": "production"
       },
       // Checked by `wrangler deploy`: the deploy fails if one is not set. The owner
       // sets them with `wrangler secret put <NAME> --env production` (never in this file).
-      "secrets": { "required": ["SUPABASE_SERVICE_ROLE_KEY", "TURNSTILE_SECRET_KEY", "AUTH_PASSWORD_PREVIEW_GRANT_SECRET"] }
+      "secrets": { "required": ["SUPABASE_SERVICE_ROLE_KEY", "TURNSTILE_SECRET_KEY", "AUTH_PASSWORD_PREVIEW_GRANT_SECRET", "REDIS_REST_TOKEN"] }
     }
   }
 }

@@ -8,11 +8,17 @@ import { BrandIcon, SocialIcon } from "./landing-brand-icons";
 import { LandingBrandVideo } from "./landing-brand-video";
 import { MobileCta, MobileExperience, MobileFooter, MobileHero, MobileHow, MobileRoles, MobileServices, MobileWhy } from "./landing-brand-mobile";
 import { LandingBrandMarket } from "./landing-brand-market";
+import { MarketplaceImagesProvider } from "../marketplace/live/image-urls";
+import type { PublicCard } from "../marketplace/live/public-contract";
+import type { MarketplaceImageMap } from "@/lib/storage/marketplace-images";
 import { formatStat, type LandingStats } from "./landing-brand-stats";
 import styles from "./landing-brand.module.css";
 
 /** The public Landing page (brand identity, design-system v1.1.0). Server component; interactive parts are the header, product chips and FAQ. */
-export function LandingBrand({ stats }: { stats: LandingStats }) {
+/** `market.open` shows the cart in the header; `market.live` (newest real products) replaces the sample cards in the product section. */
+export type LandingMarket = { open: boolean; live: PublicCard[]; images: MarketplaceImageMap };
+
+export function LandingBrand({ stats, market = { open: false, live: [], images: {} } }: { stats: LandingStats; market?: LandingMarket }) {
   const c = brandContent;
   const pills = (
     [
@@ -31,7 +37,7 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
             <Image src="/landing-brand/hero.jpg" alt="" fill priority sizes="100vw" className={styles.heroImg} />
             <div className={styles.heroShade} />
           </div>
-          <LandingBrandHeader />
+          <LandingBrandHeader showCart={market.open} />
           <div className={styles.heroBody}>
             <div className={styles.heroCopy}>
               <h1>{c.hero.title} <span>{c.hero.accent}</span> {c.hero.titleTail}</h1>
@@ -56,7 +62,7 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
         </div>
       </section>
       </div>
-      <div className={styles.onlyMobile}><MobileHero stats={stats} /></div>
+      <div className={styles.onlyMobile}><MobileHero stats={stats} showCart={market.open} /></div>
 
       <div className={styles.onlyDesktop}>
       <section id="roles" className={styles.section}>
@@ -107,9 +113,9 @@ export function LandingBrand({ stats }: { stats: LandingStats }) {
             <h2>{c.market.title}</h2>
             <p className={styles.lead}>{c.market.body}</p>
           </div>
-          <a className={styles.btnDark} href="/marketplace">{c.market.browse}<BrandIcon name="arrow" size={18} className={styles.flip} /></a>
+          <a className={styles.btnDark} href="/market">{c.market.browse}<BrandIcon name="arrow" size={18} className={styles.flip} /></a>
         </div>
-        <LandingBrandMarket />
+        <MarketplaceImagesProvider images={market.images}><LandingBrandMarket live={market.live} /></MarketplaceImagesProvider>
       </section>
 
       <div className={styles.onlyDesktop}>

@@ -84,15 +84,30 @@ describe("Cloudflare production config (committed Wrangler files)", () => {
     for (const stage of ["check", "backend", "frontend-upload", undefined]) expect(checkCutoverStage(stage, undefined)).toEqual([]);
   });
 
-  it("refuses a public address, an acceptance resource or Redis switched on", () => {
+  it("refuses a public address, an acceptance resource or video switched on", () => {
     const config = frontendConfig();
     config.env.production.workers_dev = true;
     config.env.production.vars.R2_PRIVATE_BUCKET = "aladdin-r2-acceptance-20261011-private";
-    config.env.production.vars.REDIS_CACHE_ENABLED = "true";
+    config.env.production.vars.VIDEO_ENABLED = "true";
     const problems = checkFrontend(config);
     expect(problems.some((p) => p.includes("workers_dev"))).toBe(true);
     expect(problems.some((p) => p.includes("acceptance"))).toBe(true);
-    expect(problems.some((p) => p.includes("REDIS_CACHE_ENABLED"))).toBe(true);
+    expect(problems.some((p) => p.includes("VIDEO_ENABLED"))).toBe(true);
+  });
+
+  it("allows Redis only on the Production REST transport with its token declared as a required secret", () => {
+    expect(checkFrontend(frontendConfig())).toEqual([]);
+    const broken = (edit: (env: ReturnType<typeof frontendConfig>["env"]["production"]) => void) => {
+      const config = frontendConfig();
+      edit(config.env.production);
+      return checkFrontend(config).join(" | ");
+    };
+    expect(broken((e) => { delete e.vars.REDIS_REST_URL; })).toContain("REDIS_REST_URL");
+    expect(broken((e) => { e.vars.REDIS_KEY_ENV = "cf-preview"; })).toContain("REDIS_KEY_ENV");
+    expect(broken((e) => { const secrets = e.secrets as { required: string[] };
+      secrets.required = secrets.required.filter((n) => n !== "REDIS_REST_TOKEN"); })).toContain("REDIS_REST_TOKEN");
+    expect(broken((e) => { delete e.vars.REDIS_CACHE_ENABLED; })).toContain("REDIS_CACHE_ENABLED");
+    expect(broken((e) => { e.vars.REDIS_CACHE_ENABLED = "yes"; })).toContain("REDIS_CACHE_ENABLED");
   });
 
   it("refuses Turnstile hostnames outside the live domain", () => {
