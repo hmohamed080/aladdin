@@ -1,3 +1,10 @@
+## 2026-11-15 - Admin View-As (PR #193): private video + secure Range through the view door (branch feat/view-as-media-video-20261115)
+
+- Scope: local code, tests and docs only. No hosted migration, deploy, merge, push to main, or R2 read. Local `supabase_db_aladdin` used only for a rolled-back pgTAP run (migrations 090002-090004 + the new one applied inside one transaction that the test's ROLLBACK discarded; nothing persisted).
+- Built: migration `20261115090001_admin_view_as_video_open.sql` (new function `admin_view_as_video_open`; shared resolvers and `media_edge_video` untouched); pgTAP `140` (16/16); one shared delivery module `frontend/src/server/view-as/media-delivery.ts` + `range.ts`; routes at `/view-as/[id]/media/...` and the legacy `/admin/users/[id]/view/media/...` (images and video); URL seam `lib/admin/view-as/media-url.ts`; rate rule `view-video-read` (3000/min); `database.types.ts` entry; guard test `view-as-read-only.test.ts` re-pinned to the shared module (two RPCs).
+- Design: see ADMIN_VIEW_AS_ARCHITECTURE.md section 10 (HLS playlists keep relative URIs under the door, 16 MiB per-response cap, DB check before and after every request).
+- Not done / open: not applied to hosted; `/view-as/[id]` shell, middleware gating of the new `/view-as` tree and real components using `media-url.ts` belong to the parallel shell work; no `<video>`/hls.js player wired (no UI touched); real-R2 and real-browser seeking validation is Acceptance.
+
 ## 2026-11-12 - Account identity Phase 1 final safety review: media forward-fix (v1.7, PR #179 and PR #170)
 
 - Scope: local isolated stack, scripts, tests, docs, CI, read-only hosted aggregates. No merge, hosted write, backup, restore, deploy or migration.

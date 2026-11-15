@@ -29,6 +29,10 @@ export const RATE_LIMITS = {
   "media-upload": { limit: 60, windowSeconds: 600 },
   // Private media reads through the application proxy (one per image shown).
   "media-read": { limit: 1_200, windowSeconds: 60 },
+  // Admin View-As video: a player issues many small requests (playlists, init segment, one segment per few seconds, Range probes),
+  // each one fully re-authorized. 3000/min = 50/s per admin: ~25 concurrent players' worth of 2-4 s segments, far above any real
+  // review, still a hard ceiling against a runaway loop. Images in a view keep the ordinary media-read window.
+  "view-video-read": { limit: 3_000, windowSeconds: 60 },
   // Video: signed multipart part URLs (a 2 GB upload at 16 MB parts is 128).
   "video-part": { limit: 600, windowSeconds: 600 },
 } as const;

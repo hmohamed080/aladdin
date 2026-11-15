@@ -31,9 +31,12 @@ function walk(dir: string): string[] {
 const isSource = (f: string) => /\.(ts|tsx)$/.test(f) && !/\.test\.(ts|tsx)$/.test(f);
 
 const VIEW_DIR = path.join(SRC, "app/admin/users/[id]/view");
-const MEDIA_ROUTE = path.join(VIEW_DIR, "media/[namespace]/[mediaId]/route.ts");
+const MEDIA_DIR = path.join(VIEW_DIR, "media");
+// The thin route files under view/media/ delegate to ONE shared delivery module (also mounted at /view-as/[id]/media/).
+const MEDIA_DELIVERY = path.join(SRC, "server/view-as/media-delivery.ts");
+const MEDIA_ROUTES = walk(MEDIA_DIR).filter(isSource);
 const ENTRY = [
-  ...walk(VIEW_DIR).filter(isSource).filter((f) => f !== MEDIA_ROUTE),
+  ...walk(VIEW_DIR).filter(isSource).filter((f) => !f.startsWith(MEDIA_DIR + path.sep)),
   ...walk(path.join(SRC, "features/admin-view-as")).filter(isSource),
   path.join(SRC, "server/view-as/guard.ts"),
   path.join(SRC, "server/view-as/readers.ts"),
@@ -168,11 +171,12 @@ describe("Admin View-As is read-only (transitive)", () => {
 });
 
 describe("Admin View-As private media route (stage 4): what it may import and call", () => {
-  const src = read(MEDIA_ROUTE);
+  const src = read(MEDIA_DELIVERY);
   const imports = [...src.matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]);
 
   it("imports only the audited gate, the permission model, the R2 read provider and the rate limit: no shared resolver, no service role", () => {
     expect([...imports].sort()).toEqual([
+      "./range",
       "@/lib/env/view-as",
       "@/lib/permissions/admin",
       "@/lib/storage/media-policy",
@@ -182,18 +186,26 @@ describe("Admin View-As private media route (stage 4): what it may import and ca
       "@/server/storage/r2-provider",
       "next/server",
     ]);
+    // the route files themselves only delegate to the delivery module
+    for (const f of MEDIA_ROUTES) {
+      expect([...read(f).matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]).sort(), rel(f)).toEqual(["@/server/view-as/media-delivery", "next/server"]);
+    }
+    expect(MEDIA_ROUTES.length).toBe(2);
+    for (const f of walk(path.join(SRC, "app/view-as/[id]/media")).filter(isSource)) {
+      expect([...read(f).matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]).sort(), rel(f)).toEqual(["@/server/view-as/media-delivery", "next/server"]);
+    }
     expect(src).not.toMatch(/server\/storage\/(media|delivery)|admin-server|SUPABASE_SERVICE_ROLE_KEY|privilegedStorageClient|createAdminClient/);
     expect(imports.some((i) => i?.startsWith("@/server/actions/"))).toBe(false);
   });
 
-  it("calls exactly ONE RPC, the audited open function, and writes nothing through the Supabase client or storage", () => {
+  it("calls exactly TWO RPCs, the audited image and video open functions, and writes nothing through the Supabase client or storage", () => {
     const rpcs = [...src.matchAll(/\.rpc\(\s*["']([a-z0-9_]+)["']/g)].map((m) => m[1]);
-    expect(rpcs).toEqual(["admin_view_as_media_open"]);
+    expect(rpcs).toEqual(["admin_view_as_media_open", "admin_view_as_video_open"]);
     expect(src).not.toMatch(/\.(insert|update|upsert|delete)\s*\(|\.storage\s*\.|PutObject|DeleteObject|createUploadUrl|commitVerifiedObject/);
   });
 
   it("is a same-origin-only, uncached, GET-only handler that never follows a redirect", () => {
-    expect(src).toMatch(/export const dynamic = "force-dynamic"/);
+    for (const f of MEDIA_ROUTES) expect(read(f), rel(f)).toMatch(/export const dynamic = "force-dynamic"/);
     expect(src).toMatch(/get\("sec-fetch-site"\) !== "same-origin"/);
     expect(src).toMatch(/redirect: "manual"/);
     expect(src).not.toMatch(/export (async )?function (POST|PUT|PATCH|DELETE)\b/);
@@ -201,6 +213,6 @@ describe("Admin View-As private media route (stage 4): what it may import and ca
   });
 
   it("repeats the authorization after the fetch (Exit, expiry or revocation cuts a file in flight)", () => {
-    expect(src.match(/await open\(\)/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(src.match(/await open\(\)/g)?.length).toBeGreaterThanOrEqual(4);   // image: before + after; video: before + after (+ 416)
   });
 });
