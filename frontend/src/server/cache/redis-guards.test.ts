@@ -63,17 +63,22 @@ describe("Redis use stays inside ADR-0019", () => {
   });
 });
 
-describe("Redis stays off until accepted", () => {
-  it("ships disabled in .env.example and outside the workers.dev preview", () => {
+describe("Redis is on only where the owner accepted it", () => {
+  it("ships disabled in .env.example and is on only in the preview and (owner-approved 2026-11-15) production environments", () => {
     expect(readFileSync(join(FRONTEND, ".env.example"), "utf8")).toMatch(/^REDIS_CACHE_ENABLED=false$/m);
     const wrangler = readFileSync(join(FRONTEND, "wrangler.jsonc"), "utf8");
-    // The owner accepted Redis for the acceptance preview only (2026-10-24, cf-preview key prefix).
-    // Every other environment, production included, keeps it off.
+    // Accepted for the acceptance preview (2026-10-24, cf-preview key prefix) and for Production (2026-11-15, ADR-0019
+    // Revision 3). The top-level (default) Worker and anything outside those two environments keep it off.
     const enabled = [...wrangler.matchAll(/"REDIS_CACHE_ENABLED"\s*:\s*"true"/g)].map((m) => m.index ?? 0);
     const preview = wrangler.indexOf('"preview": {');
     const production = wrangler.indexOf('"production": {');
     expect(preview).toBeGreaterThan(-1);
     expect(production).toBeGreaterThan(preview);
-    expect(enabled.every((at) => at > preview && at < production)).toBe(true);
+    expect(enabled.length).toBe(2);
+    expect(enabled.every((at) => at > preview)).toBe(true);
+    // Production needs its own namespace and the REST token as a required secret (also enforced by check-cloudflare-production).
+    const productionBlock = wrangler.slice(production);
+    expect(productionBlock).toMatch(/"REDIS_KEY_ENV"\s*:\s*"production"/);
+    expect(productionBlock).toMatch(/"required":\s*\[[^\]]*"REDIS_REST_TOKEN"/);
   });
 });
