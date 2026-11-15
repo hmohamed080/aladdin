@@ -7,9 +7,14 @@
 #   stage = check     builds and bundles both Workers (dry run). Uploads nothing. The default.
 #   stage = backend   deploys `aladdin-backend-production` (FastAPI in a Container). Run first.
 #   stage = frontend-upload  UPLOAD-ONLY: builds and uploads the frontend as a NEW VERSION that is NOT deployed (serves 0% of traffic;
-#                     users are unaffected). Test it on the live hostname with the request header
+#                     users are unaffected). An upload alone is NOT enough to test it: Cloudflare ignores an override for a version
+#                     that is not in the current deployment (the request silently uses the live version). First add it at 0%:
+#                       wrangler versions deploy <version id>@0% <live version id>@100% --env production
+#                     (`wrangler deployments status --env production` shows the live id; no visitor is affected). Then test it on the
+#                     live hostname with the request header
 #                       Cloudflare-Workers-Version-Overrides: aladdin-frontend-production="<version id>"
-#                     (only requests that carry it reach the new version), then promote it by hand with
+#                     (only requests that carry it reach the new version; confirm it really was served, e.g. a changed /api/health
+#                     field, since an ignored override still answers 200), then promote it by hand with
 #                       wrangler versions deploy <version id>@100% --env production
 #                     which is the user-facing activation and needs its own approval. Never promotes by itself.
 #   stage = frontend  deploys `aladdin-frontend-production`. Refuses to run unless the backend Worker already
@@ -189,7 +194,7 @@ jobs:
           {
             echo "### Frontend version uploaded, NOT deployed (0% of traffic)"
             grep -i "version id" "$RUNNER_TEMP/upload.txt" || true
-            echo "Test with the header Cloudflare-Workers-Version-Overrides: aladdin-frontend-production=\"<version id>\"; before promoting run node frontend/scripts/check-cloudflare-production.mjs --verify-version <version id>, then wrangler versions deploy <version id>@100% --env production (separate approval)."
+            echo "First add it to the deployment at 0% (wrangler versions deploy <version id>@0% <live version id>@100% --env production): an override for a version outside the deployment is ignored. Then test with the header Cloudflare-Workers-Version-Overrides: aladdin-frontend-production=\"<version id>\" and confirm the new version answered; before promoting run node frontend/scripts/check-cloudflare-production.mjs --verify-version <version id>, then wrangler versions deploy <version id>@100% --env production (separate approval)."
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Verify the uploaded version carries the live media flags (fails the run otherwise; do NOT promote a version this step rejected)
         if: inputs.stage == 'frontend-upload' && env.UPLOAD == 'true'
