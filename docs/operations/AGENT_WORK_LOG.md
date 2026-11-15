@@ -7592,3 +7592,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 
 - Finding: the "account already registered" warning only handled GoTrue's error `user_already_exists` (local stack). Hosted Supabase returns an obfuscated user with empty `identities` instead, so a confirmed email went to the OTP step with no code.
 - Fix: `requestPasswordSignUp` also treats `identities.length === 0` as an existing confirmed account (same budget, same degrade to neutral, nothing staged). Missing `identities` is treated as a new registration. Unit tests cover empty, populated and missing. No migration, no R2/secret/hosted-DB change.
+
+## 2026-11-15 - #193 View-As: exact UI parity plan and Phase 0 (server read-only gate)
+
+- Owner changed the View-As requirement to EXACT UI parity with the real account (same shell, pages, components, data), reusing the real components, with every mutation blocked on the server. Interim custom sections are not the final experience.
+- Plan and Craftsman parity inventory: `docs/admin/ADMIN_VIEW_AS_EXACT_PARITY_PLAN.md` (amends sections 6.4 and 7 of the architecture doc; constraints on no impersonation, no service role, admin-gated reads are unchanged).
+- Built (Phase 0): `server/view-as/read-only-gate.ts` + first statement of `middleware.ts` refuse any non-read request addressed to, or made from, the view tree (`/admin/users/<id>/view/**`, future `/view-as/<id>/**`), except session start/exit. Tests: gate (9), middleware (27).
+- NOT built: the `/view-as/[id]` shell, `AccountReader` seam, page extractions, readers/`admin_view_*` for shell/jobs/offers/network/settings/certificates/edit, media seam for all namespaces and video. The eye still opens the interim custom sections. Nothing is deployed or migrated for this.
