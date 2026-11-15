@@ -72,6 +72,21 @@ beforeEach(() => {
 });
 
 describe("middleware — account suspension", () => {
+  it("refuses a write into the view-as tree with a generic 403, before any session or database work", async () => {
+    claims = SIGNED_IN;
+    const ID = "70000001-0000-4000-8000-000000000001";
+    const res = await at(`/admin/users/${ID}/view/profile`, { method: "POST", headers: { "next-action": "abc" } });
+    expect(res.status).toBe(403);
+    expect(res.headers.get("x-view-as-read-only")).toBe("1");
+    expect(await res.json()).toEqual({ error: "view_as_read_only" });
+    expect(getClaims).not.toHaveBeenCalled();
+    expect(getUser).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+    // a read of the same page is untouched, and the audited session controls stay reachable
+    expect((await at(`/admin/users/${ID}/view/profile`)).status).not.toBe(403);
+    expect((await at(`/admin/users/${ID}/view/exit`, { method: "POST" })).status).not.toBe(403);
+  });
+
   it("sends a suspended account from every product surface to /auth/suspended", async () => {
     claims = SIGNED_IN;
     networkUser = { id: "u1" };

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { readPublicEnv } from "@/lib/env";
+import { isViewAsMutation, viewAsReadOnlyResponse } from "@/server/view-as/read-only-gate";
 import {
   identityFromClaims,
   isAuthRequiredPath,
@@ -17,6 +18,12 @@ import {
  * with no session, and bounces a signed-in caller away from the sign-in page.
  */
 export async function middleware(request: NextRequest) {
+  // "View as account" is READ-ONLY on the server. The real account components render in that tree and embed Server
+  // Actions, which would run as the Admin: refuse any write addressed to, or made from, the view tree before anything else.
+  if (isViewAsMutation({ method: request.method, pathname: request.nextUrl.pathname, headers: request.headers })) {
+    const refused = viewAsReadOnlyResponse();
+    return new NextResponse(refused.body, { status: refused.status, headers: refused.headers });
+  }
   // Sign-in / sign-up server actions never need a large body; refuse one before any work.
   const authEntryRoute = /^\/auth\/sign-(in|up)$/.test(request.nextUrl.pathname);
   const contentLength = request.headers.get("content-length");

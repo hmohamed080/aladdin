@@ -26,7 +26,10 @@ import { EyeIcon } from "@/components/ui/icons";
 import { LabeledField, Textarea, Select, Input } from "@/components/ui/controls";
 import { requireAdminRoute } from "@/server/authorization/admin";
 import { loadStaffRanks } from "@/server/queries/admin-rbac";
-import { canSuspendUser, staffRankOf } from "@/features/admin-rbac/eligibility";
+import { canSuspendUser, canViewAsUser, staffRankOf } from "@/features/admin-rbac/eligibility";
+import { ViewAsEye } from "@/features/admin-view-as/view-as-eye";
+import { viewKindForAccountType } from "@/lib/admin/view-as/registry";
+import { isViewAsEnabled } from "@/lib/env/view-as";
 
 export const dynamic = "force-dynamic";
 
@@ -157,6 +160,9 @@ export default async function PreviewUserDetailPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-sm">
+          {isViewAsEnabled() && canViewAsUser(access, caller?.id ?? "", { userId: user.id, staffRank: staffRankOf(staffRanks, user.id), accountKind: viewKindForAccountType(user.accountType) }) ? (
+            <ViewAsEye userId={user.id} variant="button" />
+          ) : null}
           {platformHref ? (
             <a
               href={platformHref}
