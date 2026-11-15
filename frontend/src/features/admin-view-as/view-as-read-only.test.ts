@@ -98,6 +98,14 @@ describe("Admin View-As is read-only (transitive)", () => {
     }
   });
 
+  it("cannot reach the Admin edit feature (Option A): edits live on their own explicit page, never inside a view", () => {
+    for (const f of files) {
+      expect(rel(f), `${rel(f)} (imported by ${graph.get(f)})`).not.toMatch(/admin-edit|^lib\/admin\/edit\/|^features\/admin-edit\//);
+      if (rel(f) === "types/database.types.ts") continue; // generated type map names every RPC
+      expect(read(f), rel(f)).not.toMatch(/\b(?:admin_user_edit_profile|admin_organization_edit|editUserProfileAction|editOrganizationAction)\b/);
+    }
+  });
+
   it("reaches no server action and no 'use server' module", () => {
     for (const f of files) {
       expect(rel(f), `${rel(f)} (imported by ${graph.get(f)})`).not.toMatch(/^server\/actions\//);
