@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   mandatory: { required: false, orgType: null } as { required: boolean; orgType: string | null },
 }));
 
+vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/home",

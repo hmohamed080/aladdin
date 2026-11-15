@@ -69,3 +69,32 @@ export function viewAsReadOnlyResponse(): Response {
     },
   });
 }
+
+/**
+ * The TRUSTED request header the middleware forwards to the server-side boundary (Server Actions, route handlers, the
+ * Supabase client factory). The middleware DELETES any client-supplied copy first and sets it only itself, so a value that
+ * reaches server code was computed from the real path / Referer. It can only ever ADD restriction: forging it on a request
+ * the middleware does not run on makes that request read-only, never the reverse.
+ */
+export const VIEW_AS_CONTEXT_HEADER = "x-view-as-context";
+export type ViewAsContext = "exact" | "interim";
+
+const EXACT_TREE = /^\/view-as\/[0-9a-f-]{36}(?:\/|$)/i;
+
+function treeOf(pathname: string): ViewAsContext | null {
+  if (!VIEW_TREE.test(pathname) || SESSION_CONTROL.test(pathname)) return null;
+  return EXACT_TREE.test(pathname) ? "exact" : "interim";
+}
+
+/**
+ * Which view tree (if any) this request belongs to: by its own path, or, for a NON-READ request only, by the page it was made
+ * from (Referer). A plain GET navigating out of a view into the Admin console is deliberately NOT a view request, so the Admin's
+ * normal console is never put into read-only mode. The two session controls (start / exit) are never a view request.
+ */
+export function viewAsContextFor(input: ViewAsGateInput): ViewAsContext | null {
+  const own = treeOf(input.pathname);
+  if (own) return own;
+  if (READ_METHODS.has(input.method.toUpperCase()) || SESSION_CONTROL.test(input.pathname)) return null;
+  const from = pathOf(input.headers.get("referer"), input.headers.get("host"));
+  return from === null ? null : treeOf(from);
+}

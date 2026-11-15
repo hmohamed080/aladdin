@@ -6,6 +6,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { readPublicEnv } from "@/lib/env";
 import type { Database } from "@/types/database.types";
+import { currentViewAsContext } from "@/server/view-as/context";
+import { readOnlySupabase } from "@/server/view-as/read-only-client";
 
 /**
  * Cookie-backed, CALLER-scoped server Supabase client (Server Components, Server
@@ -33,7 +35,7 @@ export const getServerSupabase = cache(async function getServerSupabase(): Promi
 > {
   const cookieStore = await cookies();
   const env = readPublicEnv();
-  return createServerClient<Database>(
+  const client = createServerClient<Database>(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
@@ -54,6 +56,10 @@ export const getServerSupabase = cache(async function getServerSupabase(): Promi
       },
     },
   );
+  // Admin View-As, exact tree: the real account shell renders under the Admin's own session, so every client built for
+  // such a request is the default-deny read-only wrapper (no write verbs, only allow-listed RPCs). The context comes from
+  // the header the middleware sets itself (never the client's). Normal requests are returned untouched.
+  return (await currentViewAsContext()) === "exact" ? readOnlySupabase(client) : client;
 });
 
 /**

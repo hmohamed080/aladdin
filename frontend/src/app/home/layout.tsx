@@ -1,10 +1,9 @@
-import { loadMyIdentity } from "@/server/queries/profile-identity";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/provider";
-import { getMessages, createTranslator } from "@/lib/i18n/translate";
+import { getMessages } from "@/lib/i18n/translate";
 import { getWorkspaces } from "@/server/queries/workspace";
 import { loadMandatoryBusinessSetup } from "@/server/queries/business-setup";
 import { MANDATORY_BUSINESS_SETUP_PATH } from "@/lib/onboarding/mandatory-business-setup";
@@ -20,16 +19,8 @@ import { SidebarShell } from "@/components/layout/sidebar-shell";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { SIDEBAR_MODE_COOKIE, resolveSidebarMode } from "@/lib/ui/sidebar-mode";
 import { THEME_COOKIE, resolveTheme, resolveThemePreference } from "@/lib/theme/config";
+import { selfReader } from "@/server/view-as/account-reader";
 import { InstallerDashboardShell } from "@/features/installer-dashboard-preview/installer-dashboard-shell";
-import { getServerSupabase } from "@/lib/supabase/server";
-import { listJobOpportunities } from "@/server/queries/job-opportunities";
-import { toOpportunityVMs } from "@/features/home/installer-dashboard-data";
-import { installerLocationLabel } from "@/lib/installer/opportunity-location";
-
-/** Bounded read backing the topbar's search overlay — a handful of recent,
- *  open opportunities to jump to, never the full board (see
- *  `installer-search.tsx`'s own doc comment on this scope). */
-const SEARCH_OPPORTUNITIES_LIMIT = 8;
 
 export const dynamic = "force-dynamic";
 
@@ -99,21 +90,18 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
   const home = personal ? await loadPersonalHome() : null;
 
   if (home?.accountType === "installer_technician") {
-    // Stored values are catalogue keys ("new-cairo"); show the place's name.
-    const location = installerLocationLabel(home.professional, locale);
-    const supabase = await getServerSupabase();
-    const searchOpportunities = await listJobOpportunities(supabase, { limit: SEARCH_OPPORTUNITIES_LIMIT });
-    const searchJobs = toOpportunityVMs(searchOpportunities, createTranslator(locale), locale);
-    const identity = await loadMyIdentity().catch(() => null);
+    // The shell's identity, location and search jobs come from the same AccountReader seam the Admin View-As tree uses
+    // (`/view-as/[id]`), so the two can never diverge. `selfReader` wraps the existing loaders unchanged.
+    const shell = await selfReader(locale).shell();
     return (
       <I18nProvider locale={locale} dir={dir}>
         <InstallerDashboardShell
           theme={resolveTheme(themePreference)}
           sidebarMode={sidebarMode}
-          displayName={home.displayName}
-          avatarUrl={identity?.avatarUrl ?? null}
-          location={location}
-          searchJobs={searchJobs}
+          displayName={shell.displayName}
+          avatarUrl={shell.avatarUrl}
+          location={shell.location}
+          searchJobs={shell.searchJobs}
         >
           {children}
         </InstallerDashboardShell>

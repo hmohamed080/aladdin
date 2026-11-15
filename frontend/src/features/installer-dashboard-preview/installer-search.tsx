@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { useLinkScope } from "@/components/navigation/scoped-link";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
 import { CommandIcon, EnterKeyIcon, SearchIcon, XIcon } from "@/components/ui/icons";
@@ -41,6 +42,7 @@ export function InstallerSearch({
 }) {
   const { locale, dir } = useI18n();
   const router = useRouter();
+  const linkScope = useLinkScope();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -121,7 +123,7 @@ export function InstallerSearch({
   function select(hit: Hit | undefined) {
     if (!hit) return;
     if (production && hit.href) {
-      router.push(hit.href);
+      router.push(linkScope.href(hit.href));
     } else if (hit.anchor) {
       document.getElementById(hit.anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }

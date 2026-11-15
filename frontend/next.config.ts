@@ -36,6 +36,8 @@ const nextConfig: NextConfig = {
       // Admin View-As: private account data, never cached, indexed or referred (docs/admin/ADMIN_VIEW_AS_ARCHITECTURE.md §9).
       { source: "/admin/users/:id/view/:path*", headers: [...VIEW_AS_HEADERS] },
       { source: "/admin/users/:id/view", headers: [...VIEW_AS_HEADERS] },
+      { source: "/view-as/:id/:path*", headers: [...VIEW_AS_HEADERS] },
+      { source: "/view-as/:id", headers: [...VIEW_AS_HEADERS] },
     ];
   },
 

@@ -1,6 +1,19 @@
 # Admin "View as account": exact UI parity (amendment to the architecture)
 
-**Status:** Proposed 2026-11-15 on owner instruction (PR #193). Phase 0 (the server read-only gate) is built; everything else below is NOT built. Supersedes §6.4 ("read-only variants") and §7 points 1-2 ("no server actions in the tree") of [`ADMIN_VIEW_AS_ARCHITECTURE.md`](ADMIN_VIEW_AS_ARCHITECTURE.md). Every other decision there stands.
+**Status:** Proposed 2026-11-15 on owner instruction (PR #193). Phase 0 (the server read-only gate) and Phase 1 (the `/view-as/[id]` shell) are built; page bodies (Phase 2 onward) are NOT built. Owner decisions 2026-11-15: top-level `/view-as/[id]` tree; owner-only controls render DISABLED with a read-only indication (supersedes the "render live and refuse" recommendation in §7.3); the custom `/admin/users/[id]/view/*` view is **Interim** and labelled so; read-only is enforced at three boundaries (edge, server-action/client, database).
+
+### Phase 1 checklist (built)
+
+- [x] `/view-as/[id]` layout: `requireViewAs`, banner above the real `InstallerDashboardShell`, subject identity from `viewAsReader`, no Admin chrome
+- [x] `LinkScope` (`lib/admin/view-as/link-scope.ts`, `components/navigation/scoped-link.tsx`); test fails on any rendered `/home` href
+- [x] `AccountReader` (`server/view-as/account-reader.ts`): `selfReader` (used by `/home` layout) + `viewAsReader`; drift guard = both annotated `: AccountReader` (a new loader breaks both until implemented) + key-parity test + `@ts-expect-error` proof
+- [x] Registry `parity: "interim" | "exact"`; eye opens `/view-as` only for `exact`
+- [x] Read-only UI: disabled fieldset around page content, `OwnerOnly` around sign out, "Read only" badge
+- [x] Boundary (b): trusted `x-view-as-context` (middleware strips client copy), `assertNotViewAsContext()`, default-deny read-only Supabase client in the exact tree
+- [x] Interim banner label; start/exit mirrored under `/view-as/[id]/`
+- [ ] Phase 2: page bodies via `AccountReader`; guard remaining Server Actions with `assertNotViewAsContext()`; service-role actions need an explicit guard
+- [ ] Phase 3: media seam for the exact tree, 403 notice
+- [ ] Phase 4: acceptance side-by-side, `craftsman = exact` Supersedes §6.4 ("read-only variants") and §7 points 1-2 ("no server actions in the tree") of [`ADMIN_VIEW_AS_ARCHITECTURE.md`](ADMIN_VIEW_AS_ARCHITECTURE.md). Every other decision there stands.
 
 ## 1. Purpose
 

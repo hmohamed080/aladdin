@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { readPublicEnv } from "@/lib/env";
 import { isViewAsMutation, viewAsReadOnlyResponse } from "@/server/view-as/read-only-gate";
+import { applyViewAsContext } from "@/server/view-as/trusted-context";
 import {
   identityFromClaims,
   isAuthRequiredPath,
@@ -24,6 +25,10 @@ export async function middleware(request: NextRequest) {
     const refused = viewAsReadOnlyResponse();
     return new NextResponse(refused.body, { status: refused.status, headers: refused.headers });
   }
+  // Trusted view-as context for the server-side boundary (Server Actions, route handlers, Supabase client factory): drop
+  // anything the client sent under this name, then set it from the real path / Referer. Mutating `request.headers` is what
+  // `NextResponse.next({ request })` forwards (the cookie refresh below relies on the same).
+  applyViewAsContext(request.headers, { method: request.method, pathname: request.nextUrl.pathname, headers: request.headers });
   // Sign-in / sign-up server actions never need a large body; refuse one before any work.
   const authEntryRoute = /^\/auth\/sign-(in|up)$/.test(request.nextUrl.pathname);
   const contentLength = request.headers.get("content-length");

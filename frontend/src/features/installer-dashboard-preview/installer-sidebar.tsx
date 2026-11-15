@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import Link from "next/link";
+import { ScopedLink as Link, OwnerOnly, useLinkScope } from "@/components/navigation/scoped-link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import {
@@ -53,7 +53,8 @@ export function InstallerSidebar({
   previewActiveItemId?: string;
 }) {
   const { locale, dir, t } = useI18n();
-  const pathname = usePathname();
+  const linkScope = useLinkScope();
+  const pathname = linkScope.unscope(usePathname());
   const Forward = dir === "rtl" ? ChevronLeftIcon : ChevronRightIcon;
   const [mode, setMode] = useState<SidebarMode>(initialMode);
   const [revealed, setRevealed] = useState(false);
@@ -213,7 +214,7 @@ export function InstallerSidebar({
           )}
 
           {production ? (
-            <form action={signOut}>
+            <OwnerOnly><form action={signOut}>
               <button
                 type="submit"
                 title={locale === "ar" ? "تسجيل خروج" : "Sign out"}
@@ -227,7 +228,7 @@ export function InstallerSidebar({
                 <LogOutIcon size={16} />
                 {narrow ? null : locale === "ar" ? "تسجيل خروج" : "Sign out"}
               </button>
-            </form>
+            </form></OwnerOnly>
           ) : null}
         </div>
       </div>

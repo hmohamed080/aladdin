@@ -304,3 +304,42 @@ describe("middleware — matcher", () => {
     }
   });
 });
+
+describe("middleware — trusted view-as context header", () => {
+  const ID = "70000001-0000-4000-8000-000000000001";
+  const forwarded = (res: Response) => res.headers.get("x-middleware-request-x-view-as-context");
+  const signedIn = () => {
+    claims = SIGNED_IN;
+    networkUser = { id: "u1" };
+    accountStatus = { status: "active", suspended: false };
+  };
+
+  it("sets it for the exact and interim trees", async () => {
+    signedIn();
+    expect(forwarded(await at(`/view-as/${ID}/points`))).toBe("exact");
+    expect(forwarded(await at(`/admin/users/${ID}/view/profile`))).toBe("interim");
+  });
+
+  it("strips a forged value outside the tree and from the session controls, and overwrites it inside", async () => {
+    signedIn();
+    const forged = { headers: { "x-view-as-context": "exact" } };
+    for (const path of ["/home", "/admin/users", `/admin/users/${ID}`]) expect(forwarded(await at(path, forged)), path).toBeNull();
+    expect(forwarded(await at(`/view-as/${ID}/exit`, { method: "POST", ...forged }))).toBeNull();
+    expect(forwarded(await at("/admin/users", { method: "POST", ...forged }))).toBeNull();
+    expect(forwarded(await at(`/admin/users/${ID}/view`, { headers: { "x-view-as-context": "exact" } }))).toBe("interim");
+  });
+
+  it("requires a session for /view-as, and the Admin's normal console actions still pass through", async () => {
+    expect(pathOf(await at(`/view-as/${ID}`))).toBe("/auth/sign-in");
+    signedIn();
+    const res = await at("/admin/users", { method: "POST", headers: { referer: "http://localhost/admin/users", "next-action": "abc" } });
+    expect(res.status).not.toBe(403);
+    expect(forwarded(res)).toBeNull();
+  });
+
+  it("refuses a mutation from a view page to another URL, even with a forged header", async () => {
+    signedIn();
+    const res = await at("/api/anything", { method: "POST", headers: { referer: `http://localhost/view-as/${ID}/points`, "x-view-as-context": "" } });
+    expect(res.status).toBe(403);
+  });
+});

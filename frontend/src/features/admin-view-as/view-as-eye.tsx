@@ -2,7 +2,7 @@
 
 import { EyeIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
-import { viewAsBasePath } from "@/lib/admin/view-as/registry";
+import { viewAsStartPath } from "@/lib/admin/view-as/registry";
 
 /**
  * The eye on an eligible account: opens the audited, read-only "view as account".
@@ -15,7 +15,7 @@ export function ViewAsEye({ userId, variant = "icon" }: { userId: string; varian
   const { t } = useI18n();
   const label = t("admin.viewAs.eyeLabel");
   return (
-    <form method="post" action={`${viewAsBasePath(userId)}/start`} className="inline-flex">
+    <form method="post" action={viewAsStartPath(userId)} className="inline-flex">
       {variant === "icon" ? (
         <button
           type="submit"

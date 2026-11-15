@@ -2,7 +2,7 @@
 
 import { accountTypeLabel } from "@/lib/i18n/account-type-label";
 import { useRef, useState } from "react";
-import Link from "next/link";
+import { ScopedLink as Link, OwnerOnly } from "@/components/navigation/scoped-link";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
 import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
@@ -179,7 +179,7 @@ export function InstallerTopbarCore({
                 <MenuLink href="/home/profile" icon={UserIcon} label={locale === "ar" ? "ملفي الشخصي" : "My profile"} />
                 <MenuLink href="/home/settings" icon={SettingsIcon} label={locale === "ar" ? "الإعدادات" : "Settings"} />
                 <div className="my-1 border-t" />
-                <form action={signOut}><MenuRow icon={LogOutIcon} label={locale === "ar" ? "تسجيل خروج" : "Sign out"} tone="danger" submit testId="profile-sign-out" /></form>
+                <OwnerOnly><form action={signOut}><MenuRow icon={LogOutIcon} label={locale === "ar" ? "تسجيل خروج" : "Sign out"} tone="danger" submit testId="profile-sign-out" /></form></OwnerOnly>
               </>
             ) : (
               <>

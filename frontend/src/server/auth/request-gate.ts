@@ -56,6 +56,7 @@ export function isAuthRequiredPath(path: string): boolean {
     path.startsWith("/b2b") ||
     path.startsWith("/admin") ||
     path.startsWith("/home") ||
+    path.startsWith("/view-as") ||
     path.startsWith("/onboarding")
   );
 }
@@ -71,7 +72,7 @@ export function isProductSurfacePath(path: string): boolean {
  * token locally. Admin traffic is small, so this costs little.
  */
 export function needsNetworkValidatedSession(path: string): boolean {
-  return path === "/admin" || path.startsWith("/admin/");
+  return path === "/admin" || path.startsWith("/admin/") || path === "/view-as" || path.startsWith("/view-as/");
 }
 
 /** Sign-in / sign-up entry pages a signed-in caller is sent away from. */

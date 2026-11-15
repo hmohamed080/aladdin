@@ -26,11 +26,20 @@ export type AccountViewDefinition = {
   readonly accountTypes: readonly string[];
   /** Read-only sections, in navigation order. */
   readonly sections: readonly ViewAsSection[];
+  /**
+   * `interim`: the custom `/admin/users/[id]/view/*` screens (NOT the account's own interface). `exact`: every page of the
+   * kind renders the real account UI under `/view-as/[id]/*`. Only `exact` kinds open the `/view-as` tree; the eye keeps
+   * opening the interim view until a kind is signed off (docs/admin/ADMIN_VIEW_AS_EXACT_PARITY_PLAN.md).
+   */
+  readonly parity: ViewAsParity;
 };
+
+export type ViewAsParity = "interim" | "exact";
 
 export const ACCOUNT_VIEWS: Readonly<Record<ViewAsKind, AccountViewDefinition>> = {
   craftsman: {
     kind: "craftsman",
+    parity: "interim",
     subjectType: "user",
     accountTypes: ["installer_technician"],
     sections: [
@@ -73,4 +82,15 @@ export function viewAsMediaHref(userId: string, namespace: ViewAsMediaNamespace,
 export function viewAsHref(userId: string, segment: string): string {
   const base = viewAsBasePath(userId);
   return segment ? `${base}/${segment}` : base;
+}
+
+/** Base path of the EXACT view (the account's own shell) of a user: `/view-as/[id]`. */
+export function viewAsExactBasePath(userId: string): string {
+  return `/view-as/${userId}`;
+}
+
+/** The POST route that opens the audited session: the exact tree only for an `exact` kind, otherwise the interim view. */
+export function viewAsStartPath(userId: string, kind: ViewAsKind = "craftsman"): string {
+  const base = ACCOUNT_VIEWS[kind].parity === "exact" ? viewAsExactBasePath(userId) : viewAsBasePath(userId);
+  return `${base}/start`;
 }
