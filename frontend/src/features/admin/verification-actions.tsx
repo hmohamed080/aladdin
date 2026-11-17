@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { Button, SubmitButton, Textarea } from "@/components/ui/controls";
+import { Button, Checkbox, SubmitButton, Textarea } from "@/components/ui/controls";
 import {
   startReviewAction,
   approveVerificationAction,
@@ -21,6 +21,7 @@ const INITIAL: ReviewFormState = { ok: false };
 export function VerificationActions({ v }: { v: VerificationRow }) {
   const { t } = useI18n();
   const [rejecting, setRejecting] = useState(false);
+  const [listPublicly, setListPublicly] = useState(false);
   const [startState, start] = useActionState(startReviewAction, INITIAL);
   const [approveState, approve] = useActionState(approveVerificationAction, INITIAL);
   const [rejectState, reject] = useActionState(rejectVerificationAction, INITIAL);
@@ -48,10 +49,13 @@ export function VerificationActions({ v }: { v: VerificationRow }) {
           </form>
         ) : null}
 
-        <form action={approve}>
+        <form action={approve} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="id" value={v.id} />
-          <input type="hidden" name="status" value={v.status} />
-          <input type="hidden" name="verificationType" value={v.verificationType} />
+          {v.verificationType === "professional" ? (
+            <Checkbox id={`queue-list-publicly-${v.id}`} name="grantListing" checked={listPublicly} onChange={setListPublicly}>
+              {t("admin.review.listPublicly")}
+            </Checkbox>
+          ) : null}
           <SubmitButton size="sm">{t("admin.review.approve")}</SubmitButton>
         </form>
 
@@ -63,7 +67,6 @@ export function VerificationActions({ v }: { v: VerificationRow }) {
       {rejecting ? (
         <form action={reject} className="flex flex-col gap-2 rounded-md border border-dashed p-md">
           <input type="hidden" name="id" value={v.id} />
-          <input type="hidden" name="status" value={v.status} />
           <Textarea name="reason" required rows={2} placeholder={t("admin.review.reasonPlaceholder")} />
           <div>
             <SubmitButton size="sm" variant="outline" className="text-danger">
