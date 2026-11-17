@@ -76,6 +76,9 @@ export const KNOWN_NOTIFICATION_EVENTS = [
   "whatsapp_otp.failure_rate",
   "whatsapp_otp.audit_unmatched",
   "whatsapp_otp.delivery_unmatched",
+  // Admin edit, Option A: the affected user / organization owners are told which fields changed (never the reason or the values).
+  "admin.profile_edited",
+  "admin.organization_edited",
 ] as const;
 
 export type KnownNotificationEvent = (typeof KNOWN_NOTIFICATION_EVENTS)[number];

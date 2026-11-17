@@ -43,7 +43,9 @@ export function PreviewShell({
   // PD-016: Preview areas are promoted one at a time. A promoted (live) area must
   // never sit under the "nothing is saved" banner — that would be untrue.
   const matches = (routes: string[]) => routes.some((r) => pathname === r || pathname.startsWith(r + "/"));
-  const classic = matches(CLASSIC_ROUTES);
+  // Admin View-As carries its own persistent "Admin View — Read Only" bar; the generic "changes here are saved" banner would be untrue there.
+  const viewAs = /^\/admin\/users\/[^/]+\/view(\/|$)/.test(pathname);
+  const classic = matches(CLASSIC_ROUTES) || viewAs;
   const live = matches(LIVE_PREVIEW_ROUTES);
   const liveRead = !live && matches(LIVE_READ_ROUTES);
   const bannerKey = live ? "liveBanner" : liveRead ? "liveReadBanner" : "banner";

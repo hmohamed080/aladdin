@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/server/auth/session";
-import { loadUsersDirectory } from "@/server/queries/admin-directory";
+import { loadUsersDirectory, loadPendingUserVerifications } from "@/server/queries/admin-directory";
 import { parseUsersDirectoryParams, pageWindow, USER_ACCOUNT_TYPES } from "@/features/admin-preview/directory-params";
 import { localizedName, type AdminDirectoryUser } from "@/features/admin-preview/directory-mappers";
 import { GOVERNORATES } from "@/lib/onboarding/persona-fields";
@@ -15,13 +15,17 @@ import { DataTable, RecordCell, Monogram, type Column } from "@/components/ui/da
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
 import { RowIconLink, RowIconDisabled } from "@/features/admin-preview/row-icon-button";
-import { RowIconAction } from "@/features/admin-preview/row-icon-action";
+import { UserVerificationControls } from "@/features/admin/user-verification-controls";
+import { can } from "@/lib/permissions/admin";
 import { AutoFilters, SortableHeader } from "@/features/admin-preview/auto-filters";
 import { TablePagination } from "@/features/admin-preview/table-pagination";
-import { EyeIcon, SettingsIcon, WhatsAppIcon, CheckIcon, XIcon } from "@/components/ui/icons";
+import { EyeIcon, SettingsIcon, WhatsAppIcon } from "@/components/ui/icons";
 import { requireAdminRoute } from "@/server/authorization/admin";
 import { loadStaffRanks } from "@/server/queries/admin-rbac";
-import { canSuspendUser, staffRankOf } from "@/features/admin-rbac/eligibility";
+import { canSuspendUser, canViewAsUser, staffRankOf } from "@/features/admin-rbac/eligibility";
+import { ViewAsEye } from "@/features/admin-view-as/view-as-eye";
+import { viewKindForAccountType } from "@/lib/admin/view-as/registry";
+import { isViewAsEnabled } from "@/lib/env/view-as";
 import { SuspensionAction } from "@/features/admin-ops/suspension";
 
 export const dynamic = "force-dynamic";
@@ -46,9 +50,9 @@ function filterHref(keep: Record<string, string | undefined>, overrides: Record<
  * into a safe default. Field sources: docs/admin/ADMIN_USERS_ORGS_READ_AUDIT.md.
  *
  * Last Active has no authoritative source (product activity is not tracked),
- * so it says so rather than showing a sign-in time under that label. Row
- * actions are still Preview dialogs (mutations are Phase 1B-B); the shell's
- * banner says so. The eye opens `/p/[profileId]` — the PROFILE id — only when
+ * so it says so rather than showing a sign-in time under that label. Suspend /
+ * Restore and Approve / Reject are real (Approve / Reject act on the account's open verification request —
+ * see `UserVerificationControls`); the remaining row actions are links. The eye opens `/p/[profileId]` — the PROFILE id — only when
  * `profile_public_directory` will actually render it.
  */
 export default async function PreviewUsersPage({
@@ -67,6 +71,11 @@ export default async function PreviewUsersPage({
   const m = getMessages(locale);
   const params = parseUsersDirectoryParams(await searchParams);
   const result = await loadUsersDirectory(supabase, params);
+  // Verify / Reject are drawn only for a holder of `users.verify` (the RPCs re-check it) and act on the person's
+  // OPEN verification request — one bounded read for this page's rows, never one per row.
+  const canVerify = can(access, "users.verify");
+  const pendingByUser =
+    result.ok && canVerify ? await loadPendingUserVerifications(supabase, result.data.rows.map((u) => u.id)) : new Map();
 
   const d = m.admin.preview.directory;
   const t = m.admin.preview.users;
@@ -264,32 +273,16 @@ export default async function PreviewUsersPage({
 
         return (
           <span className="flex items-center justify-end gap-0.5">
-            {u.profileId && u.publicProfileAvailable ? (
+            {isViewAsEnabled() && canViewAsUser(access, caller?.id ?? "", { userId: u.id, staffRank: staffRankOf(staffRanks, u.id), accountKind: viewKindForAccountType(u.accountType) }) ? (
+              <ViewAsEye userId={u.id} />
+            ) : u.profileId && u.publicProfileAvailable ? (
               <RowIconLink href={`/p/${u.profileId}`} label={platform.viewOnPlatform} Icon={EyeIcon} external />
             ) : (
               <RowIconDisabled label={platform.viewOnPlatform} reason={platform.notListed} Icon={EyeIcon} />
             )}
             <RowIconLink href={`/admin/users/${u.id}`} label={platform.manage} Icon={SettingsIcon} />
-            {u.status === "pending_verification" ? (
-              <>
-                <RowIconAction
-                  label={rowActionLabels.verify}
-                  icon={<CheckIcon size={16} />}
-                  tone="success"
-                  title={m.admin.preview.userOverview.verify}
-                  confirmLabel={m.admin.preview.userOverview.verify}
-                  confirmVariant="primary"
-                />
-                <RowIconAction
-                  label={rowActionLabels.reject}
-                  icon={<XIcon size={16} />}
-                  tone="danger"
-                  title={m.admin.preview.review.rejectTitle}
-                  body={m.admin.preview.review.rejectBody}
-                  confirmLabel={rowActionLabels.reject}
-                  confirmVariant="danger"
-                />
-              </>
+            {canVerify && (u.status === "pending_verification" || pendingByUser.has(u.id)) ? (
+              <UserVerificationControls userId={u.id} pending={pendingByUser.get(u.id) ?? null} compact />
             ) : null}
             {canSuspendUser(access, caller?.id ?? "", { userId: u.id, staffRank: staffRankOf(staffRanks, u.id) }) ? (
               <SuspensionAction m={m} subjectType="user" subjectId={u.id} suspended={u.status === "suspended"} compact />

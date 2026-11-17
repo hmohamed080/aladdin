@@ -16,6 +16,11 @@ export const ADMIN_PERMISSIONS = [
   "users.read",
   "users.verify",
   "users.suspend",
+  // Read-only, audited view of another user's account area (Admin View-As). Super Admin + Administrator only by default.
+  "users.view_as",
+  // Admin edit, Option A: presentation/moderation fields only, reason required, audited, owner notified (Administrator and above).
+  "users.edit_profile",
+  "organizations.edit",
   "organizations.read",
   "organizations.verify",
   "organizations.suspend",

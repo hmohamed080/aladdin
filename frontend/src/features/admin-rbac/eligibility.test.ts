@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ADMIN_PERMISSIONS, type AdminAccess, type AdminPermission } from "@/lib/permissions/admin";
-import { assignableRoles, canEditRole, canManageMember, canSuspendUser, canWieldRole, staffRankOf } from "./eligibility";
+import { assignableRoles, canEditRole, canManageMember, canSuspendUser, canViewAsUser, canWieldRole, staffRankOf } from "./eligibility";
 
 const ALL = [...ADMIN_PERMISSIONS];
 const ADMIN_PERMS = ALL.filter((p) => p !== "roles.manage");
@@ -113,5 +113,35 @@ describe("canSuspendUser", () => {
   });
   it("an unknown rank (viewer cannot read staff) draws the control; the server decides", () => {
     expect(canSuspendUser(administrator, ME, { userId: "sa", staffRank: null })).toBe(true);
+  });
+});
+
+describe("canViewAsUser (Admin View-As)", () => {
+  const ME = "me";
+  const withView = (rank: number) => acc(rank, [...ADMIN_PERMS, "users.view_as"]);
+  const craftsman = (userId: string, staffRank: number | null = 0) => ({ userId, staffRank, accountKind: "craftsman" });
+  it("needs users.view_as (Support and Moderator do not hold it)", () => {
+    expect(canViewAsUser(acc(40, ["users.read"]), ME, craftsman("u"))).toBe(false);
+    expect(canViewAsUser(acc(60, ["users.read", "users.verify"]), ME, craftsman("u"))).toBe(false);
+  });
+  it("never on yourself", () => {
+    expect(canViewAsUser(withView(80), ME, craftsman(ME))).toBe(false);
+    expect(canViewAsUser(superAdmin, ME, craftsman(ME, 100))).toBe(false);
+  });
+  it("only for an account kind the view supports", () => {
+    expect(canViewAsUser(withView(80), ME, { userId: "u", staffRank: 0, accountKind: "engineer" })).toBe(false);
+    expect(canViewAsUser(withView(80), ME, { userId: "u", staffRank: 0, accountKind: null })).toBe(false);
+  });
+  it("an Administrator: ordinary and lower-staff craftsmen yes; equal or higher rank no", () => {
+    expect(canViewAsUser(withView(80), ME, craftsman("u", 0))).toBe(true);
+    expect(canViewAsUser(withView(80), ME, craftsman("m", 60))).toBe(true);
+    expect(canViewAsUser(withView(80), ME, craftsman("p", 80))).toBe(false);
+    expect(canViewAsUser(withView(80), ME, craftsman("s", 100))).toBe(false);
+  });
+  it("a Super Admin may view any other craftsman, including staff", () => {
+    expect(canViewAsUser(superAdmin, ME, craftsman("s", 100))).toBe(true);
+  });
+  it("unknown staff rank draws the control and leaves the decision to the database", () => {
+    expect(canViewAsUser(withView(80), ME, craftsman("u", null))).toBe(true);
   });
 });

@@ -67,3 +67,45 @@ export function canSuspendUser(
   if (target.staffRank === null) return true;
   return target.staffRank < access.rank;
 }
+
+/**
+ * The actor may open a read-only VIEW of this user's account area (Admin View-As).
+ *
+ * Mirrors `app.view_as_subject_ok` (20261114090002): needs `users.view_as`; never one's own account; unless the actor
+ * is a Super Admin, never Admin Staff at or above their own rank; and the subject must be of the account kind the view
+ * supports. Suspended / deactivated / unverified accounts ARE viewable. `staffRank` unknown (`null`) means the actor
+ * cannot see staff ranks, so the control is drawn and the database stays the only judge. Presentation only.
+ */
+export function canViewAsUser(
+  access: AdminAccess,
+  callerId: string,
+  target: { userId: string; staffRank: number | null; accountKind: string | null },
+  supportedKind: string = "craftsman",
+): boolean {
+  if (!can(access, "users.view_as")) return false;
+  if (target.userId === callerId) return false;
+  if (target.accountKind !== supportedKind) return false;
+  if (isSuper(access)) return true;
+  if (target.staffRank === null) return true;
+  return target.staffRank < access.rank;
+}
+
+
+/**
+ * The actor may edit this USER's presentation details (Admin edit, Option A: `admin_user_edit_profile`).
+ *
+ * Mirrors the RPC: needs `users.edit_profile`; never one's own account; unless the actor is a Super Admin, never Admin
+ * Staff at or above the actor's own rank (a suspended peer stays protected). `staffRank` unknown (`null`) draws the control
+ * and leaves the database as the only judge. Presentation only: the RPC re-checks every rule.
+ */
+export function canEditUser(
+  access: AdminAccess,
+  callerId: string,
+  target: { userId: string; staffRank: number | null },
+): boolean {
+  if (!can(access, "users.edit_profile")) return false;
+  if (target.userId === callerId) return false;
+  if (isSuper(access)) return true;
+  if (target.staffRank === null) return true;
+  return target.staffRank < access.rank;
+}

@@ -114,6 +114,9 @@ export default async function PreviewOrgDetailPage({
               <PreviewActionDialog trigger={t.rowActions.reject} triggerVariant="danger" title={m.admin.preview.review.rejectTitle} body={m.admin.preview.review.rejectBody} confirmLabel={t.rowActions.reject} confirmVariant="danger" />
             </>
           ) : null}
+          {can(access, "organizations.edit") ? (
+            <ButtonLink href={`/admin/organizations/${org.id}/edit`} variant="outline">{m.admin.profileEdit.editButton}</ButtonLink>
+          ) : null}
           {canSuspend && org.status !== "archived" ? (
             <SuspensionAction m={m} subjectType="organization" subjectId={org.id} suspended={org.status === "suspended"} />
           ) : null}
