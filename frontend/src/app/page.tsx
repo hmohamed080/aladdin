@@ -2,6 +2,10 @@ import { I18nMessagesProvider } from "@/lib/i18n/context";
 import { LandingBrand } from "@/features/landing-brand/landing-brand";
 import { readLandingStats } from "@/features/landing-brand/landing-brand-stats.server";
 import { landingMessages } from "@/features/landing-preview/landing-messages";
+import { isMarketplacePreviewEnabled } from "@/lib/env";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { marketplacePublicImageUrls } from "@/server/media/marketplace-public-images";
+import { loadPublicCatalogPage } from "@/server/queries/marketplace-public";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +20,14 @@ export const dynamic = "force-dynamic";
  */
 export default async function RootPage() {
   // The landing page is Arabic-only: no language switch, no cookie lookup.
+  // While the Marketplace is open (release flag) the header shows the cart and the product section shows the newest
+  // real products with a working "Add to cart". Closed: the sample cards and no cart, and nothing is read.
+  const open = isMarketplacePreviewEnabled();
+  const live = open ? ((await loadPublicCatalogPage({ sort: "newest", page: 1 }))?.items ?? []).slice(0, 8) : [];
+  const images = live.length > 0 ? await marketplacePublicImageUrls(await getServerSupabase(), live.map((item) => item.image_id)) : {};
   return (
     <I18nMessagesProvider locale="ar" dir="rtl" messages={landingMessages("ar")}>
-      <LandingBrand stats={await readLandingStats()} />
+      <LandingBrand stats={await readLandingStats()} market={{ open, live, images }} />
     </I18nMessagesProvider>
   );
 }

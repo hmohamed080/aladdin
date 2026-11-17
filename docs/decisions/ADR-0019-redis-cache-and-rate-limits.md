@@ -176,3 +176,6 @@ The existing implementation was checked against the brief. Status: **Met** means
 
 **Owner decision (2026-11-15):** the preview Worker no longer uses Redis (`REDIS_CACHE_ENABLED=false`, its REST URL and `cf-preview` prefix removed from `wrangler.jsonc`), so Production gets the whole Free quota of 500,000 commands a month. The preview falls back to Postgres reads and in-memory rate limits, which is the documented fallback. The "Shared quota" point of the revision above no longer applies; the production-only prefix and guards stay.
 
+## Revision 2026-11-16 - per-client limits for the public Marketplace
+
+Two public, unauthenticated Marketplace paths are limited per CLIENT (HMAC-hashed IP, never the raw address): `market-media` 600/min (the image route, only the fallback for photos the page did not already give as Worker URLs) and `market-quote` 40/min (one read RPC per call). Key shape `aladdin:{env}:v1:rl:global:{hash}`; with Redis off (the preview) the same window counts per instance in memory, and without the identifier secret the call degrades to "allowed". An abuse brake, never an authorization input. They add Redis commands only in Production while the Marketplace is open; the facets memo (60 s, per isolate) adds none.

@@ -6,7 +6,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { toCanonicalPhone, splitE164, DEFAULT_PHONE_COUNTRY } from "@/lib/contact/phone";
 import { validateBusinessLocation } from "@/lib/location/business-location";
 import { readSessionIdentity } from "@/server/auth/session";
-import { sanitizeNext } from "@/server/auth/next";
+import { sanitizeNext, postAuthDestination } from "@/server/auth/next";
 import { resolveActiveLanding } from "@/server/queries/landing";
 import { loadAccountBasics, missingBasics } from "@/server/queries/account-basics";
 
@@ -68,7 +68,7 @@ export async function saveAccountBasics(_prev: AccountBasicsState, formData: For
 
   const landing = await resolveActiveLanding(supabase);
   const next = sanitizeNext(formData.get("next"));
-  redirect(next === landing || next.startsWith(`${landing}/`) ? next : landing);
+  redirect(postAuthDestination(next, landing));
 }
 
 type Client = Awaited<ReturnType<typeof getServerSupabase>>;

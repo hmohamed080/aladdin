@@ -1,8 +1,8 @@
 import type { MediaVariant } from "@/lib/media/image-variants";
 
 export type StorageProviderName = "supabase" | "r2";
-/** `request` = purchase-request reference photos; `verification` = business-verification documents. Both are private, R2-only after cutover. */
-export type MediaNamespace = "avatar" | "portfolio" | "certificate" | "product" | "organization" | "request" | "verification";
+/** `request` = purchase-request reference photos; `verification` = business-verification documents; `marketplace` = Marketplace product photos. All private, R2-only after cutover. */
+export type MediaNamespace = "avatar" | "portfolio" | "certificate" | "product" | "organization" | "request" | "verification" | "marketplace";
 
 export type UploadGrant =
   | { provider: "supabase"; bucket: string; key: string; token: string }

@@ -1,7 +1,7 @@
 /** Real destinations for the landing footer and social icons. */
 export const FOOTER_LINKS: Record<string, string> = {
   "الرئيسية": "#top",
-  "المنتجات": "/marketplace",
+  "المتجر": "/market",
   "الشركات والمعارض": "#roles",
   "المحترفون": "#roles",
   "عن علاء الدين": "#why",

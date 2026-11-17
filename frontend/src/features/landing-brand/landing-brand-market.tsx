@@ -4,14 +4,48 @@ import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
 import { categoryOrder, landingMarketplaceContent, previewProducts, type CategoryFilter } from "../landing-marketplace/landing-marketplace-content";
 import { CategoryIcon } from "../landing-marketplace/landing-marketplace-icons";
+import { CartAddButton } from "../marketplace/live/cart-add-button";
+import { useMarketplaceImageSrc } from "../marketplace/live/image-urls";
+import { fmtEgp, liveCopy } from "../marketplace/live/live-copy";
+import type { PublicCard } from "../marketplace/live/public-contract";
 import { brandContent } from "./landing-brand-content";
 import { BrandIcon } from "./landing-brand-icons";
 import styles from "./landing-brand.module.css";
 
 const MAX_CARDS = 6;
 
-/** Category chips + a horizontally scrolling row of at most six preview products (preview product data). */
-export function LandingBrandMarket() {
+/**
+ * A real Marketplace product (shown while the Marketplace is open): name, price and stock come from the public
+ * catalogue, "Add to cart" fills the browser cart the header counts, and the card opens the product page.
+ */
+function LiveCard({ item }: { item: PublicCard }) {
+  const imageSrc = useMarketplaceImageSrc();
+  const t = liveCopy.ar;
+  const title = item.name_ar || item.name_en;
+  const href = `/market/products/${item.slug}`;
+  return (
+    <li className={`${styles.card} ${styles.cardLive}`}>
+      <a href={href} className={styles.cardImg} aria-label={title}>
+        {item.image_id ? (
+          // eslint-disable-next-line @next/next/no-img-element -- media Worker / no-store proxy
+          <img src={imageSrc(item.image_id, "card")} alt="" loading="lazy" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : null}
+      </a>
+      <div className={styles.cardBody}>
+        <div>
+          <strong><a href={href}>{title}</a></strong>
+          <span>{item.from_price_egp === null ? "—" : `${item.variant_count > 1 ? `${t.from} ` : ""}${fmtEgp(Number(item.from_price_egp), "ar")}`}</span>
+          <span className={styles.cardSeller}>{t.soldBy(item.seller_name)}</span>
+        </div>
+        <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} className={styles.cartAdd} doneClassName={styles.cartAddDone} />
+      </div>
+    </li>
+  );
+}
+
+/** Category chips + a horizontally scrolling row of at most six preview products; real products replace both while the Marketplace is open. */
+export function LandingBrandMarket({ live = [] }: { live?: PublicCard[] } = {}) {
+  const showLive = live.length > 0;
   const t = brandContent.market;
   const cat = landingMarketplaceContent.ar;
   const [filter, setFilter] = useState<CategoryFilter>("all");
@@ -32,6 +66,7 @@ export function LandingBrandMarket() {
 
   return (
     <>
+      {showLive ? null : (
       <div className={styles.chips} role="group" aria-label={cat.filterLabel}>
         {(["all", ...categoryOrder] as CategoryFilter[]).map((key) => (
           <button key={key} type="button" aria-pressed={filter === key} className={filter === key ? styles.chipOn : undefined} onClick={() => setFilter(key)}>
@@ -39,10 +74,11 @@ export function LandingBrandMarket() {
           </button>
         ))}
       </div>
+      )}
       <div className={styles.carousel}>
       <button type="button" className={styles.arrow} aria-label="السابق" onClick={() => step(-1)}><BrandIcon name="chevron" size={18} className={styles.chevPrev} /></button>
       <ul className={styles.cards} ref={row}>
-        {products.map((p) => {
+        {showLive ? live.map((item) => <LiveCard key={item.slug} item={item} />) : products.map((p) => {
           const copy = p.copy.ar;
           const on = !!favs[p.id];
           return (
@@ -55,7 +91,7 @@ export function LandingBrandMarket() {
               </div>
               <div className={styles.cardBody}>
                 <div><strong>{copy.title}</strong><span>{nf.format(p.priceEgp)} <small>{t.currency}</small></span></div>
-                <a href="/marketplace" aria-label={cat.addToCart} className={styles.cartBtn}><BrandIcon name="cart" size={18} /></a>
+                <a href="/market" aria-label={cat.addToCart} className={styles.cartBtn}><BrandIcon name="cart" size={18} /></a>
               </div>
             </li>
           );

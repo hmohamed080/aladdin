@@ -2,13 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { checkAcceptance, checkAcceptancePost, checkRecovery, FORWARD_FIX, RESTORE_VERIFIED_SNAPSHOTS, PLANS, plan } from "./acceptance-gate.mjs";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const hist = (n) => Array.from({ length: n }, (_, i) => ({ local: `2025${1000 + i}000000`, remote: `2025${1000 + i}000000` }));
 // 206 filler + the real latest 20261107090006 = 207 applied
 const base = () => [...hist(206), { local: "20261107090006", remote: "20261107090006" }];
-const appliedFor = (P) => [...base(), ...(P.applied >= 208 ? [{ local: "20261110090001", remote: "20261110090001" }] : []), ...(P.applied >= 209 ? [{ local: "20261110090002", remote: "20261110090002" }] : [])];
+// history of exactly P.applied versions ending with the plan's real latest one (generic: also covers plans that start at 212)
+const appliedFor = (P) => [...hist(P.applied - 1), { local: P.latest, remote: P.latest }];
 const list = (name, extra = []) => {
   const P = PLANS[name];
   return { migrations: [...appliedFor(P), ...P.pending.map((v) => ({ local: v, remote: null })), ...extra] };
@@ -69,6 +70,8 @@ test("recovery: committed forward-fix files are exactly the pinned ones", () => 
   for (const [k, v] of Object.entries(FORWARD_FIX)) assert.equal(sha(v.file), v.sha256, k);
 });
 for (const n of Object.keys(PLANS)) {
+  // plans with freshBackup (tables are created) are covered by their own tests below
+  if (PLANS[n].freshBackup) continue;
   test(`recovery: ${n} needs no backup label when its pinned forward-fix hashes match`, () => assert.deepEqual(checkRecovery({ plan: n, label: "", forwardFixSha256: allShas() }), []));
   test(`recovery: ${n} refuses a missing or altered forward-fix`, () => {
     for (const fx of PLANS[n].fixes) {
@@ -105,4 +108,86 @@ test("media forward-fix: data-safety structure (guard first, no BEGIN/COMMIT, no
   const outside = fix.replace(/\$guard\$[\s\S]*?\$guard\$/g, "").replace(/\$function\$[\s\S]*?\$function\$/g, "");
   assert.ok(!/\b(insert|update|delete|truncate|alter table|drop table)\b/i.test(outside), "no top-level DML or table DDL");
   assert.deepEqual([...outside.matchAll(/drop function ([\w.]+)\(/gi)].map((m) => m[1]), ["public.media_migration_target_key"]);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// plan "marketplace": 19 migrations (5 verification + 14 Marketplace) on top of Acceptance at 212 / 20261115090001
+// ---------------------------------------------------------------------------------------------------------------------
+test("marketplace: 14 pending, all newer than the latest applied (plain push), 218 -> 232", () => {
+  const P = PLANS.marketplace;
+  assert.equal(P.pending.length, 14);
+  assert.equal(P.applied + P.pending.length, 232);
+  assert.equal(P.applied, 218);
+  assert.ok(P.pending.every((v) => v > P.latest));
+  assert.deepEqual([...P.pending].sort(), P.pending);
+  assert.equal(P.latest, "20261116090001");
+  assert.equal(P.preContract, P.latest);
+  assert.equal(P.postContract, "20261116100014");
+});
+
+test("marketplace: the pending set is exactly the migration files after 20261115090001 in this checkout, and 231 is the total file count", () => {
+  const dir = here("../../supabase/migrations");
+  const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).map((f) => f.slice(0, 14)).sort();
+  assert.deepEqual(files.filter((v) => v > PLANS.marketplace.latest), PLANS.marketplace.pending);
+  assert.equal(files.length, PLANS.marketplace.applied + PLANS.marketplace.pending.length);
+});
+
+test("marketplace: both permission contracts exist in this checkout", () => {
+  for (const v of [PLANS.marketplace.preContract, PLANS.marketplace.postContract]) assert.ok(readFileSync(here(`../../supabase/permissions/${v}.json`), "utf8").length > 1000, v);
+});
+
+test("marketplace: the expected-change list names the media functions and constraint the Marketplace re-creates and the Marketplace prefixes, and none of the verification-only objects (already on Acceptance)", () => {
+  const c = PLANS.marketplace.changed;
+  for (const f of ["public.media_storage_resolve", "app.media_metadata", "public.media_storage_locations.media_storage_locations_namespace_check"]) assert.ok(c.includes(f), f);
+  for (const f of ["public.review_approve", "public.review_reject", "app.bv_decide", "app.admin_user_status_tab", "public.admin_initiate_verification",
+    "app.showroom_review_guard", "app.craftsman_review_guard", "public.admin_organization_detail", "public.verifications.showroom_review_complete",
+    "public.audit_log.ck_audit_action_known", "public.verifications.ck_verifications_reason_required"]) assert.ok(!c.includes(f), "not part of this plan: " + f);
+  for (const w of ["public.marketplace_*", "public.ux_marketplace_*", "public.ix_marketplace_*", "public.uq_marketplace_*"]) assert.ok(c.includes(w), w);
+  assert.equal(new Set(c).size, c.length);
+});
+
+test("marketplace: it needs a fresh restore-verified snapshot (>= 212 migrations); the historical 203 one is refused", () => {
+  const shas = allShas();
+  has(checkRecovery({ plan: "marketplace", label: "", forwardFixSha256: shas }), /needs --backup-label of a fresh restore-verified snapshot/);
+  has(checkRecovery({ plan: "marketplace", label: "aladdin-acceptance-20261108T094450Z", forwardFixSha256: shas }), /has 203 migrations/);
+  has(checkRecovery({ plan: "marketplace", label: "aladdin-acceptance-20991231T000000Z", forwardFixSha256: shas }), /not a pinned restore-verified snapshot/);
+});
+
+test("marketplace: with a snapshot of 218+ migrations and the forward-fix pinned, recovery passes; a 212-migration one is refused", () => {
+  RESTORE_VERIFIED_SNAPSHOTS["aladdin-acceptance-20991231T000000Z"] = { backupRun: "x", restoreRun: "y", tables: 1, rows: 1, migrations: 218 };
+  try { assert.deepEqual(checkRecovery({ plan: "marketplace", label: "aladdin-acceptance-20991231T000000Z", forwardFixSha256: allShas() }), []);
+    RESTORE_VERIFIED_SNAPSHOTS["aladdin-acceptance-20991231T000000Z"].migrations = 212;
+    has(checkRecovery({ plan: "marketplace", label: "aladdin-acceptance-20991231T000000Z", forwardFixSha256: allShas() }), /has 212 migrations/); }
+  finally { delete RESTORE_VERIFIED_SNAPSHOTS["aladdin-acceptance-20991231T000000Z"]; }
+});
+
+test("marketplace: its only recovery is the pinned marketplace forward-fix (the verification migrations are already applied, no plan reverts them)", () => {
+  assert.deepEqual(PLANS.marketplace.fixes, ["marketplace"]);
+  for (const fx of PLANS.marketplace.fixes) assert.ok(FORWARD_FIX[fx]?.sha256, fx);
+});
+
+test("marketplace forward-fix: one transaction, a data guard that raises before any DROP, and it never deletes user rows", () => {
+  const sql = readFileSync(here(FORWARD_FIX.marketplace.file), "utf8");
+  const code = sql.split("\n").filter((l) => !l.startsWith("--")).join("\n");
+  assert.match(code, /^begin;/m);
+  assert.match(code, /commit;\s*$/);
+  assert.ok(code.indexOf("raise exception") > -1 && code.indexOf("raise exception") < code.indexOf("DROP TABLE"), "guard precedes the first DROP");
+  assert.match(code, /media_storage_locations where namespace = 'marketplace'/);
+  assert.doesNotMatch(code, /\b(truncate|delete\s+from\s+public\.marketplace_)/i);
+  // the only DELETEs are the three marketplace admin permission rows (core permissions are locked, so the guard trigger is paused and re-enabled)
+  assert.equal((code.match(/delete from/gi) ?? []).length, 2);
+  assert.ok(code.indexOf("DISABLE TRIGGER trg_admin_role_permissions_guard") < code.indexOf("delete from public.admin_role_permissions"));
+  assert.ok(code.indexOf("ENABLE TRIGGER trg_admin_role_permissions_guard") > code.indexOf("delete from public.admin_role_permissions"));
+  assert.ok(code.indexOf("ENABLE TRIGGER trg_admin_role_permissions_guard") < code.indexOf("delete from public.admin_permissions"));
+});
+
+test("verification forward-fix: one transaction, restores both removed guards and their triggers, drops the new function, never touches data", () => {
+  // restored function bodies legitimately contain DML; only statements OUTSIDE the dollar-quoted bodies may not touch data
+  const code = readFileSync(here(FORWARD_FIX.verification.file), "utf8").split("\n").filter((l) => !l.startsWith("--")).join("\n");
+  const outside = code.replace(/\$function\$[\s\S]*?\$function\$/g, "");
+  assert.match(code, /^begin;/m);
+  assert.match(code, /commit;\s*$/);
+  for (const needle of ["app.showroom_review_guard()", "app.craftsman_review_guard()", "CREATE TRIGGER showroom_review_complete", "CREATE TRIGGER craftsman_review_complete",
+    "DROP FUNCTION IF EXISTS public.admin_initiate_verification(", "ck_audit_action_known", "ck_verifications_reason_required"]) assert.ok(code.includes(needle), needle);
+  assert.doesNotMatch(outside, /\b(insert\s+into|update\s+public|delete\s+from|truncate)\b/i);
 });
