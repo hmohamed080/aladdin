@@ -1,5 +1,7 @@
 # ADR-0018 — Media delivery: R2 primary store, ticketed edge Worker for private and conditional-public media
 
+> **Amended by [ADR-0029](ADR-0029-business-verification-documents-on-r2.md) (proposed, 2026-11-17):** business-verification documents move from Supabase Storage to R2. The bullet below that keeps them in Supabase is the part amended; this ADR is otherwise unchanged.
+
 **Status:** Proposed · 2026-10-18, revised 2026-10-19 ([Revision 2](#revision-2--2026-10-19-full-media-architecture)) · **Needs owner approval.** Nothing in this ADR has been deployed, and no hosted resource exists for it. The code is on the unmerged draft PR #89 and the branch stacked on it, with edge delivery and R2 writes switched off (`MEDIA_EDGE_DELIVERY_ENABLED=false`, `R2_STORAGE_ENABLED=false`).
 
 **Refines:** [ADR-0017](ADR-0017-rc2-private-media-integration.md) (RC2 private-media provider integration). ADR-0017 stays in force. This ADR adds a second delivery path for R2-provider rows and records which media may be served without a session.
