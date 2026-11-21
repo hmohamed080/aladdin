@@ -63,7 +63,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter frontend typecheck
       - run: pnpm --filter frontend lint
+      # installer-work-production.test.tsx alone peaks near 1.7 GB of heap, close to the 2 GB Node default, so a worker can be
+      # killed ("Worker exited unexpectedly") depending on which files share it. Give the test workers headroom.
       - run: pnpm --filter frontend test
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
       # Real-Chromium regression test (local servers, no secret): Cloudflare Access credentials never follow a redirect.
       - name: Playwright matches the pinned image (exact version, bundled Chromium present)
         run: |
