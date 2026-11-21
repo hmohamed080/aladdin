@@ -28,6 +28,9 @@ export type UploadKind = "image" | "video";
 export type UploadRejection = "type_invalid" | "empty" | "image_too_large" | "video_too_large";
 
 export type UploadFileLike = { name: string; size: number; type: string };
+/** The per-file caps a check uses: the defaults, or the stored values the browser was told (hints). */
+export type UploadLimits = { image: number; video: number };
+export const DEFAULT_UPLOAD_LIMITS: UploadLimits = { image: IMAGE_MAX_BYTES, video: VIDEO_MAX_BYTES };
 
 /** What a picked file is, or null when it is neither an accepted image nor an accepted video. */
 export function uploadKind(file: Pick<UploadFileLike, "type">): UploadKind | null {
@@ -37,12 +40,12 @@ export function uploadKind(file: Pick<UploadFileLike, "type">): UploadKind | nul
 }
 
 /** The reason one file is refused, or null when it may upload. Looks at that file only. */
-export function uploadRejection(file: UploadFileLike): UploadRejection | null {
+export function uploadRejection(file: UploadFileLike, limits: UploadLimits = DEFAULT_UPLOAD_LIMITS): UploadRejection | null {
   const kind = uploadKind(file);
   if (!kind) return "type_invalid";
   if (file.size <= 0) return "empty";
-  if (kind === "image" && file.size > IMAGE_MAX_BYTES) return "image_too_large";
-  if (kind === "video" && file.size > VIDEO_MAX_BYTES) return "video_too_large";
+  if (kind === "image" && file.size > limits.image) return "image_too_large";
+  if (kind === "video" && file.size > limits.video) return "video_too_large";
   return null;
 }
 
@@ -55,10 +58,10 @@ export type UploadBatch<T extends UploadFileLike> = {
  * Splits a dropped or picked batch (images and videos together) file by file. A refusal never
  * stops the others: only the offending file lands in `rejected`.
  */
-export function partitionUploadBatch<T extends UploadFileLike>(files: readonly T[]): UploadBatch<T> {
+export function partitionUploadBatch<T extends UploadFileLike>(files: readonly T[], limits: UploadLimits = DEFAULT_UPLOAD_LIMITS): UploadBatch<T> {
   const batch: UploadBatch<T> = { accepted: [], rejected: [] };
   for (const file of files) {
-    const reason = uploadRejection(file);
+    const reason = uploadRejection(file, limits);
     const kind = uploadKind(file);
     if (reason || !kind) batch.rejected.push({ file, reason: reason ?? "type_invalid" });
     else batch.accepted.push({ file, kind });

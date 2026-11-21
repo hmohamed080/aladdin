@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ rpc: vi.fn(), list: vi.fn(), remove: vi.fn() }));
 const media = vi.hoisted(() => ({ authorize: vi.fn(), verify: vi.fn(), remove: vi.fn() }));
 vi.mock("@/server/storage/media", () => ({ authorizeMediaUpload: media.authorize, verifyPendingMedia: media.verify, removeMedia: media.remove }));
+vi.mock("@/server/media/limits", async () => { const { DEFAULT_IMAGE_LIMITS: d } = await import("@/lib/media/limits"); return { imageMaxBytes: async (p: keyof typeof d) => d[p], invalidateMediaLimitCache: () => undefined }; });
 vi.mock("@/lib/supabase/server", () => ({
   getServerSupabase: async () => ({ rpc: state.rpc, storage: { from: () => ({ list: state.list, remove: state.remove }) } }),
 }));

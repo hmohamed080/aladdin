@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { MARKETPLACE_IMAGE_MAX_BYTES } from "@/lib/storage/marketplace-images";
+import { storedObjectCeiling } from "@/server/media/limits";
 import { mediaProvider, privilegedStorageClient, resolveMedia } from "@/server/storage/media";
 
 /**
@@ -12,7 +12,7 @@ import { mediaProvider, privilegedStorageClient, resolveMedia } from "@/server/s
 export async function readMarketplaceImageBytes(client: SupabaseClient, key: string): Promise<Uint8Array> {
   const media = await resolveMedia(client, "marketplace", key, "read");
   const provider = await mediaProvider(media.provider === "supabase" ? privilegedStorageClient() : client, "marketplace", media.provider, key);
-  return provider.readObject(key, MARKETPLACE_IMAGE_MAX_BYTES);
+  return provider.readObject(key, storedObjectCeiling("image"));
 }
 
 /**
@@ -22,7 +22,7 @@ export async function readMarketplaceImageBytes(client: SupabaseClient, key: str
  */
 export async function readPublishedMarketplaceImageBytes(key: string): Promise<Uint8Array> {
   const provider = await mediaProvider(privilegedStorageClient(), "marketplace", "r2", key);
-  return provider.readObject(key, MARKETPLACE_IMAGE_MAX_BYTES);
+  return provider.readObject(key, storedObjectCeiling("image"));
 }
 
 export type PublicMarketplaceImage = { bytes: ArrayBuffer; mimeType: string; sha256: string | null };

@@ -2,6 +2,7 @@
 
 import { UploadFailure as VideoUploadFailure, uploadVideo } from "@/features/video/upload-engine";
 import { partitionUploadBatch, type UploadRejection } from "@/lib/media/upload-limits";
+import { imageHintBytes, loadMediaLimitHints, videoHintBytes } from "@/lib/media/limits-client";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { MARKETPLACE_IMAGE_ALLOWED_TYPES, MARKETPLACE_IMAGE_MAX_BYTES } from "@/lib/storage/marketplace-images";
 import { confirmImageUploadAction, removeImageAction, requestImageUploadAction } from "@/server/actions/marketplace-seller";
@@ -94,7 +95,8 @@ export async function uploadMediaBatch(
   onProgress?: (name: string | null) => void,
   deps: MediaBatchDeps = { images: uploadProductImages, video: uploadProductVideo },
 ): Promise<UploadFailure[]> {
-  const { accepted, rejected } = partitionUploadBatch(files);
+  await loadMediaLimitHints(); // the stored limits are the authority; this only lets the page answer without a round trip
+  const { accepted, rejected } = partitionUploadBatch(files, { image: imageHintBytes("marketplace"), video: videoHintBytes("product") });
   const failures: UploadFailure[] = rejected.map(({ file, reason }) => ({ name: file.name, code: REJECTION_CODE[reason] }));
   const images = accepted.filter((a) => a.kind === "image").map((a) => a.file);
   const videos = accepted.filter((a) => a.kind === "video").map((a) => a.file);

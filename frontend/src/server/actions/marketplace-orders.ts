@@ -10,11 +10,12 @@ import {
   type PlacedCheckout,
   type SellerAction,
 } from "@/features/marketplace-orders/contract";
-import { isMarketplaceProofKey, MARKETPLACE_IMAGE_ALLOWED_TYPES, MARKETPLACE_IMAGE_MAX_BYTES } from "@/lib/storage/marketplace-images";
+import { isMarketplaceProofKey, MARKETPLACE_IMAGE_ALLOWED_TYPES } from "@/lib/storage/marketplace-images";
 import type { UploadGrant } from "@/lib/storage/provider-types";
 import { authorizeMediaUpload, verifyPendingMedia } from "@/server/storage/media";
 import { readableMediaUrl } from "@/server/storage/edge-ticket";
 import type { Json } from "@/types/database.types";
+import { imageMaxBytes } from "@/server/media/limits";
 
 /**
  * Marketplace checkout and order writers (Migration 14). Thin wrappers over the SECURITY DEFINER
@@ -92,7 +93,7 @@ export async function requestProofUploadAction(
 ): Promise<OrderResult<{ proofId: string; objectKey: string; grant: UploadGrant }>> {
   if (!UUID.test(orderId)) return { ok: false, code: "not_found" };
   if (!(MARKETPLACE_IMAGE_ALLOWED_TYPES as readonly string[]).includes(contentType)) return { ok: false, code: "image_type_invalid" };
-  if (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > MARKETPLACE_IMAGE_MAX_BYTES) {
+  if (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > (await imageMaxBytes("marketplace"))) {
     return { ok: false, code: "file_too_large" };
   }
   const supabase = await getServerSupabase();

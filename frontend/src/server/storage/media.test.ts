@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 vi.mock("server-only", () => ({}));
+vi.mock("@/server/media/limits", async () => { const { DEFAULT_IMAGE_LIMITS: d } = await import("@/lib/media/limits"); return { imageMaxBytes: async (p: keyof typeof d) => d[p], invalidateMediaLimitCache: () => undefined }; });
 const adminRpc = vi.hoisted(() => vi.fn());
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({ rpc: adminRpc, storage: { from: () => ({ createSignedUrl: sign, remove }) } }) }));
 vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co" }) }));

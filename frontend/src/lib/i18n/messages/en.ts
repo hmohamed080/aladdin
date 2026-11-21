@@ -1926,6 +1926,7 @@ export const en = {
           phones: "Phone numbers",
           whatsapp_otp: "WhatsApp codes",
           backup: "Backups",
+          media_limits: "Upload limits",
         },
         permissionDesc: {
           users: {
@@ -1995,6 +1996,10 @@ export const en = {
             execute: "Start a manual backup of this environment (Super Admin), with a reason and password confirmation.",
             schedule_manage: "Change the backup schedule and activate Production backups (Super Admin), with a reason and password confirmation.",
             restore_test: "Start an isolated restore test of this environment (Super Admin), with a reason and password confirmation.",
+          },
+          media_limits: {
+            view: "See the upload size limits for photos and videos, the platform ceiling and who last changed each one.",
+            manage: "Change the upload size limit of a place, within the platform ceiling, with a reason.",
           },
         },
         scopes: {
@@ -2837,6 +2842,51 @@ export const en = {
       deliveryPrerequisites: "Sending cannot be turned on yet: something it depends on is missing. The page shows what.",
       unavailable: "The change could not be applied right now. Nothing was changed.",
       generic: "Something went wrong. Please try again.",
+    },
+  },
+  mediaLimits: {
+    title: "Upload limits",
+    subtitle: "The largest file a person can upload in each place. The server and the database enforce these values; the browser only shows them as a hint.",
+    viewOnly: "You can see the limits and the history. Only a Super Admin can change a limit.",
+    imagesTitle: "Images",
+    videosTitle: "Videos",
+    place: {
+      image: {
+        avatar: "Profile photos",
+        organization: "Organization photos",
+        portfolio: "Portfolio work samples",
+        certificate: "Certificates",
+        product: "Product photos",
+        request: "Purchase-request photos",
+        verification: "Business verification documents",
+        marketplace: "Marketplace photos and payment proofs",
+      },
+      video: {
+        portfolio: "Portfolio videos",
+        product: "Product and Marketplace videos",
+      },
+    },
+    columns: { place: "Place", current: "Limit now", default: "Default", ceiling: "Hard ceiling", change: "New limit (MB)", reason: "Reason" },
+    reasonHint: "Why the limit changes (3 to 500 characters). It is kept in the history with your name.",
+    save: "Save limit",
+    saving: "Saving…",
+    changed: "Last changed {when}",
+    notes: {
+      ceiling: "The hard ceiling is what the platform can carry. A limit above it cannot be saved.",
+      existing: "A lower limit applies to new uploads only. Files that are already stored keep working.",
+      browser: "Profile and organization photos are fitted in the browser before they upload. A limit lower than that size will refuse them.",
+    },
+    history: { title: "Change history", empty: "No limit has been changed yet.", from: "from", to: "to", by: "by" },
+    saved: "The limit was saved.",
+    unchanged: "That is already the limit.",
+    errors: {
+      forbidden: "You do not have permission to change upload limits.",
+      reason: "Write a reason of 3 to 500 characters.",
+      number: "Enter the limit in MB, for example 12 or 12.5.",
+      aboveCeiling: "That is above the platform ceiling for this place.",
+      belowFloor: "That is below the minimum for this place.",
+      unknownPlace: "That place does not exist.",
+      unavailable: "The limit could not be saved right now. Nothing was changed.",
     },
   },
   backups: {

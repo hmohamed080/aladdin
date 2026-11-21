@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { parseSellerError, type SellerActionError } from "@/features/marketplace-seller/errors";
 import { removeImageLifecycle, type RemovalResult } from "@/features/marketplace-seller/image-removal";
-import { isMarketplaceImageKey, MARKETPLACE_IMAGE_MAX_BYTES } from "@/lib/storage/marketplace-images";
+import { isMarketplaceImageKey } from "@/lib/storage/marketplace-images";
 import type { UploadGrant } from "@/lib/storage/provider-types";
 import { authorizeMediaUpload, removeMedia, resolveMedia, verifyPendingMedia } from "@/server/storage/media";
 import type { Json } from "@/types/database.types";
+import { imageMaxBytes } from "@/server/media/limits";
 
 /**
  * Marketplace seller writers. Thin wrappers over the trusted SECURITY DEFINER
@@ -115,7 +116,7 @@ export async function requestImageUploadAction(
   expectedBytes: number,
   variantId?: string | null,
 ): Promise<SellerResult<{ imageId: string; objectKey: string; grant: UploadGrant }>> {
-  if (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > MARKETPLACE_IMAGE_MAX_BYTES) {
+  if (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > (await imageMaxBytes("marketplace"))) {
     return { ok: false, code: "file_too_large" };
   }
   const supabase = await getServerSupabase();

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/storage/browser-upload", () => ({ uploadWithGrant: vi.fn() }));
 vi.mock("@/server/actions/marketplace-seller", () => ({
@@ -9,11 +9,27 @@ vi.mock("@/server/actions/marketplace-seller", () => ({
 vi.mock("@/features/video/upload-engine", () => ({ uploadVideo: vi.fn(), UploadFailure: class extends Error { code = "server"; } }));
 
 import { MIB } from "@/lib/media/upload-limits";
+import { resetMediaLimitHints } from "@/lib/media/limits-client";
 import { uploadMediaBatch } from "./image-upload";
 
 const file = (name: string, size: number, type: string) => ({ name, size, type }) as File;
 
 describe("uploadMediaBatch", () => {
+  afterEach(() => resetMediaLimitHints(null));
+
+  it("follows the stored limits the browser was told: a raised image cap admits a 15 MB photo, a lowered video cap refuses a 60 MB video", async () => {
+    const images = vi.fn(async () => []);
+    const video = vi.fn(async () => null);
+    resetMediaLimitHints([
+      { kind: "image", place: "marketplace", maxBytes: 20 * MIB, defaultBytes: 10 * MIB, ceilingBytes: 25 * MIB, updatedAt: null },
+      { kind: "video", place: "product", maxBytes: 50 * MIB, defaultBytes: 100 * MIB, ceilingBytes: 1024 * MIB, updatedAt: null },
+    ]);
+    const failures = await uploadMediaBatch("product-1", [file("big.jpg", 15 * MIB, "image/jpeg"), file("clip.mp4", 60 * MIB, "video/mp4")], undefined, { images, video });
+    expect(images).toHaveBeenCalledTimes(1);
+    expect(video).not.toHaveBeenCalled();
+    expect(failures).toEqual([{ name: "clip.mp4", code: "video_too_large" }]);
+  });
+
   it("uploads images and videos together and refuses only the oversize file", async () => {
     const images = vi.fn(async () => []);
     const video = vi.fn(async () => null);

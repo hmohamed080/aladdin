@@ -15,6 +15,7 @@ import type { StorageProvider } from "@/lib/storage/provider-types";
 import { applicationMediaUrl } from "@/lib/storage/media-url";
 import { readSessionIdentity } from "@/server/auth/session";
 import { consumeRateLimit } from "@/server/cache/rate-limit";
+import { imageMaxBytes } from "@/server/media/limits";
 
 const descriptor = z.object({ provider: z.enum(["supabase", "r2"]), contentType: z.string(),
   reserved: z.boolean(), state: z.enum(["pending", "ready", "deleted"]), owner: z.string().uuid().nullable() });
@@ -73,7 +74,7 @@ export async function authorizeMediaUpload(client: SupabaseClient, namespace: Me
   const provider = media.reserved ? media.provider : env.R2_STORAGE_ENABLED ? "r2" : "supabase";
   requireWritableProvider(provider);
   requireWriteApproval(provider);
-  const maxBytes = mediaPolicy(namespace).maxBytes;
+  const maxBytes = await imageMaxBytes(namespace); // the stored, admin-configurable limit
   if (provider === "r2" && (!expectedBytes || !Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > maxBytes)) {
     throw new Error("upload size is outside policy");
   }
@@ -134,7 +135,7 @@ export async function verifyPendingMedia(client: SupabaseClient, namespace: Medi
   }
   const provider = await mediaProvider(pending.provider === "supabase" ? privilegedStorageClient() : client, namespace, pending.provider, key);
   requireWriteApproval(pending.provider);
-  const maxBytes = mediaPolicy(namespace).maxBytes;
+  const maxBytes = await imageMaxBytes(namespace); // the stored, admin-configurable limit
   const bytes = await provider.readObject(key, maxBytes);
   const checked = await verifyMediaBytes(bytes, pending.contentType, maxBytes);
   // The stored original is the verified upload RE-ENCODED (sRGB, bounded edge, no personal metadata).

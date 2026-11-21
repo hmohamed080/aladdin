@@ -49,8 +49,8 @@ function fakeCanvas(): FakeCanvas {
 const MiB = 1024 * 1024;
 /** The fitting engine (still used for certificates) exercised with the pre-2026-11-19 profiles. */
 const FITTING = {
-  portfolio: { ...UPLOAD_RESIZE_PROFILES.portfolio, keepOriginal: false, keepBelowBytes: MiB, maxBytes: 5 * MiB },
-  product: { ...UPLOAD_RESIZE_PROFILES.product, keepOriginal: false, keepBelowBytes: MiB, maxBytes: 5 * MiB },
+  portfolio: { ...UPLOAD_RESIZE_PROFILES.portfolio, place: undefined, keepOriginal: false, keepBelowBytes: MiB, maxBytes: 5 * MiB },
+  product: { ...UPLOAD_RESIZE_PROFILES.product, place: undefined, keepOriginal: false, keepBelowBytes: MiB, maxBytes: 5 * MiB },
 };
 const file = (size: number, type = "image/jpeg", name = "IMG_0001.JPG") =>
   new File([new Uint8Array(size)], name, { type, lastModified: 42 });

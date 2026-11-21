@@ -14,12 +14,12 @@ import {
 } from "@/features/purchase-requests/model";
 import { countChars } from "@/lib/text/count-chars";
 import {
-  REQUEST_IMAGE_MAX_BYTES,
   isRequestImageContentType,
   isRequestImageKey,
 } from "@/lib/storage/request-images";
 import type { UploadGrant } from "@/lib/storage/provider-types";
 import { authorizeMediaUpload, removeMedia, verifyPendingMedia } from "@/server/storage/media";
+import { imageMaxBytes } from "@/server/media/limits";
 
 /**
  * Server Actions for shared Purchase Requests. Every one forwards the CALLER's JWT to a security-definer
@@ -137,7 +137,7 @@ export type RequestImageConfirm = { ok: true; id: string } | { ok: false; code: 
  */
 export async function requestRequestImageUploadAction(itemId: string, contentType: string, expectedBytes?: number): Promise<RequestImageTicket> {
   if (!isUuid(itemId) || !isRequestImageContentType(contentType)) return { ok: false, code: E("imageType") };
-  if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > REQUEST_IMAGE_MAX_BYTES)) {
+  if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > (await imageMaxBytes("request")))) {
     return { ok: false, code: E("imageSize") };
   }
   const supabase = await getServerSupabase();
