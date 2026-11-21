@@ -104,3 +104,15 @@ revoke all on function public.marketplace_rejected_images_purge(interval, intege
 grant execute on function public.marketplace_rejected_images_purge(interval, integer) to service_role;
 comment on function public.marketplace_rejected_images_purge(interval, integer) is
   'Marketplace media policy: rejected images are removed from storage two days after the rejection. Service role, run by the media cleanup job; idempotent.';
+
+-- ---------------------------------------------------------------------------
+-- 4. Legacy Supabase buckets follow the 10 MiB image cap
+-- ---------------------------------------------------------------------------
+-- While legacy Supabase writes are open, images between 5 and 10 MiB pass the browser and the receipt but the
+-- bucket itself still refused them at 5 MiB. Only the three site-content buckets move; the 3 MiB (avatar,
+-- organization) and the 10 MiB (certificate, verification) buckets are already right. A bucket already above
+-- 10 MiB is never lowered.
+update storage.buckets
+   set file_size_limit = 10485760
+ where id in ('professional-portfolio', 'product-images', 'purchase-request-images')
+   and coalesce(file_size_limit, 0) < 10485760;

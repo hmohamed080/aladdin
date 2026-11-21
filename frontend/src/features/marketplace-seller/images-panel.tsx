@@ -9,7 +9,7 @@ import { cn } from "@/lib/ui/cn";
 import { finishPendingImageRemovalsAction, removeImageAction, updateImagesAction } from "@/server/actions/marketplace-seller";
 import { errorKey } from "./errors";
 import { UPLOAD_VIDEO_TYPES } from "@/lib/media/upload-limits";
-import { ACCEPTED_IMAGE_TYPES, uploadMediaBatch } from "./image-upload";
+import { ACCEPTED_IMAGE_TYPES, MARKETPLACE_VIDEO_UPLOADS_ENABLED, uploadMediaBatch } from "./image-upload";
 import type { SellerProductImage } from "@/server/queries/marketplace-seller-catalog";
 
 type Arranged = SellerProductImage;
@@ -144,7 +144,7 @@ export function ImagesPanel({
         <input
           ref={inputRef}
           type="file"
-          accept={[...ACCEPTED_IMAGE_TYPES, ...UPLOAD_VIDEO_TYPES].join(",")}
+          accept={(MARKETPLACE_VIDEO_UPLOADS_ENABLED ? [...ACCEPTED_IMAGE_TYPES, ...UPLOAD_VIDEO_TYPES] : ACCEPTED_IMAGE_TYPES).join(",")}
           multiple
           className="sr-only"
           onChange={(e) => {

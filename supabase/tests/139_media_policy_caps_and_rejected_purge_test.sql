@@ -11,7 +11,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(17);
+select plan(18);
 
 update auth.users set email_confirmed_at = now() where id = '70000001-0000-4000-8000-000000000001';
 select set_config('t.a', '9c000000-cccc-4ccc-8ccc-000000000001', true);
@@ -122,6 +122,10 @@ select is((select public.marketplace_rejected_images_purge()), '{"expired": 0, "
   'C9. once cleanup recorded the deletion, the row is forgotten');
 select is((select count(*)::int from public.marketplace_product_images where id = current_setting('t.i1')::uuid), 0,
   'C10. ...and it is gone');
+
+select is((select array_agg(id order by id) from storage.buckets where file_size_limit = 10485760 and id in ('professional-portfolio', 'product-images', 'purchase-request-images')),
+  array['product-images', 'professional-portfolio', 'purchase-request-images']::text[],
+  'D1. the legacy site-content buckets accept the 10 MiB image cap, not the old 5 MiB');
 
 select * from finish();
 rollback;

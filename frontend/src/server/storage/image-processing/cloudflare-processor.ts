@@ -12,7 +12,7 @@ import {
 export type ImagesBindingLike = {
   info(stream: ReadableStream<Uint8Array>): Promise<{ format: string; width?: number; height?: number }>;
   input(stream: ReadableStream<Uint8Array>): {
-    transform(options: { width: number; fit: "scale-down" }): {
+    transform(options: { width: number; height?: number; fit: "scale-down" }): {
       output(options: { format: "image/webp" | "image/jpeg" | "image/png"; quality: number }): Promise<{ image(): ReadableStream<Uint8Array> }>;
     };
   };
@@ -100,7 +100,7 @@ export function createCloudflareImageProcessor(images: ImagesBindingLike): Image
     for (const quality of ORIGINAL_QUALITY_STEPS) {
       const output = await call(async () => {
         const result = await images.input(stream(bytes))
-          .transform({ width: ORIGINAL_MAX_EDGE, fit: "scale-down" })
+          .transform({ width: ORIGINAL_MAX_EDGE, height: ORIGINAL_MAX_EDGE, fit: "scale-down" })
           .output({ format: contentType, quality });
         return new Uint8Array(await new Response(result.image()).arrayBuffer());
       });
