@@ -10,7 +10,8 @@ vi.mock("@/features/video/upload-engine", () => ({ uploadVideo: vi.fn(), UploadF
 
 import { MIB } from "@/lib/media/upload-limits";
 import { resetMediaLimitHints } from "@/lib/media/limits-client";
-import { uploadMediaBatch } from "./image-upload";
+import { imageFileProblem, uploadMediaBatch, uploadProductImages } from "./image-upload";
+import { requestImageUploadAction } from "@/server/actions/marketplace-seller";
 
 const file = (name: string, size: number, type: string) => ({ name, size, type }) as File;
 
@@ -21,7 +22,7 @@ describe("uploadMediaBatch", () => {
     const images = vi.fn(async () => []);
     const video = vi.fn(async () => null);
     resetMediaLimitHints([
-      { kind: "image", place: "marketplace", maxBytes: 20 * MIB, defaultBytes: 10 * MIB, ceilingBytes: 25 * MIB, updatedAt: null },
+      { kind: "image", place: "marketplace", maxBytes: 20 * MIB, defaultBytes: 10 * MIB, ceilingBytes: 20 * MIB, updatedAt: null },
       { kind: "video", place: "product", maxBytes: 50 * MIB, defaultBytes: 100 * MIB, ceilingBytes: 1024 * MIB, updatedAt: null },
     ]);
     const failures = await uploadMediaBatch("product-1", [file("big.jpg", 15 * MIB, "image/jpeg"), file("clip.mp4", 60 * MIB, "video/mp4")], undefined, { images, video });
@@ -96,5 +97,15 @@ describe("uploadMediaBatch", () => {
     expect(video).not.toHaveBeenCalled();
     expect(images).toHaveBeenCalledTimes(1);
     expect(failures).toEqual([{ name: "tour.mp4", code: "file_type_invalid" }]);
+  });
+
+  it("the image uploader itself honours the raised limit: a 15 MB photo reaches the upload ticket, and a lowered limit refuses it", async () => {
+    vi.mocked(requestImageUploadAction).mockResolvedValue({ ok: false, code: "stop" } as never);
+    resetMediaLimitHints([{ kind: "image", place: "marketplace", maxBytes: 20 * MIB, defaultBytes: 10 * MIB, ceilingBytes: 20 * MIB, updatedAt: null }]);
+    await uploadProductImages("product-1", [file("big.jpg", 15 * MIB, "image/jpeg")]);
+    expect(requestImageUploadAction).toHaveBeenCalledTimes(1);
+    expect(imageFileProblem(file("big.jpg", 15 * MIB, "image/jpeg"))).toBeNull();
+    resetMediaLimitHints([{ kind: "image", place: "marketplace", maxBytes: 5 * MIB, defaultBytes: 10 * MIB, ceilingBytes: 20 * MIB, updatedAt: null }]);
+    expect(imageFileProblem(file("big.jpg", 6 * MIB, "image/jpeg"))).toBe("file_too_large");
   });
 });

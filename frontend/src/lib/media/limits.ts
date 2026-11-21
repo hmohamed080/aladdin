@@ -18,8 +18,8 @@ export type ImagePlace = (typeof IMAGE_PLACES)[number];
 export type VideoPlace = (typeof VIDEO_PLACES)[number];
 export type MediaKind = "image" | "video";
 
-/** What the platform can carry: image decode memory / 25 MP pixel budget, transcode worker disk and time. */
-export const MEDIA_LIMIT_CEILING: Readonly<Record<MediaKind, number>> = { image: 25 * MIB, video: 1024 * MIB };
+/** What the platform can carry: 20 MiB = the Workers image binding input limit (BINDING_INPUT_LIMIT), image decode memory / 25 MP pixel budget, transcode worker disk and time. */
+export const MEDIA_LIMIT_CEILING: Readonly<Record<MediaKind, number>> = { image: 20 * MIB, video: 1024 * MIB };
 /** Keeps a typo from locking a place out. */
 export const MEDIA_LIMIT_FLOOR: Readonly<Record<MediaKind, number>> = { image: 100 * 1024, video: MIB };
 

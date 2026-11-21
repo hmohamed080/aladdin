@@ -11,7 +11,7 @@ import { imageMaxBytes, invalidateMediaLimitCache, loadMediaLimits, storedObject
 
 const stored = (marketplaceMb: number) => ({
   data: [
-    { kind: "image", place: "marketplace", max_bytes: marketplaceMb * MIB, default_bytes: 10 * MIB, ceiling_bytes: 25 * MIB, updated_at: null },
+    { kind: "image", place: "marketplace", max_bytes: marketplaceMb * MIB, default_bytes: 10 * MIB, ceiling_bytes: 20 * MIB, updated_at: null },
     { kind: "video", place: "product", max_bytes: 250 * MIB, default_bytes: 100 * MIB, ceiling_bytes: 1024 * MIB, updated_at: null },
   ],
   error: null,
@@ -66,7 +66,7 @@ describe("server media limits", () => {
   });
 
   it("serves and reads stored files up to the platform ceiling, whatever the current upload limit", () => {
-    expect(storedObjectCeiling("image")).toBe(25 * MIB);
+    expect(storedObjectCeiling("image")).toBe(20 * MIB);
     expect(storedObjectCeiling("video")).toBe(1024 * MIB);
   });
 });

@@ -5,14 +5,14 @@ import { MediaLimitRow } from "./media-limit-row";
 
 vi.mock("@/server/actions/media-limits", () => ({ saveMediaLimitAction: vi.fn(async () => ({ ok: true, code: "mediaLimits.saved" })) }));
 
-const props = { kind: "image" as const, place: "marketplace", label: "Marketplace photos and payment proofs", currentMb: "10 MB", defaultMb: "10 MB", ceilingMb: "25 MB", floorMb: "100 KB", changedLabel: null };
+const props = { kind: "image" as const, place: "marketplace", label: "Marketplace photos and payment proofs", currentMb: "10 MB", defaultMb: "10 MB", ceilingMb: "20 MB", floorMb: "100 KB", changedLabel: null };
 
 describe("MediaLimitRow", () => {
   it("shows the limit now, the default and the hard ceiling, and posts the place with the typed value and the reason", () => {
     const { container } = renderWithI18n(<MediaLimitRow {...props} />, "en");
     expect(screen.getByText("Marketplace photos and payment proofs")).toBeTruthy();
     expect(container.textContent).toContain("10 MB");
-    expect(container.textContent).toContain("25 MB");
+    expect(container.textContent).toContain("20 MB");
     const form = screen.getByTestId("media-limit-image-marketplace");
     expect((form.querySelector('input[name="kind"]') as HTMLInputElement).value).toBe("image");
     expect((form.querySelector('input[name="place"]') as HTMLInputElement).value).toBe("marketplace");

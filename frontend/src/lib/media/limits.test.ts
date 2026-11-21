@@ -40,7 +40,7 @@ describe("media limit defaults", () => {
   it("keep every default inside the hard ceiling and above the floor", () => {
     for (const p of IMAGE_PLACES) expect(DEFAULT_IMAGE_LIMITS[p]).toBeLessThanOrEqual(MEDIA_LIMIT_CEILING.image);
     for (const p of VIDEO_PLACES) expect(DEFAULT_VIDEO_LIMITS[p]).toBeLessThanOrEqual(MEDIA_LIMIT_CEILING.video);
-    expect(MEDIA_LIMIT_CEILING).toEqual({ image: 25 * MIB, video: 1024 * MIB });
+    expect(MEDIA_LIMIT_CEILING).toEqual({ image: 20 * MIB, video: 1024 * MIB });
     expect(MEDIA_LIMIT_FLOOR).toEqual({ image: 100 * 1024, video: MIB });
   });
 });
@@ -50,7 +50,7 @@ describe("resolveLimit", () => {
     expect(resolveLimit(null, "image", "marketplace")).toBe(10 * MIB);
     expect(resolveLimit([row("image", "marketplace", 20 * MIB)], "image", "marketplace")).toBe(20 * MIB);
     expect(resolveLimit([row("image", "marketplace", 20 * MIB)], "image", "avatar")).toBe(3 * MIB); // other place: default
-    expect(resolveLimit([row("image", "marketplace", 500 * MIB)], "image", "marketplace")).toBe(25 * MIB); // tampered row: clamped
+    expect(resolveLimit([row("image", "marketplace", 500 * MIB)], "image", "marketplace")).toBe(20 * MIB); // tampered row: clamped
     expect(resolveLimit([row("video", "product", 10)], "video", "product")).toBe(MIB); // below floor: clamped
     expect(resolveLimit([row("video", "product", Number.NaN)], "video", "product")).toBe(100 * MIB); // junk: default
   });
@@ -58,8 +58,8 @@ describe("resolveLimit", () => {
 
 describe("validateLimitInput", () => {
   it("accepts the ceiling and the floor, refuses one byte beyond either, and unknown places", () => {
-    expect(validateLimitInput("image", "marketplace", 25 * MIB)).toEqual({ ok: true });
-    expect(validateLimitInput("image", "marketplace", 25 * MIB + 1)).toEqual({ ok: false, code: "above_ceiling" });
+    expect(validateLimitInput("image", "marketplace", 20 * MIB)).toEqual({ ok: true });
+    expect(validateLimitInput("image", "marketplace", 20 * MIB + 1)).toEqual({ ok: false, code: "above_ceiling" });
     expect(validateLimitInput("image", "marketplace", 100 * 1024 - 1)).toEqual({ ok: false, code: "below_floor" });
     expect(validateLimitInput("video", "product", 1024 * MIB)).toEqual({ ok: true });
     expect(validateLimitInput("video", "product", 1024 * MIB + 1)).toEqual({ ok: false, code: "above_ceiling" });
@@ -77,12 +77,12 @@ describe("validateLimitInput", () => {
 describe("parseLimitRows", () => {
   it("reads the RPC rows and drops anything malformed", () => {
     const rows = parseLimitRows([
-      { kind: "image", place: "marketplace", max_bytes: 15728640, default_bytes: 10485760, ceiling_bytes: 26214400, updated_at: "2026-11-21T10:00:00Z" },
+      { kind: "image", place: "marketplace", max_bytes: 15728640, default_bytes: 10485760, ceiling_bytes: 20971520, updated_at: "2026-11-21T10:00:00Z" },
       { kind: "audio", place: "x", max_bytes: 1, default_bytes: 1, ceiling_bytes: 1 },
       { kind: "video", place: "product", max_bytes: "not a number", default_bytes: 1, ceiling_bytes: 1 },
       null,
     ]);
-    expect(rows).toEqual([{ kind: "image", place: "marketplace", maxBytes: 15728640, defaultBytes: 10485760, ceilingBytes: 26214400, updatedAt: "2026-11-21T10:00:00Z" }]);
+    expect(rows).toEqual([{ kind: "image", place: "marketplace", maxBytes: 15728640, defaultBytes: 10485760, ceilingBytes: 20971520, updatedAt: "2026-11-21T10:00:00Z" }]);
     expect(parseLimitRows({})).toEqual([]);
   });
 });

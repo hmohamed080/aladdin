@@ -52,8 +52,8 @@ select is((select max_bytes from public.media_limits_get() where kind = 'image' 
   'A2. the marketplace image default is the 10 MB cap');
 select is((select array_agg(place || ':' || max_bytes order by place) from public.media_limits_get() where kind = 'video'),
   array['portfolio:104857600', 'product:104857600'], 'A3. both video places default to 100 MB');
-select is((select ceiling_bytes from public.media_limits_get() where kind = 'image' limit 1), 26214400::bigint,
-  'A4. the hard ceiling travels with the limits (25 MiB images)');
+select is((select ceiling_bytes from public.media_limits_get() where kind = 'image' limit 1), 20971520::bigint,
+  'A4. the hard ceiling travels with the limits (20 MiB images)');
 reset role;
 set local role anon;
 select throws_ok($$select * from public.media_limits_get()$$, '42501', null, 'A5. anonymous visitors cannot read the limits');
@@ -80,7 +80,7 @@ select pg_temp.act_as(:'sup');
 select throws_ok($$select public.admin_media_limit_set('image', 'marketplace', 15728640, '  ')$$, '22023', 'a reason of 3-500 characters is required',
   'C1. a reason is mandatory');
 select throws_ok($$select public.admin_media_limit_set('image', 'marketplace', 26214401, 'too big')$$, '22023', 'the limit exceeds the platform ceiling',
-  'C2. one byte above the 25 MiB image ceiling is refused');
+  'C2. one byte above the 20 MiB image ceiling is refused');
 select throws_ok($$select public.admin_media_limit_set('video', 'product', 1073741825, 'too big')$$, '22023', 'the limit exceeds the platform ceiling',
   'C3. one byte above the 1 GiB video ceiling is refused');
 select throws_ok($$select public.admin_media_limit_set('image', 'marketplace', 1000, 'too small')$$, '22023', 'the limit is below the minimum',

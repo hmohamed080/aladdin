@@ -8,7 +8,7 @@
 -- grant. The browser only receives it as a hint.
 --
 -- HARD CEILING: a value above the ceiling cannot be stored (CHECK) and the RPC says so. The ceilings are
--- what the platform can actually carry: 25 MiB per image (decode memory and the 25 MP pixel budget of the
+-- what the platform can actually carry: 20 MiB per image (the Workers image binding accepts 20 MiB of input; decode memory and the 25 MP pixel budget of the
 -- image pipeline), 1 GiB per video (the transcode worker's disk and time budget; R2 itself allows far more).
 -- The floor keeps a typo from locking a place out (100 KiB image, 1 MiB video).
 --
@@ -57,7 +57,7 @@ create table public.media_limits (
     or (kind = 'video' and place in ('portfolio', 'product'))),
   -- the hard ceiling and floor: not configurable
   constraint media_limits_ceiling_ck check (
-    (kind = 'image' and max_bytes between 102400 and 26214400 and default_bytes between 102400 and 26214400)
+    (kind = 'image' and max_bytes between 102400 and 20971520 and default_bytes between 102400 and 20971520)
     or (kind = 'video' and max_bytes between 1048576 and 1073741824 and default_bytes between 1048576 and 1073741824))
 );
 comment on table public.media_limits is
@@ -165,7 +165,7 @@ create or replace function public.media_limits_get()
 returns table (kind text, place text, max_bytes bigint, default_bytes bigint, ceiling_bytes bigint, updated_at timestamptz)
 language sql stable security definer set search_path = '' as $$
   select l.kind, l.place, l.max_bytes, l.default_bytes,
-         case l.kind when 'image' then 26214400::bigint else 1073741824::bigint end,
+         case l.kind when 'image' then 20971520::bigint else 1073741824::bigint end,
          l.updated_at
     from public.media_limits l
    order by l.kind, l.place;
@@ -194,7 +194,7 @@ begin
   if not found then
     raise exception 'unknown place' using errcode = '22023';
   end if;
-  v_ceiling := case p_kind when 'image' then 26214400 else 1073741824 end;
+  v_ceiling := case p_kind when 'image' then 20971520 else 1073741824 end;
   v_floor   := case p_kind when 'image' then 102400 else 1048576 end;
   if p_max_bytes is null or p_max_bytes > v_ceiling then
     raise exception 'the limit exceeds the platform ceiling' using errcode = '22023', detail = v_ceiling::text;
