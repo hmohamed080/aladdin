@@ -7643,3 +7643,8 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Code (PR #210): `fetchPriority="high"` on both hero images; `hurme` fonts no longer preload; both heroes share `HERO_SIZES` and quality 65 (`images.qualities` allows 65) so a phone fetches one 750w file instead of 1200w.
 - Cloudflare (owner-approved, dashboard): custom rule "Block common scanner paths" (Block) and rate-limiting rule "Rate limit auth POST" (20 POSTs per 10 s per IP on `/auth/*`, block 10 s). Verified live: `/.env`, `/wp-login.php`, `/x.php`, `/api/dev/check-version` answer 403; `/`, `/auth/sign-in`, `/legal/privacy` answer 200. Scanner traffic seen: one Belgian cloud IP probing `.env`, `.git`, `.aws` files. Min TLS raised to 1.2 by the owner. HSTS stays as the Worker's `max-age=63072000` (no preload, by decision). Cloudflare Traces left off (billing starts 2026-12-01, no need).
 
+
+## 2026-11-21 — PR #216 acceptance checks (colour accuracy, HLS on a throttled link)
+- Measured, not assumed: [`media-policy-acceptance-20261121.md`](media-policy-acceptance-20261121.md). Colour (CIEDE2000): profile conversion correct; PNG in-gamut max dE 0.85; JPEG q90 mean <= 1.0 but isolated edge pixels reach 4-6 (flagged); out-of-sRGB-gamut colours clip. Found and fixed a real bug: `png({ effort })` made sharp quantise PNG originals to 256 colours (fix + regression test, `cf6e0e56`).
+- HLS 720p: clean on 4G; switches down on slow links; Slow 3G (0.5 Mbit/s) stalls because no rung is below 360p (a 240p rung is an owner decision, not made).
+- Open: admin-configurable media caps (follow-up PR stacked on this branch, requested by the owner via the Marketplace session).
