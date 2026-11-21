@@ -3,40 +3,18 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { cn } from "@/lib/ui/cn";
 import { CommandPalette } from "@/features/admin-preview/command-palette";
 import type { PaletteItem } from "@/features/admin-preview/command-palette-search";
 import { AlertIcon } from "@/components/ui/icons";
 
-/** Preview routes already promoted to real, enforced Admin Core (Phase 1A: Staff · Roles · Permissions). */
-const LIVE_PREVIEW_ROUTES = ["/admin/staff"];
 /**
- * Preview routes whose DATA is real (Phase 1B-A: Users · Organizations read
- * from Admin Core) while their actions are still Preview dialogs until 1B-B.
- * They get their own banner — "changes here are real" would be untrue.
- * `/admin/review/verification/[id]` is a real verification request decided through the same live actions;
- * the other Review Center types (referrals, organization requests) stay under the Preview banner.
+ * Pages that still show demo (fixture / Preview-dialog) data. Only these carry the Preview banner;
+ * every other admin page is real and shows no banner (owner decision, marketplace walkthrough Part 2).
  */
-const LIVE_READ_ROUTES = ["/admin/users", "/admin/organizations", "/admin/review/verification"];
-/**
- * Pages whose every number and row is read LIVE and that change nothing (exact paths only): the Dashboard, the Review Center
- * queue (real verification, network-referral and sales-referral records) and the Business verification queue. They must not sit
- * under a banner that calls them a mock-up. The Business verification DETAIL page makes real, audited decisions (see below).
- */
-const LIVE_DATA_ROUTES = ["/admin", "/admin/review", "/admin/business-verification"];
-/** Detail pages (a path under it, never the list itself) whose actions are real, enforced on the server and audited. */
-const LIVE_DETAIL_PREFIXES = ["/admin/business-verification/"];
+const DEMO_DATA_ROUTES = ["/admin/analytics", "/admin/points", "/admin/settings"];
 
 /**
- * Routes that predate the Admin Core dashboard and are fully live (real reads and
- * real decisions): they carry no Preview banner at all.
- */
-const CLASSIC_ROUTES = ["/admin/verifications"];
-
-/**
- * The Admin console's content chrome: a per-area banner saying honestly whether
- * the area is live, live-read, or still Preview (fixtures / dialogs that save
- * nothing), plus the Command Palette. Rendered inside `app/admin/layout.tsx`, so
+ * The Admin console's content chrome: a Preview banner on pages that still show demo data, plus the Command Palette. Rendered inside `app/admin/layout.tsx`, so
  * it sits behind the Admin Staff gate; navigation lives in the console rail
  * (components/admin/admin-nav.tsx) and each page still enforces its own permission.
  */
@@ -50,34 +28,21 @@ export function PreviewShell({
   const { t } = useI18n();
   const pathname = usePathname();
 
-  // PD-016: Preview areas are promoted one at a time. A promoted (live) area must
-  // never sit under the "nothing is saved" banner — that would be untrue.
-  const matches = (routes: string[]) => routes.some((r) => pathname === r || pathname.startsWith(r + "/"));
-  const classic = matches(CLASSIC_ROUTES);
-  const live = matches(LIVE_PREVIEW_ROUTES) || LIVE_DETAIL_PREFIXES.some((p) => pathname.startsWith(p));
-  const liveRead = !live && matches(LIVE_READ_ROUTES);
-  const liveData = !live && !liveRead && LIVE_DATA_ROUTES.includes(pathname);
-  const bannerKey = live ? "liveBanner" : liveRead ? "liveReadBanner" : liveData ? "liveDataBanner" : "banner";
+  const demo = DEMO_DATA_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
 
   return (
     <div className="flex flex-col gap-lg">
-      {classic ? null : (
-        <div
-          role="note"
-          className={cn(
-            "flex items-start gap-3 rounded-md border px-md py-3",
-            live || liveRead || liveData ? "border-info/40 bg-info/10" : "border-warning/40 bg-warning/10",
-          )}
-        >
-          <span aria-hidden="true" className={cn("mt-0.5 shrink-0", live || liveRead || liveData ? "text-info" : "text-warning")}>
+      {demo ? (
+        <div role="note" className="flex items-start gap-3 rounded-md border border-warning/40 bg-warning/10 px-md py-3">
+          <span aria-hidden="true" className="mt-0.5 shrink-0 text-warning">
             <AlertIcon size={18} />
           </span>
           <div className="min-w-0">
-            <p className="text-body-lg font-medium text-fg">{t(`admin.preview.${bannerKey}Title`)}</p>
-            <p className="mt-0.5 text-body text-fg-secondary">{t(`admin.preview.${bannerKey}Body`)}</p>
+            <p className="text-body-lg font-medium text-fg">{t("admin.preview.bannerTitle")}</p>
+            <p className="mt-0.5 text-body text-fg-secondary">{t("admin.preview.bannerBody")}</p>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* No trigger here: the header search is the single entry point (see palette-bridge). */}
       <CommandPalette items={paletteItems} />

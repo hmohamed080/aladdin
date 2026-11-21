@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { storedObjectCeiling } from "@/server/media/limits";
-import { mediaProvider, privilegedStorageClient, resolveMedia } from "@/server/storage/media";
+import { mediaProvider, privilegedStorageClient, requireR2ForRead, resolveMedia } from "@/server/storage/media";
 
 /**
  * The bytes of one Marketplace image, read through the central media system (R2).
@@ -11,7 +11,8 @@ import { mediaProvider, privilegedStorageClient, resolveMedia } from "@/server/s
  */
 export async function readMarketplaceImageBytes(client: SupabaseClient, key: string): Promise<Uint8Array> {
   const media = await resolveMedia(client, "marketplace", key, "read");
-  const provider = await mediaProvider(media.provider === "supabase" ? privilegedStorageClient() : client, "marketplace", media.provider, key);
+  requireR2ForRead("marketplace", media.provider);
+  const provider = await mediaProvider(client, "marketplace", "r2", key);
   return provider.readObject(key, storedObjectCeiling("image"));
 }
 

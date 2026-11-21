@@ -4,7 +4,7 @@ import { z } from "zod";
 import { readPublicEnv } from "@/lib/env";
 import { legacyStorageWritesOpen, readStorageEnv } from "@/lib/env/storage";
 import { createHash } from "node:crypto";
-import { mediaPolicy, isOrganizationMedia, reencodesOriginal } from "@/lib/storage/media-policy";
+import { mediaPolicy, isOrganizationMedia, isR2OnlyMedia, reencodesOriginal } from "@/lib/storage/media-policy";
 import type { MediaNamespace, StorageProviderName } from "@/lib/storage/provider-types";
 import { SupabaseStorageProvider } from "./supabase-provider";
 import { CloudflareR2StorageProvider } from "./r2-provider";
@@ -58,8 +58,16 @@ function requireWriteApproval(provider: StorageProviderName) {
  * closed explicitly) a Supabase-backed write fails closed: there is no automatic fallback when R2
  * is down, uploads simply pause and the user retries. Reads and deletes of legacy objects stay open.
  */
-function requireWritableProvider(provider: StorageProviderName) {
-  if (provider === "supabase" && !legacyStorageWritesOpen(readStorageEnv())) throw new Error("media uploads are unavailable");
+function requireWritableProvider(provider: StorageProviderName, namespace: MediaNamespace) {
+  // R2-only namespaces (Marketplace) never write to Supabase Storage, even while legacy writes are open.
+  if (provider === "supabase" && (isR2OnlyMedia(namespace) || !legacyStorageWritesOpen(readStorageEnv()))) {
+    throw new Error("media uploads are unavailable");
+  }
+}
+
+/** Reads of an R2-only namespace never touch Supabase Storage either. */
+export function requireR2ForRead(namespace: MediaNamespace, provider: StorageProviderName) {
+  if (isR2OnlyMedia(namespace) && provider !== "r2") throw new Error("media unavailable");
 }
 
 export async function authorizeMediaUpload(client: SupabaseClient, namespace: MediaNamespace, key: string, expectedBytes?: number) {
@@ -71,8 +79,8 @@ export async function authorizeMediaUpload(client: SupabaseClient, namespace: Me
   }
   const env = readStorageEnv();
   // Existing R2 records remain R2 when routing is disabled. Reserve is authoritative and rejects provider changes.
-  const provider = media.reserved ? media.provider : env.R2_STORAGE_ENABLED ? "r2" : "supabase";
-  requireWritableProvider(provider);
+  const provider = media.reserved ? media.provider : env.R2_STORAGE_ENABLED || isR2OnlyMedia(namespace) ? "r2" : "supabase";
+  requireWritableProvider(provider, namespace);
   requireWriteApproval(provider);
   const maxBytes = await imageMaxBytes(namespace); // the stored, admin-configurable limit
   if (provider === "r2" && (!expectedBytes || !Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > maxBytes)) {
@@ -124,7 +132,7 @@ export async function verifyPendingMedia(client: SupabaseClient, namespace: Medi
   }
   const pending = await resolveMedia(client, namespace, key, "upload");
   if (!pending.owner) throw new Error("owner required");
-  requireWritableProvider(pending.provider);
+  requireWritableProvider(pending.provider, namespace);
   if (!pending.reserved) {
     const reserveClient = isOrganizationMedia(namespace) ? privilegedStorageClient() : client;
     const { error: reserveError } = await reserveClient.rpc("media_storage_reserve", {
