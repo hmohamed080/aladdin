@@ -35,6 +35,13 @@ describe("checkVideoFile", () => {
     expect(checkVideoFile({ type: "video/mp4", size: VIDEO_STORAGE_MAX_BYTES } as File)).toBe("video/mp4");
     expect(VIDEO_STORAGE_MAX_BYTES).toBe(100 * 1024 * 1024);
   });
+
+  it("takes the stored limit of the place as its cap (a browser hint)", () => {
+    const big = { type: "video/mp4", size: 150 * 1024 * 1024 } as File;
+    expect(() => checkVideoFile(big)).toThrow(expect.objectContaining({ code: "size" }));
+    expect(checkVideoFile(big, 200 * 1024 * 1024)).toBe("video/mp4");
+    expect(() => checkVideoFile(big, 120 * 1024 * 1024)).toThrow(expect.objectContaining({ code: "size" }));
+  });
 });
 
 describe("part sizes", () => {

@@ -2,22 +2,25 @@
 
 import { UploadFailure as VideoUploadFailure, uploadVideo } from "@/features/video/upload-engine";
 import { partitionUploadBatch, type UploadRejection } from "@/lib/media/upload-limits";
+import { imageHintBytes, loadMediaLimitHints, videoHintBytes } from "@/lib/media/limits-client";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
-import { MARKETPLACE_IMAGE_ALLOWED_TYPES, MARKETPLACE_IMAGE_MAX_BYTES } from "@/lib/storage/marketplace-images";
+import { MARKETPLACE_IMAGE_ALLOWED_TYPES } from "@/lib/storage/marketplace-images";
 import { confirmImageUploadAction, removeImageAction, requestImageUploadAction } from "@/server/actions/marketplace-seller";
 
 /** The image formats and size the `marketplace` media namespace accepts (Migration 13). */
 export const ACCEPTED_IMAGE_TYPES: readonly string[] = MARKETPLACE_IMAGE_ALLOWED_TYPES;
-export const MAX_IMAGE_BYTES = MARKETPLACE_IMAGE_MAX_BYTES;
 /** Upload keys a product may hold open at once (Migration 07 abuse limit). */
 export const MAX_IMAGES_PER_BATCH = 10;
 
 export type UploadFailure = { name: string; code: string };
 
-/** Client-side pre-check; the media verifier and the confirm RPC check again. */
-export function imageFileProblem(file: File): string | null {
+/**
+ * Client-side pre-check; the media verifier and the confirm RPC check again. The size bound is the stored limit as the
+ * browser knows it (a hint loaded from /api/media-limits, the compiled default until then), never a fixed constant.
+ */
+export function imageFileProblem(file: File, maxBytes: number = imageHintBytes("marketplace")): string | null {
   if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) return "image_type_invalid";
-  if (file.size > MAX_IMAGE_BYTES) return "file_too_large";
+  if (file.size > maxBytes) return "file_too_large";
   return null;
 }
 
@@ -34,8 +37,10 @@ export async function uploadProductImages(
   onProgress?: (name: string | null) => void,
 ): Promise<UploadFailure[]> {
   const failures: UploadFailure[] = [];
+  await loadMediaLimitHints();
+  const maxBytes = imageHintBytes("marketplace");
   for (const [index, file] of files.entries()) {
-    const problem = imageFileProblem(file);
+    const problem = imageFileProblem(file, maxBytes);
     if (problem) {
       failures.push({ name: file.name, code: problem });
       continue;
@@ -103,7 +108,8 @@ export async function uploadMediaBatch(
   onProgress?: (name: string | null) => void,
   deps: MediaBatchDeps = { images: uploadProductImages, video: uploadProductVideo },
 ): Promise<UploadFailure[]> {
-  const { accepted: all, rejected } = partitionUploadBatch(files);
+  await loadMediaLimitHints(); // the stored limits are the authority; this only lets the page answer without a round trip
+  const { accepted: all, rejected } = partitionUploadBatch(files, { image: imageHintBytes("marketplace"), video: videoHintBytes("product") });
   const videoEnabled = deps.videoEnabled ?? MARKETPLACE_VIDEO_UPLOADS_ENABLED;
   // A video is refused as an unsupported file while the Marketplace has no video path; the images still upload.
   const accepted = videoEnabled ? all : all.filter((a) => a.kind === "image");

@@ -38,6 +38,8 @@
 import { ASSET_POLICY } from "@/lib/storage/professional-assets";
 import { PRODUCT_IMAGE_MAX_BYTES } from "@/lib/storage/product-images";
 import { REQUEST_IMAGE_MAX_BYTES } from "@/lib/storage/request-images";
+import type { ImagePlace } from "./limits";
+import { imageHintBytes, loadMediaLimitHints } from "./limits-client";
 
 export type ResizeProfile = {
   /** Long-edge cap in pixels. */
@@ -53,6 +55,8 @@ export type ResizeProfile = {
    * as picked, apart from a photo over the 25 MP server decode bound, which is fitted down.
    */
   readonly keepOriginal?: boolean;
+  /** The place whose stored upload limit (browser hint) replaces `maxBytes` when the page knows it. */
+  readonly place?: ImagePlace;
 };
 
 /**
@@ -64,10 +68,10 @@ export type ResizeProfile = {
  * `file_size_limit`, which stays the server's ceiling.
  */
 export const UPLOAD_RESIZE_PROFILES = {
-  portfolio: { keepOriginal: true, maxEdge: 2560, quality: 0.85, keepBelowBytes: ASSET_POLICY.portfolio.maxBytes, maxBytes: ASSET_POLICY.portfolio.maxBytes },
-  product: { keepOriginal: true, maxEdge: 2560, quality: 0.85, keepBelowBytes: PRODUCT_IMAGE_MAX_BYTES, maxBytes: PRODUCT_IMAGE_MAX_BYTES },
-  request: { keepOriginal: true, maxEdge: 2560, quality: 0.85, keepBelowBytes: REQUEST_IMAGE_MAX_BYTES, maxBytes: REQUEST_IMAGE_MAX_BYTES },
-  certificate: { maxEdge: 3200, quality: 0.9, keepBelowBytes: 1536 * 1024, maxBytes: ASSET_POLICY.certificate.maxBytes },
+  portfolio: { place: "portfolio", keepOriginal: true, maxEdge: 2560, quality: 0.85, keepBelowBytes: ASSET_POLICY.portfolio.maxBytes, maxBytes: ASSET_POLICY.portfolio.maxBytes },
+  product: { place: "product", keepOriginal: true, maxEdge: 2560, quality: 0.85, keepBelowBytes: PRODUCT_IMAGE_MAX_BYTES, maxBytes: PRODUCT_IMAGE_MAX_BYTES },
+  request: { place: "request", keepOriginal: true, maxEdge: 2560, quality: 0.85, keepBelowBytes: REQUEST_IMAGE_MAX_BYTES, maxBytes: REQUEST_IMAGE_MAX_BYTES },
+  certificate: { place: "certificate", maxEdge: 3200, quality: 0.9, keepBelowBytes: 1536 * 1024, maxBytes: ASSET_POLICY.certificate.maxBytes },
 } as const satisfies Record<string, ResizeProfile>;
 
 /** The server's sharp `limitInputPixels`. No derivative may exceed it. */
@@ -405,8 +409,15 @@ async function fitWithin(bitmap: ImageBitmap, profile: ResizeProfile, sourceType
  * Prepare `file` for upload under `profile`. Types other than JPEG/PNG/WebP (a
  * certificate PDF) pass through untouched: type rules are the caller's.
  */
-export async function resizeImageForUpload(file: File, profile: ResizeProfile): Promise<PreparedImage> {
+export async function resizeImageForUpload(file: File, given: ResizeProfile): Promise<PreparedImage> {
   if (!RESIZABLE_TYPES.has(file.type)) return { ok: true, file };
+  // The stored limit of the place (a hint: the server and the database decide) replaces the compiled cap.
+  let profile = given;
+  if (given.place) {
+    await loadMediaLimitHints();
+    const limit = imageHintBytes(given.place);
+    profile = { ...given, maxBytes: limit, keepBelowBytes: given.keepOriginal ? limit : given.keepBelowBytes };
+  }
   // Site-wide media policy (PR 2): a profile with `keepOriginal` refuses a picked file over its
   // per-file cap and otherwise uploads it untouched. The server keeps the re-encoded original (sRGB,
   // 2560 px, no personal metadata), so the browser must not re-encode a photo and shift its colours.

@@ -71,15 +71,14 @@ select throws_ok($$select pg_temp.backend_attest(current_setting('t.k3'), 'image
   '42501', 'invalid verification receipt', 'A3. one byte over 10 MiB is refused');
 select lives_ok($$select pg_temp.backend_attest(current_setting('t.k3'), 'image/png', 1000)$$,
   'A4. the refusal did not poison the key: a valid receipt is still accepted');
-select ok(pg_get_functiondef('public.media_storage_attest(text,text,uuid,text,bigint,text,text)'::regprocedure) like '%''avatar'' then 3145728%',
-  'A5. avatars keep their 3 MiB ceiling');
+select is(app.media_limit_bytes('image', 'avatar'), 3145728::bigint, 'A5. avatars keep their 3 MiB ceiling (the stored default)');
 
 -- ===========================================================================
 -- B. Video cap on new uploads
 -- ===========================================================================
 select throws_ok($$insert into public.media_videos (owner_user_id, scope, title, content_type, declared_bytes, sort_order)
     values ('70000001-0000-4000-8000-000000000001', 'portfolio', 'too big', 'video/mp4', 104857601, 1)$$,
-  '22023', 'video is larger than 100 MB', 'B1. a new video row over 100 MiB is refused');
+  '22023', 'video is larger than the limit for this place', 'B1. a new video row over 100 MiB is refused');
 select lives_ok($$insert into public.media_videos (owner_user_id, scope, title, content_type, declared_bytes, sort_order)
     values ('70000001-0000-4000-8000-000000000001', 'portfolio', 'just fits', 'video/mp4', 104857600, 1)$$,
   'B2. exactly 100 MiB is accepted');
