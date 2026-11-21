@@ -17,6 +17,14 @@ export function mediaPolicy(namespace: MediaNamespace) {
   return ASSET_POLICY[namespace];
 }
 
+/**
+ * Namespaces whose bytes live in R2 ONLY: no Supabase Storage write, read or fallback, whatever the
+ * R2 flags say. When R2 is unavailable these uploads and reads fail explicitly instead of drifting.
+ */
+export function isR2OnlyMedia(namespace: MediaNamespace) {
+  return namespace === "marketplace";
+}
+
 /** Workspace- or organization-scoped namespaces are authorized by `organization_media_resolve`. */
 export function isOrganizationMedia(namespace: MediaNamespace) {
   return namespace === "product" || namespace === "organization" || namespace === "request" || namespace === "verification"

@@ -845,8 +845,8 @@ export const ar: Messages = {
       organizations: "المؤسسات",
       verifications: "التحقق",
       audit: "السجل",
-      marketplace: "بائعو الماركت",
-      marketplaceMedia: "مراجعة الصور",
+      marketplace: "المتجر",
+      marketplaceMedia: "مراجعة المنتجات",
     },
     status: {
       pending_verification: "بانتظار التحقق",
@@ -7681,7 +7681,7 @@ export const ar: Messages = {
   },
   adminMarketplace: {
     sellers: {
-      title: "بائعو الماركت",
+      title: "المتجر",
       subtitle: "المعارض المسموح لها بالبيع في الماركت العام. كل تغيير يحتاج سببًا ويُسجَّل.",
       organization: "المعرض",
       status: "حالة البائع",
@@ -7697,7 +7697,7 @@ export const ar: Messages = {
       approvedBy: "اعتمده {name}",
       empty: "لا توجد معارض مؤهلة بعد.",
       statusLabel: { pending: "قيد المراجعة", approved: "معتمد", suspended: "موقوف", revoked: "ملغى" },
-      action: { approve: "اعتماد", suspend: "إيقاف", revoke: "إلغاء", reinstate: "إعادة تفعيل" },
+      action: { approve: "اعتماد", suspend: "إيقاف", revoke: "سحب", reinstate: "إعادة تفعيل" },
       reasonLabel: "السبب (مطلوب)",
       reasonPlaceholder: "لماذا يتم هذا التغيير؟",
       confirm: "تأكيد",
@@ -7705,7 +7705,7 @@ export const ar: Messages = {
       done: "تم تحديث حالة البائع.",
     },
     media: {
-      title: "مراجعة الصور",
+      title: "مراجعة المنتجات",
       subtitle: "كل صورة منتج تُفحص بايت ببايت على الخادم قبل اعتمادها. لا يرى العملاء إلا الصور المعتمدة لمنتجات منشورة.",
       tabs: { pending: "قيد المراجعة", verified: "معتمدة", rejected: "مرفوضة" },
       ready: "عرض الصور للعامة",
