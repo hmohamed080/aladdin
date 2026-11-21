@@ -7,8 +7,9 @@
  *
  * PURE ON PURPOSE — no `server-only`, no Supabase client.
  */
+import { IMAGE_MAX_BYTES } from "@/lib/media/upload-limits";
 export const MARKETPLACE_IMAGE_BUCKET = "marketplace";
-export const MARKETPLACE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const MARKETPLACE_IMAGE_MAX_BYTES = IMAGE_MAX_BYTES;
 export const MARKETPLACE_IMAGE_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
 /** `<organization>/<product>/<image>.<ext>`, all three UUIDs — what the request-upload RPC mints. */

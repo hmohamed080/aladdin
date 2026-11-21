@@ -59,7 +59,7 @@ describe("uploadAsset", () => {
 
   it("refuses a prepared file still over the ceiling before anything is created", async () => {
     const start = vi.fn();
-    const big = new File([new Uint8Array(9_000_000)], "big.png", { type: "image/png" });
+    const big = new File([new Uint8Array(11 * 1024 * 1024)], "big.png", { type: "image/png" });
     expect(await uploadAsset("portfolio", big, start, vi.fn())).toEqual({
       ok: false,
       code: "assets.errors.tooLarge",
@@ -136,12 +136,16 @@ describe("uploadAsset", () => {
     expect(uploadToSignedUrl.mock.calls[0]![3]).toEqual({ contentType: "image/webp", upsert: false });
   });
 
-  it("never refuses the picked original for its size: any source is prepared first", async () => {
+  it("accepts a photo up to the 10 MB per-file cap (the old 5 MB limit is gone) and refuses one over it", async () => {
     const png = new Uint8Array(1000);
     png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     resize.mockResolvedValueOnce({ ok: true, file: new File([png], "photo.png", { type: "image/png" }) });
-    expect(await uploadAsset("portfolio", pngFile(30_000_000), async () => ticket, async () => ({ ok: true }))).toEqual({ ok: true });
-    expect(resize).toHaveBeenCalledWith(expect.objectContaining({ size: 30_000_000 }), expect.objectContaining({ maxBytes: 5 * 1024 * 1024 }));
+    expect(await uploadAsset("portfolio", pngFile(9_000_000), async () => ticket, async () => ({ ok: true }))).toEqual({ ok: true });
+    expect(resize).toHaveBeenCalledWith(expect.objectContaining({ size: 9_000_000 }), expect.objectContaining({ maxBytes: 10 * 1024 * 1024 }));
+    const start = vi.fn();
+    resize.mockResolvedValueOnce({ ok: false, reason: "too_large" });
+    expect(await uploadAsset("portfolio", pngFile(30_000_000), start, vi.fn())).toEqual({ ok: false, code: "assets.errors.tooLarge" });
+    expect(start).not.toHaveBeenCalled();
   });
 
   it("names a photo this device could not prepare, and creates nothing", async () => {

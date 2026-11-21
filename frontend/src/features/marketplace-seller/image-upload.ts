@@ -1,5 +1,7 @@
 "use client";
 
+import { UploadFailure as VideoUploadFailure, uploadVideo } from "@/features/video/upload-engine";
+import { partitionUploadBatch, type UploadRejection } from "@/lib/media/upload-limits";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { MARKETPLACE_IMAGE_ALLOWED_TYPES, MARKETPLACE_IMAGE_MAX_BYTES } from "@/lib/storage/marketplace-images";
 import { confirmImageUploadAction, removeImageAction, requestImageUploadAction } from "@/server/actions/marketplace-seller";
@@ -57,4 +59,64 @@ export async function uploadProductImages(
   }
   onProgress?.(null);
   return failures;
+}
+
+const REJECTION_CODE: Record<UploadRejection, string> = {
+  type_invalid: "file_type_invalid",
+  empty: "file_type_invalid",
+  image_too_large: "file_too_large",
+  video_too_large: "video_too_large",
+};
+
+/** One product video through the resumable R2 upload; resolves to a failure code, or null on success. */
+export async function uploadProductVideo(productId: string, file: File): Promise<string | null> {
+  try {
+    await uploadVideo({ file, title: file.name.slice(0, 120), scope: "product", productId, onProgress: () => undefined, signal: new AbortController().signal });
+    return null;
+  } catch (error) {
+    return error instanceof VideoUploadFailure && error.code === "limit" ? "too_many_images" : "video_upload_failed";
+  }
+}
+
+/**
+ * Marketplace products live in marketplace_products, but the resumable video API authorizes against the catalog table
+ * public.products, so a Marketplace video would be refused. The option stays off until a Marketplace-aware video path
+ * exists (PR 7: product form with 1 video + 4 images); the panel offers and accepts images only.
+ */
+export const MARKETPLACE_VIDEO_UPLOADS_ENABLED = false;
+
+export type MediaBatchDeps = {
+  images: typeof uploadProductImages;
+  video: typeof uploadProductVideo;
+  /** Defaults to MARKETPLACE_VIDEO_UPLOADS_ENABLED. */
+  videoEnabled?: boolean;
+};
+
+/**
+ * A dropped or picked batch of images AND videos, uploaded together. Every file is judged on its
+ * own: an oversize or unsupported file is reported and skipped, the rest still upload. Images go
+ * through the trusted ticket workflow one after another; each video runs beside them.
+ */
+export async function uploadMediaBatch(
+  productId: string,
+  files: File[],
+  onProgress?: (name: string | null) => void,
+  deps: MediaBatchDeps = { images: uploadProductImages, video: uploadProductVideo },
+): Promise<UploadFailure[]> {
+  const { accepted: all, rejected } = partitionUploadBatch(files);
+  const videoEnabled = deps.videoEnabled ?? MARKETPLACE_VIDEO_UPLOADS_ENABLED;
+  // A video is refused as an unsupported file while the Marketplace has no video path; the images still upload.
+  const accepted = videoEnabled ? all : all.filter((a) => a.kind === "image");
+  if (!videoEnabled) for (const a of all) if (a.kind === "video") rejected.push({ file: a.file, reason: "type_invalid" });
+  const failures: UploadFailure[] = rejected.map(({ file, reason }) => ({ name: file.name, code: REJECTION_CODE[reason] }));
+  const images = accepted.filter((a) => a.kind === "image").map((a) => a.file);
+  const videos = accepted.filter((a) => a.kind === "video").map((a) => a.file);
+  const results = await Promise.all([
+    images.length > 0 ? deps.images(productId, images, onProgress) : Promise.resolve<UploadFailure[]>([]),
+    ...videos.map(async (file) => {
+      const code = await deps.video(productId, file);
+      return code ? [{ name: file.name, code }] : [];
+    }),
+  ]);
+  return [...failures, ...results.flat()];
 }

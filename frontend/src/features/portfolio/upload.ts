@@ -63,7 +63,7 @@ export async function uploadAsset(
   onProgress?: (percent: number) => void,
 ): Promise<UploadOutcome> {
   const prepared = await resizeImageForUpload(original, UPLOAD_RESIZE_PROFILES[namespace]);
-  if (!prepared.ok) return { ok: false, code: "assets.errors.prepareFailed" };
+  if (!prepared.ok) return { ok: false, code: prepared.reason === "too_large" ? "assets.errors.tooLarge" : "assets.errors.prepareFailed" };
   const file = prepared.file;
   const head = new Uint8Array(await file.slice(0, SIGNATURE_BYTES).arrayBuffer());
   const valid = validateAssetContent(namespace, { type: file.type, size: file.size }, head);

@@ -94,8 +94,8 @@ select is(
 
 select is(
   (select file_size_limit from storage.buckets where id = 'professional-portfolio'),
-  5242880::bigint,
-  'Portfolio is capped at 5 MiB — one real phone photo, not a burst'
+  10485760::bigint,
+  'Portfolio is capped at 10 MiB (site-wide image cap, media policy 2026-11-21)'
 );
 
 select is(
@@ -104,12 +104,12 @@ select is(
   'Certificates are capped at 10 MiB — a scanned multi-page document is the large end'
 );
 
--- The limits are DIFFERENT, which is the entire reason there are two buckets:
--- Storage enforces them per bucket and RLS cannot see a size at INSERT time.
+-- The accepted types DIFFER (certificates also take PDF), which is why there are two buckets:
+-- Storage enforces types per bucket and RLS cannot see a size or a type at INSERT time.
 select isnt(
-  (select file_size_limit from storage.buckets where id = 'professional-portfolio'),
-  (select file_size_limit from storage.buckets where id = 'professional-certificates'),
-  'The two limits differ, which is why the namespace is a BUCKET rather than a path segment'
+  (select allowed_mime_types from storage.buckets where id = 'professional-portfolio'),
+  (select allowed_mime_types from storage.buckets where id = 'professional-certificates'),
+  'The two buckets differ in accepted types, which is why the namespace is a BUCKET rather than a path segment'
 );
 
 select ok(

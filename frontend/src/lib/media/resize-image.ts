@@ -1,11 +1,12 @@
 /**
  * Prepare a photo in the browser before it is uploaded.
  *
- * THE RULE (owner decision, 2026-10-19): the ORIGINAL a person picks is never
- * refused for its size, its pixel count or its long edge. What the server
- * refuses is a prepared upload over its namespace's ceiling, and this module
- * guarantees the prepared upload meets that ceiling. The only refusal left is
- * "this device could not prepare it": a typed failure the UI shows as a clear,
+ * THE RULE for site-content photos (owner decision, 2026-11-19, replacing the 2026-10-19 rule; profiles
+ * with `keepOriginal`): a picked photo is refused only when it is over its namespace's per-file cap
+ * (10 MB), and is otherwise uploaded untouched: the server stores a re-encoded original (sRGB, long edge at most 2560 px, no
+ * personal metadata), so the browser no longer shrinks it. The one thing still prepared here is a
+ * photo over the server's 25 MP decode bound, fitted down so it can be verified at all. The other
+ * failure is "this device could not prepare it": a typed failure the UI shows as a clear,
  * translated message, never a silent server refusal.
  *
  * WHY HERE: the server keeps reading only small, bounded files (the per-bucket
@@ -47,6 +48,11 @@ export type ResizeProfile = {
   readonly keepBelowBytes: number;
   /** The namespace's server-side ceiling. The prepared file never exceeds it. */
   readonly maxBytes: number;
+  /**
+   * Site-content photos: a file over `maxBytes` is refused (`too_large`) and anything else is uploaded
+   * as picked, apart from a photo over the 25 MP server decode bound, which is fitted down.
+   */
+  readonly keepOriginal?: boolean;
 };
 
 /**
@@ -58,9 +64,9 @@ export type ResizeProfile = {
  * `file_size_limit`, which stays the server's ceiling.
  */
 export const UPLOAD_RESIZE_PROFILES = {
-  portfolio: { maxEdge: 2560, quality: 0.85, keepBelowBytes: 1024 * 1024, maxBytes: ASSET_POLICY.portfolio.maxBytes },
-  product: { maxEdge: 2560, quality: 0.85, keepBelowBytes: 1024 * 1024, maxBytes: PRODUCT_IMAGE_MAX_BYTES },
-  request: { maxEdge: 2560, quality: 0.85, keepBelowBytes: 1024 * 1024, maxBytes: REQUEST_IMAGE_MAX_BYTES },
+  portfolio: { keepOriginal: true, maxEdge: 2560, quality: 0.85, keepBelowBytes: ASSET_POLICY.portfolio.maxBytes, maxBytes: ASSET_POLICY.portfolio.maxBytes },
+  product: { keepOriginal: true, maxEdge: 2560, quality: 0.85, keepBelowBytes: PRODUCT_IMAGE_MAX_BYTES, maxBytes: PRODUCT_IMAGE_MAX_BYTES },
+  request: { keepOriginal: true, maxEdge: 2560, quality: 0.85, keepBelowBytes: REQUEST_IMAGE_MAX_BYTES, maxBytes: REQUEST_IMAGE_MAX_BYTES },
   certificate: { maxEdge: 3200, quality: 0.9, keepBelowBytes: 1536 * 1024, maxBytes: ASSET_POLICY.certificate.maxBytes },
 } as const satisfies Record<string, ResizeProfile>;
 
@@ -85,9 +91,10 @@ export type EncodedType = "image/webp" | "image/jpeg" | "image/png";
  *   decode       the browser could not decode the image (or not at a size it can hold);
  *   canvas       the browser could not draw or encode it (for example a canvas-area limit);
  *   fit          even at the lowest quality and the smallest edge it is over the ceiling;
- *   unsupported  the browser has no `createImageBitmap`/canvas and the file needs preparing.
+ *   unsupported  the browser has no `createImageBitmap`/canvas and the file needs preparing;
+ *   too_large    the picked file is over the namespace's per-file cap (site-wide 10 MB image rule).
  */
-export type ImagePrepareFailure = "decode" | "canvas" | "fit" | "unsupported";
+export type ImagePrepareFailure = "decode" | "canvas" | "fit" | "unsupported" | "too_large";
 export type PreparedImage = { ok: true; file: File } | { ok: false; reason: ImagePrepareFailure };
 
 /** Thrown by `encodeCanvasWithin` so a crop field can tell "could not prepare" from "could not upload". */
@@ -400,9 +407,14 @@ async function fitWithin(bitmap: ImageBitmap, profile: ResizeProfile, sourceType
  */
 export async function resizeImageForUpload(file: File, profile: ResizeProfile): Promise<PreparedImage> {
   if (!RESIZABLE_TYPES.has(file.type)) return { ok: true, file };
+  // Site-wide media policy (PR 2): a profile with `keepOriginal` refuses a picked file over its
+  // per-file cap and otherwise uploads it untouched. The server keeps the re-encoded original (sRGB,
+  // 2560 px, no personal metadata), so the browser must not re-encode a photo and shift its colours.
+  const keep = profile.keepOriginal === true;
+  if (keep && file.size > profile.maxBytes) return { ok: false, reason: "too_large" };
   const header = await readImageHeader(file, file.type);
-  const overBytes = file.size > profile.maxBytes;
-  const overEdge = header !== null && Math.max(header.width, header.height) > profile.maxEdge;
+  const overBytes = !keep && file.size > profile.maxBytes;
+  const overEdge = !keep && header !== null && Math.max(header.width, header.height) > profile.maxEdge;
   const overPixels = header !== null && header.width * header.height > SERVER_DECODE_MAX_PIXELS;
   const mustFit = overBytes || overEdge || overPixels;
   if (!mustFit && header && file.size <= profile.keepBelowBytes) return { ok: true, file };
@@ -417,7 +429,7 @@ export async function resizeImageForUpload(file: File, profile: ResizeProfile): 
     const { width, height } = bitmap;
     if (width <= 0 || height <= 0) return mustFit ? { ok: false, reason: "decode" } : { ok: true, file };
     // Without a readable header, the full decode is the first look at the dimensions.
-    const needsFit = mustFit || Math.max(width, height) > profile.maxEdge || width * height > SERVER_DECODE_MAX_PIXELS;
+    const needsFit = mustFit || (!keep && Math.max(width, height) > profile.maxEdge) || width * height > SERVER_DECODE_MAX_PIXELS;
     if (!needsFit && file.size <= profile.keepBelowBytes) return { ok: true, file };
 
     if (needsFit) {

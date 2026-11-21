@@ -54,10 +54,10 @@ describe("beginSchema", () => {
     expect(beginSchema.safeParse({ ...base, scope: "product" }).success).toBe(false);
     expect(beginSchema.safeParse({ ...base, scope: "product", productId: ID }).success).toBe(true);
   });
-  it("refuses other types, and sizes only beyond R2's own object limit", () => {
+  it("refuses other types, and sizes beyond the 100 MB per-file cap", () => {
     expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/x-msvideo", bytes: 10 }).success).toBe(false);
-    expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 600 * 1024 * 1024 }).success).toBe(true);
-    expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 200 * 1024 ** 3 }).success).toBe(true);
+    expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 100 * 1024 * 1024 }).success).toBe(true);
+    expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 100 * 1024 * 1024 + 1 }).success).toBe(false);
     expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 5 * 1024 ** 4 + 1 }).success).toBe(false);
   });
 });
