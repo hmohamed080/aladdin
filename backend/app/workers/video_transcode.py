@@ -471,7 +471,7 @@ def transcode_command(
         raise ValueError("unknown codec")
     n = len(renditions)
     labels = "".join(f"[v{i}]" for i in range(n))
-    # Never above 30 fps; a slower source keeps its own rate (the fps filter would duplicate frames).
+    # Never above 30 fps; a slower source keeps its own rate (fps would duplicate frames).
     limit = f",fps={MAX_FPS}" if info.fps > MAX_FPS + 0.5 else ""
     graph = [f"[0:v:0]split={n}{labels}"] + [
         f"[v{i}]{_scale(r, info)}{limit},setsar=1[o{i}]" for i, r in enumerate(renditions)
