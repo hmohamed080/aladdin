@@ -156,8 +156,8 @@ export function LiveProduct({ product }: { product: PublicProduct }) {
                     <dd>{product.brand}</dd>
                   </div>
                 ) : null}
-                {[...product.attributes, ...(variant?.attributes ?? [])].map((a) => (
-                  <div key={a.key} className={styles.specRow}>
+                {[...product.attributes, ...(variant?.attributes ?? [])].map((a, i) => (
+                  <div key={`${i}:${a.key}`} className={styles.specRow}>
                     <dt>{label(a, locale)}</dt>
                     <dd>{valueText(a, locale)}</dd>
                   </div>
