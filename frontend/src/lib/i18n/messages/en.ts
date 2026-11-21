@@ -880,8 +880,8 @@ export const en = {
       organizations: "Organizations",
       verifications: "Verifications",
       audit: "Audit",
-      marketplace: "Marketplace sellers",
-      marketplaceMedia: "Media moderation",
+      marketplace: "Marketplace",
+      marketplaceMedia: "Product review",
     },
     status: {
       pending_verification: "Pending verification",
@@ -7913,7 +7913,7 @@ export const en = {
   },
   adminMarketplace: {
     sellers: {
-      title: "Marketplace sellers",
+      title: "Marketplace",
       subtitle: "Showrooms allowed to sell on the public Marketplace. Every change needs a reason and is recorded.",
       organization: "Showroom",
       status: "Seller status",
@@ -7929,7 +7929,7 @@ export const en = {
       approvedBy: "Approved by {name}",
       empty: "No eligible showrooms yet.",
       statusLabel: { pending: "Pending", approved: "Approved", suspended: "Suspended", revoked: "Revoked" },
-      action: { approve: "Approve", suspend: "Suspend", revoke: "Revoke", reinstate: "Reinstate" },
+      action: { approve: "Approve", suspend: "Suspend", revoke: "Withdraw", reinstate: "Reinstate" },
       reasonLabel: "Reason (required)",
       reasonPlaceholder: "Why is this change being made?",
       confirm: "Confirm",
@@ -7937,7 +7937,7 @@ export const en = {
       done: "Seller status updated.",
     },
     media: {
-      title: "Media moderation",
+      title: "Product review",
       subtitle: "Every product image is checked byte by byte on the server before it can be approved. Only approved images of published products are ever shown to customers.",
       tabs: { pending: "Pending", verified: "Approved", rejected: "Rejected" },
       ready: "Public image delivery",

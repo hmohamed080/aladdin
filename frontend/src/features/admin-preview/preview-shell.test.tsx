@@ -5,8 +5,7 @@ import { en } from "@/lib/i18n/messages/en";
 import { ar } from "@/lib/i18n/messages/ar";
 
 /**
- * Each Admin area states honestly what it is. Live data must not sit under the "planned experience" banner; areas that are
- * still fixtures or Preview dialogs keep it.
+ * Only Admin pages that still show demo data carry the Preview banner; real pages show none.
  */
 const pathname = { value: "/admin" };
 vi.mock("next/navigation", () => ({ usePathname: () => pathname.value, useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
@@ -32,41 +31,24 @@ function titleAt(path: string, locale: "en" | "ar" = "en"): string {
 afterEach(cleanup);
 
 describe("PreviewShell banners", () => {
-  it.each(["/admin", "/admin/review", "/admin/business-verification"])("%s is live, read-only data (not a mock-up)", (path) => {
-    expect(titleAt(path)).toBe(P.liveDataBannerTitle);
-  });
-
-  it("a Business verification DETAIL page (real, audited decisions) is Live, not a preview and not read-only", () => {
-    expect(titleAt("/admin/business-verification/abc")).toBe(P.liveBannerTitle);
-  });
-
-  it("keeps the existing live-read and live banners", () => {
-    expect(titleAt("/admin/users")).toBe(P.liveReadBannerTitle);
-    expect(titleAt("/admin/organizations/abc")).toBe(P.liveReadBannerTitle);
-    expect(titleAt("/admin/staff")).toBe(P.liveBannerTitle);
-  });
-
-  it("areas that are still fixtures or Preview dialogs keep the Preview banner", () => {
-    for (const path of ["/admin/analytics", "/admin/points", "/admin/settings", "/admin/review/network-referral/x"]) {
+  it("pages that still show demo data keep the Preview banner", () => {
+    for (const path of ["/admin/analytics", "/admin/points", "/admin/settings"]) {
       expect(titleAt(path)).toBe(P.bannerTitle);
+      expect(titleAt(path, "ar")).toBe(ar.admin.preview.bannerTitle);
     }
   });
 
-  it("the classic Verifications queue carries no banner at all", () => {
-    pathname.value = "/admin/verifications";
-    const { container } = render(
-      <I18nProvider locale="en" dir="ltr">
-        <PreviewShell paletteItems={[]}>
-          <p>content</p>
-        </PreviewShell>
-      </I18nProvider>,
-    );
-    expect(container.querySelector('[role="note"]')).toBeNull();
-  });
-
-  it("the new live-data banner is translated and says read-only in both languages", () => {
-    expect(titleAt("/admin", "ar")).toBe(ar.admin.preview.liveDataBannerTitle);
-    expect(en.admin.preview.liveDataBannerBody).toMatch(/read live/i);
-    expect(ar.admin.preview.liveDataBannerBody.length).toBeGreaterThan(10);
+  it.each([
+    "/admin",
+    "/admin/review",
+    "/admin/users",
+    "/admin/organizations/abc",
+    "/admin/staff",
+    "/admin/business-verification/abc",
+    "/admin/marketplace",
+    "/admin/marketplace/media",
+    "/admin/verifications",
+  ])("%s is real data and carries no banner", (path) => {
+    expect(titleAt(path)).toBe("");
   });
 });
