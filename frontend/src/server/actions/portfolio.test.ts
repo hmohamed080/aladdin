@@ -94,7 +94,7 @@ describe("startPortfolioUpload", () => {
       await startPortfolioUpload({ title: "x", description: null, contentType: "application/pdf", size: 10 }),
     ).toEqual({ ok: false, code: "assets.errors.unsupportedType" });
     expect(
-      await startPortfolioUpload({ title: "x", description: null, contentType: "image/png", size: 9_000_000 }),
+      await startPortfolioUpload({ title: "x", description: null, contentType: "image/png", size: 11 * 1024 * 1024 }),
     ).toEqual({ ok: false, code: "assets.errors.tooLarge" });
     expect(rpc).not.toHaveBeenCalled();
   });

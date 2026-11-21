@@ -23,20 +23,22 @@ export function QueuedImages({ files, onChange, disabled }: { files: File[]; onC
   useEffect(() => () => previews.forEach((p) => URL.revokeObjectURL(p.url)), [previews]);
 
   const add = (list: FileList | File[]) => {
-    setMessage(null);
     const next = [...files];
+    const problems: string[] = [];
     for (const file of Array.from(list)) {
       const problem = imageFileProblem(file);
+      // Per file: a refused file is listed and skipped, the others still join the queue.
       if (problem) {
-        setMessage(`${file.name}: ${t(errorKey(problem))}`);
+        problems.push(`${file.name}: ${t(errorKey(problem))}`);
         continue;
       }
       if (next.length >= MAX_IMAGES_PER_BATCH) {
-        setMessage(t("marketplaceSeller.image.queueFull", { count: MAX_IMAGES_PER_BATCH }));
+        problems.push(t("marketplaceSeller.image.queueFull", { count: MAX_IMAGES_PER_BATCH }));
         break;
       }
       if (!next.some((f) => f.name === file.name && f.size === file.size)) next.push(file);
     }
+    setMessage(problems.length > 0 ? problems.join(" · ") : null);
     onChange(next);
   };
 

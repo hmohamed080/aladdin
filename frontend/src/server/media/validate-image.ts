@@ -1,5 +1,6 @@
 import "server-only";
 
+import { IMAGE_MAX_BYTES } from "@/lib/media/upload-limits";
 import { verifyMediaBytes } from "@/server/storage/validation";
 
 export type ImageValidation =
@@ -8,7 +9,7 @@ export type ImageValidation =
 
 /** The largest image the Marketplace accepts, per side, and in bytes (Migration 06 bucket limit). */
 const MAX_SIDE = 12000;
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = IMAGE_MAX_BYTES;
 
 const MIME = { jpeg: "image/jpeg", png: "image/png", webp: "image/webp" } as const;
 

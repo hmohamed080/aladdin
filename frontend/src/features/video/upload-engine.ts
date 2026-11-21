@@ -48,8 +48,7 @@ export function rememberedUpload(file: File): string | null {
 }
 
 /**
- * Type, and size only against R2's own 5 TiB object limit: there is no product
- * cap on size or length. Reading the duration needs no check, so it is not read.
+ * Type and the site-wide 100 MB per-file cap. Length is not limited, so the duration is not read.
  */
 export function checkVideoFile(file: File): VideoContentType {
   if (!isVideoType(file.type)) throw new UploadFailure("type");

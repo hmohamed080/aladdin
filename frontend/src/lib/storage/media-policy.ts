@@ -22,3 +22,12 @@ export function isOrganizationMedia(namespace: MediaNamespace) {
   return namespace === "product" || namespace === "organization" || namespace === "request" || namespace === "verification"
     || namespace === "marketplace";
 }
+
+/**
+ * Namespaces whose images are kept as a RE-ENCODED original (sRGB, long edge at most 2560, personal
+ * metadata removed). Verification documents and certificates are evidence and stay byte-for-byte what
+ * the person uploaded.
+ */
+export function reencodesOriginal(namespace: MediaNamespace) {
+  return namespace !== "verification" && namespace !== "certificate";
+}

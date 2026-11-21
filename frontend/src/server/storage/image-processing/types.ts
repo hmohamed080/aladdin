@@ -32,4 +32,16 @@ export interface ImageProcessor {
   verify(bytes: Uint8Array, contentType: string): Promise<void>;
   /** thumb / card / full WebP of VERIFIED bytes: EXIF orientation applied, no metadata, never upscaled. */
   variants(verifiedBytes: Uint8Array): Promise<ImageVariant[]>;
+  /**
+   * The stored ORIGINAL: the verified upload re-encoded in its own format (long edge at most
+   * ORIGINAL_MAX_EDGE, never upscaled, quality ORIGINAL_QUALITY, orientation baked in, converted to
+   * sRGB with the profile attached, full chroma), carrying no personal metadata. Stepped down in
+   * quality only when the result would exceed `maxBytes`; throws when even that does not fit.
+   */
+  reencodeOriginal(verifiedBytes: Uint8Array, contentType: string, maxBytes: number): Promise<ReencodedOriginal>;
 }
+
+export type ReencodedOriginal = { bytes: Uint8Array; contentType: "image/jpeg" | "image/png" | "image/webp"; width: number; height: number };
+
+/** Quality steps for the re-encoded original: the target first, then lower only to fit the byte ceiling. */
+export const ORIGINAL_QUALITY_STEPS = [90, 85, 80, 75] as const;

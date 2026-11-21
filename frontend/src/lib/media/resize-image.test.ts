@@ -47,6 +47,11 @@ function fakeCanvas(): FakeCanvas {
 }
 
 const MiB = 1024 * 1024;
+/** The fitting engine (still used for certificates) exercised with the pre-2026-11-19 profiles. */
+const FITTING = {
+  portfolio: { ...UPLOAD_RESIZE_PROFILES.portfolio, keepOriginal: false, keepBelowBytes: MiB, maxBytes: 5 * MiB },
+  product: { ...UPLOAD_RESIZE_PROFILES.product, keepOriginal: false, keepBelowBytes: MiB, maxBytes: 5 * MiB },
+};
 const file = (size: number, type = "image/jpeg", name = "IMG_0001.JPG") =>
   new File([new Uint8Array(size)], name, { type, lastModified: 42 });
 
@@ -96,7 +101,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("resizeImageForUpload", () => {
   it("caps the long edge at 2560 px, applies EXIF orientation and re-encodes to WebP", async () => {
-    const out = prepared(await resizeImageForUpload(file(4_000_000), UPLOAD_RESIZE_PROFILES.portfolio));
+    const out = prepared(await resizeImageForUpload(file(4_000_000), FITTING.portfolio));
     // eslint-disable-next-line no-restricted-syntax -- a createImageBitmap option, not a Tailwind class
     expect(createImageBitmap).toHaveBeenCalledWith(expect.any(File), { imageOrientation: "from-image" });
     expect(lastCanvas()).toEqual([2560, 1920]);
@@ -109,7 +114,7 @@ describe("resizeImageForUpload", () => {
 
   it("downsamples in halving steps for large reductions", async () => {
     bitmap = { width: 8000, height: 6000, close: vi.fn() };
-    await resizeImageForUpload(file(4_900_000), UPLOAD_RESIZE_PROFILES.portfolio);
+    await resizeImageForUpload(file(4_900_000), FITTING.portfolio);
     expect(canvases.map((c) => c.draws[0])).toEqual([[4000, 3000], [2560, 1920]]);
   });
 
@@ -117,7 +122,7 @@ describe("resizeImageForUpload", () => {
     const qualities: number[] = [];
     // An encoder whose output grows with pixels and quality: 2560 x 1920 at 0.85 is ~6.3 MB.
     encoder = (type, q, c) => { qualities.push(q); return { type, size: Math.round(c.width * c.height * q * 1.5) }; };
-    const out = prepared(await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB), UPLOAD_RESIZE_PROFILES.portfolio));
+    const out = prepared(await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB), FITTING.portfolio));
     expect(out.size).toBeLessThanOrEqual(5 * MiB);
     expect(out.type).toBe("image/webp");
     expect(qualities).toEqual([0.85, 0.75, 0.65]);
@@ -125,7 +130,7 @@ describe("resizeImageForUpload", () => {
   });
 
   it("decodes a 120 MP source at reduced size, upright, with high-quality resize options", async () => {
-    const out = prepared(await resizeImageForUpload(jpeg(12_000, 10_000, 45 * MiB), UPLOAD_RESIZE_PROFILES.portfolio));
+    const out = prepared(await resizeImageForUpload(jpeg(12_000, 10_000, 45 * MiB), FITTING.portfolio));
     expect(createImageBitmap).toHaveBeenCalledTimes(1);
     // eslint-disable-next-line no-restricted-syntax -- a createImageBitmap option, not a Tailwind class
     expect(createImageBitmap).toHaveBeenCalledWith(expect.any(File), { imageOrientation: "from-image", resizeWidth: 2560, resizeHeight: 2133, resizeQuality: "high" });
@@ -139,7 +144,7 @@ describe("resizeImageForUpload", () => {
     // This engine applies the box to the stored image and rotates afterwards.
     createImageBitmap.mockImplementation(async (_f, options) =>
       ({ width: options!.resizeHeight!, height: options!.resizeWidth!, close: bitmap.close }));
-    await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB, 6), UPLOAD_RESIZE_PROFILES.portfolio);
+    await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB, 6), FITTING.portfolio);
     expect(createImageBitmap).toHaveBeenCalledTimes(2);
     expect(createImageBitmap.mock.calls[0]![1]).toMatchObject({ resizeWidth: 1920, resizeHeight: 2560 });
     expect(createImageBitmap.mock.calls[1]![1]).toMatchObject({ resizeWidth: 2560, resizeHeight: 1920 });
@@ -149,7 +154,7 @@ describe("resizeImageForUpload", () => {
   it("falls back to a full decode when the browser rejects resize options", async () => {
     createImageBitmap.mockImplementationOnce(async () => { throw new TypeError("unsupported option"); });
     bitmap = { width: 12_000, height: 10_000, close: vi.fn() };
-    const out = prepared(await resizeImageForUpload(jpeg(12_000, 10_000, 45 * MiB), UPLOAD_RESIZE_PROFILES.portfolio));
+    const out = prepared(await resizeImageForUpload(jpeg(12_000, 10_000, 45 * MiB), FITTING.portfolio));
     // eslint-disable-next-line no-restricted-syntax -- a createImageBitmap option, not a Tailwind class
     expect(createImageBitmap).toHaveBeenLastCalledWith(expect.any(File), { imageOrientation: "from-image" });
     expect(lastCanvas()).toEqual([2560, 2133]);
@@ -158,14 +163,14 @@ describe("resizeImageForUpload", () => {
 
   it("steps the long edge down by 0.8 when quality alone cannot fit", async () => {
     encoder = (type, _q, c) => ({ type, size: Math.round(c.width * c.height * 1.5) });
-    const out = prepared(await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB), UPLOAD_RESIZE_PROFILES.portfolio));
+    const out = prepared(await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB), FITTING.portfolio));
     expect(lastCanvas()).toEqual([2048, 1536]);
     expect(out.size).toBeLessThanOrEqual(5 * MiB);
   });
 
   it("returns a typed failure when the image cannot be fitted, never an oversized file", async () => {
     encoder = (type) => ({ type, size: 6 * MiB });
-    const result = await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB), UPLOAD_RESIZE_PROFILES.portfolio);
+    const result = await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB), FITTING.portfolio);
     expect(result).toEqual({ ok: false, reason: "fit" });
     expect(Math.max(...lastCanvas())).toBe(1280);
     expect(bitmap.close).toHaveBeenCalled();
@@ -173,68 +178,68 @@ describe("resizeImageForUpload", () => {
 
   it("returns a typed failure when the canvas cannot be encoded (a canvas-area limit)", async () => {
     encoder = () => null;
-    expect(await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB), UPLOAD_RESIZE_PROFILES.portfolio)).toEqual({ ok: false, reason: "canvas" });
+    expect(await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB), FITTING.portfolio)).toEqual({ ok: false, reason: "canvas" });
   });
 
   it("returns a typed failure when a large source cannot be decoded", async () => {
     createImageBitmap.mockRejectedValue(new Error("decode failed"));
-    expect(await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB), UPLOAD_RESIZE_PROFILES.portfolio)).toEqual({ ok: false, reason: "decode" });
+    expect(await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB), FITTING.portfolio)).toEqual({ ok: false, reason: "decode" });
   });
 
   it("returns a typed failure when the browser cannot prepare a file that needs it", async () => {
     vi.stubGlobal("createImageBitmap", undefined);
-    expect(await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB), UPLOAD_RESIZE_PROFILES.product)).toEqual({ ok: false, reason: "unsupported" });
+    expect(await resizeImageForUpload(jpeg(8000, 6000, 20 * MiB), FITTING.product)).toEqual({ ok: false, reason: "unsupported" });
     const small = jpeg(1200, 900, 2 * MiB);
-    expect(prepared(await resizeImageForUpload(small, UPLOAD_RESIZE_PROFILES.product))).toBe(small);
+    expect(prepared(await resizeImageForUpload(small, FITTING.product))).toBe(small);
   });
 
   it("leaves a small file within the edge untouched, without decoding it", async () => {
     const small = jpeg(1600, 1200, 400_000);
-    expect(prepared(await resizeImageForUpload(small, UPLOAD_RESIZE_PROFILES.portfolio))).toBe(small);
+    expect(prepared(await resizeImageForUpload(small, FITTING.portfolio))).toBe(small);
     expect(createImageBitmap).not.toHaveBeenCalled();
     expect(canvases).toHaveLength(0);
   });
 
   it("never upscales, and keeps an in-bounds original unless re-encoding makes it smaller", async () => {
     bitmap = { width: 1200, height: 900, close: vi.fn() };
-    const heavy = prepared(await resizeImageForUpload(file(2_000_000, "image/png", "scan.png"), UPLOAD_RESIZE_PROFILES.portfolio));
+    const heavy = prepared(await resizeImageForUpload(file(2_000_000, "image/png", "scan.png"), FITTING.portfolio));
     expect(lastCanvas()).toEqual([1200, 900]);
     expect(heavy.type).toBe("image/webp");
     encoder = (type) => ({ type, size: 3_000_000 });
     const original = file(2_000_000);
-    expect(prepared(await resizeImageForUpload(original, UPLOAD_RESIZE_PROFILES.portfolio))).toBe(original);
+    expect(prepared(await resizeImageForUpload(original, FITTING.portfolio))).toBe(original);
   });
 
   it("keeps transparency: WebP when available, else PNG for a source that really has alpha", async () => {
-    const webp = prepared(await resizeImageForUpload(png(4000, 3000, 9 * MiB), UPLOAD_RESIZE_PROFILES.product));
+    const webp = prepared(await resizeImageForUpload(png(4000, 3000, 9 * MiB), FITTING.product));
     expect(webp.type).toBe("image/webp");
     expect(webp.name).toBe("logo.webp");
     encoder = (type) => ({ type: type === "image/webp" ? "image/png" : type, size: 500_000 });
     pixelAlpha = 128;
-    expect(prepared(await resizeImageForUpload(png(4000, 3000, 9 * MiB), UPLOAD_RESIZE_PROFILES.product)).type).toBe("image/png");
+    expect(prepared(await resizeImageForUpload(png(4000, 3000, 9 * MiB), FITTING.product)).type).toBe("image/png");
     pixelAlpha = null; // pixels unreadable: never flatten on a guess
-    expect(prepared(await resizeImageForUpload(png(4000, 3000, 9 * MiB), UPLOAD_RESIZE_PROFILES.product)).type).toBe("image/png");
+    expect(prepared(await resizeImageForUpload(png(4000, 3000, 9 * MiB), FITTING.product)).type).toBe("image/png");
   });
 
   it("writes an opaque PNG as JPEG when WebP is unavailable, and JPEG sources as JPEG", async () => {
     encoder = (type) => ({ type: type === "image/webp" ? "image/png" : type, size: 500_000 });
     pixelAlpha = 255;
-    expect(prepared(await resizeImageForUpload(png(4000, 3000, 9 * MiB), UPLOAD_RESIZE_PROFILES.product)).type).toBe("image/jpeg");
-    expect(prepared(await resizeImageForUpload(file(4_000_000), UPLOAD_RESIZE_PROFILES.product)).type).toBe("image/jpeg");
+    expect(prepared(await resizeImageForUpload(png(4000, 3000, 9 * MiB), FITTING.product)).type).toBe("image/jpeg");
+    expect(prepared(await resizeImageForUpload(file(4_000_000), FITTING.product)).type).toBe("image/jpeg");
   });
 
   it("leaves PDFs and unsupported types to the caller's type rules", async () => {
     const pdf = file(40 * MiB, "application/pdf", "cert.pdf");
     expect(prepared(await resizeImageForUpload(pdf, UPLOAD_RESIZE_PROFILES.certificate))).toBe(pdf);
     const gif = file(2_000_000, "image/gif", "a.gif");
-    expect(prepared(await resizeImageForUpload(gif, UPLOAD_RESIZE_PROFILES.portfolio))).toBe(gif);
+    expect(prepared(await resizeImageForUpload(gif, FITTING.portfolio))).toBe(gif);
     expect(createImageBitmap).not.toHaveBeenCalled();
   });
 
   it("uploads an in-bounds original the browser cannot decode; the server judges it", async () => {
     createImageBitmap.mockRejectedValueOnce(new Error("decode failed"));
     const broken = file(4_000_000);
-    expect(prepared(await resizeImageForUpload(broken, UPLOAD_RESIZE_PROFILES.portfolio))).toBe(broken);
+    expect(prepared(await resizeImageForUpload(broken, FITTING.portfolio))).toBe(broken);
   });
 
   it("keeps certificates legible: a higher cap and quality, and a 10 MiB ceiling", async () => {
@@ -248,13 +253,37 @@ describe("resizeImageForUpload", () => {
   });
 
   it("has a byte ceiling per namespace that mirrors the server caps, and stays inside the server decode limit", () => {
-    expect(UPLOAD_RESIZE_PROFILES.portfolio.maxBytes).toBe(5 * MiB);
-    expect(UPLOAD_RESIZE_PROFILES.product.maxBytes).toBe(5 * MiB);
-    expect(UPLOAD_RESIZE_PROFILES.request.maxBytes).toBe(5 * MiB);
+    expect(UPLOAD_RESIZE_PROFILES.portfolio.maxBytes).toBe(10 * MiB);
+    expect(UPLOAD_RESIZE_PROFILES.product.maxBytes).toBe(10 * MiB);
+    expect(UPLOAD_RESIZE_PROFILES.request.maxBytes).toBe(10 * MiB);
     expect(UPLOAD_RESIZE_PROFILES.certificate.maxBytes).toBe(10 * MiB);
     for (const profile of Object.values(UPLOAD_RESIZE_PROFILES)) {
       expect(profile.maxEdge * profile.maxEdge).toBeLessThan(SERVER_DECODE_MAX_PIXELS);
     }
+  });
+  describe("site-content photos (keepOriginal: the 10 MB per-file rule)", () => {
+    it("refuses a picked photo over 10 MB and nothing else, without decoding it", async () => {
+      for (const profile of [UPLOAD_RESIZE_PROFILES.portfolio, UPLOAD_RESIZE_PROFILES.product, UPLOAD_RESIZE_PROFILES.request]) {
+        expect(await resizeImageForUpload(file(10 * MiB + 1), profile)).toEqual({ ok: false, reason: "too_large" });
+      }
+      expect(createImageBitmap).not.toHaveBeenCalled();
+    });
+
+    it("uploads a 6 to 10 MB photo exactly as picked (the old 5 MB limit is gone), whatever its edge", async () => {
+      const big = jpeg(6000, 4000, 9 * MiB);
+      expect(prepared(await resizeImageForUpload(big, UPLOAD_RESIZE_PROFILES.product))).toBe(big);
+      const atCap = jpeg(4000, 3000, 10 * MiB);
+      expect(prepared(await resizeImageForUpload(atCap, UPLOAD_RESIZE_PROFILES.portfolio))).toBe(atCap);
+      expect(createImageBitmap).not.toHaveBeenCalled(); // no browser re-encode: colours and profile stay as shot
+      expect(canvases).toHaveLength(0);
+    });
+
+    it("still fits a photo over the 25 MP server decode bound, so it can be verified at all", async () => {
+      const out = prepared(await resizeImageForUpload(jpeg(8000, 6000, 9 * MiB), UPLOAD_RESIZE_PROFILES.product));
+      expect(out).not.toBe(undefined);
+      expect(Math.max(...lastCanvas())).toBeLessThanOrEqual(2560);
+      expect(out.size).toBeLessThanOrEqual(10 * MiB);
+    });
   });
 });
 

@@ -651,7 +651,20 @@ export async function main(argv = process.argv.slice(2)) {
   } finally { journal?.close(); }
 }
 
+/**
+ * Marketplace policy: rejected images leave storage two days after the rejection. The database moves
+ * the expired ones into the removal lifecycle (so the candidate query below returns them) and
+ * forgets the rows whose objects a previous run confirmed gone. Idempotent; a failure is reported
+ * and never stops the rest of the cleanup.
+ */
+export async function purgeRejectedImages(supabase) {
+  const { data, error } = await supabase.rpc("marketplace_rejected_images_purge");
+  if (error) return { rejectedPurge: "unavailable" };
+  return { rejectedExpired: data?.expired ?? 0, rejectedForgotten: data?.forgotten ?? 0 };
+}
+
 async function cleanup(supabase, env, project, options) {
+  const purged = options.execute ? await purgeRejectedImages(supabase) : {};
   const { data: rows, error } = await supabase.rpc("media_cleanup_candidates", { p_limit: options.limit });
   if (error) throw new OperatorError("Cleanup query failed; confirm the provider migration is installed in the selected environment");
   if (!options.execute) {
@@ -659,7 +672,8 @@ async function cleanup(supabase, env, project, options) {
     return;
   }
   const result = await runCleanup(supabase, r2Io(env), rows);
-  console.log(JSON.stringify({ project, ...result }));
+  const forgotten = await purgeRejectedImages(supabase);
+  console.log(JSON.stringify({ project, ...result, ...purged, rejectedForgotten: forgotten.rejectedForgotten ?? 0 }));
   if (result.failed) process.exitCode = 1;
 }
 

@@ -1,3 +1,6 @@
+## Site-wide media policy (draft PR, not deployed) - 2026-11-21
+- Branch `feat/mkt-media-policy-20261121` (ADR-0030, Proposed): 10 MB image / 100 MB video per-file caps, re-encoded originals without personal metadata, video original deleted only after verification, rejected Marketplace images purged after 2 days. Migration `20261121090001` is NOT applied to Acceptance or Production (local isolated stack only). Nothing deployed.
+
 ## Redis moved from preview to production only (draft PR, not deployed) - 2026-11-15
 - Owner decision: preview `REDIS_CACHE_ENABLED=false`; only production uses Redis (whole 500,000 commands a month). The live preview keeps its current Redis settings until a version with this config is deployed. Preview acceptance runs then exercise the in-memory / Postgres fallback, not Redis.
 

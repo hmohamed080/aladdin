@@ -8,7 +8,8 @@ import { UploadIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/ui/cn";
 import { finishPendingImageRemovalsAction, removeImageAction, updateImagesAction } from "@/server/actions/marketplace-seller";
 import { errorKey } from "./errors";
-import { ACCEPTED_IMAGE_TYPES, uploadProductImages } from "./image-upload";
+import { UPLOAD_VIDEO_TYPES } from "@/lib/media/upload-limits";
+import { ACCEPTED_IMAGE_TYPES, uploadMediaBatch } from "./image-upload";
 import type { SellerProductImage } from "@/server/queries/marketplace-seller-catalog";
 
 type Arranged = SellerProductImage;
@@ -52,9 +53,9 @@ export function ImagesPanel({
 
   const upload = async (files: FileList | File[]) => {
     setMessage(null);
-    const failures = await uploadProductImages(productId, Array.from(files), setBusy);
-    const first = failures[0];
-    if (first) setMessage({ tone: "error", text: `${first.name}: ${t(errorKey(first.code))}` });
+    const failures = await uploadMediaBatch(productId, Array.from(files), setBusy);
+    // Every refused file is listed: one oversize file never hides the others, and never stops them.
+    if (failures.length > 0) setMessage({ tone: "error", text: failures.map((f) => `${f.name}: ${t(errorKey(f.code))}`).join(" · ") });
     setDirty(false);
     router.refresh();
   };
@@ -143,7 +144,7 @@ export function ImagesPanel({
         <input
           ref={inputRef}
           type="file"
-          accept={ACCEPTED_IMAGE_TYPES.join(",")}
+          accept={[...ACCEPTED_IMAGE_TYPES, ...UPLOAD_VIDEO_TYPES].join(",")}
           multiple
           className="sr-only"
           onChange={(e) => {

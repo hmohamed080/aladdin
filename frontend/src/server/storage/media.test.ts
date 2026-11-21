@@ -51,7 +51,7 @@ describe("mixed-provider authorization and finalization", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(bytes))));
     await verifyPendingMedia(client, "product", "key.png");
     expect(rpc).not.toHaveBeenCalledWith("organization_media_resolve", expect.objectContaining({ p_operation: "read" }));
-    expect(adminRpc).toHaveBeenCalledWith("media_storage_attest", expect.objectContaining({ p_namespace: "product", p_size: bytes.length }));
+    expect(adminRpc).toHaveBeenCalledWith("media_storage_attest", expect.objectContaining({ p_namespace: "product", p_size: expect.any(Number) }));
   });
   it("refuses missing bytes without writing a verification receipt", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
@@ -63,8 +63,37 @@ describe("mixed-provider authorization and finalization", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(bytes))));
     await verifyPendingMedia(client, "portfolio", "key.png");
     expect(adminRpc).toHaveBeenCalledWith("media_storage_attest", expect.objectContaining({
-      p_owner: OWNER, p_size: bytes.length, p_content_type: "image/png", p_sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      p_owner: OWNER, p_size: expect.any(Number), p_content_type: "image/png", p_sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
     }));
+    expect(bytes.length).toBeGreaterThan(0);
+  });
+  it("stores a re-encoded original without personal metadata and attests THOSE bytes", async () => {
+    rpc.mockResolvedValue({ data: { ...pending, provider: "r2", contentType: "image/jpeg" }, error: null });
+    const uploaded = await sharp({ create: { width: 3000, height: 1500, channels: 3, background: "white" } })
+      .withExif({ IFD0: { Make: "PrivatePhone" }, IFD3: { GPSLatitudeRef: "N", GPSLatitude: "30/1 2/1 3/1" } }).jpeg().toBuffer();
+    expect((await sharp(uploaded).metadata()).exif).toBeDefined();
+    r2.readObject.mockResolvedValue(new Uint8Array(uploaded));
+    await verifyPendingMedia(client, "portfolio", "key.jpg");
+    const stored = r2.commitVerifiedObject.mock.calls[0]![1] as Uint8Array;
+    const meta = await sharp(stored).metadata();
+    expect(meta.exif).toBeUndefined();
+    expect(Buffer.from(stored).toString("latin1")).not.toContain("PrivatePhone");
+    expect(Math.max(meta.width!, meta.height!)).toBe(2560);
+    // the receipt describes the stored bytes, not the upload
+    const { createHash } = await import("node:crypto");
+    expect(adminRpc).toHaveBeenCalledWith("media_storage_attest", expect.objectContaining({
+      p_size: stored.byteLength, p_sha256: createHash("sha256").update(stored).digest("hex"),
+    }));
+    // variants derive from the stored original
+    expect(r2.putVariant).toHaveBeenCalledTimes(3);
+  });
+  it("keeps verification documents exactly as uploaded", async () => {
+    rpc.mockResolvedValue({ data: { ...pending, provider: "r2", contentType: "image/jpeg" }, error: null });
+    const uploaded = await sharp({ create: { width: 64, height: 64, channels: 3, background: "white" } })
+      .withExif({ IFD0: { Make: "PrivatePhone" } }).jpeg().toBuffer();
+    r2.readObject.mockResolvedValue(new Uint8Array(uploaded));
+    await verifyPendingMedia(client, "verification", "key.jpg");
+    expect(Buffer.from(r2.commitVerifiedObject.mock.calls[0]![1] as Uint8Array).equals(uploaded)).toBe(true);
   });
   it("blocks wrong-type bytes and authorization refusal before privileged writes", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("<script>bad</script>")));

@@ -16,8 +16,12 @@ most three attempts) the worker:
      poster frame, uploading each finished segment to ``video/<id>/<revision>/``
      (a fresh revision) and deleting it locally while ffmpeg runs, so outputs
      never pile up on disk; playlists go last, and
-  5. calls ``video_job_finish``. A video deleted meanwhile stays deleted; the
-     purge removes what was written.
+  5. VERIFIES what was published (every object present at its size, the master
+     and rendition playlists, a poster, and a real decode of a rendition's first
+     segment with the video codec and, when the source had sound, the audio codec),
+  6. calls ``video_job_finish``, and only then deletes the original from R2. A
+     video deleted meanwhile stays deleted; the purge removes what was written.
+     When the poster is missing the video still plays, but the original is KEPT.
 
 The purge (``--purge``) removes deleted and expired videos: it aborts any
 unfinished multipart upload, deletes every object under ``video/<id>/`` and
@@ -61,8 +65,8 @@ import structlog
 
 log = structlog.get_logger(__name__)
 
-# No product limit on length or size (ADR-0020 Revision 2). What remains is
-# technical: ffmpeg's time budget grows with the video and the lease is renewed
+# Upload size is capped at 100 MB per file (ADR-0030, enforced before an upload starts), but
+# length is not limited: ffmpeg's time budget grows with the video and the lease is renewed
 # while it runs. Disk no longer bounds the size: segments leave the disk as they
 # are written, and an original the disk cannot hold is read from R2 over HTTPS.
 LEASE_SECONDS = 900
@@ -82,6 +86,11 @@ UPLOAD_EVERY_SECONDS = 2.0
 URL_SLACK_SECONDS = 300
 URL_MAX_SECONDS = 7 * 24 * 3600
 SEGMENT_SECONDS = 4
+# Quality: constant-quality H.264 (CRF 22) bounded by each rendition's max rate, and at most 30 fps.
+H264_CRF = "22"
+MAX_FPS = 30
+# What the published output must decode as ("vp9" exists only for local tests).
+EXPECTED_CODECS = {"h264": ("h264", "aac"), "vp9": ("vp9", "opus")}
 
 # Closed set, mirrored by the media Worker's file pattern (edge/media-worker/src/video.ts).
 RENDITIONS: tuple[tuple[str, int, str, str], ...] = (
@@ -146,6 +155,7 @@ class VideoStore(Protocol):
     def presign_get(self, key: str, seconds: int) -> str: ...
     def upload(self, source: Path, key: str, content_type: str) -> None: ...
     def delete_prefix(self, prefix: str) -> int: ...
+    def delete_object(self, key: str) -> None: ...
     def abort_multipart(self, key: str, upload_id: str) -> None: ...
 
 
@@ -240,6 +250,12 @@ class S3VideoStore:
                 deleted += len(keys)
         return deleted
 
+    def delete_object(self, key: str) -> None:
+        # Only a video's own original: nothing else is ever deleted one key at a time.
+        if not re.match(r"^video/[0-9a-f-]{36}/original$", key):
+            raise ValueError("refusing to delete anything but a video's original")
+        self._client.delete_object(Bucket=self._bucket, Key=key)
+
     def abort_multipart(self, key: str, upload_id: str) -> None:
         try:
             self._client.abort_multipart_upload(Bucket=self._bucket, Key=key, UploadId=upload_id)
@@ -253,6 +269,7 @@ class Probe:
     width: int
     height: int
     has_audio: bool
+    fps: float = 0.0
 
 
 Runner = Callable[[Sequence[str], int], subprocess.CompletedProcess[bytes]]
@@ -395,7 +412,21 @@ def probe(source: Source, content_type: str, runner: Runner = run) -> Probe:
         width=width,
         height=height,
         has_audio=any(s.get("codec_type") == "audio" for s in streams),
+        fps=_frame_rate(video),
     )
+
+
+def _frame_rate(stream: dict[str, Any]) -> float:
+    """The stream's average frame rate ("30000/1001"), 0 when ffprobe gives none."""
+    for field in ("avg_frame_rate", "r_frame_rate"):
+        numerator, _, denominator = str(stream.get(field) or "").partition("/")
+        try:
+            rate = float(numerator) / float(denominator or 1)
+        except (ValueError, ZeroDivisionError):
+            continue
+        if rate > 0:
+            return round(rate, 3)
+    return 0.0
 
 
 def _rotation(stream: dict[str, Any]) -> int:
@@ -440,8 +471,10 @@ def transcode_command(
         raise ValueError("unknown codec")
     n = len(renditions)
     labels = "".join(f"[v{i}]" for i in range(n))
+    # Never above 30 fps; a slower source keeps its own rate (the fps filter would duplicate frames).
+    limit = f",fps={MAX_FPS}" if info.fps > MAX_FPS + 0.5 else ""
     graph = [f"[0:v:0]split={n}{labels}"] + [
-        f"[v{i}]{_scale(r, info)},setsar=1[o{i}]" for i, r in enumerate(renditions)
+        f"[v{i}]{_scale(r, info)}{limit},setsar=1[o{i}]" for i, r in enumerate(renditions)
     ]
     args = [
         "ffmpeg",
@@ -461,8 +494,9 @@ def transcode_command(
             f"[o{i}]",
             f"-c:v:{i}",
             "libx264" if codec == "h264" else "libvpx-vp9",
-            f"-b:v:{i}",
-            rate,
+            # H.264: constant quality (CRF 22) under the rendition's max rate, so a weak
+            # connection can follow the ladder. The test codec keeps a bitrate target.
+            *([f"-crf:v:{i}", H264_CRF] if codec == "h264" else [f"-b:v:{i}", rate]),
             f"-maxrate:v:{i}",
             maxrate,
             f"-bufsize:v:{i}",
@@ -578,6 +612,7 @@ class SegmentUploader:
     def __init__(self, store: VideoStore, out: Path, prefix: str, names: list[str]) -> None:
         self._store, self._out, self._prefix, self._names = store, out, prefix, names
         self.uploaded: set[str] = set()
+        self.sizes: dict[str, int] = {}
 
     def flush(self, final: bool = False) -> None:
         for name in self._names:
@@ -586,6 +621,7 @@ class SegmentUploader:
                 relative = f"{name}/{segment.name}"
                 if not OUTPUT_FILE.match(relative):
                     raise RuntimeError("unexpected output file")
+                self.sizes[relative] = segment.stat().st_size
                 self._store.upload(segment, self._prefix + relative, CONTENT_TYPES[".m4s"])
                 segment.unlink()
                 self.uploaded.add(relative)
@@ -598,6 +634,93 @@ class SegmentUploader:
             missing = [u for u in uris if f"{name}/{u}" not in self.uploaded]
             if not uris or missing:
                 raise RuntimeError(f"playlist {name} names segments that were not uploaded")
+
+
+class OriginalKept(Exception):
+    """The output plays but is not complete enough to let the original go (no poster)."""
+
+
+def verify_published(
+    store: VideoStore,
+    prefix: str,
+    names: list[str],
+    published: dict[str, int],
+    info: Probe,
+    has_poster: bool,
+    codec: str,
+    runner: Runner,
+    workdir: Path,
+) -> None:
+    """Proves the published HLS is complete and plays, BEFORE the original may be deleted.
+
+    Raises RuntimeError when anything is missing or does not decode (the job is retried with
+    the original intact) and OriginalKept when only the poster is missing. Checks:
+      * the master playlist and every rendition's playlist, init segment and media segment exist
+        in R2 at exactly the size that was uploaded;
+      * the first rendition's init + first segment decode cleanly (ffmpeg, no errors) and carry
+        the expected video codec and, when the source had sound, the expected audio codec.
+    """
+    wanted = {"master.m3u8"} | {f"{n}/index.m3u8" for n in names} | {f"{n}/init.mp4" for n in names}
+    for name in names:
+        wanted |= {k for k in published if k.startswith(f"{name}/seg_")}
+        if not any(k.startswith(f"{name}/seg_") for k in published):
+            raise RuntimeError(f"rendition {name} has no segments")
+    for key in sorted(wanted):
+        if published.get(key) is None or store.size(prefix + key) != published[key]:
+            raise RuntimeError(f"published object {key} is missing or truncated")
+
+    video_codec, audio_codec = EXPECTED_CODECS[codec]
+    first = names[0]
+    sample = workdir / "verify.mp4"
+    init, segment = workdir / "verify-init.mp4", workdir / "verify-seg.m4s"
+    store.download(prefix + f"{first}/init.mp4", init)
+    store.download(prefix + f"{first}/seg_00000.m4s", segment)
+    sample.write_bytes(init.read_bytes() + segment.read_bytes())
+    probed = runner(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-protocol_whitelist",
+            "file",
+            "-print_format",
+            "json",
+            "-show_streams",
+            f"file:{sample}",
+        ],
+        PROBE_TIMEOUT_SECONDS,
+    )
+    if probed.returncode != 0:
+        raise RuntimeError("the published output could not be probed")
+    streams = json.loads(probed.stdout).get("streams") or []
+    kinds = {str(s.get("codec_type")): str(s.get("codec_name")) for s in streams}
+    if kinds.get("video") != video_codec:
+        raise RuntimeError("the published video stream is not " + video_codec)
+    if info.has_audio and kinds.get("audio") != audio_codec:
+        raise RuntimeError("the published output lost the audio track")
+    decoded = runner(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-hide_banner",
+            "-v",
+            "error",
+            "-protocol_whitelist",
+            "file",
+            "-i",
+            f"file:{sample}",
+            "-f",
+            "null",
+            "-",
+        ],
+        PROBE_TIMEOUT_SECONDS,
+    )
+    if decoded.returncode != 0 or decoded.stderr.strip():
+        raise RuntimeError("the published output does not decode cleanly")
+    if not has_poster or published.get("poster.jpg") is None:
+        raise OriginalKept("no poster")
+    if store.size(prefix + "poster.jpg") != published["poster.jpg"]:
+        raise RuntimeError("the published poster is truncated")
 
 
 def read_locally(size: int, free: int) -> bool:
@@ -723,10 +846,20 @@ def process_one(
             if not has_poster:
                 (out / "poster.jpg").unlink(missing_ok=True)
             files = output_files(out)
+            published = dict(segments.sizes)
             # Playlists last: nothing references a segment that is not stored yet.
             for name in sorted(files, key=lambda f: f.endswith(".m3u8")):
                 suffix = name[name.rfind(".") :]
+                published[name] = (out / name).stat().st_size
                 store.upload(out / name, prefix + name, CONTENT_TYPES[suffix])
+            # The original is deleted only after this passes; a failure retries with it intact.
+            keep_original: str | None = None
+            try:
+                verify_published(
+                    store, prefix, names, published, info, has_poster, codec, runner, root
+                )
+            except OriginalKept as kept:
+                keep_original = str(kept)
             jobs.rpc(
                 "video_job_finish",
                 {
@@ -739,6 +872,18 @@ def process_one(
                     "p_has_poster": has_poster,
                 },
             )
+            if keep_original is None:
+                try:
+                    store.delete_object(key)
+                    log.info("video.original_deleted", video=_ref(video_id))
+                except Exception as error:  # noqa: BLE001 - the video is ready; the purge removes it later
+                    log.warning(
+                        "video.original_delete_failed",
+                        video=_ref(video_id),
+                        error=type(error).__name__,
+                    )
+            else:
+                log.warning("video.original_kept", video=_ref(video_id), reason=keep_original)
             log.info(
                 "video.ready",
                 video=_ref(video_id),

@@ -35,7 +35,7 @@ export const beginSchema = z.object({
   projectId: UUID.optional(),
   title: z.string().trim().min(1).max(VIDEO_TITLE_MAX),
   contentType: z.enum(VIDEO_TYPES),
-  // No product cap: only R2's own object limit.
+  // Site-wide per-file cap (100 MB).
   bytes: z.number().int().positive().max(VIDEO_STORAGE_MAX_BYTES),
 }).refine((v) => (v.scope === "product") === (v.productId !== undefined), { message: "productId belongs to product scope" })
   .refine((v) => v.projectId === undefined || v.scope === "portfolio", { message: "projectId belongs to portfolio scope" });

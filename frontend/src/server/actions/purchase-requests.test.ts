@@ -122,7 +122,7 @@ describe("reference image actions", () => {
     expect(media.authorize).toHaveBeenCalledWith(expect.anything(), "request", KEY, 93);
     expect((await requestRequestImageUploadAction(ITEM, "image/gif")).ok).toBe(false);
     expect((await requestRequestImageUploadAction("nope", "image/png")).ok).toBe(false);
-    expect((await requestRequestImageUploadAction(ITEM, "image/png", 6 * 1024 * 1024)).ok).toBe(false);
+    expect((await requestRequestImageUploadAction(ITEM, "image/png", 11 * 1024 * 1024)).ok).toBe(false);
     expect(state.rpc).toHaveBeenCalledTimes(1);
   });
 

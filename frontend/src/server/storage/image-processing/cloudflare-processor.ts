@@ -1,9 +1,11 @@
 import { MEDIA_VARIANTS, MEDIA_VARIANT_WIDTH, type MediaVariant } from "@/lib/media/image-variants";
+import { ORIGINAL_MAX_EDGE } from "@/lib/media/upload-limits";
 import { checkImageContainer } from "./container-check";
+import { stripPersonalMetadata } from "./metadata-strip";
 import { countImages } from "./metrics";
 import {
-  IMAGE_PIXEL_LIMIT, VARIANT_MAX_BYTES, VARIANT_QUALITY_STEPS, VERIFIABLE_IMAGE_TYPES,
-  type ImageProcessor, type ImageVariant,
+  IMAGE_PIXEL_LIMIT, ORIGINAL_QUALITY_STEPS, VARIANT_MAX_BYTES, VARIANT_QUALITY_STEPS, VERIFIABLE_IMAGE_TYPES,
+  type ImageProcessor, type ImageVariant, type ReencodedOriginal,
 } from "./types";
 
 /** The part of the Workers Images binding (`env.IMAGES`) this module uses; the real binding satisfies it. */
@@ -11,7 +13,7 @@ export type ImagesBindingLike = {
   info(stream: ReadableStream<Uint8Array>): Promise<{ format: string; width?: number; height?: number }>;
   input(stream: ReadableStream<Uint8Array>): {
     transform(options: { width: number; fit: "scale-down" }): {
-      output(options: { format: "image/webp"; quality: number }): Promise<{ image(): ReadableStream<Uint8Array> }>;
+      output(options: { format: "image/webp" | "image/jpeg" | "image/png"; quality: number }): Promise<{ image(): ReadableStream<Uint8Array> }>;
     };
   };
 };
@@ -86,8 +88,41 @@ export function createCloudflareImageProcessor(images: ImagesBindingLike): Image
       sha256: await sha256Hex(encoded), bytes: encoded };
   }
 
+  /**
+   * The re-encoded original on the Images binding: same format, long edge scaled down to
+   * ORIGINAL_MAX_EDGE (never up), quality ORIGINAL_QUALITY, orientation applied by Cloudflare. The
+   * binding gives no control over chroma subsampling or the ICC profile, so the pure metadata
+   * stripper runs on the result: whatever EXIF / XMP / IPTC the engine kept is removed and the
+   * colour profile stays. Colour fidelity of this path is covered by the acceptance (delta E) check
+   * on real samples; the Node engine is exact.
+   */
+  async function reencode(bytes: Uint8Array, contentType: ReencodedOriginal["contentType"], maxBytes: number): Promise<ReencodedOriginal> {
+    for (const quality of ORIGINAL_QUALITY_STEPS) {
+      const output = await call(async () => {
+        const result = await images.input(stream(bytes))
+          .transform({ width: ORIGINAL_MAX_EDGE, fit: "scale-down" })
+          .output({ format: contentType, quality });
+        return new Uint8Array(await new Response(result.image()).arrayBuffer());
+      });
+      countImages("transform");
+      if (output.byteLength > maxBytes) {
+        if (contentType === "image/png") break;
+        continue;
+      }
+      const info = await call(() => images.info(stream(output)));
+      countImages("info");
+      if (info.format !== contentType || !info.width || !info.height) throw new Error("image could not be processed");
+      return { bytes: stripPersonalMetadata(output, contentType), contentType, width: info.width, height: info.height };
+    }
+    throw new Error("image does not fit the size limit once re-encoded");
+  }
+
   return {
     name: "cloudflare-images",
+    async reencodeOriginal(verifiedBytes, contentType, maxBytes) {
+      if (!(VERIFIABLE_IMAGE_TYPES as readonly string[]).includes(contentType)) throw new Error("unsupported image");
+      return reencode(verifiedBytes, contentType as ReencodedOriginal["contentType"], maxBytes);
+    },
     async verify(bytes, contentType) {
       if (!(VERIFIABLE_IMAGE_TYPES as readonly string[]).includes(contentType) || bytes.byteLength > BINDING_INPUT_LIMIT) {
         throw new Error("unsupported image");

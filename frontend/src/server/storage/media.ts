@@ -3,11 +3,13 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { readPublicEnv } from "@/lib/env";
 import { legacyStorageWritesOpen, readStorageEnv } from "@/lib/env/storage";
-import { mediaPolicy, isOrganizationMedia } from "@/lib/storage/media-policy";
+import { createHash } from "node:crypto";
+import { mediaPolicy, isOrganizationMedia, reencodesOriginal } from "@/lib/storage/media-policy";
 import type { MediaNamespace, StorageProviderName } from "@/lib/storage/provider-types";
 import { SupabaseStorageProvider } from "./supabase-provider";
 import { CloudflareR2StorageProvider } from "./r2-provider";
-import { verifyMediaBytes } from "./validation";
+import { verifyMediaBytes, withMediaProcessingSlot } from "./validation";
+import { runtimeImageProcessor } from "./image-processing/runtime";
 import { generateImageVariants, variantManifest, type VariantManifest } from "./public-image-variants";
 import type { StorageProvider } from "@/lib/storage/provider-types";
 import { applicationMediaUrl } from "@/lib/storage/media-url";
@@ -134,9 +136,16 @@ export async function verifyPendingMedia(client: SupabaseClient, namespace: Medi
   requireWriteApproval(pending.provider);
   const maxBytes = mediaPolicy(namespace).maxBytes;
   const bytes = await provider.readObject(key, maxBytes);
-  const verified = await verifyMediaBytes(bytes, pending.contentType, maxBytes);
-  await provider.commitVerifiedObject(key, bytes, verified.contentType);
-  const variants = await storeVariants(provider, namespace, key, bytes, verified.contentType);
+  const checked = await verifyMediaBytes(bytes, pending.contentType, maxBytes);
+  // The stored original is the verified upload RE-ENCODED (sRGB, bounded edge, no personal metadata).
+  // Fail closed: an image whose metadata cannot be removed is refused, never stored as uploaded.
+  const stored = checked.contentType.startsWith("image/") && reencodesOriginal(namespace)
+    ? (await withMediaProcessingSlot(() => runtimeImageProcessor().reencodeOriginal(bytes, checked.contentType, maxBytes))).bytes
+    : bytes;
+  const verified = stored === bytes ? checked
+    : { ...checked, size: stored.byteLength, sha256: createHash("sha256").update(stored).digest("hex") };
+  await provider.commitVerifiedObject(key, stored, verified.contentType);
+  const variants = await storeVariants(provider, namespace, key, stored, verified.contentType);
   const admin = privilegedStorageClient();
   const { error } = await admin.rpc("media_storage_attest", {
     p_namespace: namespace, p_key: key, p_owner: pending.owner, p_provider: pending.provider,

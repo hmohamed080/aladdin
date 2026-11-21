@@ -36,9 +36,9 @@ describe("QueuedImages (images before the first save)", () => {
     expect(screen.getByTestId("count").textContent).toBe("1");
   });
 
-  it("refuses a non-image file and an image over 5 MB, and ignores a duplicate", () => {
+  it("refuses a non-image file and an image over 10 MB, and ignores a duplicate", () => {
     render(<Harness />);
-    pick([file("doc.pdf", "application/pdf"), file("big.jpg", "image/jpeg", 5 * 1024 * 1024 + 1), file("ok.webp", "image/webp"), file("ok.webp", "image/webp")]);
+    pick([file("doc.pdf", "application/pdf"), file("big.jpg", "image/jpeg", 10 * 1024 * 1024 + 1), file("ok.webp", "image/webp"), file("ok.webp", "image/webp")]);
     expect(screen.getByTestId("count").textContent).toBe("1");
     expect(screen.getByRole("alert").textContent).toMatch(/big\.jpg/);
   });
