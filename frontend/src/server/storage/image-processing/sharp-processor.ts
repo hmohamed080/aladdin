@@ -50,7 +50,9 @@ export const sharpImageProcessor: ImageProcessor = {
       const image = prepared();
       const encoded = contentType === "image/jpeg" ? image.jpeg({ quality, chromaSubsampling: "4:4:4" })
         : contentType === "image/webp" ? image.webp({ quality, smartSubsample: true, effort: 4 })
-        : image.png({ compressionLevel: 9, effort: 7 });
+        // No `effort`/`quality`/`colours` here: sharp reads any of them as "palette: true" and
+        // quantises the image to 256 colours, which would break colour fidelity.
+        : image.png({ compressionLevel: 9, palette: false });
       const { data, info } = await encoded.toBuffer({ resolveWithObject: true });
       if (data.byteLength > maxBytes) {
         if (contentType === "image/png") break; // lossless: lowering quality changes nothing
