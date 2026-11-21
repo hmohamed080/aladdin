@@ -78,9 +78,18 @@ export async function uploadProductVideo(productId: string, file: File): Promise
   }
 }
 
+/**
+ * Marketplace products live in marketplace_products, but the resumable video API authorizes against the catalog table
+ * public.products, so a Marketplace video would be refused. The option stays off until a Marketplace-aware video path
+ * exists (PR 7: product form with 1 video + 4 images); the panel offers and accepts images only.
+ */
+export const MARKETPLACE_VIDEO_UPLOADS_ENABLED = false;
+
 export type MediaBatchDeps = {
   images: typeof uploadProductImages;
   video: typeof uploadProductVideo;
+  /** Defaults to MARKETPLACE_VIDEO_UPLOADS_ENABLED. */
+  videoEnabled?: boolean;
 };
 
 /**
@@ -94,7 +103,11 @@ export async function uploadMediaBatch(
   onProgress?: (name: string | null) => void,
   deps: MediaBatchDeps = { images: uploadProductImages, video: uploadProductVideo },
 ): Promise<UploadFailure[]> {
-  const { accepted, rejected } = partitionUploadBatch(files);
+  const { accepted: all, rejected } = partitionUploadBatch(files);
+  const videoEnabled = deps.videoEnabled ?? MARKETPLACE_VIDEO_UPLOADS_ENABLED;
+  // A video is refused as an unsupported file while the Marketplace has no video path; the images still upload.
+  const accepted = videoEnabled ? all : all.filter((a) => a.kind === "image");
+  if (!videoEnabled) for (const a of all) if (a.kind === "video") rejected.push({ file: a.file, reason: "type_invalid" });
   const failures: UploadFailure[] = rejected.map(({ file, reason }) => ({ name: file.name, code: REJECTION_CODE[reason] }));
   const images = accepted.filter((a) => a.kind === "image").map((a) => a.file);
   const videos = accepted.filter((a) => a.kind === "video").map((a) => a.file);

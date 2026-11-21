@@ -7784,7 +7784,7 @@ export const en = {
     },
     image: {
       title: "Product images",
-      hint: "Images (JPG, PNG, WebP) up to 10 MB and video (MP4, MOV, WebM) up to 100 MB, per file.",
+      hint: "Images (JPG, PNG, WebP) up to 10 MB, per file.",
       saveFirst: "Save the draft first to upload images.",
       queuedHint: "Images upload automatically when the draft is saved for the first time. The first image is the cover.",
       queueFull: "You can add up to {count} images before saving.",

@@ -87,6 +87,18 @@ describe("mixed-provider authorization and finalization", () => {
     // variants derive from the stored original
     expect(r2.putVariant).toHaveBeenCalledTimes(3);
   });
+  it("on the legacy Supabase path attests the bytes that are actually stored, never a re-encoded copy", async () => {
+    rpc.mockResolvedValue({ data: { ...pending, provider: "supabase", contentType: "image/jpeg" }, error: null });
+    const uploaded = await sharp({ create: { width: 3000, height: 1500, channels: 3, background: "white" } })
+      .withExif({ IFD0: { Make: "PrivatePhone" } }).jpeg().toBuffer();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(uploaded))));
+    await verifyPendingMedia(client, "portfolio", "key.jpg");
+    const { createHash } = await import("node:crypto");
+    expect(adminRpc).toHaveBeenCalledWith("media_storage_attest", expect.objectContaining({
+      p_size: uploaded.byteLength, p_sha256: createHash("sha256").update(uploaded).digest("hex"),
+    }));
+    expect(r2.commitVerifiedObject).not.toHaveBeenCalled();
+  });
   it("keeps verification documents exactly as uploaded", async () => {
     rpc.mockResolvedValue({ data: { ...pending, provider: "r2", contentType: "image/jpeg" }, error: null });
     const uploaded = await sharp({ create: { width: 64, height: 64, channels: 3, background: "white" } })

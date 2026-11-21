@@ -137,9 +137,12 @@ export async function verifyPendingMedia(client: SupabaseClient, namespace: Medi
   const maxBytes = mediaPolicy(namespace).maxBytes;
   const bytes = await provider.readObject(key, maxBytes);
   const checked = await verifyMediaBytes(bytes, pending.contentType, maxBytes);
-  // The stored original is the verified upload RE-ENCODED (sRGB, bounded edge, no personal metadata).
+  // On R2 the stored original is the verified upload RE-ENCODED (sRGB, bounded edge, no personal metadata).
   // Fail closed: an image whose metadata cannot be removed is refused, never stored as uploaded.
-  const stored = checked.contentType.startsWith("image/") && reencodesOriginal(namespace)
+  // The legacy Supabase provider cannot replace an object (keys are immutable, commit is a no-op), so there the
+  // stored bytes ARE the upload: re-encoding would make the receipt describe bytes that were never stored.
+  // The receipt must always describe the stored object, so that path attests the upload as it is.
+  const stored = pending.provider === "r2" && checked.contentType.startsWith("image/") && reencodesOriginal(namespace)
     ? (await withMediaProcessingSlot(() => runtimeImageProcessor().reencodeOriginal(bytes, checked.contentType, maxBytes))).bytes
     : bytes;
   const verified = stored === bytes ? checked

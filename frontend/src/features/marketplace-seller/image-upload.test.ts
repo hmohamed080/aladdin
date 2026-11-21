@@ -26,7 +26,7 @@ describe("uploadMediaBatch", () => {
         file("tour.mp4", 80 * MIB, "video/mp4"),
       ],
       undefined,
-      { images, video },
+      { images, video, videoEnabled: true },
     );
     // the two valid images go up as one ordered batch, the video runs beside them
     expect(images).toHaveBeenCalledTimes(1);
@@ -42,7 +42,7 @@ describe("uploadMediaBatch", () => {
       "product-1",
       [file("a.webp", MIB, "image/webp"), file("film.mov", 150 * MIB, "video/quicktime")],
       undefined,
-      { images, video },
+      { images, video, videoEnabled: true },
     );
     expect(images).toHaveBeenCalledTimes(1);
     expect(video).not.toHaveBeenCalled();
@@ -56,7 +56,7 @@ describe("uploadMediaBatch", () => {
       "product-1",
       [file("a.jpg", MIB, "image/jpeg"), file("v.mp4", MIB, "video/mp4"), file("notes.txt", 4, "text/plain")],
       undefined,
-      { images, video },
+      { images, video, videoEnabled: true },
     );
     expect(failures.map((f) => [f.name, f.code]).sort()).toEqual([
       ["a.jpg", "upload_failed"],
@@ -68,8 +68,17 @@ describe("uploadMediaBatch", () => {
   it("uploads nothing for a batch where every file is refused", async () => {
     const images = vi.fn(async () => []);
     const video = vi.fn(async () => null);
-    const failures = await uploadMediaBatch("product-1", [file("x.jpg", 11 * MIB, "image/jpeg")], undefined, { images, video });
+    const failures = await uploadMediaBatch("product-1", [file("x.jpg", 11 * MIB, "image/jpeg")], undefined, { images, video, videoEnabled: true });
     expect(images).not.toHaveBeenCalled();
     expect(failures).toHaveLength(1);
+  });
+
+  it("offers no video while the Marketplace has no video path: a video is refused, images still upload", async () => {
+    const images = vi.fn(async () => []);
+    const video = vi.fn(async () => null);
+    const failures = await uploadMediaBatch("product-1", [file("a.jpg", MIB, "image/jpeg"), file("tour.mp4", MIB, "video/mp4")], undefined, { images, video });
+    expect(video).not.toHaveBeenCalled();
+    expect(images).toHaveBeenCalledTimes(1);
+    expect(failures).toEqual([{ name: "tour.mp4", code: "file_type_invalid" }]);
   });
 });
