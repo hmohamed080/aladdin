@@ -39,15 +39,16 @@ export function LiveProduct({ product }: { product: PublicProduct }) {
   const title = label(product, locale);
   const description = (locale === "ar" ? product.description_ar : product.description_en) || product.description_ar || product.description_en;
   const typeName = locale === "ar" ? product.product_type_name_ar : product.product_type_name_en;
+  const crumbSep = locale === "ar" ? "‹" : "›";
   const categoryName = locale === "ar" ? product.category_name_ar : product.category_name_en;
 
   return (
     <div className={styles.detail}>
       <nav className={styles.crumbs} aria-label={t.back}>
         <Link href="/market">{t.back}</Link>
-        <span aria-hidden="true">/</span>
+        <span aria-hidden="true">{crumbSep}</span>
         <Link href={`/market?category=${product.category_key}`}>{categoryName}</Link>
-        <span aria-hidden="true">/</span>
+        <span aria-hidden="true">{crumbSep}</span>
         <Link href={`/market?category=${product.category_key}&type=${product.product_type_key}`}>{typeName}</Link>
       </nav>
 
@@ -88,9 +89,6 @@ export function LiveProduct({ product }: { product: PublicProduct }) {
         </div>
 
         <div className={styles.buy}>
-          <p className={styles.kicker}>
-            {typeName} · {t.soldBy(product.seller_name)}
-          </p>
           <h1 className={styles.detailTitle}>{title}</h1>
           {description ? <p className={styles.detailDesc}>{description}</p> : null}
 
@@ -123,7 +121,7 @@ export function LiveProduct({ product }: { product: PublicProduct }) {
                 <strong>{fmtEgp(Number(variant.price_egp), locale)}</strong>
               </p>
               <p className={styles.sku}>
-                {t.taxNote} · {t.unit}: {tr(`marketplaceSeller.unit.${variant.selling_unit}`)}
+                {t.unit}: {tr(`marketplaceSeller.unit.${variant.selling_unit}`)}
               </p>
               <p className={styles.sku}>
                 {t.sku}: <bdi dir="ltr">{variant.sku}</bdi>
@@ -145,7 +143,6 @@ export function LiveProduct({ product }: { product: PublicProduct }) {
                   {c.addedToCart} · <Link href="/market/cart">{c.viewCart}</Link>
                 </p>
               ) : null}
-              <p className={styles.notice}>{t.honestNote}</p>
             </div>
           ) : null}
 
@@ -159,8 +156,8 @@ export function LiveProduct({ product }: { product: PublicProduct }) {
                     <dd>{product.brand}</dd>
                   </div>
                 ) : null}
-                {[...product.attributes, ...(variant?.attributes ?? [])].map((a) => (
-                  <div key={a.key} className={styles.specRow}>
+                {[...product.attributes, ...(variant?.attributes ?? [])].map((a, i) => (
+                  <div key={`${i}:${a.key}`} className={styles.specRow}>
                     <dt>{label(a, locale)}</dt>
                     <dd>{valueText(a, locale)}</dd>
                   </div>

@@ -4,10 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Select } from "@/components/ui/controls";
-import { FilterIcon, GridIcon, ListIcon, PackageIcon } from "@/components/ui/icons";
+import { FilterIcon, PackageIcon } from "@/components/ui/icons";
 import type { Facets, PublicCard, PublicPage, PublicSort } from "./public-contract";
-import { PUBLIC_PAGE_SIZE, PUBLIC_SORTS } from "./public-contract";
+import { PUBLIC_PAGE_SIZE } from "./public-contract";
 import type { Locale } from "../marketplace-types";
 import { fmtEgp, fmtNum, liveCopy } from "./live-copy";
 import { ALL_PRODUCTS_TYPES, HERO_TYPES, typeCover } from "./type-covers";
@@ -96,7 +95,6 @@ function Card({ item, locale }: { item: PublicCard; locale: Locale }) {
           </p>
         ) : null}
         <p className={`${styles.stock} ${item.in_stock ? styles.stockIn : styles.stockOut}`}>{item.in_stock ? t.inStock : t.outOfStock}</p>
-        <p className={styles.cardMeta}>{t.soldBy(item.seller_name)}</p>
         <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} className={styles.cardCart} doneClassName={styles.cardCartDone} />
       </div>
     </article>
@@ -115,7 +113,6 @@ export function LiveCatalog({ locale, dir, params, page, facets }: { locale: Loc
   const router = useRouter();
   const pathname = usePathname();
   const [panelOpen, setPanelOpen] = useState(false);
-  const [view, setView] = useState<"grid" | "list">("grid");
   const [q, setQ] = useState(params.q);
   const [pmin, setPmin] = useState(params.priceMin?.toString() ?? "");
   const [pmax, setPmax] = useState(params.priceMax?.toString() ?? "");
@@ -347,30 +344,11 @@ export function LiveCatalog({ locale, dir, params, page, facets }: { locale: Loc
         <section className={store.main} aria-label={t.allProducts}>
           <div className={store.headRow}>
             <h2 className={store.heading}>{activeType ? name(activeType, locale) : t.allProducts}</h2>
-            <div className={store.tools}>
-              <div className={store.sortWrap}>
-                <Select aria-label={t.sort} value={params.sort} onChange={(e) => go({ sort: e.target.value as PublicSort })}>
-                  {PUBLIC_SORTS.map((s) => (
-                    <option key={s} value={s}>
-                      {t.sorts[s]}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className={store.viewGroup} role="group" aria-label={`${t.gridView} / ${t.listView}`}>
-                <button type="button" className={`${store.viewBtn} ${view === "grid" ? store.viewBtnActive : ""}`} aria-pressed={view === "grid"} aria-label={t.gridView} onClick={() => setView("grid")}>
-                  <GridIcon size={18} />
-                </button>
-                <button type="button" className={`${store.viewBtn} ${view === "list" ? store.viewBtnActive : ""}`} aria-pressed={view === "list"} aria-label={t.listView} onClick={() => setView("list")}>
-                  <ListIcon size={18} />
-                </button>
-              </div>
-            </div>
           </div>
 
           <div className={styles.resultsHead}>
             <p role="status" aria-live="polite">
-              {t.results(fmtNum(total, locale))} · {t.taxNote}
+              {t.results(fmtNum(total, locale))}
             </p>
             {chips.length ? (
               <ul className={styles.chips} aria-label={t.filters}>
@@ -391,7 +369,7 @@ export function LiveCatalog({ locale, dir, params, page, facets }: { locale: Loc
               <p>{filtered || anyPublished ? t.noMatchBody : t.emptyBody}</p>
             </div>
           ) : (
-            <ul className={`${styles.grid} ${view === "list" ? styles.gridList : ""}`}>
+            <ul className={styles.grid}>
               {page.items.map((item) => (
                 <li key={item.slug}>
                   <Card item={item} locale={locale} />
