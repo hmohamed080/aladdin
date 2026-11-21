@@ -2,6 +2,7 @@
 
 import { UploadFailure as VideoUploadFailure, uploadVideo } from "@/features/video/upload-engine";
 import { partitionUploadBatch, type UploadRejection } from "@/lib/media/upload-limits";
+import { imageHintBytes, loadMediaLimitHints, videoHintBytes } from "@/lib/media/limits-client";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { MARKETPLACE_IMAGE_ALLOWED_TYPES, MARKETPLACE_IMAGE_MAX_BYTES } from "@/lib/storage/marketplace-images";
 import { confirmImageUploadAction, removeImageAction, requestImageUploadAction } from "@/server/actions/marketplace-seller";
@@ -103,7 +104,8 @@ export async function uploadMediaBatch(
   onProgress?: (name: string | null) => void,
   deps: MediaBatchDeps = { images: uploadProductImages, video: uploadProductVideo },
 ): Promise<UploadFailure[]> {
-  const { accepted: all, rejected } = partitionUploadBatch(files);
+  await loadMediaLimitHints(); // the stored limits are the authority; this only lets the page answer without a round trip
+  const { accepted: all, rejected } = partitionUploadBatch(files, { image: imageHintBytes("marketplace"), video: videoHintBytes("product") });
   const videoEnabled = deps.videoEnabled ?? MARKETPLACE_VIDEO_UPLOADS_ENABLED;
   // A video is refused as an unsupported file while the Marketplace has no video path; the images still upload.
   const accepted = videoEnabled ? all : all.filter((a) => a.kind === "image");

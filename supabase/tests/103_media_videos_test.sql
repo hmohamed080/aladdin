@@ -58,7 +58,7 @@ set local request.jwt.claims = :'c_pro';
 select throws_ok($$select public.video_upload_begin('portfolio', null, 'Tour', 'video/x-msvideo', 1000)$$, '22023', 'unsupported video type', 'unknown types are refused');
 select throws_ok($$select public.video_upload_begin('portfolio', null, 'Tour', 'video/mp4', 5497558138881)$$, '22023', 'video size is outside what storage accepts', 'only R2''s own 5 TiB object limit applies');
 select lives_ok($$select public.video_delete(public.video_upload_begin('portfolio', null, 'Long take', 'video/mp4', 104857600))$$, 'a 100 MB video is accepted: the site-wide video cap (ADR-0030)');
-select throws_ok($$select public.video_upload_begin('portfolio', null, 'Too long', 'video/mp4', 104857601)$$, '22023', 'video is larger than 100 MB', 'a video over 100 MB is refused');
+select throws_ok($$select public.video_upload_begin('portfolio', null, 'Too long', 'video/mp4', 104857601)$$, '22023', 'video is larger than the limit for this place', 'a video over 100 MB is refused');
 select throws_ok($$select public.video_upload_begin('portfolio', null, '   ', 'video/mp4', 1000)$$, '23514', null, 'blank titles are refused');
 select public.video_upload_begin('portfolio', null, 'Kitchen tour', 'video/mp4', 4096) as vid \gset
 select is((select state::text from public.media_videos where id = :'vid'), 'uploading', 'owner sees the new upload');

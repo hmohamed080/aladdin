@@ -3977,6 +3977,66 @@ export type Database = {
         }
         Relationships: []
       }
+      media_limit_events: {
+        Row: {
+          actor_id: string
+          at: string
+          id: number
+          kind: string
+          new_bytes: number
+          old_bytes: number
+          place: string
+          reason: string
+        }
+        Insert: {
+          actor_id: string
+          at?: string
+          id?: number
+          kind: string
+          new_bytes: number
+          old_bytes: number
+          place: string
+          reason: string
+        }
+        Update: {
+          actor_id?: string
+          at?: string
+          id?: number
+          kind?: string
+          new_bytes?: number
+          old_bytes?: number
+          place?: string
+          reason?: string
+        }
+        Relationships: []
+      }
+      media_limits: {
+        Row: {
+          default_bytes: number
+          kind: string
+          max_bytes: number
+          place: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          default_bytes: number
+          kind: string
+          max_bytes: number
+          place: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          default_bytes?: number
+          kind?: string
+          max_bytes?: number
+          place?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       media_migration_ledger: {
         Row: {
           namespace: string
@@ -9710,6 +9770,23 @@ export type Database = {
         Args: { p_ready: boolean; p_reason: string }
         Returns: boolean
       }
+      admin_media_limit_events: {
+        Args: { p_limit?: number }
+        Returns: {
+          actor_id: string
+          at: string
+          id: number
+          kind: string
+          new_bytes: number
+          old_bytes: number
+          place: string
+          reason: string
+        }[]
+      }
+      admin_media_limit_set: {
+        Args: { p_kind: string; p_max_bytes: number; p_place: string; p_reason: string }
+        Returns: Json
+      }
       admin_my_access: { Args: never; Returns: Json }
       admin_network_referrals_list: {
         Args: { p_pending_only?: boolean }
@@ -11200,6 +11277,17 @@ export type Database = {
           p_workspace: string
         }
         Returns: Json
+      }
+      media_limits_get: {
+        Args: never
+        Returns: {
+          ceiling_bytes: number
+          default_bytes: number
+          kind: string
+          max_bytes: number
+          place: string
+          updated_at: string
+        }[]
       }
       media_historical_purge_finalize: {
         Args: { p_limit?: number }

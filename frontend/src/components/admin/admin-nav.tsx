@@ -46,6 +46,7 @@ const items: Item[] = [
   { href: "/admin/marketplace/media", key: "admin.nav.marketplaceMedia", exact: false, Icon: CameraIcon },
   { href: "/admin/audit", key: "admin.preview.nav.audit", exact: false, Icon: ScrollIcon },
   { href: "/admin/backups", key: "backups.title", exact: false, Icon: PackageIcon },
+  { href: "/admin/media-limits", key: "mediaLimits.title", exact: false, Icon: CameraIcon },
   { href: "/admin/settings", key: "admin.preview.nav.settings", exact: false, Icon: SettingsIcon },
 ];
 
