@@ -18,7 +18,7 @@ vi.mock("./r2-provider", () => ({ CloudflareR2StorageProvider: class {
   constructor(...args: unknown[]) { r2Keys.push(args); }
   createUploadUrl = r2Upload; readObject = r2.readObject; commitVerifiedObject = r2.commitVerifiedObject; putVariant = r2.putVariant; deleteObject = (key: string) => r2.deleteObject(key);
 } }));
-import { authorizeMediaUpload, readMediaUrl, removeMedia, verifyPendingMedia } from "./media";
+import { authorizeMediaUpload, readMediaUrl, removeMedia, requireR2ForRead, verifyPendingMedia } from "./media";
 
 const OWNER = "70000009-0000-4000-8000-000000000009";
 const OBJECT = `u/${OWNER}/portfolio/70000009-0000-4000-8000-0000000000aa/original.png`;
@@ -167,6 +167,29 @@ describe("R2 is the only home of new media bytes", () => {
     await expect(authorizeMediaUpload(client, "portfolio", "key.png", 93)).rejects.toThrow("R2 unavailable");
     expect(upload).not.toHaveBeenCalled();
     expect(sign).not.toHaveBeenCalled();
+  });
+  it("routes a new Marketplace upload to R2 even while R2 routing is off, never to Supabase", async () => {
+    settings.R2_STORAGE_ENABLED = false;
+    rpc.mockResolvedValue({ data: fresh, error: null });
+    r2Upload.mockResolvedValue({ provider: "r2" });
+    await authorizeMediaUpload(client, "marketplace", "key.png", 93);
+    expect(adminRpc).toHaveBeenCalledWith("media_storage_reserve", expect.objectContaining({ p_namespace: "marketplace", p_provider: "r2" }));
+    expect(upload).not.toHaveBeenCalled(); expect(sign).not.toHaveBeenCalled();
+  });
+  it("refuses a Marketplace upload that is already reserved on Supabase", async () => {
+    rpc.mockResolvedValue({ data: pending, error: null });
+    await expect(authorizeMediaUpload(client, "marketplace", "key.png", 93)).rejects.toThrow("unavailable");
+    expect(upload).not.toHaveBeenCalled(); expect(r2Upload).not.toHaveBeenCalled();
+  });
+  it("refuses to verify Marketplace bytes held on Supabase, even with legacy writes open", async () => {
+    rpc.mockResolvedValue({ data: pending, error: null });
+    await expect(verifyPendingMedia(client, "marketplace", "key.png")).rejects.toThrow("unavailable");
+    expect(writes()).not.toContain("media_storage_attest");
+  });
+  it("refuses to read Marketplace bytes from a non-R2 provider", () => {
+    expect(() => requireR2ForRead("marketplace", "supabase")).toThrow("unavailable");
+    expect(() => requireR2ForRead("marketplace", "r2")).not.toThrow();
+    expect(() => requireR2ForRead("portfolio", "supabase")).not.toThrow();
   });
   it("still allows legacy Supabase writes before activation (default) so the current release is unchanged", async () => {
     rpc.mockResolvedValue({ data: pending, error: null });
