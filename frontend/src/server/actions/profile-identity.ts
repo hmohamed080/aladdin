@@ -1,6 +1,7 @@
 "use server";
 
 import { authorizeMediaUpload, verifyPendingMedia, removeMedia } from "@/server/storage/media";
+import { imageMaxBytes } from "@/server/media/limits";
 import type { UploadGrant } from "@/lib/storage/provider-types";
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -137,8 +138,11 @@ export type AvatarUploadTicket =
 
 /** Step 1 — creates the pending metadata row and returns the server-generated key the client must upload to. */
 export async function requestAvatarUploadAction(contentType: string, expectedBytes?: number): Promise<AvatarUploadTicket> {
-  if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > 3 * 1024 * 1024)) {
-    return { ok: false, code: "profileIdentity.avatar.errorUpload" };
+  if (expectedBytes !== undefined) {
+    if (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0) return { ok: false, code: "profileIdentity.avatar.errorUpload" };
+    // The limit in force today (the one an administrator sets on Upload limits), checked BEFORE the pending row and
+    // before any byte is uploaded, on every storage provider. The database still refuses the same size on the receipt.
+    if (expectedBytes > (await imageMaxBytes("avatar"))) return { ok: false, code: "profileIdentity.avatar.errorTooLarge" };
   }
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("avatar_request_upload", { p_content_type: contentType });
