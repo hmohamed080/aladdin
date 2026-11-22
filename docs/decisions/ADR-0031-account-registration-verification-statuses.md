@@ -2,7 +2,7 @@
 
 **Status:** Accepted (owner decisions, 2026-11-22) · Implementation is staged and each step needs its own owner GO before it touches Acceptance or Production. Nothing in this ADR is applied anywhere hosted.
 
-**Refines:** the account/organization/workspace model in `CLAUDE.md` and [`PRODUCT_DIRECTION_GUIDE.md`](../product/PRODUCT_DIRECTION_GUIDE.md) (one person = one user ID; an Organization is not a user; the workspace is derived). It changes no rule there; it removes a UI/registration side effect (a personal account created next to a business) and names three states that were being mixed.
+**Refines:** the account/organization/workspace model in `CLAUDE.md` and [`PRODUCT_DIRECTION_GUIDE.md`](../product/PRODUCT_DIRECTION_GUIDE.md). It is a **staged target**: until each Rollout step ships, current behavior in that guide (activation after onboarding, Contractor/Engineer/Personal Coming Soon, first business created at "Add a business") stays authoritative. It changes no rule there by itself; it removes a UI/registration side effect (a personal account created next to a business) and names three states that were being mixed.
 
 ## Purpose
 
