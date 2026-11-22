@@ -7684,3 +7684,9 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 ## 2026-11-22 — Acceptance snapshot pinned for the media-notify plan
 - Backup run 45010533680 produced `aladdin-acceptance-20261122T100424Z` (202 tables, 3815 rows, 232 migrations). After the restore-test CLI pin moved to 3.2.0 (#221), restore run 45019578075 on the rebuilt kit reported schema fingerprint exact, row counts exact, media inventory exact (19 of 19 restored), `RESULT: PASS`.
 - Pinned in `RESTORE_VERIFIED_SNAPSHOTS`. This satisfies the `media-notify` plan's fresh-backup requirement (>= 232 migrations) at the time of pinning; it is a recovery point only for data written before it. Nothing applied to Acceptance or Production.
+
+## 2026-11-22 — Plan media-notify APPLIED to Acceptance (owner GO)
+- Owner ran `acceptance-apply.sh --plan media-notify` from `15de92c7` with snapshot `aladdin-acceptance-20261122T100424Z`: pre-checks passed (883 functions = contract 20261116100014), `20261121090001..003` pushed, post-checks passed (235 applied, latest `20261121090003`, 898 functions = contract 20261121090003, catalog diff exactly 89 objects, all inside the plan).
+- Row counts: `admin_permissions` 39 -> 43, `admin_role_permissions` 93 -> 99, `media_limits` 10 rows, `notification_templates` 6 rows, both event tables empty.
+- Read-only re-check afterwards (Supabase SQL): 235 migrations, no limit changed from default, 6 templates, 0 notifications with a rendered snapshot. So the pinned forward-fix guard would still allow a rollback.
+- NOT done: the matching frontend is not deployed to Acceptance (the admin pages `/admin/media-limits` and `/admin/notification-templates` need it); Production untouched. Next, each needing its own owner GO: deploy the frontend to Acceptance, then PR 5 (seller approval v2) and PR 6 (product review).
