@@ -8,6 +8,7 @@
 --                  two constraints on notifications, 8 functions, permissions notification_templates.*.
 -- Removes 4 tables, 15 functions, 1 trigger, 1 column and 4 permissions; restores public.media_storage_attest, the notifications event-type
 -- constraint and the three bucket limits to the Acceptance state read on 2026-11-22 (232 migrations, latest 20261116100014).
+-- Safe from a partly applied plan (each migration commits separately): it inspects only the tables and the column that exist, and every drop is IF EXISTS.
 -- DATA GUARD: refuses (RAISE) as soon as an administrator has changed an upload limit or a notification template, when any notification
 -- holds a rendered snapshot or one of the six new event types, or when a seeded table differs from its migration seed. It never deletes
 -- user data. Roll the Worker (the application) back to the version before these migrations first: the old code does not call any of this.
@@ -18,27 +19,40 @@ begin;
 do $guard$
 declare n bigint;
 begin
-  select count(*) into n from public.media_limit_events;
-  if n <> 0 then raise exception 'media-notify forward-fix refused: media_limit_events holds % rows (an upload limit was changed; the audit trail would be lost)', n; end if;
-  if exists (select 1 from public.media_limits where max_bytes <> default_bytes) then
-    raise exception 'media-notify forward-fix refused: an upload limit differs from its default';
+  -- each migration commits separately, so a partly applied plan is a valid starting state: inspect only what exists
+  if to_regclass('public.media_limit_events') is not null then
+    execute 'select count(*) from public.media_limit_events' into n;
+    if n <> 0 then raise exception 'media-notify forward-fix refused: media_limit_events holds % rows (an upload limit was changed; the audit trail would be lost)', n; end if;
   end if;
-  select count(*) into n from public.media_limits;
-  if n <> 10 then raise exception 'media-notify forward-fix refused: media_limits holds % rows (migration seed: 10)', n; end if;
-
-  select count(*) into n from public.notification_template_events;
-  if n <> 0 then raise exception 'media-notify forward-fix refused: notification_template_events holds % rows (a template was edited; the history would be lost)', n; end if;
-  if exists (select 1 from public.notification_templates where title_ar is not null or body_ar is not null or title_en is not null or body_en is not null) then
-    raise exception 'media-notify forward-fix refused: a notification template holds an edit';
+  if to_regclass('public.media_limits') is not null then
+    if exists (select 1 from public.media_limits where max_bytes <> default_bytes) then
+      raise exception 'media-notify forward-fix refused: an upload limit differs from its default';
+    end if;
+    select count(*) into n from public.media_limits;
+    if n <> 10 then raise exception 'media-notify forward-fix refused: media_limits holds % rows (migration seed: 10)', n; end if;
   end if;
-  select count(*) into n from public.notification_templates;
-  if n <> 6 then raise exception 'media-notify forward-fix refused: notification_templates holds % rows (migration seed: 6)', n; end if;
 
+  if to_regclass('public.notification_template_events') is not null then
+    execute 'select count(*) from public.notification_template_events' into n;
+    if n <> 0 then raise exception 'media-notify forward-fix refused: notification_template_events holds % rows (a template was edited; the history would be lost)', n; end if;
+  end if;
+  if to_regclass('public.notification_templates') is not null then
+    if exists (select 1 from public.notification_templates where title_ar is not null or body_ar is not null or title_en is not null or body_en is not null) then
+      raise exception 'media-notify forward-fix refused: a notification template holds an edit';
+    end if;
+    select count(*) into n from public.notification_templates;
+    if n <> 6 then raise exception 'media-notify forward-fix refused: notification_templates holds % rows (migration seed: 6)', n; end if;
+  end if;
+
+  -- the content column and the six event types exist only once 20261121090003 is applied
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'notifications' and column_name = 'content') then
+    execute 'select count(*) from public.notifications where content is not null' into n;
+    if n <> 0 then raise exception 'media-notify forward-fix refused: % notification(s) hold a rendered snapshot', n; end if;
+  end if;
   select count(*) into n from public.notifications
-   where content is not null
-      or event_type in ('marketplace.seller.approved', 'marketplace.seller.rejected', 'marketplace.seller.suspended',
+   where event_type in ('marketplace.seller.approved', 'marketplace.seller.rejected', 'marketplace.seller.suspended',
                         'marketplace.seller.reinstated', 'marketplace.seller.revoked', 'marketplace.product.rejected');
-  if n <> 0 then raise exception 'media-notify forward-fix refused: % notification(s) were written from a template', n; end if;
+  if n <> 0 then raise exception 'media-notify forward-fix refused: % notification(s) use one of the six new event types', n; end if;
 end
 $guard$;
 

@@ -239,7 +239,7 @@ export const FORWARD_FIX = {
   // kept (reviewed, pinned) for a future rollback of them. It does NOT undo the rows they wrote (only a restore-tested backup can).
   marketplace: { file: "forward-fix/marketplace-remove.sql", sha256: "72bdfd9b68ef88f85338321d4eb79c711e2d0be3bbf1e708a96b001dee58b734" },
   // media-notify: refuses (RAISE) once an admin changed a limit or template or any notification was written from a template; never deletes user data.
-  "media-notify": { file: "forward-fix/media-notify-remove.sql", sha256: "97f24d26990816369bc4cd19d51f4f259528936cfc0fae6b7576e7219acee9d2" },
+  "media-notify": { file: "forward-fix/media-notify-remove.sql", sha256: "807149eb92e650ae6e3ffccea420fca110ba3a6bf3eed44f9a1be8f799ace6a5" },
   verification: { file: "forward-fix/verification-restore-previous.sql", sha256: "a50cd460c243b3580927c1f8b8e84ec1cc1109048c9b08b055a06b470570fcac" },
   m1: { file: "forward-fix/m1-restore-previous.sql", sha256: "5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045" },
   m3a: { file: "forward-fix/m3a-restore-previous.sql", sha256: "d4161977e7664e3345d000ee87503fd3a5983935c81257dd082c0a5ef0b43ec3" },

@@ -242,6 +242,14 @@ test("media-notify forward-fix: one transaction, a data guard that raises before
   assert.equal((code.match(/drop table/gi) ?? []).length, 4);
 });
 
+test("media-notify forward-fix: safe from a partly applied plan - every guarded table or column is checked for existence first", () => {
+  const code = readFileSync(here(FORWARD_FIX["media-notify"].file), "utf8").split("\n").filter((l) => !l.startsWith("--")).join("\n");
+  const guard = code.slice(code.indexOf("do $guard$"), code.indexOf("$guard$;", code.indexOf("do $guard$")));
+  for (const t of ["media_limit_events", "media_limits", "notification_template_events", "notification_templates"]) assert.ok(guard.includes(`to_regclass('public.${t}') is not null`), t);
+  assert.match(guard, /information_schema\.columns[^;]*column_name = 'content'/);
+  assert.doesNotMatch(code.replace(/\$guard\$[\s\S]*?\$guard\$/g, ""), /drop (table|function|trigger|constraint) (?!if exists)/i);
+});
+
 test("verification forward-fix: one transaction, restores both removed guards and their triggers, drops the new function, never touches data", () => {
   // restored function bodies legitimately contain DML; only statements OUTSIDE the dollar-quoted bodies may not touch data
   const code = readFileSync(here(FORWARD_FIX.verification.file), "utf8").split("\n").filter((l) => !l.startsWith("--")).join("\n");
