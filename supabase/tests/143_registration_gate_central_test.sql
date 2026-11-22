@@ -11,7 +11,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(22);
+select plan(23);
 
 \set inc  '14300000-0000-4000-8000-0000000000d1'
 \set unc  '14300000-0000-4000-8000-0000000000d2'
@@ -50,6 +50,11 @@ begin
   end;
 end $$;
 
+-- Overloads: a name with a STABLE and a VOLATILE overload is refused (PostgREST picks the overload from the arguments).
+create function public.zz_gate_probe(a int) returns int language sql stable as 'select 1';
+create function public.zz_gate_probe(a text) returns int language plpgsql volatile as $f$ begin return 1; end $f$;
+revoke execute on function public.zz_gate_probe(int), public.zz_gate_probe(text) from public, anon;
+
 -- A. unfinished registration: writes refused
 select is(pg_temp.hook(:'inc', 'POST', '/organizations'), 'registration incomplete|registration_incomplete', 'consent pending: a direct table INSERT is refused');
 select is(pg_temp.hook(:'inc', 'PATCH', '/profiles'), 'registration incomplete|registration_incomplete', 'consent pending: a table UPDATE is refused');
@@ -69,6 +74,8 @@ select is(pg_temp.hook(:'inc', 'POST', '/rpc/graphql', 'authenticated', '{"conte
 select is(pg_temp.hook(:'inc', 'POST', '/rpc/my_registration_state', 'authenticated', '{"content-profile":"graphql_public"}'), 'registration incomplete|registration_incomplete', 'a non-public Content-Profile is refused even for a public function name');
 select is(pg_temp.hook(:'inc', 'POST', '/rpc/record%5Fconsent'), 'registration incomplete|registration_incomplete', 'an encoded name does not match the allowlist and is refused');
 select is(pg_temp.hook(:'inc', 'POST', '/rpc/my_registration_state', 'authenticated', '{"content-profile":"public"}'), '', 'an explicit public Content-Profile is allowed');
+
+select is(pg_temp.hook(:'inc', 'POST', '/rpc/zz_gate_probe'), 'registration incomplete|registration_incomplete', 'a name with a volatile overload is refused even though another overload is stable');
 
 -- C. unaffected accounts
 select is(pg_temp.hook(:'done', 'POST', '/organizations'), '', 'access_ready: a table INSERT is not refused');

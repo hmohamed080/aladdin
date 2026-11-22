@@ -61,11 +61,17 @@ begin
     end if;
     -- Fail closed: allowed only when the name resolves to an existing function that cannot write (stable / immutable) or
     -- that the anon role may execute (public by definition). Unknown names are refused (403 instead of PostgREST's 404).
+    -- Worst case over ALL overloads of the name (PostgREST picks the overload from the arguments): at least one must exist and
+    -- none may be volatile and non-public.
     return exists (
-      select 1 from pg_catalog.pg_proc p
-      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = 'public' and p.proname = v_fn and p.prokind = 'f'
-        and (p.provolatile <> 'v' or pg_catalog.has_function_privilege('anon', p.oid, 'execute')));
+             select 1 from pg_catalog.pg_proc p
+             join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+             where n.nspname = 'public' and p.proname = v_fn and p.prokind = 'f')
+       and not exists (
+             select 1 from pg_catalog.pg_proc p
+             join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+             where n.nspname = 'public' and p.proname = v_fn and p.prokind = 'f'
+               and p.provolatile = 'v' and not pg_catalog.has_function_privilege('anon', p.oid, 'execute'));
   end if;
   -- Any other non-read request is a table/view write.
   return false;
