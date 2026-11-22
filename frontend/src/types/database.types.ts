@@ -4628,6 +4628,7 @@ export type Database = {
       notifications: {
         Row: {
           body_key: string | null
+          content: Json | null
           created_at: string
           deep_link: string
           event_type: string
@@ -4642,6 +4643,7 @@ export type Database = {
         }
         Insert: {
           body_key?: string | null
+          content?: Json | null
           created_at?: string
           deep_link: string
           event_type: string
@@ -4656,6 +4658,7 @@ export type Database = {
         }
         Update: {
           body_key?: string | null
+          content?: Json | null
           created_at?: string
           deep_link?: string
           event_type?: string
@@ -9786,6 +9789,45 @@ export type Database = {
       admin_media_limit_set: {
         Args: { p_kind: string; p_max_bytes: number; p_place: string; p_reason: string }
         Returns: Json
+      }
+      admin_notification_template_events: {
+        Args: { p_limit?: number }
+        Returns: {
+          action: string
+          actor_id: string
+          at: string
+          id: number
+          reason: string
+          template_key: string
+        }[]
+      }
+      admin_notification_template_reset: {
+        Args: { p_key: string; p_reason: string }
+        Returns: Json
+      }
+      admin_notification_template_set: {
+        Args: { p_body_ar: string; p_body_en: string; p_key: string; p_reason: string; p_title_ar: string; p_title_en: string }
+        Returns: Json
+      }
+      admin_notification_templates: {
+        Args: never
+        Returns: {
+          body_ar: string
+          body_en: string
+          default_body_ar: string
+          default_body_en: string
+          default_title_ar: string
+          default_title_en: string
+          event_type: string
+          is_edited: boolean
+          key: string
+          title_ar: string
+          title_en: string
+          updated_at: string
+          updated_by: string
+          variables: string[]
+          version: number
+        }[]
       }
       admin_my_access: { Args: never; Returns: Json }
       admin_network_referrals_list: {

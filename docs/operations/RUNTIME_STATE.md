@@ -1,3 +1,6 @@
+## Marketplace notification templates (draft PR, not deployed) - 2026-11-21
+- Branch `feat/mkt-notification-templates-20261121`: migration `20261121090003` (templates, history, `notifications.content`, six `marketplace.*` event types) is NOT applied to Acceptance or Production (local isolated stack only). Admin page `/admin/notification-templates`. No emitter calls it yet (PR 5 and PR 6).
+
 ## Site-wide media policy (draft PR, not deployed) - 2026-11-21
 - Branch `feat/mkt-media-policy-20261121` (ADR-0030, Proposed): 10 MB image / 100 MB video per-file caps, re-encoded originals without personal metadata, video original deleted only after verification, rejected Marketplace images purged after 2 days. Migration `20261121090001` is NOT applied to Acceptance or Production (local isolated stack only). Nothing deployed.
 
