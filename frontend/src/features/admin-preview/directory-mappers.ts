@@ -80,6 +80,8 @@ export type AdminDirectoryUser = {
   /** What the person registered as: their persona, else the business type they chose or belong to. */
   registeredAccount?: string | null;
   status: string;
+  /** Derived sign-up progress (ADR-0031): unverified | consent_pending | account_type_pending | access_ready | active_personal | manually_blocked. Null from an older database. */
+  registrationState?: string | null;
   isVerified: boolean;
   createdAt: string;
   verificationState: UserVerificationState;
@@ -125,6 +127,7 @@ export function mapDirectoryUser(raw: unknown): AdminDirectoryUser | null {
     accountType: str(o.account_type),
     registeredAccount: str(o.registered_account),
     status,
+    registrationState: str(o.registration_state),
     isVerified: bool(o.is_verified),
     createdAt,
     verificationState: verificationState(o.verification_state),
