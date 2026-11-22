@@ -3190,6 +3190,7 @@ export const en = {
       errorSize: "That image is empty. Please choose another file.",
       errorPrepare: "This photo could not be prepared on this device. Try a smaller copy.",
       errorUpload: "We could not upload your photo. Please try again.",
+      errorTooLarge: "This photo is larger than the allowed size. Try a smaller copy.",
     },
   },
   completeProfile: {
