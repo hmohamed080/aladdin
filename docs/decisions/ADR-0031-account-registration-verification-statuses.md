@@ -18,8 +18,9 @@ Admin pages show "Status", "Personal verification" and a profile percentage next
 | **Registration Status** | How far did the person get in sign-up? | derived (today `my_registration_state()`; the Admin gets a per-user version) | email not confirmed · consent pending · account type pending · access ready · active |
 | **Verification Status** | Did an Admin vouch for this person or business? | `verifications` (+ organization flags below) | not requested · submitted · under review · needs more information · approved · rejected · revoked |
 
-- **Active is automatic.** An account is active from creation unless an Admin suspends it. There is no "send for review" or "request activation" step. Verification and public listing stay separate and are decided by an Admin.
-- **Active never bypasses sign-up.** Active does not skip email confirmation, consent or account-type selection. Those are Registration Status and keep gating entry.
+- **Active means "not blocked", nothing more.** It does not mean the person finished registration or may use every service. Use of any service requires Registration Status = access ready (email confirmed, consent recorded, account type chosen) **and** the capability for that action. This supersedes the wording "active from creation" in the first draft and keeps the existing rule (PRODUCT_DIRECTION_GUIDE, "Activation vs. Verification") that *completing onboarding is what lets the person in*; verification is never the entry gate.
+- **The database enforces it, not the UI.** Every RPC and RLS policy that grants a service must check registration state and capability server-side (central check in `app.api_pre_request` / `has_capability`), so a direct API call cannot skip email confirmation, consent or account-type selection. Step 6 ships pgTAP tests that call the RPCs directly with an incomplete registration and expect refusal.
+- **All nine types carry the same gates now.** Contractor, Engineer and Personal are "Coming Soon" today (visible, disabled; the server action and the account-type RPC refuse a fresh selection, existing holders keep theirs). That stays. But every rule in this ADR (registration gates, verification, revocation, per-organization review) is written for all nine types, so enabling a type later is a switch, not a redesign. Section 4 describes the target model, not current availability.
 - **The legacy "pending verification" user status ends as an operating state** (staged, see Rollout). Until then the UI says "did not finish registration", never "pending verification", for a user.
 - `users.is_verified` (a legacy column: 0 of 34 accounts on Acceptance, ignored by the UI) is removed in the last stage.
 
@@ -37,7 +38,18 @@ Admin pages show "Status", "Personal verification" and a profile percentage next
 
 - **Revoking a verification removes the verification and everything public that depends on it, for every account type.** It does not suspend the account (suspension is a separate Admin action).
 - A written reason is mandatory. The owner is notified through the notification-template system (new templates, editable at `/admin/notification-templates`).
-- **Level 1 (approval) revoked:** the organization returns to "pending verification" and leaves the directory. New unauthorized activity stops, including new selling. Existing orders, quotations and transactions are kept and stay readable.
+- **Level 1 (approval) revoked:** the organization returns to "pending verification" and leaves the directory. Effects on selling and in-flight work are **proposed, awaiting owner approval** (the rule is not final until approved):
+
+| Item | Proposed effect of revoking level 1 |
+|---|---|
+| Directory / public pages / search | Removed immediately |
+| New product publication, new quotations, new RFQ responses, new orders | Blocked |
+| Already published products | Hidden from public catalog (not deleted) |
+| Orders and quotations already accepted / in progress | Stay open; the organization and the counterparty can finish, update status and message |
+| History, invoices, documents, reviews | Kept and readable |
+| Members and their access to the organization's private workspace | Kept (only suspension removes it) |
+| Re-approval | Restores everything above without re-entering data |
+
 - **Level 2 revoked:** only the commercial badge is removed.
 - Verified persons (Engineer, Craftsman, Contractor, Sales Team) lose the verified state and any public listing that was granted with it.
 
