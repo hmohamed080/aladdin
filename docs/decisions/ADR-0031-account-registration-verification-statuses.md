@@ -38,9 +38,9 @@ Admin pages show "Status", "Personal verification" and a profile percentage next
 
 - **Revoking a verification removes the verification and everything public that depends on it, for every account type.** It does not suspend the account (suspension is a separate Admin action).
 - A written reason is mandatory. The owner is notified through the notification-template system (new templates, editable at `/admin/notification-templates`).
-- **Level 1 (approval) revoked:** the organization returns to "pending verification" and leaves the directory. Effects on selling and in-flight work are **proposed, awaiting owner approval** (the rule is not final until approved):
+- **Level 1 (approval) revoked:** the organization returns to "pending verification" and leaves the directory. Effects on selling and in-flight work (table approved by the owner, 2026-11-22):
 
-| Item | Proposed effect of revoking level 1 |
+| Item | Effect of revoking level 1 |
 |---|---|
 | Directory / public pages / search | Removed immediately |
 | New product publication, new quotations, new RFQ responses, new orders | Blocked |
