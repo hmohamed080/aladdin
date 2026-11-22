@@ -13,6 +13,8 @@
 --   * a call to a VOLATILE public function (/rpc/<name>), unless the name is in the sign-up allowlist below.
 -- Always allowed: reads (GET/HEAD); STABLE / IMMUTABLE functions (they cannot write); functions the anon role may execute
 -- (they are public by definition); the sign-up steps themselves (allowlist); my_account_status (unchanged exemption).
+-- The RPC branch FAILS CLOSED: an unknown function name, or any schema other than public (Content-Profile, e.g. graphql_public),
+-- is refused for an unfinished registration.
 -- Accounts that are access_ready or active_personal (active membership or users.status = 'active') are unaffected, so staff
 -- and existing active members behave exactly as before. anon and service_role are not touched (the hook returns early).
 --
@@ -30,7 +32,8 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_fn text;
+  v_fn      text;
+  v_profile text;
 begin
   -- Reads never change state (RLS still applies as before).
   if upper(coalesce(p_method, '')) in ('GET', 'HEAD', 'OPTIONS') then
@@ -50,16 +53,19 @@ begin
       'my_account_status') then
       return true;
     end if;
-    -- A function that does not exist is left to PostgREST (404); a read-only (stable/immutable) function cannot write;
-    -- a function the anon role may execute is public.
-    if not exists (
-         select 1 from pg_catalog.pg_proc p
-         join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-         where n.nspname = 'public' and p.proname = v_fn and p.prokind = 'f' and p.provolatile = 'v'
-           and not pg_catalog.has_function_privilege('anon', p.oid, 'execute')) then
-      return true;
+    -- Only the public schema is available to an unfinished registration: PostgREST also exposes graphql_public (pg_graphql
+    -- mutations) and selects the schema from the Content-Profile header, so any other schema is refused.
+    v_profile := nullif(btrim(coalesce(nullif(current_setting('request.headers', true), '')::jsonb ->> 'content-profile', '')), '');
+    if v_profile is not null and v_profile <> 'public' then
+      return false;
     end if;
-    return false;
+    -- Fail closed: allowed only when the name resolves to an existing function that cannot write (stable / immutable) or
+    -- that the anon role may execute (public by definition). Unknown names are refused (403 instead of PostgREST's 404).
+    return exists (
+      select 1 from pg_catalog.pg_proc p
+      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = v_fn and p.prokind = 'f'
+        and (p.provolatile <> 'v' or pg_catalog.has_function_privilege('anon', p.oid, 'execute')));
   end if;
   -- Any other non-read request is a table/view write.
   return false;

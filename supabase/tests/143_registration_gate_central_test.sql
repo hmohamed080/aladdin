@@ -11,7 +11,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(18);
+select plan(22);
 
 \set inc  '14300000-0000-4000-8000-0000000000d1'
 \set unc  '14300000-0000-4000-8000-0000000000d2'
@@ -34,12 +34,13 @@ update public.users set status = 'active' where id = :'stf';
 update public.users set status = 'suspended' where id = :'sus';
 
 -- Returns '' when the request passes the hook, else 'message|hint' of the refusal.
-create function pg_temp.hook(p_user uuid, p_method text, p_path text, p_role text default 'authenticated') returns text language plpgsql as $$
+create function pg_temp.hook(p_user uuid, p_method text, p_path text, p_role text default 'authenticated', p_headers text default null) returns text language plpgsql as $$
 declare v_hint text;
 begin
   perform set_config('request.jwt.claims', json_build_object('sub', p_user, 'role', p_role)::text, true);
   perform set_config('request.method', coalesce(p_method, ''), true);
   perform set_config('request.path', p_path, true);
+  perform set_config('request.headers', coalesce(p_headers, ''), true);
   begin
     perform app.api_pre_request();
     return '';
@@ -63,7 +64,11 @@ select is(pg_temp.hook(:'inc', 'HEAD', '/profiles'), '', 'consent pending: HEAD 
 select is(pg_temp.hook(:'inc', 'POST', '/rpc/my_registration_state'), '', 'consent pending: a STABLE function is allowed');
 select is(pg_temp.hook(:'inc', 'POST', '/rpc/record_consent'), '', 'consent pending: record_consent (a sign-up step) is allowed');
 select is(pg_temp.hook(:'inc', 'POST', '/rpc/onboarding_select_account_type'), '', 'consent pending: onboarding_select_account_type is allowed');
-select is(pg_temp.hook(:'inc', 'POST', '/rpc/this_function_does_not_exist'), '', 'an unknown function is left to PostgREST (404), not refused here');
+select is(pg_temp.hook(:'inc', 'POST', '/rpc/this_function_does_not_exist'), 'registration incomplete|registration_incomplete', 'an unknown function name fails closed');
+select is(pg_temp.hook(:'inc', 'POST', '/rpc/graphql', 'authenticated', '{"content-profile":"graphql_public"}'), 'registration incomplete|registration_incomplete', 'the graphql_public schema (pg_graphql mutations) is refused');
+select is(pg_temp.hook(:'inc', 'POST', '/rpc/my_registration_state', 'authenticated', '{"content-profile":"graphql_public"}'), 'registration incomplete|registration_incomplete', 'a non-public Content-Profile is refused even for a public function name');
+select is(pg_temp.hook(:'inc', 'POST', '/rpc/record%5Fconsent'), 'registration incomplete|registration_incomplete', 'an encoded name does not match the allowlist and is refused');
+select is(pg_temp.hook(:'inc', 'POST', '/rpc/my_registration_state', 'authenticated', '{"content-profile":"public"}'), '', 'an explicit public Content-Profile is allowed');
 
 -- C. unaffected accounts
 select is(pg_temp.hook(:'done', 'POST', '/organizations'), '', 'access_ready: a table INSERT is not refused');
