@@ -7690,3 +7690,8 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Row counts: `admin_permissions` 39 -> 43, `admin_role_permissions` 93 -> 99, `media_limits` 10 rows, `notification_templates` 6 rows, both event tables empty.
 - Read-only re-check afterwards (Supabase SQL): 235 migrations, no limit changed from default, 6 templates, 0 notifications with a rendered snapshot. So the pinned forward-fix guard would still allow a rollback.
 - NOT done: the matching frontend is not deployed to Acceptance (the admin pages `/admin/media-limits` and `/admin/notification-templates` need it); Production untouched. Next, each needing its own owner GO: deploy the frontend to Acceptance, then PR 5 (seller approval v2) and PR 6 (product review).
+
+## 2026-11-22 — Correction: the showroom completeness check on approval is NOT enforced
+- The 2026-11-15 entry "Admin-initiated verification ..." says the showroom "complete business information" check on approval is "still enforced and NOT bypassed". That is wrong. Migration `20261115090002_admin_initiated_verification.sql` DROPS the trigger `showroom_review_complete` and its function `app.showroom_review_guard()` (and the Craftsman equivalent), by owner policy: an authorized Admin may approve regardless of profile completion.
+- What still holds: `app.showroom_activation_guard` (an approved organization verification is required before a showroom becomes active), no self-review, the assigned-reviewer rule, and the Administrator tier for organization reviews. Completion below 100 on a verified user only raises the derived "Needs attention" flag; it never blocks or revokes.
+- No code or database change in this entry; documentation only.
