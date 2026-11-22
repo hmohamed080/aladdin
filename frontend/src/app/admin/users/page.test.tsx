@@ -237,6 +237,22 @@ describe("Users directory page - real Verify / Reject", () => {
     }
   });
 
+  it("labels a legacy pending_verification account by its derived registration state (ADR-0031)", async () => {
+    loadUsersDirectory.mockResolvedValue(
+      okPage([
+        user({ id: "70000001-0000-4000-8000-0000000000a1", status: "pending_verification", registrationState: "consent_pending" }),
+        user({ id: "70000001-0000-4000-8000-0000000000a2", status: "pending_verification", registrationState: "access_ready" }),
+      ]),
+    );
+    await renderPage({});
+    // Rows may render in more than one layout; one unfinished account must produce exactly as many "unfinished" labels
+    // as "Terms not accepted" labels, so the finished account contributes none.
+    const unfinished = screen.getAllByText("Did not finish registration").length;
+    expect(unfinished).toBeGreaterThan(0);
+    expect(unfinished).toBe(screen.getAllByText("Terms not accepted").length);
+    expect(screen.getAllByText("Registered").length).toBeGreaterThan(0);
+  });
+
   it("keeps the buttons but disabled, with the reason, when the account has no pending request", async () => {
     loadUsersDirectory.mockResolvedValue(okPage([user({ status: "pending_verification" })]));
     await renderPage({});

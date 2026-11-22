@@ -83,6 +83,16 @@ export default async function PreviewUsersPage({
   const cityLabels = m.onboarding.consumer.cities as Record<string, string>;
   const verificationStateLabels = t.verificationState;
   const registrationLabels = t.registrationState as Record<string, string>;
+  // ADR-0031: the legacy `pending_verification` user status is shown by what the person actually did. Only a person whose
+  // derived registration is NOT finished reads "did not finish registration"; one who finished is simply active (not blocked).
+  const registrationFinished = (u: { registrationState?: string | null }) =>
+    u.registrationState === "access_ready" || u.registrationState === "active_personal";
+  const accountStatusLabel = (u: { status: string; registrationState?: string | null }) =>
+    u.status !== "pending_verification"
+      ? (statusLabels[u.status] ?? u.status)
+      : registrationFinished(u)
+        ? (statusLabels.active ?? u.status)
+        : t.userStatusPendingLabel;
   const flagLabels = t.flagLabels;
   const cols = t.columns;
   const rowActionLabels = t.rowActions;
@@ -220,7 +230,7 @@ export default async function PreviewUsersPage({
       header: cols.status,
       minWidth: "7.5rem",
       nowrap: true,
-      cell: (u) => <StatusBadge status={u.status} label={u.status === "pending_verification" ? t.userStatusPendingLabel : (statusLabels[u.status] ?? u.status)} />,
+      cell: (u) => <StatusBadge status={u.status === "pending_verification" && registrationFinished(u) ? "active" : u.status} label={accountStatusLabel(u)} />,
     },
     {
       key: "lastActive",
