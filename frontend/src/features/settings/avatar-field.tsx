@@ -110,8 +110,12 @@ export function AvatarField({ avatarUrl, displayName }: { avatarUrl: string | nu
       setSaved(true);
       router.refresh();
     } catch (e) {
-      // A photo this device could not crop or fit is named as such, not reported as a failed upload.
-      setError(t(e instanceof ImagePrepareError ? "profileIdentity.avatar.errorPrepare" : "profileIdentity.avatar.errorUpload"));
+      // A photo this device could not crop or fit, or one above the allowed size, is named as such, not reported as a failed upload.
+      setError(t(
+        e instanceof ImagePrepareError ? "profileIdentity.avatar.errorPrepare"
+          : e instanceof Error && e.message === "profileIdentity.avatar.errorTooLarge" ? "profileIdentity.avatar.errorTooLarge"
+            : "profileIdentity.avatar.errorUpload",
+      ));
     } finally {
       setBusy(false);
     }
