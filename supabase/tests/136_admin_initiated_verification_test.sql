@@ -234,7 +234,7 @@ select ok(exists (select 1 from jsonb_array_elements(pg_temp.q('13600000-0000-40
 -- status tab: an approved verification lists the account under Verified (never activating it); the other rules are unchanged
 select is(app.admin_user_status_tab('pending_verification', 'approved'), 'verified', 'tab: an approved verification is listed under Verified');
 select is(app.admin_user_status_tab('pending_verification', 'submitted'), 'pending', 'tab: an open request stays Pending');
-select is(app.admin_user_status_tab('pending_verification', null), 'pending', 'tab: no request stays Pending');
+select is(app.admin_user_status_tab('pending_verification', null), null::text, 'tab: an unfinished registration with no request has no Pending tab (ADR-0031 step 1)');
 select is(app.admin_user_status_tab('pending_verification', 'rejected'), 'rejected', 'tab: a rejection is still Rejected');
 select is(app.admin_user_status_tab('suspended', 'approved'), 'suspended', 'tab: Suspended always wins');
 select is(app.admin_user_status_tab('active', null), null, 'tab: an active account that never asked for verification is NOT Verified (All only)');
