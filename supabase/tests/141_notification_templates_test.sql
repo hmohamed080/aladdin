@@ -9,7 +9,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(28);
+select plan(30);
 
 \set sup  '6e000000-0000-4000-8000-000000000001'
 \set adm  '6e000000-0000-4000-8000-000000000002'
@@ -107,6 +107,21 @@ select throws_ok($$select app.notify_from_template(null, null, 'marketplace.sell
                  '22023', null, 'E5 a missing recipient is refused');
 select throws_ok($$select app.notify_from_template('6e000000-0000-4000-8000-000000000004', null, 'no.such_template', 'organization', null, '/x', '{}'::jsonb)$$,
                  '22023', 'unknown notification template no.such_template', 'E6 an unknown template key is refused');
+-- a permitted template that repeats a variable can expand past the field limits: the write must still succeed
+-- (a failure would roll back the caller, e.g. a seller approval) and every rendered field must stay within its limit.
+-- The 300-character value is all quotes and backslashes, the worst case for JSON escaping.
+select pg_temp.act_as(:'sup');
+select public.admin_notification_template_set('marketplace.product.rejected',
+  'عنوان {message}{message}{message}{message}', repeat('{message}', 10),
+  'Title {message}{message}{message}{message}', repeat('{message}', 10), 'اختبار التمدد');
+select pg_temp.back();
+select lives_ok($$select app.notify_from_template('6e000000-0000-4000-8000-000000000004', null, 'marketplace.product.rejected', 'product', null, '/x',
+  jsonb_build_object('message', repeat('"\', 150), 'product_name', 'p', 'showroom_name', 's'))$$,
+  'E9 an expanding template still writes the notification');
+select ok((select char_length(content #>> '{ar,body}') <= 500 and char_length(content #>> '{en,body}') <= 500
+              and char_length(content #>> '{ar,title}') <= 120 and char_length(content #>> '{en,title}') <= 120
+           from public.notifications where event_type = 'marketplace.product.rejected' and recipient_user_id = '6e000000-0000-4000-8000-000000000004'),
+  'E10 every rendered field is cut to its limit');
 -- closed to clients
 select pg_temp.act_as(:'sup');
 select throws_ok($$select app.notify_from_template('6e000000-0000-4000-8000-000000000004', null, 'marketplace.seller.rejected', 'organization', null, '/x', '{}'::jsonb)$$,

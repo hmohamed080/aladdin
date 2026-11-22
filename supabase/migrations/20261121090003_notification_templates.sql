@@ -74,7 +74,13 @@ alter table public.notifications add constraint ck_notifications_content_shape c
   content is null or (
     jsonb_typeof(content) = 'object'
     and jsonb_typeof(content -> 'ar') = 'object' and jsonb_typeof(content -> 'en') = 'object'
-    and length(content::text) <= 4096));
+    -- bound the fields themselves (what the writer guarantees), not the serialized size: escaping of quotes and
+    -- backslashes in JSON can double the serialized length, so a size-only limit could reject a valid template
+    and char_length(coalesce(content -> 'ar' ->> 'title', '')) <= 120
+    and char_length(coalesce(content -> 'en' ->> 'title', '')) <= 120
+    and char_length(coalesce(content -> 'ar' ->> 'body', '')) <= 500
+    and char_length(coalesce(content -> 'en' ->> 'body', '')) <= 500
+    and length(content::text) <= 16384));
 comment on column public.notifications.content is
   'Rendered bilingual snapshot written by app.notify_from_template. Null for key-based rows (title_key/body_key). A template edit never changes a stored row.';
 
@@ -239,13 +245,16 @@ begin
     raise exception 'template variables must be a JSON object' using errcode = '22023';
   end if;
 
+  -- Each rendered field is cut to its limit (title 120, body 500, the same limits the editor enforces on the template
+  -- itself). A template that repeats a variable can expand past them; cutting keeps the write from failing, which would
+  -- roll back the caller's transaction (for example a seller approval).
   v_content := jsonb_build_object(
     'ar', jsonb_build_object(
-      'title', app.render_template(coalesce(t.title_ar, t.default_title_ar), v_vars),
-      'body',  app.render_template(coalesce(t.body_ar,  t.default_body_ar),  v_vars)),
+      'title', btrim(left(app.render_template(coalesce(t.title_ar, t.default_title_ar), v_vars), 120)),
+      'body',  btrim(left(app.render_template(coalesce(t.body_ar,  t.default_body_ar),  v_vars), 500))),
     'en', jsonb_build_object(
-      'title', app.render_template(coalesce(t.title_en, t.default_title_en), v_vars),
-      'body',  app.render_template(coalesce(t.body_en,  t.default_body_en),  v_vars)));
+      'title', btrim(left(app.render_template(coalesce(t.title_en, t.default_title_en), v_vars), 120)),
+      'body',  btrim(left(app.render_template(coalesce(t.body_en,  t.default_body_en),  v_vars), 500))));
 
   -- the key is the i18n fallback for readers that do not know `content`; it is never shown as text
   v_id := app.notify(p_recipient_user_id, p_organization_id, t.event_type, p_subject_type, p_subject_id,
