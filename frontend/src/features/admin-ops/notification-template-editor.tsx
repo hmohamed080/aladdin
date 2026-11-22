@@ -1,13 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { Input, SubmitButton, Textarea } from "@/components/ui/controls";
 import { saveNotificationTemplateAction } from "@/server/actions/notification-templates";
-import type { FormState } from "@/server/actions/sales-forms";
 import { BODY_MAX, TITLE_MAX } from "@/lib/notifications/templates";
+import { useKeptFormAction } from "./use-kept-form-action";
 
-const INITIAL: FormState = { ok: false };
+const FIELDS = ["title_ar", "body_ar", "title_en", "body_en", "reason"] as const;
 
 export type TemplateEditorProps = {
   templateKey: string;
@@ -24,7 +23,7 @@ export type TemplateEditorProps = {
  */
 export function NotificationTemplateEditor({ templateKey, label, variables, texts, isEdited, changedLabel }: TemplateEditorProps) {
   const { t } = useI18n();
-  const [state, formAction] = useActionState(saveNotificationTemplateAction, INITIAL);
+  const { state, formAction, valueOf } = useKeptFormAction(saveNotificationTemplateAction, FIELDS);
   const id = `nt-${templateKey.replaceAll(".", "-")}`;
   return (
     <form action={formAction} className="flex flex-col gap-md border-b border-strong py-lg" data-testid={`notification-template-${templateKey}`}>
@@ -47,20 +46,20 @@ export function NotificationTemplateEditor({ templateKey, label, variables, text
       <div className="grid gap-md md:grid-cols-2">
         <div className="flex flex-col gap-sm" dir="rtl" lang="ar">
           <label htmlFor={`${id}-title-ar`} className="text-label text-fg-muted">{t("notificationTemplates.fields.titleAr")}</label>
-          <Input id={`${id}-title-ar`} name="title_ar" required maxLength={TITLE_MAX} defaultValue={texts.titleAr} />
+          <Input id={`${id}-title-ar`} name="title_ar" required maxLength={TITLE_MAX} defaultValue={valueOf("title_ar", texts.titleAr)} />
           <label htmlFor={`${id}-body-ar`} className="text-label text-fg-muted">{t("notificationTemplates.fields.bodyAr")}</label>
-          <Textarea id={`${id}-body-ar`} name="body_ar" required maxLength={BODY_MAX} rows={3} defaultValue={texts.bodyAr} />
+          <Textarea id={`${id}-body-ar`} name="body_ar" required maxLength={BODY_MAX} rows={3} defaultValue={valueOf("body_ar", texts.bodyAr)} />
         </div>
         <div className="flex flex-col gap-sm" dir="ltr" lang="en">
           <label htmlFor={`${id}-title-en`} className="text-label text-fg-muted">{t("notificationTemplates.fields.titleEn")}</label>
-          <Input id={`${id}-title-en`} name="title_en" required maxLength={TITLE_MAX} defaultValue={texts.titleEn} />
+          <Input id={`${id}-title-en`} name="title_en" required maxLength={TITLE_MAX} defaultValue={valueOf("title_en", texts.titleEn)} />
           <label htmlFor={`${id}-body-en`} className="text-label text-fg-muted">{t("notificationTemplates.fields.bodyEn")}</label>
-          <Textarea id={`${id}-body-en`} name="body_en" required maxLength={BODY_MAX} rows={3} defaultValue={texts.bodyEn} />
+          <Textarea id={`${id}-body-en`} name="body_en" required maxLength={BODY_MAX} rows={3} defaultValue={valueOf("body_en", texts.bodyEn)} />
         </div>
       </div>
       <div>
         <label htmlFor={`${id}-reason`} className="text-label text-fg-muted">{t("notificationTemplates.fields.reason")}</label>
-        <Input id={`${id}-reason`} name="reason" required minLength={3} maxLength={500} dir="auto" placeholder={t("notificationTemplates.reasonHint")} />
+        <Input id={`${id}-reason`} name="reason" required minLength={3} maxLength={500} dir="auto" placeholder={t("notificationTemplates.reasonHint")} defaultValue={valueOf("reason")} />
       </div>
       <div className="flex flex-wrap items-center gap-md">
         <SubmitButton name="intent" value="save" pendingLabel={t("notificationTemplates.saving")}>{t("notificationTemplates.save")}</SubmitButton>
