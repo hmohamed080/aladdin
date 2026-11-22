@@ -50,6 +50,9 @@ begin
       'pending_registration_consume', 'profile_set_display_name', 'profile_set_phone', 'profile_set_username',
       'account_password_confirm', 'identity_password_change_audit', 'identity_password_change_authorize',
       'installer_phone_change_begin', 'installer_phone_change_settle', 'installer_phone_change_status',
+      -- Invitation acceptance runs while registration is still unfinished (a new staff invitee deliberately has no account type
+      -- until they accept; a member invitation hands off to onboarding). Both authenticate by token + confirmed email match.
+      'staff_invitation_accept', 'invitation_accept',
       'my_account_status') then
       return true;
     end if;

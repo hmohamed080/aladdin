@@ -11,7 +11,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(23);
+select plan(25);
 
 \set inc  '14300000-0000-4000-8000-0000000000d1'
 \set unc  '14300000-0000-4000-8000-0000000000d2'
@@ -68,6 +68,8 @@ select is(pg_temp.hook(:'inc', 'GET', '/organizations'), '', 'consent pending: a
 select is(pg_temp.hook(:'inc', 'HEAD', '/profiles'), '', 'consent pending: HEAD is allowed');
 select is(pg_temp.hook(:'inc', 'POST', '/rpc/my_registration_state'), '', 'consent pending: a STABLE function is allowed');
 select is(pg_temp.hook(:'inc', 'POST', '/rpc/record_consent'), '', 'consent pending: record_consent (a sign-up step) is allowed');
+select is(pg_temp.hook(:'inc', 'POST', '/rpc/staff_invitation_accept'), '', 'consent pending: staff_invitation_accept (a new staff invitee) is allowed');
+select is(pg_temp.hook(:'inc', 'POST', '/rpc/invitation_accept'), '', 'consent pending: invitation_accept (a member invitee) is allowed');
 select is(pg_temp.hook(:'inc', 'POST', '/rpc/onboarding_select_account_type'), '', 'consent pending: onboarding_select_account_type is allowed');
 select is(pg_temp.hook(:'inc', 'POST', '/rpc/this_function_does_not_exist'), 'registration incomplete|registration_incomplete', 'an unknown function name fails closed');
 select is(pg_temp.hook(:'inc', 'POST', '/rpc/graphql', 'authenticated', '{"content-profile":"graphql_public"}'), 'registration incomplete|registration_incomplete', 'the graphql_public schema (pg_graphql mutations) is refused');
