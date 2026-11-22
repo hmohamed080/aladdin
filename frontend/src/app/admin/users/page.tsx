@@ -82,6 +82,7 @@ export default async function PreviewUsersPage({
   const governorateLabels = m.onboarding.consumer.governorates as Record<string, string>;
   const cityLabels = m.onboarding.consumer.cities as Record<string, string>;
   const verificationStateLabels = t.verificationState;
+  const registrationLabels = t.registrationState as Record<string, string>;
   const flagLabels = t.flagLabels;
   const cols = t.columns;
   const rowActionLabels = t.rowActions;
@@ -195,6 +196,18 @@ export default async function PreviewUsersPage({
       cell: (u) => <StatusBadge status={u.verificationState} label={verificationStateLabels[u.verificationState]} />,
     },
     {
+      key: "registration",
+      header: cols.registration,
+      minWidth: "9rem",
+      nowrap: true,
+      cell: (u) =>
+        u.registrationState ? (
+          <StatusBadge status={u.registrationState} label={registrationLabels[u.registrationState] ?? u.registrationState} />
+        ) : (
+          <span className="text-fg-muted">—</span>
+        ),
+    },
+    {
       key: "registered",
       header: <SortableHeader field="registered" label={cols.registered} isDefault />,
       minWidth: "8.5rem",
@@ -207,7 +220,7 @@ export default async function PreviewUsersPage({
       header: cols.status,
       minWidth: "7.5rem",
       nowrap: true,
-      cell: (u) => <StatusBadge status={u.status} label={statusLabels[u.status] ?? u.status} />,
+      cell: (u) => <StatusBadge status={u.status} label={u.status === "pending_verification" ? t.userStatusPendingLabel : (statusLabels[u.status] ?? u.status)} />,
     },
     {
       key: "lastActive",
