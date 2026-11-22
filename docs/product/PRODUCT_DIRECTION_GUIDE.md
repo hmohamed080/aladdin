@@ -381,6 +381,11 @@ During every account review, Landing Page review, Registration review, and featu
 ## Change History
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
 
+### 2026-11-22 — Account / Registration / Verification are separate statuses (ADR-0031, target model)
+- **What:** [ADR-0031](../decisions/ADR-0031-account-registration-verification-statuses.md) separates Account Status, Registration Status and Verification Status, defines two organization trust levels, revocation and one-account-per-chosen-type. **It is a staged target, not current behavior.** Until each rollout step ships: activation stays tied to completing onboarding (*Activation vs. Verification*, 2026-08-11, unchanged); Contractor, Engineer and Personal Account stay *Coming Soon* (visible, disabled; server and account-type RPC refuse a fresh selection); the registration choice stays *intent* and the first business is created at the explicit *Add a business* step. ADR-0031 only says that when those are enabled the same registration gates and verification rules already apply to all nine types, and that Active means "not blocked", never "registration complete".
+- **Why:** The Admin showed Account Status, Verification and profile completion that disagreed.
+- **Approved by:** Owner, 2026-11-22.
+
 ### 2026-10-28 — Instagram-style sign-in and sign-up; mobile sign-up for every account type
 - **What:** `/auth/sign-in` takes one field, "Mobile number, username or email", plus the password, with Google / Facebook under an "OR". `/auth/sign-up` is a centred form: Google / Facebook, then Mobile number or email, Password, Birthday (required, 18+, private), Full Name, Username and Account Type, under one agreement line instead of three checkboxes (consents still recorded). Every account type may sign up with a mobile number, verified by a 6-digit WhatsApp code (Meta WhatsApp Cloud API) before the account is created. The separate installer and showroom phone pages and their links are removed; old URLs redirect. Auth pages no longer show the photo.
 - **Supersedes:** the installer Phone + Password exception's separate pages (2026-09-28) and the showroom phone entry (ADR-0014). Existing phone accounts sign in on `/auth/sign-in` with their number.
