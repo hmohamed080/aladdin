@@ -14,6 +14,8 @@
  *             outside this plan) and are not part of it. NOT function-only: it creates 30 tables and 9 sequences, so recovery is the
  *             pinned "marketplace" forward-fix and, unlike the function-only plans, a fresh restore-tested backup is required
  *             (a pinned snapshot with >= 218 migrations: see RESTORE_VERIFIED_SNAPSHOTS).
+ *   media-notify  20261121090001..003 (media caps, admin upload limits, notification templates) on top of Acceptance at 232 / 20261116100014.
+ *             232 -> 235. Creates tables: pinned "media-notify" forward-fix plus a fresh restore-verified backup (>= 232 migrations).
  *   m3a       after `m1` is applied (Acceptance and Production are both at 209 today): only 20261112090001 (P1 M3a) is pending. 209 -> 210.
  *
  *   node acceptance-gate.mjs <plan> <migration-list.json> <dry-run.json> <migrations dir>
@@ -29,6 +31,8 @@ import { fileURLToPath } from "node:url";
 export const ACCEPTANCE_REF = "nxossqhdfltcqdwvbewi";
 const MEDIA = "20261110090001", M1 = "20261110090002", M3A = "20261112090001", BASE = "20261107090006";
 const ACC_218 = "20261116090001"; // latest on Acceptance: #192/#200 (20261115090001..006) and the organization approval state (20261116090001)
+const ACC_232 = "20261116100014"; // latest on Acceptance after the Marketplace plan (read 2026-11-22: 232 migrations)
+const MN_PENDING = ["20261121090001", "20261121090002", "20261121090003"];
 const MKT_PENDING = Array.from({ length: 14 }, (_, i) => `202611161000${String(i + 1).padStart(2, "0")}`);
 /** changed = function names (schema.name, every overload) the plan is allowed to touch; nothing else may change in the catalog. */
 export const PLANS = {
@@ -186,6 +190,20 @@ export const PLANS = {
       "public.ix_marketplace_*",
       "public.uq_marketplace_*"
     ] },
+  // media-notify: media policy caps + admin-configurable upload limits + bilingual notification templates. 232 -> 235. Creates 4 tables and
+  // 1 sequence pair, so like the marketplace plan it needs a fresh restore-verified backup (>= 232 migrations) and a pinned forward-fix.
+  "media-notify": { fixes: ["media-notify"], recovery: "forward-fix", freshBackup: true, applied: 232, latest: ACC_232, pending: MN_PENDING, preContract: ACC_232, postContract: "20261121090003",
+    changed: [
+      "public.media_storage_attest",
+      "public.media_limits*", "public.media_limit_events*", "public.notification_templates*", "public.notification_template_events*",
+      "public.notifications.content*", "public.notifications.ck_notifications_*",
+      "public.media_videos.media_videos_cap_on_insert",
+      "app.media_videos_enforce_cap", "app.media_limit_bytes", "app.media_limit_events_append_only",
+      "app.notification_template_events_append_only", "app.notify_from_template", "app.render_template", "app.template_variables",
+      "public.admin_media_limit_events", "public.admin_media_limit_set", "public.admin_notification_template_events",
+      "public.admin_notification_template_reset", "public.admin_notification_template_set", "public.admin_notification_templates",
+      "public.marketplace_rejected_images_purge"
+    ] },
   "media+m1": { fixes: ["media", "m1"], recovery: "forward-fix", applied: 207, latest: BASE, pending: [MEDIA, M1], preContract: BASE, postContract: M1,
     changed: ["app.media_storage_key_assign", "public.media_migration_target_key", "public.media_migration_switch", "public.media_migration_rollback",
       "public.my_registration_state", "app.profile_completion", "public.admin_users_directory"] },
@@ -220,6 +238,8 @@ export const FORWARD_FIX = {
   // verification: restores what 20261115090002..006 changed. Those migrations are already applied on Acceptance, so NO plan uses it today;
   // kept (reviewed, pinned) for a future rollback of them. It does NOT undo the rows they wrote (only a restore-tested backup can).
   marketplace: { file: "forward-fix/marketplace-remove.sql", sha256: "72bdfd9b68ef88f85338321d4eb79c711e2d0be3bbf1e708a96b001dee58b734" },
+  // media-notify: refuses (RAISE) once an admin changed a limit or template or any notification was written from a template; never deletes user data.
+  "media-notify": { file: "forward-fix/media-notify-remove.sql", sha256: "97f24d26990816369bc4cd19d51f4f259528936cfc0fae6b7576e7219acee9d2" },
   verification: { file: "forward-fix/verification-restore-previous.sql", sha256: "a50cd460c243b3580927c1f8b8e84ec1cc1109048c9b08b055a06b470570fcac" },
   m1: { file: "forward-fix/m1-restore-previous.sql", sha256: "5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045" },
   m3a: { file: "forward-fix/m3a-restore-previous.sql", sha256: "d4161977e7664e3345d000ee87503fd3a5983935c81257dd082c0a5ef0b43ec3" },

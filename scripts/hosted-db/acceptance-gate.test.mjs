@@ -125,11 +125,11 @@ test("marketplace: 14 pending, all newer than the latest applied (plain push), 2
   assert.equal(P.postContract, "20261116100014");
 });
 
-test("marketplace: the pending set is exactly the migration files after 20261115090001 in this checkout, and 231 is the total file count", () => {
+test("marketplace: the pending set is exactly the migration files in (20261116090001, 20261116100014] in this checkout, and 232 files end at its post contract", () => {
   const dir = here("../../supabase/migrations");
   const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).map((f) => f.slice(0, 14)).sort();
-  assert.deepEqual(files.filter((v) => v > PLANS.marketplace.latest), PLANS.marketplace.pending);
-  assert.equal(files.length, PLANS.marketplace.applied + PLANS.marketplace.pending.length);
+  assert.deepEqual(files.filter((v) => v > PLANS.marketplace.latest && v <= PLANS.marketplace.postContract), PLANS.marketplace.pending);
+  assert.equal(files.filter((v) => v <= PLANS.marketplace.postContract).length, PLANS.marketplace.applied + PLANS.marketplace.pending.length);
 });
 
 test("marketplace: both permission contracts exist in this checkout", () => {
@@ -179,6 +179,67 @@ test("marketplace forward-fix: one transaction, a data guard that raises before 
   assert.ok(code.indexOf("DISABLE TRIGGER trg_admin_role_permissions_guard") < code.indexOf("delete from public.admin_role_permissions"));
   assert.ok(code.indexOf("ENABLE TRIGGER trg_admin_role_permissions_guard") > code.indexOf("delete from public.admin_role_permissions"));
   assert.ok(code.indexOf("ENABLE TRIGGER trg_admin_role_permissions_guard") < code.indexOf("delete from public.admin_permissions"));
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// plan "media-notify": 20261121090001..003 on top of Acceptance at 232 / 20261116100014
+// ---------------------------------------------------------------------------------------------------------------------
+test("media-notify: 3 pending, all newer than the latest applied, 232 -> 235, chained after the marketplace plan", () => {
+  const P = PLANS["media-notify"];
+  assert.deepEqual(P.pending, ["20261121090001", "20261121090002", "20261121090003"]);
+  assert.equal(P.applied, PLANS.marketplace.applied + PLANS.marketplace.pending.length);
+  assert.equal(P.latest, PLANS.marketplace.postContract);
+  assert.equal(P.preContract, P.latest);
+  assert.equal(P.postContract, "20261121090003");
+  assert.ok(P.pending.every((v) => v > P.latest));
+});
+
+test("media-notify: the pending set is exactly the migration files after 20261116100014 in this checkout, until a later plan exists", () => {
+  const files = readdirSync(here("../../supabase/migrations")).filter((f) => f.endsWith(".sql")).map((f) => f.slice(0, 14)).sort();
+  assert.deepEqual(files.filter((v) => v > PLANS["media-notify"].latest && v <= PLANS["media-notify"].postContract), PLANS["media-notify"].pending);
+});
+
+test("media-notify: both permission contracts exist in this checkout", () => {
+  for (const v of [PLANS["media-notify"].preContract, PLANS["media-notify"].postContract]) assert.ok(readFileSync(here(`../../supabase/permissions/${v}.json`), "utf8").length > 1000, v);
+});
+
+test("media-notify: the expected-change list names the four tables by prefix, the 15 functions and the notifications column, and nothing unrelated", () => {
+  const c = PLANS["media-notify"].changed;
+  for (const w of ["public.media_limits*", "public.media_limit_events*", "public.notification_templates*", "public.notification_template_events*", "public.notifications.content*",
+    "public.media_storage_attest", "app.notify_from_template", "public.marketplace_rejected_images_purge", "public.media_videos.media_videos_cap_on_insert"]) assert.ok(c.includes(w), w);
+  assert.equal(c.filter((x) => !x.endsWith("*") && /^(app|public)\.[a-z_]+$/.test(x)).length, 15);
+  for (const f of ["public.marketplace_*", "public.notifications", "public.profiles*"]) assert.ok(!c.includes(f), "not part of this plan: " + f);
+  assert.equal(new Set(c).size, c.length);
+});
+
+test("media-notify: it needs a fresh restore-verified snapshot (>= 232 migrations); the 203 and 218 ones are refused", () => {
+  const shas = allShas();
+  has(checkRecovery({ plan: "media-notify", label: "", forwardFixSha256: shas }), /needs --backup-label of a fresh restore-verified snapshot/);
+  has(checkRecovery({ plan: "media-notify", label: "aladdin-acceptance-20261108T094450Z", forwardFixSha256: shas }), /has 203 migrations/);
+  has(checkRecovery({ plan: "media-notify", label: "aladdin-acceptance-20261116T152127Z", forwardFixSha256: shas }), /has 218 migrations/);
+});
+
+test("media-notify: with a snapshot of 232+ migrations and the forward-fix pinned, recovery passes", () => {
+  RESTORE_VERIFIED_SNAPSHOTS["aladdin-acceptance-20991231T000000Z"] = { backupRun: "x", restoreRun: "y", tables: 1, rows: 1, migrations: 232 };
+  try { assert.deepEqual(checkRecovery({ plan: "media-notify", label: "aladdin-acceptance-20991231T000000Z", forwardFixSha256: allShas() }), []); }
+  finally { delete RESTORE_VERIFIED_SNAPSHOTS["aladdin-acceptance-20991231T000000Z"]; }
+});
+
+test("media-notify forward-fix: one transaction, a data guard that raises before any DROP, only permission rows are deleted, grants and limits restored", () => {
+  const sql = readFileSync(here(FORWARD_FIX["media-notify"].file), "utf8");
+  const code = sql.split("\n").filter((l) => !l.startsWith("--")).join("\n");
+  const outside = code.replace(/\$guard\$[\s\S]*?\$guard\$/g, "").replace(/\$function\$[\s\S]*?\$function\$/g, "");
+  assert.match(code, /^begin;/m);
+  assert.match(code, /commit;\s*$/);
+  assert.ok(code.indexOf("raise exception") > -1 && code.indexOf("raise exception") < code.indexOf("DROP TABLE"), "guard precedes the first DROP");
+  assert.doesNotMatch(code, /truncate/i);
+  assert.equal((outside.match(/delete from/gi) ?? []).length, 2);
+  assert.ok(code.indexOf("DISABLE TRIGGER trg_admin_role_permissions_guard") < code.indexOf("delete from public.admin_role_permissions"));
+  assert.ok(code.indexOf("ENABLE TRIGGER trg_admin_role_permissions_guard") > code.indexOf("delete from public.admin_role_permissions"));
+  assert.ok(code.indexOf("ENABLE TRIGGER trg_admin_role_permissions_guard") < code.indexOf("delete from public.admin_permissions"));
+  assert.match(code, /ADD CONSTRAINT ck_notifications_event_type_known/);
+  assert.match(code, /file_size_limit = 5242880/);
+  assert.equal((code.match(/drop table/gi) ?? []).length, 4);
 });
 
 test("verification forward-fix: one transaction, restores both removed guards and their triggers, drops the new function, never touches data", () => {
