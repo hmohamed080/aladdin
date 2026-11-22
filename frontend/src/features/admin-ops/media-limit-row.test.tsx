@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
 import { MediaLimitRow } from "./media-limit-row";
 
@@ -24,6 +24,26 @@ describe("MediaLimitRow", () => {
     expect(reason.required).toBe(true);
     expect(reason.minLength).toBe(3);
     expect(reason.maxLength).toBe(500);
+  });
+
+  it("keeps what was typed when the server refuses the save, and clears it after a success", async () => {
+    const { saveMediaLimitAction } = await import("@/server/actions/media-limits");
+    const save = vi.mocked(saveMediaLimitAction);
+    save.mockResolvedValueOnce({ ok: false, code: "mediaLimits.errors.aboveCeiling" });
+    renderWithI18n(<MediaLimitRow {...props} />, "en");
+    const form = screen.getByTestId("media-limit-image-marketplace");
+    const megabytes = form.querySelector('input[name="megabytes"]') as HTMLInputElement;
+    const reason = form.querySelector('input[name="reason"]') as HTMLInputElement;
+    fireEvent.change(megabytes, { target: { value: "25" } });
+    fireEvent.change(reason, { target: { value: "a long reason" } });
+    await act(async () => { fireEvent.submit(form); });
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(megabytes.value).toBe("25");
+    expect(reason.value).toBe("a long reason");
+    // a success returns the form to the saved state
+    await act(async () => { fireEvent.submit(form); });
+    expect(megabytes.value).toBe("");
+    expect(reason.value).toBe("");
   });
 
   it("says when the limit last changed, and gives the inputs accessible names", () => {

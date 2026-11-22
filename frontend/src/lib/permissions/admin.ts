@@ -55,6 +55,9 @@ export const ADMIN_PERMISSIONS = [
   // Upload size limits per place: view = Administrator and higher; manage = Super Admin only (by default).
   "media_limits.view",
   "media_limits.manage",
+  // In-app notification templates (Arabic + English): view = Administrator and higher; manage = Super Admin only (by default).
+  "notification_templates.view",
+  "notification_templates.manage",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
@@ -123,6 +126,7 @@ export const ADMIN_ROUTE_RULES: Readonly<Record<string, AdminRequirement>> = {
   "/admin/whatsapp-otp": "whatsapp_otp.view",
   "/admin/backups": "backup.view",
   "/admin/media-limits": "media_limits.view",
+  "/admin/notification-templates": "notification_templates.view",
   "/admin/points": "points.read",
   "/admin/analytics": "analytics.read",
   "/admin/audit": "audit.read",

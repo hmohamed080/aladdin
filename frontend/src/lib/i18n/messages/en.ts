@@ -1927,6 +1927,7 @@ export const en = {
           whatsapp_otp: "WhatsApp codes",
           backup: "Backups",
           media_limits: "Upload limits",
+          notification_templates: "Notification templates",
         },
         permissionDesc: {
           users: {
@@ -2000,6 +2001,10 @@ export const en = {
           media_limits: {
             view: "See the upload size limits for photos and videos, the platform ceiling and who last changed each one.",
             manage: "Change the upload size limit of a place, within the platform ceiling, with a reason.",
+          },
+          notification_templates: {
+            view: "See the in-app notification templates in Arabic and English and their change history.",
+            manage: "Edit the text of a notification template in Arabic and English, or reset it to the default, with a reason.",
           },
         },
         scopes: {
@@ -2887,6 +2892,55 @@ export const en = {
       belowFloor: "That is below the minimum for this place.",
       unknownPlace: "That place does not exist.",
       unavailable: "The limit could not be saved right now. Nothing was changed.",
+    },
+  },
+  notificationTemplates: {
+    title: "Notification templates",
+    subtitle: "In-app notification texts in Arabic and English. A notification is written with the template's current text when the event happens.",
+    viewOnly: "You can view the templates and their change history. Only a Super Admin can edit a template.",
+    listTitle: "Templates",
+    template: {
+      marketplace: {
+        seller: {
+          approved: "Showroom approved for the Marketplace",
+          rejected: "Showroom approval rejected",
+          suspended: "Showroom suspended",
+          reinstated: "Showroom reinstated",
+          revoked: "Showroom approval revoked",
+        },
+        product: { rejected: "Product rejected" },
+      },
+    },
+    variables: "Available variables",
+    variable: {
+      showroom_name: "Showroom name",
+      message: "Admin message to the owner",
+      product_name: "Product name",
+    },
+    fields: { titleAr: "Arabic title", bodyAr: "Arabic text", titleEn: "English title", bodyEn: "English text", reason: "Reason" },
+    reasonHint: "Why you are changing it (3 to 500 characters). Saved in the history under your name.",
+    edited: "Edited text",
+    default: "Default text",
+    changed: "Last changed {when}",
+    save: "Save template",
+    saving: "Saving…",
+    resetAction: "Back to default text",
+    saved: "Template saved.",
+    reset: "Template is back to its default text.",
+    unchanged: "Nothing changed.",
+    notes: {
+      snapshot: "Editing a template does not change notifications already sent. It applies to new notifications only.",
+      variables: "Write a variable in braces, like {showroom_name}. A variable the template does not list is refused. A missing variable shows as empty.",
+      default: "Going back to the default text is recorded in the history. It does not delete the template.",
+    },
+    history: { title: "Change history", empty: "No template has been changed yet.", set: "was edited", reset: "was reset to its default text", by: "by" },
+    errors: {
+      forbidden: "You do not have permission to edit notification templates.",
+      reason: "Write a reason of 3 to 500 characters.",
+      variable: "The text uses a variable this template does not allow.",
+      length: "Every text is required in Arabic and English: title up to 120 characters, text up to 500.",
+      unknown: "This template does not exist.",
+      unavailable: "Could not save the template right now. Nothing changed.",
     },
   },
   backups: {
