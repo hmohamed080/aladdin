@@ -18,8 +18,9 @@
 -- Accounts that are access_ready or active_personal (active membership or users.status = 'active') are unaffected, so staff
 -- and existing active members behave exactly as before. anon and service_role are not touched (the hook returns early).
 --
--- FAIL-OPEN NOTE. If PostgREST does not provide request.method the registration gate is skipped (revoked/suspended checks
--- still run). PostgREST sets it; the owner's post-apply smoke test must confirm a refusal (see the Acceptance gate plan).
+-- FAIL CLOSED. If the method cannot be determined (request.method missing) the request is treated as a write: an unfinished
+-- registration is refused unless the path is a sign-up step, a read-only function or a public function. The gate never skips
+-- itself because it cannot verify; (revoked/suspended checks run first, unchanged).
 --
 -- NOT CHANGED: my_registration_state, users.status, RLS policies, any RPC, any grant. Rollout/rollback: CREATE OR REPLACE
 -- app.api_pre_request again with the definition from 20261021090013 (forward-fix, never a down migration).
@@ -115,9 +116,9 @@ begin
     raise exception 'account suspended' using errcode = '42501', hint = 'account_suspended';
   end if;
 
-  -- ADR-0031: an unfinished registration may not change state outside the sign-up steps.
+  -- ADR-0031: an unfinished registration may not change state outside the sign-up steps. An unknown method counts as a write.
   v_method := nullif(current_setting('request.method', true), '');
-  if v_method is not null and upper(v_method) not in ('GET', 'HEAD', 'OPTIONS') then
+  if upper(coalesce(v_method, '')) not in ('GET', 'HEAD', 'OPTIONS') then
     -- Cheap path first: an active membership or users.status = 'active' (staff, existing members) is never incomplete.
     if not exists (select 1 from public.memberships m where m.user_id = v_sub and m.status = 'active')
        and not exists (select 1 from public.users u where u.id = v_sub and u.status = 'active')

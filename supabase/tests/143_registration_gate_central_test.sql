@@ -11,7 +11,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(25);
+select plan(28);
 
 \set inc  '14300000-0000-4000-8000-0000000000d1'
 \set unc  '14300000-0000-4000-8000-0000000000d2'
@@ -84,10 +84,13 @@ select is(pg_temp.hook(:'done', 'POST', '/organizations'), '', 'access_ready: a 
 select is(pg_temp.hook(:'done', 'POST', '/rpc/avatar_request_upload'), '', 'access_ready: a volatile RPC is not refused');
 select is(pg_temp.hook(:'stf', 'POST', '/organizations'), '', 'users.status = active (staff) is never refused');
 
--- D. suspended first; anon/service_role untouched; no method = fail open
+-- D. suspended first; anon/service_role untouched; no method = fail closed
 select is(pg_temp.hook(:'sus', 'POST', '/organizations'), 'account suspended|account_suspended', 'a suspended account is still refused as suspended');
 select is(pg_temp.hook(:'inc', 'POST', '/organizations', 'anon'), '', 'anon is untouched');
-select is(pg_temp.hook(:'inc', null, '/organizations'), '', 'no request.method: the registration gate fails open (documented)');
+select is(pg_temp.hook(:'inc', null, '/organizations'), 'registration incomplete|registration_incomplete', 'no request.method: the gate FAILS CLOSED for a table path');
+select is(pg_temp.hook(:'inc', null, '/rpc/avatar_request_upload'), 'registration incomplete|registration_incomplete', 'no request.method: the gate FAILS CLOSED for a volatile RPC');
+select is(pg_temp.hook(:'inc', null, '/rpc/record_consent'), '', 'no request.method: a sign-up step is still allowed');
+select is(pg_temp.hook(:'done', null, '/organizations'), '', 'no request.method: a finished registration is unaffected');
 
 select * from finish();
 rollback;
