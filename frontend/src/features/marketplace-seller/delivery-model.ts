@@ -9,7 +9,25 @@ import type { DeliveryPlace, DeliveryRate } from "@/server/actions/marketplace-s
  */
 
 /** What the database stores for one place. */
-export type StoredRate = { governorate_key: string; area_key: string | null; fee_egp: number | string | null };
+export type StoredRate = {
+  governorate_key: string;
+  area_key: string | null;
+  fee_egp: number | string | null;
+  duration_min_days?: number | null;
+  duration_max_days?: number | null;
+  next_day_available?: boolean;
+  next_day_fee_egp?: number | string | null;
+  free_shipping_min_egp?: number | string | null;
+};
+
+/** The showroom-wide delivery settings as the database returns them. */
+export type StoredSettings = {
+  preparation_days: number | null;
+  order_cutoff_time: string | null;
+  free_shipping_min_egp: number | string | null;
+  pickup_instructions: string | null;
+};
+export const EMPTY_SETTINGS: StoredSettings = { preparation_days: null, order_cutoff_time: null, free_shipping_min_egp: null, pickup_instructions: null };
 
 /* ---------------------------------------------------------------- areas */
 
@@ -53,9 +71,20 @@ export function toPlaces(governorates: readonly string[], rows: readonly AreaRow
 
 /* --------------------------------------------------------------- prices */
 
-/** One covered place with the price being typed (blank = not set). */
-export type PriceRow = { key: string; governorate: string; area: string; fee: string };
-export type PriceProblem = { row: number };
+/** One covered place with the terms being typed (blank = not set). */
+export type PriceRow = {
+  key: string;
+  governorate: string;
+  area: string;
+  fee: string;
+  minDays: string;
+  maxDays: string;
+  nextDay: boolean;
+  nextDayFee: string;
+  freeMin: string;
+};
+export type PriceField = "fee" | "duration" | "nextDayFee" | "freeMin";
+export type PriceProblem = { row: number; field?: PriceField };
 
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 
@@ -75,32 +104,106 @@ export function parseFee(input: string): number | null {
   return n <= 100000 ? n : null;
 }
 
+/** A whole number of days from 0 to `max` (Arabic digits accepted). */
+export function parseDays(input: string, max = 30): number | null {
+  const s = normalizeFee(input);
+  if (!/^\d{1,2}$/.test(s)) return null;
+  const n = Number(s);
+  return n <= max ? n : null;
+}
+
+/** A free-shipping minimum order value: more than 0, up to 1,000,000 EGP, at most two decimals. */
+export function parseMinimum(input: string): number | null {
+  const s = normalizeFee(input);
+  if (!/^\d{1,7}(\.\d{1,2})?$/.test(s)) return null;
+  const n = Number(s);
+  return n > 0 && n <= 1000000 ? n : null;
+}
+
+const numText = (v: number | string | null | undefined) => (v === null || v === undefined ? "" : String(Number(v)));
+
 /** Governorates first, each followed by its areas, in the order the database returned them. */
 export function priceRowsFrom(rates: readonly StoredRate[]): PriceRow[] {
   return rates.map((r, i) => ({
     key: `p${i}`,
     governorate: r.governorate_key,
     area: r.area_key ?? "",
-    fee: r.fee_egp === null || r.fee_egp === undefined ? "" : String(Number(r.fee_egp)),
+    fee: numText(r.fee_egp),
+    minDays: numText(r.duration_min_days),
+    maxDays: numText(r.duration_max_days),
+    nextDay: Boolean(r.next_day_available),
+    nextDayFee: numText(r.next_day_fee_egp),
+    freeMin: numText(r.free_shipping_min_egp),
   }));
 }
 
-/** A blank price is allowed (not set); anything typed must be a valid fee. */
+/** Blank is allowed (not set); anything typed must be valid. Duration needs both bounds, min <= max. */
 export function validatePrices(rows: readonly PriceRow[]): PriceProblem[] {
   const problems: PriceProblem[] = [];
   rows.forEach((r, i) => {
-    if (r.fee.trim() !== "" && parseFee(r.fee) === null) problems.push({ row: i + 1 });
+    const row = i + 1;
+    if (r.fee.trim() !== "" && parseFee(r.fee) === null) problems.push({ row, field: "fee" });
+    const min = r.minDays.trim() === "" ? undefined : parseDays(r.minDays);
+    const max = r.maxDays.trim() === "" ? undefined : parseDays(r.maxDays);
+    const oneBlank = (r.minDays.trim() === "") !== (r.maxDays.trim() === "");
+    if (oneBlank || min === null || max === null || (min !== undefined && max !== undefined && min > max)) problems.push({ row, field: "duration" });
+    if (r.nextDay && parseFee(r.nextDayFee) === null) problems.push({ row, field: "nextDayFee" });
+    if (r.freeMin.trim() !== "" && parseMinimum(r.freeMin) === null) problems.push({ row, field: "freeMin" });
   });
   return problems;
 }
 
-export function toPrices(rows: readonly PriceRow[]): DeliveryRate[] {
+export type PlaceTerms = DeliveryRate & {
+  duration_min_days: number | null;
+  duration_max_days: number | null;
+  next_day_available: boolean;
+  next_day_fee_egp: number | null;
+  free_shipping_min_egp: number | null;
+};
+
+export function toPrices(rows: readonly PriceRow[]): PlaceTerms[] {
   return rows.map((r) => ({
     governorate_key: r.governorate,
     area_key: r.area || null,
     fee_egp: r.fee.trim() === "" ? null : parseFee(r.fee),
+    duration_min_days: r.minDays.trim() === "" ? null : parseDays(r.minDays),
+    duration_max_days: r.maxDays.trim() === "" ? null : parseDays(r.maxDays),
+    next_day_available: r.nextDay,
+    next_day_fee_egp: r.nextDay ? parseFee(r.nextDayFee) : null,
+    free_shipping_min_egp: r.freeMin.trim() === "" ? null : parseMinimum(r.freeMin),
   }));
 }
 
 /** How many covered places still have no price. */
 export const unpricedCount = (rates: readonly StoredRate[]) => rates.filter((r) => r.fee_egp === null || r.fee_egp === undefined).length;
+
+/* ------------------------------------------------------------- showroom-wide */
+
+export type SettingsForm = { prep: string; cutoff: string; freeMin: string; pickupNote: string };
+export type SettingsProblem = "prep" | "cutoff" | "freeMin" | "pickupNote";
+
+export const settingsFormFrom = (s: StoredSettings): SettingsForm => ({
+  prep: numText(s.preparation_days),
+  cutoff: s.order_cutoff_time ?? "",
+  freeMin: numText(s.free_shipping_min_egp),
+  pickupNote: s.pickup_instructions ?? "",
+});
+
+export function validateSettings(f: SettingsForm): SettingsProblem[] {
+  const out: SettingsProblem[] = [];
+  if (f.prep.trim() !== "" && parseDays(f.prep) === null) out.push("prep");
+  if (f.cutoff.trim() !== "" && !/^([01]\d|2[0-3]):[0-5]\d$/.test(f.cutoff.trim())) out.push("cutoff");
+  if (f.freeMin.trim() !== "" && parseMinimum(f.freeMin) === null) out.push("freeMin");
+  if (f.pickupNote.trim().length > 300) out.push("pickupNote");
+  return out;
+}
+
+/** Every key is sent, so a blank box clears the stored value. */
+export function toSettings(f: SettingsForm): Record<string, unknown> {
+  return {
+    preparation_days: f.prep.trim() === "" ? null : parseDays(f.prep),
+    order_cutoff_time: f.cutoff.trim() === "" ? null : f.cutoff.trim(),
+    free_shipping_min_egp: f.freeMin.trim() === "" ? null : parseMinimum(f.freeMin),
+    pickup_instructions: f.pickupNote.trim() === "" ? null : f.pickupNote.trim(),
+  };
+}

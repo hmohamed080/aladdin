@@ -18,6 +18,7 @@ export function PaymentSettingsEditor({ organizationId, initial }: { organizatio
   const { t } = useI18n();
   const [cod, setCod] = useState(initial.cod_enabled);
   const [instapay, setInstapay] = useState(initial.instapay_enabled);
+  const [full, setFull] = useState(Boolean(initial.instapay_full_enabled));
   const [address, setAddress] = useState(initial.instapay_address ?? "");
   const [name, setName] = useState(initial.instapay_account_name ?? "");
   const [percent, setPercent] = useState(initial.instapay_deposit_percent === null ? "" : String(initial.instapay_deposit_percent));
@@ -35,10 +36,15 @@ export function PaymentSettingsEditor({ organizationId, initial }: { organizatio
       setMessage({ ok: false, text: k("percentInvalid") });
       return;
     }
+    if ((instapay || full) && (address.trim().length < 3 || name.trim().length < 2)) {
+      setMessage({ ok: false, text: k("accountRequired") });
+      return;
+    }
     startSave(async () => {
       const r = await savePaymentSettingsAction(organizationId, {
         cod_enabled: cod,
         instapay_enabled: instapay,
+        instapay_full_enabled: full,
         instapay_address: address,
         instapay_account_name: name,
         instapay_deposit_percent: percentValue,
@@ -80,6 +86,19 @@ export function PaymentSettingsEditor({ organizationId, initial }: { organizatio
         </div>
       </section>
 
+      <section className={card} aria-labelledby="pay-instapay-full">
+        <h2 id="pay-instapay-full" className="flex items-center gap-sm text-title text-fg">
+          <ReceiptIcon size={20} />
+          {k("instapayFullTitle")}
+        </h2>
+        <p className="mt-1 text-label text-fg-secondary">{k("instapayFullHint")}</p>
+        <div className="mt-md">
+          <Checkbox id="pay-instapay-full-on" name="instapay-full" checked={full} onChange={(on) => { setMessage(null); setFull(on); }}>
+            {k("instapayFullLabel")}
+          </Checkbox>
+        </div>
+      </section>
+
       <section className={card} aria-labelledby="pay-instapay">
         <h2 id="pay-instapay" className="flex items-center gap-sm text-title text-fg">
           <ReceiptIcon size={20} />
@@ -91,35 +110,44 @@ export function PaymentSettingsEditor({ organizationId, initial }: { organizatio
             {k("instapayLabel")}
           </Checkbox>
           {instapay ? (
-            <div className="grid gap-md tablet:grid-cols-2">
-              <label className="flex flex-col gap-1 text-label text-fg">
-                {k("address")}
-                <Input value={address} dir="ltr" maxLength={100} disabled={readOnly} onChange={(e) => setAddress(e.target.value)} />
-                <span className="text-caption text-fg-secondary">{k("addressHint")}</span>
-              </label>
-              <label className="flex flex-col gap-1 text-label text-fg">
-                {k("accountName")}
-                <Input value={name} maxLength={100} disabled={readOnly} onChange={(e) => setName(e.target.value)} />
-              </label>
-              <label className="flex flex-col gap-1 text-label text-fg">
-                {k("percent")}
-                <Input
-                  value={percent}
-                  dir="ltr"
-                  inputMode="numeric"
-                  maxLength={3}
-                  disabled={readOnly}
-                  aria-invalid={percentBad || undefined}
-                  onChange={(e) => setPercent(e.target.value)}
-                />
-                <span className="text-caption text-fg-secondary">{k("percentHint")}</span>
-              </label>
-            </div>
+            <label className="flex flex-col gap-1 text-label text-fg tablet:max-w-sm">
+              {k("percent")}
+              <Input
+                value={percent}
+                dir="ltr"
+                inputMode="numeric"
+                maxLength={3}
+                disabled={readOnly}
+                aria-invalid={percentBad || undefined}
+                onChange={(e) => setPercent(e.target.value)}
+              />
+              <span className="text-caption text-fg-secondary">{k("percentHint")}</span>
+            </label>
           ) : null}
         </div>
       </section>
 
-      {!cod && !instapay ? <p className="text-label text-warning" role="status">{k("noneOn")}</p> : null}
+      {instapay || full ? (
+        <section className={card} aria-labelledby="pay-account">
+          <h2 id="pay-account" className="flex items-center gap-sm text-title text-fg">
+            <MoneyIcon size={20} />
+            {k("accountTitle")}
+          </h2>
+          <div className="mt-md grid gap-md tablet:grid-cols-2">
+            <label className="flex flex-col gap-1 text-label text-fg">
+              {k("address")}
+              <Input value={address} dir="ltr" maxLength={100} disabled={readOnly} onChange={(e) => setAddress(e.target.value)} />
+              <span className="text-caption text-fg-secondary">{k("addressHint")}</span>
+            </label>
+            <label className="flex flex-col gap-1 text-label text-fg">
+              {k("accountName")}
+              <Input value={name} maxLength={100} disabled={readOnly} onChange={(e) => setName(e.target.value)} />
+            </label>
+          </div>
+        </section>
+      ) : null}
+
+      {!cod && !instapay && !full ? <p className="text-label text-warning" role="status">{k("noneOn")}</p> : null}
 
       <div className="flex flex-wrap items-center gap-sm">
         <Button variant="accent" onClick={save} disabled={saving || readOnly} aria-busy={saving}>

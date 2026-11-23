@@ -1,4 +1,7 @@
 - Acceptance (`nxossqhdfltcqdwvbewi`) is at 235 migrations, latest `20261121090003` (media caps, admin upload limits, notification templates applied 2026-11-22). The matching frontend is NOT deployed there yet. Production is untouched (last recorded 207).
+## Marketplace seller delivery and payment settings (draft PR 8, not deployed) - 2026-11-23
+- Branch `feat/mkt-delivery-payment-settings-20261123`: migration `20261123120001` (preparation days, daily cut-off, per-area duration / next-day / free-shipping minimum, per-product free shipping, InstaPay full payment, append-only settings audit, `app.marketplace_seller_commerce_missing` readiness contract) is NOT applied to Acceptance or Production (local isolated stack only, tested in rolled-back transactions). The publication gate is untouched (PR 7 consumes the readiness function). Seller pages: `/showroom/marketplace/delivery` and `/showroom/marketplace/payments`.
+
 ## Marketplace notification templates (draft PR, not deployed) - 2026-11-21
 - Branch `feat/mkt-notification-templates-20261121`: migration `20261121090003` (templates, history, `notifications.content`, six `marketplace.*` event types) is NOT applied to Acceptance or Production (local isolated stack only). Admin page `/admin/notification-templates`. No emitter calls it yet (PR 5 and PR 6).
 
