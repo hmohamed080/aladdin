@@ -58,3 +58,45 @@ export async function saveNotificationTemplateAction(_previous: FormState, fd: F
   revalidatePath("/admin/notification-templates");
   return { ok: true, code: (data as { changed?: boolean } | null)?.changed === false ? "notificationTemplates.unchanged" : "notificationTemplates.saved" };
 }
+
+const PRESET_ACTIONS = ["approve", "reject", "suspend", "reinstate", "revoke"];
+
+/**
+ * Super Admin: create or edit one owner-message preset of the Marketplace seller transitions (admin_marketplace_seller_preset_save,
+ * notification_templates.manage). Presets are deactivated, never deleted, so an old event keeps its meaning. The database judges the
+ * permission, the lengths and the reason; this reshapes the form and maps the refusals.
+ */
+export async function saveSellerPresetAction(_previous: FormState, fd: FormData): Promise<FormState> {
+  const id = String(fd.get("id") ?? "").trim() || null;
+  const action = String(fd.get("action") ?? "");
+  const text = (name: string) => String(fd.get(name) ?? "").trim();
+  const reason = text("reason");
+  const sort = Number.parseInt(String(fd.get("sort_order") ?? "0"), 10);
+  if (!PRESET_ACTIONS.includes(action)) return { ok: false, code: "notificationTemplates.presets.errors.action" };
+  if (reason.length < 3 || reason.length > 500) return { ok: false, code: "notificationTemplates.errors.reason" };
+  if (!text("label_ar") || !text("label_en") || !text("text_ar") || !text("text_en")
+      || text("label_ar").length > 80 || text("label_en").length > 80 || text("text_ar").length > 300 || text("text_en").length > 300) {
+    return { ok: false, code: "notificationTemplates.presets.errors.length" };
+  }
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.rpc("admin_marketplace_seller_preset_save", {
+    p_id: id as string,
+    p_action: action,
+    p_label_ar: text("label_ar"),
+    p_label_en: text("label_en"),
+    p_text_ar: text("text_ar"),
+    p_text_en: text("text_en"),
+    p_is_active: fd.get("is_active") === "on",
+    p_sort_order: Number.isFinite(sort) ? sort : 0,
+    p_reason: reason,
+  });
+  if (error) {
+    const code = error.code === "42501" ? "notificationTemplates.errors.forbidden"
+      : error.code === "22023" ? "notificationTemplates.presets.errors.length"
+      : "notificationTemplates.errors.unavailable";
+    return { ok: false, code };
+  }
+  revalidatePath("/admin/notification-templates");
+  revalidatePath("/admin/marketplace");
+  return { ok: true, code: "notificationTemplates.presets.saved" };
+}

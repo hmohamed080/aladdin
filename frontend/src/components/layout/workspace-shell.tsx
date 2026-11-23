@@ -17,7 +17,8 @@ import { SIDEBAR_MODE_COOKIE, resolveSidebarMode } from "@/lib/ui/sidebar-mode";
 import { commerceStance } from "@/lib/workspace/supply-side";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadMarketplaceSellerStatus } from "@/server/queries/marketplace-seller";
-import { MARKETPLACE_SELL_ENTITLEMENT } from "@/lib/nav/modules";
+import { MARKETPLACE_REQUEST_ENTITLEMENT, MARKETPLACE_SELL_ENTITLEMENT } from "@/lib/nav/modules";
+import { isMarketplacePreviewEnabled } from "@/lib/env";
 
 /**
  * The B2B WORKSPACE assembly — what fills the shared shell for an organization.
@@ -66,8 +67,19 @@ export async function WorkspaceShell({
   // membership capability: the module is drawn only for an approved seller. The
   // membership capabilities themselves are passed on untouched everywhere else.
   const sellerStatus = await loadMarketplaceSellerStatus(await getServerSupabase(), active.organizationId);
+  // An owner of an active showroom that is not an approved seller sees the one "Marketplace approval" module instead,
+  // where the standing is shown and approval can be requested (the database re-checks owner authority and eligibility).
+  const canAskForApproval =
+    isMarketplacePreviewEnabled() &&
+    active.orgType === "showroom_dealer" &&
+    active.capabilities.includes("org.manage") &&
+    sellerStatus !== "approved";
   const navCapabilities =
-    sellerStatus === "approved" ? [...active.capabilities, MARKETPLACE_SELL_ENTITLEMENT] : active.capabilities;
+    sellerStatus === "approved"
+      ? [...active.capabilities, MARKETPLACE_SELL_ENTITLEMENT]
+      : canAskForApproval
+        ? [...active.capabilities, MARKETPLACE_REQUEST_ENTITLEMENT]
+        : active.capabilities;
 
   return (
     <AppShell

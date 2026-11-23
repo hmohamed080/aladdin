@@ -1,4 +1,7 @@
 - Acceptance (`nxossqhdfltcqdwvbewi`) is at 235 migrations, latest `20261121090003` (media caps, admin upload limits, notification templates applied 2026-11-22). The matching frontend is NOT deployed there yet. Production is untouched (last recorded 207).
+## Marketplace seller approval v2 (draft PR, not deployed) - 2026-11-23
+- Branch `feat/mkt-seller-approval-v2-20261123`: migration `20261123090001` (status `rejected`, reversible revoke, owner request RPC, owner-message presets, owner-only notifications through the templates) is NOT applied to Acceptance or Production (local isolated stack only, rolled-back transactions). Pages: `/admin/marketplace`, `/admin/notification-templates` (preset editor), `/showroom/marketplace`.
+
 ## Marketplace notification templates (draft PR, not deployed) - 2026-11-21
 - Branch `feat/mkt-notification-templates-20261121`: migration `20261121090003` (templates, history, `notifications.content`, six `marketplace.*` event types) is NOT applied to Acceptance or Production (local isolated stack only). Admin page `/admin/notification-templates`. No emitter calls it yet (PR 5 and PR 6).
 
