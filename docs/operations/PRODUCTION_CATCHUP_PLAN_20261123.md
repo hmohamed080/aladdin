@@ -42,7 +42,7 @@ Why the gate (6) is not first: Production has 1,039 users whose `users.status` i
 1. Live read-only history of Production (done 2026-11-23: 210, latest `20261112090001`; repeat immediately before each batch) and a catalog fingerprint against the expected pre-state.
 2. A Production gate per batch. `acceptance-gate.mjs` is Acceptance-only; `p2-gate.mjs` and `production-p2-push.sh` exist for Production but are pinned to the old 203 / 4 pending state and must be re-pinned to the live state for each batch (plan name, applied count, pending list, pre and post permission contract, forward-fix sha256).
 3. A forward-fix file per batch, proven on a scratch database against the live Production function hashes (the same method used for `registration-gate`).
-4. For batches 4 and 5 (and any batch that creates tables): a fresh Production backup and its restore test. Production backups wait for their own owner GO.
+4. A restore-verified PRODUCTION snapshot for every Production step (the Production gate scripts enforce it and refuse today because none is pinned). How to take, restore-test and pin it, and how to turn on automatic backups for both environments: [`BACKUPS_ENABLEMENT_PLAN_20261123.md`](BACKUPS_ENABLEMENT_PLAN_20261123.md). Production backups wait for their own owner GO.
 5. The matching frontend is deployed AFTER its migrations, never before.
 6. Per action: a gate plan shown to the owner and an explicit GO. No batch is applied by this document.
 
