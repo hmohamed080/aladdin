@@ -209,14 +209,14 @@ Logs: moving image bytes to the Worker also removes `getUser` and 2–3 RPCs per
 ---
 
 ## 7. Remaining Supabase Storage dependencies after the switch
-1. **`business-verification-documents` (PR #88), unchanged by contract.**
+1. **`business-verification-documents` (PR #88), unchanged by contract.** *(Superseded by [ADR-0029](../../decisions/ADR-0029-business-verification-documents-on-r2.md), 2026-11-23: these documents are R2-only; the text below is the historical contract.)*
    - It keeps its private Supabase bucket, `bv_documents_*` policies, caller-signed 30 s URL and the `/business-verification/file/<org>/<file>` streaming route. It is low volume (≤ 10 MB per document, reviewer views only).
    - **Verified compatible with PR #89:**
      - `revocable_media_backend_reads` lists only the five revocable buckets, so the BV `SELECT` policy still applies.
      - `media_metadata`, the inventory, the migration and cleanup functions, the `buckets` map in `scripts/media-storage.mjs` and the `MediaNamespace` type do not include BV.
      - The migration-20261021090008 check asserts exactly the five revocable buckets and ignores BV.
    - Not changing: the route has no size bound or fetch timeout. I note it as a separate PR #88 follow-up, not part of this work.
-2. **`purchase-request-images`**: independent grant model, caller-signed 300 s URLs direct from Supabase (0 objects now). Candidate for a later move to Mode P with an explicit ADR (ADR-0017 excludes it).
+2. **`purchase-request-images`** *(no longer deferred: ADR-0029, 2026-11-23, covers it)*: independent grant model, caller-signed 300 s URLs direct from Supabase (0 objects now). Candidate for a later move to Mode P with an explicit ADR (ADR-0017 excludes it).
 3. **Legacy Supabase sources** of the five namespaces: kept ≥ 30 days as the rollback source. Any `provider='supabase'` row continues through `delivery.ts`. The Supabase upload branch in `browser-upload.ts` stays reachable while `R2_STORAGE_ENABLED=false`.
 4. **Supabase Storage policies and buckets** (INSERT policies, the restrictive SELECT policy): retained.
 5. **Metadata and authority** (`media_storage_locations`, source tables, resolvers, Auth): stays in Supabase by design (ADR-0017).
