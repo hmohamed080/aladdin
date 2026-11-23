@@ -31,7 +31,7 @@ describe("QueuedImages (images before the first save)", () => {
     pick([file("a.jpg", "image/jpeg"), file("b.png", "image/png")]);
     expect(screen.getByTestId("count").textContent).toBe("2");
     expect(screen.getByAltText("a.jpg").getAttribute("src")).toBe("blob:a.jpg");
-    expect(screen.getByText("رئيسية")).toBeTruthy();
+    expect(screen.getByText("الرئيسية")).toBeTruthy();
     fireEvent.click(screen.getByLabelText("إزالة a.jpg"));
     expect(screen.getByTestId("count").textContent).toBe("1");
   });
@@ -43,10 +43,19 @@ describe("QueuedImages (images before the first save)", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/big\.jpg/);
   });
 
-  it("stops at the per-product limit of 10 images", () => {
+  it("stops at the 5 media slots of a product", () => {
     render(<Harness />);
-    pick(Array.from({ length: 12 }, (_, i) => file(`p${i}.jpg`, "image/jpeg", 1000 + i)));
-    expect(screen.getByTestId("count").textContent).toBe("10");
+    pick(Array.from({ length: 8 }, (_, i) => file(`p${i}.jpg`, "image/jpeg", 1000 + i)));
+    expect(screen.getByTestId("count").textContent).toBe("5");
     expect(screen.getByRole("alert")).toBeTruthy();
+    expect(screen.getByTestId("queued-slots").textContent).toContain("٥");
+  });
+
+  it("lets the seller choose which image is the main one", () => {
+    render(<Harness />);
+    pick([file("a.jpg", "image/jpeg"), file("b.png", "image/png")]);
+    fireEvent.click(screen.getByText("اجعلها الصورة الرئيسية"));
+    const imgs = screen.getAllByRole("img").map((i) => i.getAttribute("alt"));
+    expect(imgs[0]).toBe("b.png");
   });
 });
