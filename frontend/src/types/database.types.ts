@@ -9723,6 +9723,11 @@ export type Database = {
         Returns: Json
       }
       admin_marketplace_media_settings: { Args: never; Returns: Json }
+      admin_marketplace_platform_status: { Args: never; Returns: Json }
+      admin_marketplace_set_open: {
+        Args: { p_open: boolean; p_reason: string }
+        Returns: boolean
+      }
       admin_marketplace_seller_approve: {
         Args: { p_message_ar: string | null; p_message_en: string | null; p_organization_id: string; p_preset_id: string | null; p_reason: string | null }
         Returns: string
@@ -11324,6 +11329,10 @@ export type Database = {
       marketplace_seller_product_readiness: {
         Args: { p_product_id: string }
         Returns: string[]
+      }
+      marketplace_seller_product_publication_state: {
+        Args: { p_product_id: string }
+        Returns: Json
       }
       marketplace_seller_product_save: {
         Args: { p_payload: Json }

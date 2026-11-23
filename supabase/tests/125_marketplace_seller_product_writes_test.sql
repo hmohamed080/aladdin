@@ -40,14 +40,14 @@ select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname like 'marketplace\_seller\_%'
      and p.prosecdef and exists (select 1 from unnest(p.proconfig) c where c = 'search_path=""')),
-  29, 'A1. the twenty-nine seller RPCs (nine from Migration 06, two from 07, three from 09, four from 12, six from 14, one from seller approval v2, four from PR 8) are SECURITY DEFINER with an empty search_path');
+  30, 'A1. the thirty seller RPCs (nine from Migration 06, two from 07, three from 09, four from 12, six from 14, one from seller approval v2, four from PR 8, one from PR 7) are SECURITY DEFINER with an empty search_path');
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname like 'marketplace\_seller\_%'
      and has_function_privilege('authenticated', p.oid, 'execute')
      and not has_function_privilege('anon', p.oid, 'execute')
      and not has_function_privilege('service_role', p.oid, 'execute')),
-  29, 'A2. ...executable by authenticated only (never anon, never a service credential)');
+  30, 'A2. ...executable by authenticated only (never anon, never a service credential)');
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'app' and p.proname like 'marketplace\_%' and has_function_privilege('authenticated', p.oid, 'execute')),
@@ -181,8 +181,8 @@ select is((select status from public.marketplace_product_variants where sku = 'W
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
 select throws_like($$ select public.marketplace_seller_product_save(
-  public.marketplace_seller_product_get(current_setting('t.p1')::uuid) || '{"product_type_key":"cornice"}'::jsonb) $$,
-  'mp:product_type_immutable%', 'D5. the product type cannot be changed');
+  public.marketplace_seller_product_get(current_setting('t.p1')::uuid) || '{"product_type_key":"no-such-type"}'::jsonb) $$,
+  'mp:product_type_invalid%', 'D5. an unknown product type is refused (the type itself is changeable since PR 7, see test 183)');
 select lives_ok($$ select public.marketplace_seller_product_save(jsonb_build_object(
   'id', current_setting('t.p1'), 'organization_id', '91000005-1111-4111-8111-000000000005',
   'name_ar', 'س', 'name_en', 'Org field ignored')) $$,

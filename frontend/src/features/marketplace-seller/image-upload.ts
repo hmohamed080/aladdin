@@ -9,8 +9,12 @@ import { confirmImageUploadAction, removeImageAction, requestImageUploadAction }
 
 /** The image formats and size the `marketplace` media namespace accepts (Migration 13). */
 export const ACCEPTED_IMAGE_TYPES: readonly string[] = MARKETPLACE_IMAGE_ALLOWED_TYPES;
-/** Upload keys a product may hold open at once (Migration 07 abuse limit). */
-export const MAX_IMAGES_PER_BATCH = 10;
+/**
+ * A product holds up to 5 media slots: 5 images, or 1 video and 4 images (PR 7). The database enforces the same limit
+ * on live images. The video path itself stays off (see MARKETPLACE_VIDEO_UPLOADS_ENABLED).
+ */
+export const MAX_MEDIA_SLOTS = 5;
+export const MAX_IMAGES_PER_BATCH = MAX_MEDIA_SLOTS;
 
 export type UploadFailure = { name: string; code: string };
 

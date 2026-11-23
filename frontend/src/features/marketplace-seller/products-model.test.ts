@@ -72,8 +72,14 @@ describe("toRow", () => {
 describe("stock rules", () => {
   it("draws the line at the low-stock threshold", () => {
     expect(stockState(0)).toBe("out");
-    expect(stockState(9)).toBe("low");
-    expect(stockState(10)).toBe("in");
+    expect(stockState(5)).toBe("low");
+    expect(stockState(6)).toBe("in");
+  });
+
+  it("uses the product's own threshold", () => {
+    expect(stockState(9, 10)).toBe("low");
+    expect(stockState(11, 10)).toBe("in");
+    expect(stockState(1, 0)).toBe("in");
   });
 
   it("lets stock lead the pill only for a product that is on sale", () => {

@@ -144,3 +144,13 @@ export async function setMediaReadyAction(ready: boolean, reason: string): Promi
   revalidatePath("/market");
   return { ok: true, ready: Boolean(data) };
 }
+
+/** Opens or closes the public Marketplace (Super Admin: marketplace_platform.manage). Audited with the acting admin. */
+export async function setMarketplaceOpenAction(open: boolean, reason: string): Promise<AdminResult<{ open: boolean }>> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("admin_marketplace_set_open", { p_open: open, p_reason: reason.trim() });
+  if (error) return { ok: false, code: parseSellerError(error.message).code };
+  revalidatePath("/admin/marketplace");
+  revalidatePath("/market");
+  return { ok: true, open: Boolean(data) };
+}
