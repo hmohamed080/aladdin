@@ -192,7 +192,7 @@ export function PasswordSignUpForm({
   const footer = (
     <p>
       {t("authPasswordPreview.signUp.haveAccount")}{" "}
-      <Link href="/auth/sign-in" className="font-semibold text-accent hover:underline">
+      <Link prefetch={false} href="/auth/sign-in" className="font-semibold text-accent hover:underline">
         {t("authPasswordPreview.signUp.signInLink")}
       </Link>
     </p>
