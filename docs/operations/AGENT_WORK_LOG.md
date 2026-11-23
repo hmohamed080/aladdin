@@ -1,3 +1,11 @@
+## 2026-11-24 - Production catch-up plan extended to all 7 later Marketplace migrations (not applied anywhere)
+
+- Scope: PR #247 (branch `chore/prod-catchup-add-pr5-20261123`) merged with latest `origin/main` (7faec643). Plan `prod-catchup` now lists 34 pending migrations (the 27 plus `20261123090001`, `20261123100001`, `20261123120001`, `20261123130001`, `20261123150001`, `20261123160001`, `20261123160002`): Production 210 -> 244. `PC_LATER` and `PC_LATER_CHANGED` (51 new function names plus media_videos and index prefixes) updated; post permission contract is the last version (`20261123160002`).
+- Recovery: `forward-fix/mkt-later-remove.sql` (new, pinned sha256, replaces `mkt-seller-approval-v2-remove.sql`): guard first (RAISE), never deletes user rows, drops the 6 new tables, 3 triggers, 52 new function signatures, 8 columns and 3 constraints of `public.media_videos`, and restores the 5 video functions and `ck_media_videos_scope` with exact Production definitions (read-only SELECTs on Production). Not undoable: enum value `media_video_scope.marketplace`.
+- Proof: `prod-catchup-scratch-proof.mjs` rewritten to use a throwaway database (cloned by pg_dump, dropped at the end, commit after the enum migration); 1,868 changed objects, round trip clean except the enum, permissions match contract 20261123160002; container `postgres` database untouched (207 migrations).
+- Validation: `cd scripts/hosted-db && node --test`: 301 tests, 300 pass, 0 fail, 1 skipped. Nothing applied; Production and Acceptance only read.
+- Unfinished: owner steps unchanged (restore-tested backup and pin, preflight, apply GO). A stray file was created by mistake under `D:\Users\scorp\AppData\...` (outside the repo); the owner may delete it.
+
 ## 2026-11-23 - Marketplace plan PR 9: public catalog and product page v2 (code, not applied anywhere hosted)
 
 - Scope: branch `feat/mkt-public-catalog-20261123` off `origin/main` (170c7747). Browse-only first launch: buyers browse, ordering comes later. One migration `20261123150001_marketplace_public_catalog_v2.sql`, code, tests, permission contract. Nothing applied to Acceptance or Production; applied to the local isolated stack (`supabase_db_aladdin_marketview`) only, together with the PR 5/6/7/8 migrations that are still unmerged drafts (their commits are NOT in this PR).

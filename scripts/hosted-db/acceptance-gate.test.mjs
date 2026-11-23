@@ -392,8 +392,8 @@ test("prod-catchup: needs a restore-verified PRODUCTION snapshot; only the pinne
   has(checkRecovery({ plan: "prod-catchup", label: Object.keys(RESTORE_VERIFIED_SNAPSHOTS).at(-1), forwardFixSha256: shas }), /not a pinned restore-verified PRODUCTION snapshot/);
   has(checkRecovery({ plan: "prod-catchup", label: "aladdin-production-20261123T000000Z", forwardFixSha256: shas }), /not a pinned restore-verified PRODUCTION snapshot/);
 });
-test("prod-catchup: recovery is four pinned forward-fixes in undo order (mkt-seller-approval-v2, media-notify, marketplace, prod-catchup); a missing or altered one is refused", () => {
-  assert.deepEqual(PC().fixes, ["mkt-seller-approval-v2", "media-notify", "marketplace", "prod-catchup"]);
+test("prod-catchup: recovery is four pinned forward-fixes in undo order (mkt-later, media-notify, marketplace, prod-catchup); a missing or altered one is refused", () => {
+  assert.deepEqual(PC().fixes, ["mkt-later", "media-notify", "marketplace", "prod-catchup"]);
   for (const fx of PC().fixes) assert.ok(FORWARD_FIX[fx]?.sha256, fx);
   const shas = allShas();
   has(checkRecovery({ plan: "prod-catchup", label: "aladdin-production-x", forwardFixSha256: { ...shas, "prod-catchup": "0".repeat(64) } }), /forward-fix .*prod-catchup-restore-previous.sql/);
@@ -465,13 +465,28 @@ test("production scripts: Production only, plan prod-catchup only, hidden passwo
   assert.ok(apply.includes('[ -e .git ]'), "works from a git worktree too");
   for (const f of ["acceptance-apply.sh", "acceptance-preflight.sh"]) assert.ok(!/prod-(batch1|catchup)/.test(readFileSync(here(`./${f}`), "utf8")), `${f} must not accept the Production plan`);
 });
-test("prod-catchup: PR 5 (20261123090001) is in PC_LATER and its forward-fix is pinned, undone first, guard first, never deletes user rows, replaces no function", () => {
-  assert.ok(PC_LATER.includes("20261123090001") && PC().pending.at(-1) === PC_LATER.at(-1));
-  const sql = readFileSync(here(FORWARD_FIX["mkt-seller-approval-v2"].file), "utf8");
+const LATER_7 = ["20261123090001", "20261123100001", "20261123120001", "20261123130001", "20261123150001", "20261123160001", "20261123160002"];
+test("prod-catchup: the 7 later Marketplace migrations (PR 5-9, video) are in PC_LATER in order; the post contract is the last one's and exists", () => {
+  assert.deepEqual(PC_LATER.slice(0, 7), LATER_7);
+  assert.equal(PC().postContract, PC().pending.at(-1));
+  assert.ok(readFileSync(here(`../../supabase/permissions/${PC().postContract}.json`)).length > 0);
+});
+// md5 of pg_get_functiondef read LIVE on Production 2026-11-23: these 5 video functions exist on Production and are replaced by 20261123160002
+const PRODUCTION_VIDEO_MD5 = { "app.video_writable": "2eeea8fb32a166ef61a008393727f263", "public.media_edge_video": "2ca06cffa7463ef17ec54b62e9c1fd6f", "public.video_delete": "460141edc413845c3e56c65ea20972d8",
+  "public.video_update": "9ba4a223a9769653c4dfd07b64d558c0", "public.video_upload_begin": "af1ad683b7f86e039d93672a8cfa7422" };
+test("mkt-later forward-fix: pinned, undone first, guard before any drop, restores the 5 video functions with the exact Production definitions, deletes only seeded rows", () => {
+  const sql = readFileSync(here(FORWARD_FIX["mkt-later"].file), "utf8");
   const code = sql.split("\n").filter((l) => !l.startsWith("--")).join("\n");
-  assert.equal(PC().fixes[0], "mkt-seller-approval-v2");
-  assert.ok(code.indexOf("$guard$") < code.search(/\bDROP (TABLE|FUNCTION)\b/));
-  assert.ok(!/create or replace function/i.test(code), "20261123090001 only adds overloads, so nothing has to be re-created");
-  assert.ok(!/drop function (?!if exists)/i.test(code) && !/\b(delete|truncate|insert into)\b/i.test(code.replace(/\$guard\$[\s\S]*?\$guard\$/, "")));
+  assert.equal(PC().fixes[0], "mkt-later");
+  assert.ok(code.indexOf("$guard$") < code.search(/\bDROP (TABLE|FUNCTION|TRIGGER)\b/i));
+  const got = {};
+  for (const m of sql.matchAll(/CREATE OR REPLACE FUNCTION ([a-z_.]+)\([\s\S]*?\$function\$;/g)) got[m[1]] = createHash("md5").update(m[0].slice(0, -1) + "\n").digest("hex");
+  assert.deepEqual(got, PRODUCTION_VIDEO_MD5);
+  assert.ok(!/drop function (?!if exists)/i.test(code));
+  const deletes = [...code.replace(/\$guard\$[\s\S]*?\$guard\$/, "").replace(/\$function\$[\s\S]*?\$function\$/g, "").matchAll(/\bdelete\s+from\s+([a-z_.]+)/gi)].map((m) => m[1].toLowerCase()).sort();
+  assert.deepEqual(deletes, ["public.admin_permissions", "public.admin_role_permissions", "public.notification_templates"], "only seeded permission and template rows");
+  assert.ok(!/\btruncate\b|insert into/i.test(code.replace(/\$function\$[\s\S]*?\$function\$/g, "")));
+  for (const t of ["marketplace_seller_preset_events", "marketplace_seller_settings_events", "marketplace_video_events", "marketplace_free_shipping_products", "marketplace_seller_delivery_settings"]) assert.ok(sql.includes(`'${t}'`), `guard counts ${t}`);
+  assert.ok(sql.includes("media_video_scope") && /cannot/i.test(sql), "the irreversible enum value is documented");
   assert.ok(sql.includes("begin;") && sql.trimEnd().endsWith("commit;"));
 });

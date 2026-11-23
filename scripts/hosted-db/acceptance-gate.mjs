@@ -54,8 +54,65 @@ const PC_BASE = [
   "20261121090001", "20261121090002", "20261121090003",
   "20261122090001", "20261122090002"
 ];
-export const PC_LATER = ["20261123090001"]; // versions newer than 20261122090002 that this plan also pushes: 20261123090001 (PR 5, seller approval v2). PRs 6-9 append theirs here
-export const PC_LATER_CHANGED = ["public.admin_marketplace_seller_reject", "public.admin_marketplace_seller_presets", "public.admin_marketplace_seller_preset_save", "public.admin_marketplace_seller_overview_v2", "public.admin_marketplace_seller_history_v2"]; // 20261123090001 (PR 5); its other objects are covered by public.marketplace_* and the function names above // objects those later migrations add or change (function schema.name, or a key prefix ending in *)
+export const PC_LATER = ["20261123090001", "20261123100001", "20261123120001", "20261123130001", "20261123150001", "20261123160001", "20261123160002"]; // versions newer than 20261122090002 that this plan also pushes: 20261123090001 (PR 5, seller approval v2). PRs 6-9 append theirs here
+export const PC_LATER_CHANGED = [ // objects the later migrations add or change that the first 27 do not; measured with prod-catchup-scratch-proof.mjs (everything else they touch is covered by the public.marketplace_* prefix)
+  "app.marketplace_delivery_terms",
+  "app.marketplace_free_shipping",
+  "app.marketplace_is_open",
+  "app.marketplace_product_is_listed",
+  "app.marketplace_product_review_state",
+  "app.marketplace_product_ships_free",
+  "app.marketplace_public_stock_left",
+  "app.marketplace_review_approve_image",
+  "app.marketplace_review_products",
+  "app.marketplace_seller_commerce_missing",
+  "app.marketplace_seller_delivery_ready",
+  "app.marketplace_seller_is_public",
+  "app.marketplace_seller_payment_ready",
+  "app.marketplace_seller_unpublish_all",
+  "app.marketplace_settings_event",
+  "app.marketplace_settings_events_append_only",
+  "app.marketplace_stock_notify",
+  "app.marketplace_video_event",
+  "app.marketplace_video_free_slot",
+  "app.marketplace_video_manager",
+  "app.video_writable",
+  "public.admin_marketplace_pending_videos",
+  "public.admin_marketplace_platform_status",
+  "public.admin_marketplace_product_review_approve",
+  "public.admin_marketplace_product_review_queue",
+  "public.admin_marketplace_product_review_reject",
+  "public.admin_marketplace_product_review_summary",
+  "public.admin_marketplace_product_videos",
+  "public.admin_marketplace_seller_history_v2",
+  "public.admin_marketplace_seller_overview_v2",
+  "public.admin_marketplace_seller_preset_save",
+  "public.admin_marketplace_seller_presets",
+  "public.admin_marketplace_seller_reject",
+  "public.admin_marketplace_set_open",
+  "public.admin_marketplace_video_review",
+  "public.marketplace_product_video_list",
+  "public.marketplace_public_browse",
+  "public.marketplace_public_delivery",
+  "public.marketplace_public_seller",
+  "public.marketplace_public_status",
+  "public.marketplace_seller_commerce_readiness",
+  "public.marketplace_seller_delivery_terms_save",
+  "public.marketplace_seller_free_shipping_products_get",
+  "public.marketplace_seller_image_replace_request_upload",
+  "public.marketplace_seller_product_free_shipping_set",
+  "public.marketplace_seller_product_publication_state",
+  "public.marketplace_seller_request_approval",
+  "public.media_edge_video",
+  "public.video_delete",
+  "public.video_update",
+  "public.video_upload_begin",
+  "public.media_video_scope",
+  "public.media_videos.*",
+  "public.ix_media_videos_*",
+  "public.uq_media_videos_*",
+  "public.ix_mp_*"
+];
 export const PC_PENDING = [...PC_BASE, ...PC_LATER];
 const MN_PENDING = ["20261121090001", "20261121090002", "20261121090003"];
 const MKT_PENDING = Array.from({ length: 14 }, (_, i) => `202611161000${String(i + 1).padStart(2, "0")}`);
@@ -239,7 +296,7 @@ export const PLANS = {
   // (PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS pins only aladdin-production-20261123T142725Z, restore PASS), so the plan is refused for any other label. "changed" was MEASURED, not written by hand: replay of the 27 on a scratch
   // database with scripts/hosted-db/catalog-fingerprint.sql before/after and catalog-diff.mjs (170 functions, the touched constraints/trigger, and prefixes for the new tables).
   // Run only through production-preflight.sh / production-apply.sh; the Acceptance scripts refuse it.
-  "prod-catchup": { target: "production", fixes: ["mkt-seller-approval-v2", "media-notify", "marketplace", "prod-catchup"], recovery: "forward-fix", freshBackup: true, applied: 210, latest: PROD_210, pending: PC_PENDING, preContract: PROD_210, postContract: PC_PENDING.at(-1),
+  "prod-catchup": { target: "production", fixes: ["mkt-later", "media-notify", "marketplace", "prod-catchup"], recovery: "forward-fix", freshBackup: true, applied: 210, latest: PROD_210, pending: PC_PENDING, preContract: PROD_210, postContract: PC_PENDING.at(-1),
     changed: [
       "app.admin_user_registration_state",
       "app.admin_user_status_tab",
@@ -480,8 +537,8 @@ export const FORWARD_FIX = {
   // "media-notify" and "marketplace" forward-fixes (re-proved against Production's pre-state: Production pre-state + 27 migrations + the three files = identical catalog fingerprint).
   // Undo order: media-notify, marketplace, prod-catchup.
   "prod-catchup": { file: "forward-fix/prod-catchup-restore-previous.sql", sha256: "1137c10d511193a4cee599a1105b5a3bbb6ae714fdd5f04b753a932c3740ce7a" },
-  // mkt-seller-approval-v2: undoes 20261123090001 (PR 5, seller approval v2; PC_LATER) only: new overloads, 2 tables, columns and constraints, guard first. Undo order: this file first.
-  "mkt-seller-approval-v2": { file: "forward-fix/mkt-seller-approval-v2-remove.sql", sha256: "dec2cbd320c950a7b50add38142f9ea2ecba72abca3968f34912d47a0e105406" },
+  // mkt-later: undoes the 7 later Marketplace migrations (20261123090001..160002): new overloads and tables, the media_videos columns, 5 video functions restored to their exact Production definitions, guard first. The enum value media_video_scope.marketplace cannot be removed. Undo order: this file first.
+  "mkt-later": { file: "forward-fix/mkt-later-remove.sql", sha256: "b579c9c592bd356e1b117b4e08db64541a69309e75b285c97c7414d97384eebd" },
   verification: { file: "forward-fix/verification-restore-previous.sql", sha256: "a50cd460c243b3580927c1f8b8e84ec1cc1109048c9b08b055a06b470570fcac" },
   m1: { file: "forward-fix/m1-restore-previous.sql", sha256: "5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045" },
   m3a: { file: "forward-fix/m3a-restore-previous.sql", sha256: "d4161977e7664e3345d000ee87503fd3a5983935c81257dd082c0a5ef0b43ec3" },
