@@ -146,6 +146,22 @@ select lives_ok(format($q$select set_config('t.v3', public.video_upload_begin('m
 reset role;
 select is((select slot::int from public.media_videos where id = current_setting('t.v3')::uuid), 3, 'C9. ...it is slot 3 again (slot 2 holds the 100 MB video)');
 
+-- An archived product takes no new video (a slot is free here: delete one first).
+select set_config('t.arch', (select status from public.marketplace_products where id = current_setting('t.p')::uuid), true);
+update public.marketplace_products set status = 'archived' where id = current_setting('t.p')::uuid;
+update public.media_videos set state = 'deleted', deleted_at = now() where id = current_setting('t.v3')::uuid;
+set local role authenticated;
+set local request.jwt.claims = :'c_hana';
+select throws_ok(format($q$select public.video_upload_begin('marketplace', %L, 'Archived', 'video/mp4', 1000)$q$, current_setting('t.p')),
+  '22023', 'mp:product_archived', 'C10. an archived product takes no new video');
+reset role;
+update public.marketplace_products set status = current_setting('t.arch') where id = current_setting('t.p')::uuid;
+set local role authenticated;
+set local request.jwt.claims = :'c_hana';
+select lives_ok(format($q$select set_config('t.v3', public.video_upload_begin('marketplace', %L, 'Restored', 'video/mp4', 1000)::text, true)$q$, current_setting('t.p')),
+  'C11. restored, the product takes a video again');
+reset role;
+
 -- ===========================================================================
 -- D. Review
 -- ===========================================================================
