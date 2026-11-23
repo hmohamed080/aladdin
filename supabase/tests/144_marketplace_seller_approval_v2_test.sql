@@ -177,7 +177,7 @@ select pg_temp.act_as(:'nobody');
 select throws_ok($$select * from public.admin_marketplace_seller_presets()$$, '42501', null, 'E1 a plain user cannot list presets');
 select pg_temp.back();
 select pg_temp.act_as(:'adm');
-select is((select count(*)::int from public.admin_marketplace_seller_presets() where is_active), 8, 'E2 an Administrator sees the eight seeded presets');
+select is((select count(*)::int from public.admin_marketplace_seller_presets() where is_active and action <> 'product_reject'), 8, 'E2 an Administrator sees the eight seeded seller presets (product review adds its own kind)');
 select throws_ok($$select public.admin_marketplace_seller_preset_save(null, 'reject', 'ل', 'L', 'ن', 'T', true, 5, 'adding one')$$,
   '42501', null, 'E3 an Administrator cannot edit presets');
 select pg_temp.back();

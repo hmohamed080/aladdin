@@ -10,7 +10,6 @@ import { Badge, Card, InlineError, InlineSuccess } from "@/components/ui/primiti
 import { Button, ButtonLink, Input, Select, Textarea } from "@/components/ui/controls";
 import { CheckIcon, XIcon } from "@/components/ui/icons";
 import { approveImagesAction, approveProductAction, rejectProductAction } from "@/server/actions/admin-marketplace";
-import { PresetManager, type ReviewPreset } from "./review-preset-manager";
 
 export type ReviewImage = {
   id: string;
@@ -42,6 +41,9 @@ export type ReviewProduct = {
   images: ReviewImage[];
 };
 
+/** A ready-made owner message: a `product_reject` preset of the shared preset system (edited under notification templates). */
+export type ReviewPreset = { id: string; label_ar: string; label_en: string; message_ar: string; message_en: string };
+
 export type ReviewTab = "pending" | "approved" | "rejected";
 export type ReviewCounts = Record<ReviewTab, number>;
 
@@ -52,7 +54,6 @@ const KNOWN_ERRORS = new Set([
   "no_pending_images",
   "owner_message_required",
   "preset_not_found",
-  "preset_invalid",
 ]);
 const STATUS_TONE = { pending: "warning", verified: "success", rejected: "danger" } as const;
 const REVIEW_PATH = "/admin/marketplace/media";
@@ -64,7 +65,6 @@ export function ProductReview({
   counts,
   products,
   presets,
-  canManagePresets,
 }: {
   tab: ReviewTab;
   page: number;
@@ -72,10 +72,8 @@ export function ProductReview({
   counts: ReviewCounts;
   products: ReviewProduct[];
   presets: ReviewPreset[];
-  canManagePresets: boolean;
 }) {
   const { t, locale } = useI18n();
-  const activePresets = presets.filter((p) => p.is_active);
 
   return (
     <div className="flex flex-col gap-md">
@@ -102,7 +100,7 @@ export function ProductReview({
         <ul className="flex flex-col gap-md">
           {products.map((p) => (
             <li key={p.id}>
-              <ProductCard product={p} presets={activePresets} />
+              <ProductCard product={p} presets={presets} />
             </li>
           ))}
         </ul>
@@ -123,8 +121,6 @@ export function ProductReview({
           ) : null}
         </div>
       ) : null}
-
-      {canManagePresets ? <PresetManager presets={presets} /> : null}
     </div>
   );
 }

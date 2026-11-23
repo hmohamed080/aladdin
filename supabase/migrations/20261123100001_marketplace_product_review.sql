@@ -18,15 +18,14 @@
 --      central cleanup turns into a deleted R2 object and marketplace_rejected_images_purge then forgets.
 --   4. Product-level review RPCs: queue (per product, images inside), summary counts, approve a product's pending
 --      images, reject all pending / chosen images with an internal reason + an owner-facing message.
---   5. Owner-facing messages come from admin-managed presets (bilingual) or custom text. The owner is notified
---      ONLY on rejection, in-app, through app.notify_from_template (template marketplace.product.rejected,
---      organization id passed), to the active organization managers (org.manage) of the seller.
---   6. app.notify_from_template learns per-language variable overrides: a variable x is rendered from x_ar in the
---      Arabic text and from x_en in the English text when those keys are present (preset messages and product
---      names are bilingual). Callers that do not pass them are unchanged.
+--   5. Owner-facing messages come from the ONE preset system of PR 5 (marketplace_seller_message_presets, edited
+--      under notification_templates.manage with its audit trail): product review adds the preset kind
+--      'product_reject' to it, or custom text. The owner is notified ONLY on rejection, in-app, through
+--      app.notify_from_template (template marketplace.product.rejected, organization id passed, per-language
+--      variables of PR 5), to the active organization managers (org.manage) of the seller.
 --
--- Every decision lands in the append-only marketplace_image_moderation_events trail; every preset change in the
--- append-only marketplace_review_preset_events trail.
+-- BASED ON PR 5 (20261123090001): it must reach main first. Every decision lands in the append-only
+-- marketplace_image_moderation_events trail.
 
 -- ---------------------------------------------------------------------------
 -- 1. Image verification is always mandatory
@@ -74,122 +73,85 @@ alter table public.marketplace_image_moderation_events add constraint ck_marketp
   check (action in ('validated', 'approved', 'rejected', 'replaced'));
 
 -- ---------------------------------------------------------------------------
--- 3. Owner-facing message presets (admin-managed, bilingual)
+-- 3. Owner-facing message presets: a new kind in the PR 5 preset system
 -- ---------------------------------------------------------------------------
-create table public.marketplace_review_presets (
-  id         uuid        primary key default gen_random_uuid(),
-  sort_order integer     not null default 0,
-  label_ar   text        not null,
-  label_en   text        not null,
-  message_ar text        not null,
-  message_en text        not null,
-  is_active  boolean     not null default true,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  updated_by uuid,
-  constraint ck_marketplace_review_presets_label check (
-    char_length(btrim(label_ar)) between 1 and 80 and char_length(btrim(label_en)) between 1 and 80),
-  constraint ck_marketplace_review_presets_message check (
-    char_length(btrim(message_ar)) between 3 and 300 and char_length(btrim(message_en)) between 3 and 300)
-);
-comment on table public.marketplace_review_presets is
-  'Ready-made owner-facing rejection messages for Product review (Arabic + English). RLS on, no grant: read and written only through the admin_marketplace_review_preset* RPCs.';
-create trigger set_marketplace_review_presets_updated_at before update on public.marketplace_review_presets
-  for each row execute function app.set_updated_at();
+alter table public.marketplace_seller_message_presets drop constraint ck_marketplace_seller_presets_action;
+alter table public.marketplace_seller_message_presets add constraint ck_marketplace_seller_presets_action
+  check (action in ('approve', 'reject', 'suspend', 'reinstate', 'revoke', 'product_reject'));
 
-create table public.marketplace_review_preset_events (
-  id          bigint      generated always as identity primary key,
-  at          timestamptz not null default now(),
-  preset_id   uuid        not null,
-  action      text        not null check (action in ('created', 'updated', 'deactivated', 'reactivated')),
-  old_content jsonb,
-  new_content jsonb       not null,
-  actor_id    uuid        not null
-);
-comment on table public.marketplace_review_preset_events is
-  'Append-only history of preset changes. No foreign keys: audit outlives presets and accounts.';
-create trigger marketplace_review_preset_events_append_only before update or delete on public.marketplace_review_preset_events
-  for each row execute function app.marketplace_append_only();
-
-alter table public.marketplace_review_presets       enable row level security;
-alter table public.marketplace_review_preset_events enable row level security;
-revoke all on public.marketplace_review_presets, public.marketplace_review_preset_events
-  from public, anon, authenticated, service_role;
-
-insert into public.marketplace_review_presets (sort_order, label_ar, label_en, message_ar, message_en) values
-  (10, 'صورة غير واضحة', 'Blurry or low quality',
+insert into public.marketplace_seller_message_presets (action, label_ar, label_en, text_ar, text_en, sort_order) values
+  ('product_reject', 'صورة غير واضحة', 'Blurry or low quality',
    'الصورة غير واضحة أو منخفضة الجودة. ارفع صورة أوضح للمنتج.',
-   'The image is blurry or low quality. Please upload a clearer photo of the product.'),
-  (20, 'لا تُظهر المنتج', 'Does not show the product',
+   'The image is blurry or low quality. Please upload a clearer photo of the product.', 10),
+  ('product_reject', 'لا تُظهر المنتج', 'Does not show the product',
    'الصورة لا تُظهر المنتج بوضوح. ارفع صورة تعرض المنتج نفسه.',
-   'The image does not clearly show the product. Please upload a photo of the product itself.'),
-  (30, 'نصوص أو علامة مائية', 'Text, watermark or contact details',
+   'The image does not clearly show the product. Please upload a photo of the product itself.', 20),
+  ('product_reject', 'نصوص أو علامة مائية', 'Text, watermark or contact details',
    'الصورة تحتوي على نصوص أو علامة مائية أو بيانات تواصل. ارفع صورة بدونها.',
-   'The image contains text, a watermark or contact details. Please upload one without them.'),
-  (40, 'لا تخص هذا المنتج', 'Not this product',
+   'The image contains text, a watermark or contact details. Please upload one without them.', 30),
+  ('product_reject', 'لا تخص هذا المنتج', 'Not this product',
    'الصورة لا تخص هذا المنتج. ارفع صورة المنتج الصحيح.',
-   'The image does not belong to this product. Please upload the right product photo.'),
-  (50, 'محتوى غير مناسب', 'Inappropriate content',
+   'The image does not belong to this product. Please upload the right product photo.', 40),
+  ('product_reject', 'محتوى غير مناسب', 'Inappropriate content',
    'الصورة تحتوي على محتوى غير مناسب للمتجر.',
-   'The image contains content that is not suitable for the Marketplace.');
+   'The image contains content that is not suitable for the Marketplace.', 50);
 
--- ---------------------------------------------------------------------------
--- 4. Notification writer: per-language variable overrides (x_ar / x_en)
--- ---------------------------------------------------------------------------
-create or replace function app.notify_from_template(
-  p_recipient_user_id uuid,
-  p_organization_id   uuid,
-  p_template_key      text,
-  p_subject_type      text,
-  p_subject_id        uuid,
-  p_deep_link         text,
-  p_vars              jsonb default '{}'::jsonb
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = ''
-as $fn$
+-- The PR 5 editor accepts the new kind (same signature, same permission, same mandatory reason and audit event).
+create or replace function public.admin_marketplace_seller_preset_save(
+  p_id uuid, p_action text, p_label_ar text, p_label_en text, p_text_ar text, p_text_en text,
+  p_is_active boolean, p_sort_order integer, p_reason text)
+returns uuid language plpgsql security definer set search_path = '' as $$
 declare
-  t      public.notification_templates%rowtype;
-  v_vars jsonb := coalesce(p_vars, '{}'::jsonb);
-  v_ar   jsonb;
-  v_en   jsonb;
-  v_id   uuid;
-  v_content jsonb;
+  v_actor uuid := (select auth.uid());
+  v_old   public.marketplace_seller_message_presets;
+  v_id    uuid;
+  v_new   jsonb;
 begin
-  select * into t from public.notification_templates where key = p_template_key;
+  if v_actor is null then
+    raise exception 'authentication required' using errcode = '42501';
+  end if;
+  if not app.has_admin_permission('notification_templates.manage') then
+    raise exception 'permission notification_templates.manage is required' using errcode = '42501';
+  end if;
+  if p_reason is null or char_length(btrim(p_reason)) not between 3 and 500 then
+    raise exception 'a reason of 3-500 characters is required' using errcode = '22023';
+  end if;
+  if p_action is null or p_action not in ('approve', 'reject', 'suspend', 'reinstate', 'revoke', 'product_reject') then
+    raise exception 'unknown action' using errcode = '22023';
+  end if;
+  p_label_ar := btrim(p_label_ar); p_label_en := btrim(p_label_en);
+  p_text_ar := btrim(p_text_ar);   p_text_en := btrim(p_text_en);
+  if coalesce(char_length(p_label_ar), 0) not between 1 and 80 or coalesce(char_length(p_label_en), 0) not between 1 and 80
+     or coalesce(char_length(p_text_ar), 0) not between 1 and 300 or coalesce(char_length(p_text_en), 0) not between 1 and 300 then
+    raise exception 'labels must be 1-80 characters and texts 1-300 characters, in both languages' using errcode = '22023';
+  end if;
+  v_new := jsonb_build_object('action', p_action, 'label_ar', p_label_ar, 'label_en', p_label_en, 'text_ar', p_text_ar,
+                              'text_en', p_text_en, 'is_active', coalesce(p_is_active, true), 'sort_order', coalesce(p_sort_order, 0));
+  if p_id is null then
+    insert into public.marketplace_seller_message_presets
+      (action, label_ar, label_en, text_ar, text_en, is_active, sort_order, updated_by)
+    values (p_action, p_label_ar, p_label_en, p_text_ar, p_text_en, coalesce(p_is_active, true), coalesce(p_sort_order, 0), v_actor)
+    returning id into v_id;
+    insert into public.marketplace_seller_preset_events (preset_id, action, old_content, new_content, actor_id, reason)
+    values (v_id, 'created', null, v_new, v_actor, btrim(p_reason));
+    return v_id;
+  end if;
+  select * into v_old from public.marketplace_seller_message_presets where id = p_id for update;
   if not found then
-    raise exception 'unknown notification template %', p_template_key using errcode = '22023';
+    raise exception 'unknown preset' using errcode = '22023';
   end if;
-  if jsonb_typeof(v_vars) <> 'object' then
-    raise exception 'template variables must be a JSON object' using errcode = '22023';
-  end if;
-
-  -- A variable x may carry a language-specific value in x_ar / x_en; the plain x is the fallback for both.
-  v_ar := v_vars || coalesce((select jsonb_object_agg(left(e.key, -3), e.value) from jsonb_each(v_vars) e where e.key ~ '.+_ar$'), '{}'::jsonb);
-  v_en := v_vars || coalesce((select jsonb_object_agg(left(e.key, -3), e.value) from jsonb_each(v_vars) e where e.key ~ '.+_en$'), '{}'::jsonb);
-
-  -- Each rendered field is cut to its limit (title 120, body 500, the same limits the editor enforces on the template
-  -- itself). A template that repeats a variable can expand past them; cutting keeps the write from failing, which would
-  -- roll back the caller's transaction (for example a seller approval).
-  v_content := jsonb_build_object(
-    'ar', jsonb_build_object(
-      'title', btrim(left(app.render_template(coalesce(t.title_ar, t.default_title_ar), v_ar), 120)),
-      'body',  btrim(left(app.render_template(coalesce(t.body_ar,  t.default_body_ar),  v_ar), 500))),
-    'en', jsonb_build_object(
-      'title', btrim(left(app.render_template(coalesce(t.title_en, t.default_title_en), v_en), 120)),
-      'body',  btrim(left(app.render_template(coalesce(t.body_en,  t.default_body_en),  v_en), 500))));
-
-  -- the key is the i18n fallback for readers that do not know `content`; it is never shown as text
-  v_id := app.notify(p_recipient_user_id, p_organization_id, t.event_type, p_subject_type, p_subject_id,
-                     p_deep_link, 'notifications.template.' || t.key, null, '{}'::jsonb);
-  if v_id is not null then
-    update public.notifications set content = v_content where id = v_id;
-  end if;
-  return v_id;
+  update public.marketplace_seller_message_presets set
+    action = p_action, label_ar = p_label_ar, label_en = p_label_en, text_ar = p_text_ar, text_en = p_text_en,
+    is_active = coalesce(p_is_active, true), sort_order = coalesce(p_sort_order, 0), updated_by = v_actor
+   where id = p_id;
+  insert into public.marketplace_seller_preset_events (preset_id, action, old_content, new_content, actor_id, reason)
+  values (p_id, 'updated',
+          jsonb_build_object('action', v_old.action, 'label_ar', v_old.label_ar, 'label_en', v_old.label_en, 'text_ar', v_old.text_ar,
+                             'text_en', v_old.text_en, 'is_active', v_old.is_active, 'sort_order', v_old.sort_order),
+          v_new, v_actor, btrim(p_reason));
+  return p_id;
 end;
-$fn$;
+$$;
 
 -- ---------------------------------------------------------------------------
 -- 5. The one approval step (internal)
@@ -437,7 +399,7 @@ declare
   v_reason text := btrim(coalesce(p_reason, ''));
   v_msg_ar text;
   v_msg_en text;
-  v_pre    public.marketplace_review_presets;
+  v_pre    public.marketplace_seller_message_presets;
   v_ids    uuid[];
   v_id     uuid;
   i        public.marketplace_product_images;
@@ -452,12 +414,12 @@ begin
     raise exception 'mp:reason_required' using errcode = '22023';
   end if;
   if p_preset_id is not null then
-    select * into v_pre from public.marketplace_review_presets where id = p_preset_id and is_active;
+    select * into v_pre from public.marketplace_seller_message_presets where id = p_preset_id and is_active and action = 'product_reject';
     if not found then
       raise exception 'mp:preset_not_found' using errcode = '22023';
     end if;
-    v_msg_ar := btrim(v_pre.message_ar);
-    v_msg_en := btrim(v_pre.message_en);
+    v_msg_ar := btrim(v_pre.text_ar);
+    v_msg_en := btrim(v_pre.text_en);
   else
     v_msg_ar := btrim(coalesce(p_owner_message, ''));
     if char_length(v_msg_ar) not between 3 and 300 then
@@ -534,16 +496,16 @@ begin
     perform app.notify_from_template(
       v_owner, p.seller_organization_id, 'marketplace.product.rejected', 'marketplace_product', p.id,
       '/showroom/marketplace/products',
-      jsonb_build_object('product_name_ar', coalesce(p.name_ar, p.name_en), 'product_name_en', coalesce(p.name_en, p.name_ar),
-                         'showroom_name', coalesce(v_org, ''), 'message_ar', v_msg_ar, 'message_en', v_msg_en,
-                         'message', v_msg_en));
+      jsonb_build_object('showroom_name', coalesce(v_org, ''), 'message', v_msg_en, 'product_name', coalesce(p.name_en, p.name_ar)),
+      jsonb_build_object('product_name', coalesce(p.name_ar, p.name_en), 'message', v_msg_ar),
+      jsonb_build_object('product_name', coalesce(p.name_en, p.name_ar), 'message', v_msg_en));
   end loop;
   return v_out;
 end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 7. Presets: read and manage
+-- 7. Presets for the review page (read side; editing is the PR 5 editor under notification_templates.manage)
 -- ---------------------------------------------------------------------------
 create or replace function public.admin_marketplace_review_presets()
 returns jsonb
@@ -552,78 +514,13 @@ stable
 security definer
 set search_path = ''
 as $$
-declare
-  v_manage boolean;
 begin
   perform app.marketplace_assert_admin_permission('marketplace_media.moderate');
-  v_manage := app.has_admin_permission('notification_templates.manage');
-  return jsonb_build_object('can_manage', v_manage, 'items', coalesce((
+  return coalesce((
     select jsonb_agg(jsonb_build_object(
-             'id', r.id, 'sort_order', r.sort_order, 'label_ar', r.label_ar, 'label_en', r.label_en,
-             'message_ar', r.message_ar, 'message_en', r.message_en, 'is_active', r.is_active)
+             'id', r.id, 'label_ar', r.label_ar, 'label_en', r.label_en, 'message_ar', r.text_ar, 'message_en', r.text_en)
            order by r.sort_order, r.created_at)
-    from public.marketplace_review_presets r where r.is_active or v_manage), '[]'::jsonb));
-end;
-$$;
-
--- Create (p_id null) or change a preset; deactivate by is_active = false. Super Admin only (same authority as the
--- notification texts: these words reach showroom owners).
-create or replace function public.admin_marketplace_review_preset_save(
-  p_id uuid, p_label_ar text, p_label_en text, p_message_ar text, p_message_en text, p_is_active boolean, p_sort_order integer)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_actor uuid := (select auth.uid());
-  r       public.marketplace_review_presets;
-  v_old   jsonb;
-  v_new   jsonb;
-  v_action text;
-  v_id    uuid;
-begin
-  if v_actor is null then
-    raise exception 'mp:auth_required' using errcode = '42501';
-  end if;
-  if not app.has_admin_permission('notification_templates.manage') then
-    raise exception 'mp:not_permitted' using errcode = '42501';
-  end if;
-  p_label_ar := btrim(coalesce(p_label_ar, '')); p_label_en := btrim(coalesce(p_label_en, ''));
-  p_message_ar := btrim(coalesce(p_message_ar, '')); p_message_en := btrim(coalesce(p_message_en, ''));
-  if char_length(p_label_ar) not between 1 and 80 or char_length(p_label_en) not between 1 and 80
-     or char_length(p_message_ar) not between 3 and 300 or char_length(p_message_en) not between 3 and 300 then
-    raise exception 'mp:preset_invalid' using errcode = '22023';
-  end if;
-  v_new := jsonb_build_object('label_ar', p_label_ar, 'label_en', p_label_en, 'message_ar', p_message_ar,
-                              'message_en', p_message_en, 'is_active', coalesce(p_is_active, true),
-                              'sort_order', coalesce(p_sort_order, 0));
-  if p_id is null then
-    insert into public.marketplace_review_presets (sort_order, label_ar, label_en, message_ar, message_en, is_active, updated_by)
-    values (coalesce(p_sort_order, 0), p_label_ar, p_label_en, p_message_ar, p_message_en, coalesce(p_is_active, true), v_actor)
-    returning id into v_id;
-    insert into public.marketplace_review_preset_events (preset_id, action, old_content, new_content, actor_id)
-    values (v_id, 'created', null, v_new, v_actor);
-    return jsonb_build_object('id', v_id, 'changed', true);
-  end if;
-  select * into r from public.marketplace_review_presets where id = p_id for update;
-  if not found then
-    raise exception 'mp:preset_not_found' using errcode = '22023';
-  end if;
-  v_old := jsonb_build_object('label_ar', r.label_ar, 'label_en', r.label_en, 'message_ar', r.message_ar,
-                              'message_en', r.message_en, 'is_active', r.is_active, 'sort_order', r.sort_order);
-  if v_old = v_new then
-    return jsonb_build_object('id', p_id, 'changed', false);
-  end if;
-  v_action := case when r.is_active and not coalesce(p_is_active, true) then 'deactivated'
-                   when not r.is_active and coalesce(p_is_active, true) then 'reactivated' else 'updated' end;
-  update public.marketplace_review_presets
-     set label_ar = p_label_ar, label_en = p_label_en, message_ar = p_message_ar, message_en = p_message_en,
-         is_active = coalesce(p_is_active, true), sort_order = coalesce(p_sort_order, 0), updated_by = v_actor
-   where id = p_id;
-  insert into public.marketplace_review_preset_events (preset_id, action, old_content, new_content, actor_id)
-  values (p_id, v_action, v_old, v_new, v_actor);
-  return jsonb_build_object('id', p_id, 'changed', true);
+    from public.marketplace_seller_message_presets r where r.action = 'product_reject' and r.is_active), '[]'::jsonb);
 end;
 $$;
 
@@ -673,7 +570,6 @@ revoke all on function
   public.admin_marketplace_product_review_approve(uuid),
   public.admin_marketplace_product_review_reject(uuid, uuid[], text, text, uuid),
   public.admin_marketplace_review_presets(),
-  public.admin_marketplace_review_preset_save(uuid, text, text, text, text, boolean, integer),
   public.marketplace_seller_image_replace_request_upload(uuid, text),
   public.admin_marketplace_media_approve(uuid[]),
   public.admin_marketplace_set_media_verification_ready(boolean, text)
@@ -684,7 +580,6 @@ grant execute on function
   public.admin_marketplace_product_review_approve(uuid),
   public.admin_marketplace_product_review_reject(uuid, uuid[], text, text, uuid),
   public.admin_marketplace_review_presets(),
-  public.admin_marketplace_review_preset_save(uuid, text, text, text, text, boolean, integer),
   public.marketplace_seller_image_replace_request_upload(uuid, text),
   public.admin_marketplace_media_approve(uuid[]),
   public.admin_marketplace_set_media_verification_ready(boolean, text)

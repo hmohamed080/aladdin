@@ -9745,18 +9745,6 @@ export type Database = {
         Returns: Json
       }
       admin_marketplace_product_review_summary: { Args: never; Returns: Json }
-      admin_marketplace_review_preset_save: {
-        Args: {
-          p_id: string
-          p_is_active: boolean
-          p_label_ar: string
-          p_label_en: string
-          p_message_ar: string
-          p_message_en: string
-          p_sort_order: number
-        }
-        Returns: Json
-      }
       admin_marketplace_review_presets: { Args: never; Returns: Json }
       admin_marketplace_seller_approve: {
         Args: { p_message?: string; p_organization_id: string; p_preset_id?: string; p_reason?: string }

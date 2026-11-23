@@ -17,7 +17,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(74);
+select plan(71);
 
 update auth.users set email_confirmed_at = now()
   where id in ('70000001-0000-4000-8000-000000000001', '70000002-0000-4000-8000-000000000002',
@@ -119,12 +119,11 @@ select ok(not has_function_privilege('authenticated', 'app.marketplace_review_ap
       and not has_function_privilege('service_role', 'app.marketplace_review_approve_image(uuid,uuid)', 'execute'),
   'A3. the internal approval step and tab helper are closed to every client role');
 select is((select count(*)::int from information_schema.role_table_grants
-           where table_name in ('marketplace_review_presets', 'marketplace_review_preset_events')
+           where table_name in ('marketplace_seller_message_presets', 'marketplace_seller_preset_events')
              and grantee in ('anon', 'authenticated', 'service_role')), 0,
-  'A4. the preset tables have no client grant');
-select ok((select relrowsecurity from pg_class where oid = 'public.marketplace_review_presets'::regclass)
-      and (select relrowsecurity from pg_class where oid = 'public.marketplace_review_preset_events'::regclass),
-  'A5. row level security is on for both preset tables');
+  'A4. the shared preset tables (PR 5) still have no client grant');
+select is((select count(*)::int from public.marketplace_seller_message_presets where action = 'product_reject' and is_active), 5,
+  'A5. product review adds five rejection presets to the ONE preset system (no table of its own)');
 select is(app.marketplace_media_verification_ready(), true, 'A6. image verification is always mandatory');
 select pg_temp.act_as('55555555-5555-4555-8555-555555555555');
 select throws_like($$ select public.admin_marketplace_set_media_verification_ready(false, 'turn it off') $$, 'mp:media_verification_mandatory%',
@@ -244,7 +243,7 @@ select set_config('t.q', (public.marketplace_seller_product_save(jsonb_build_obj
 select pg_temp.back();
 select set_config('t.q1', pg_temp.new_image(current_setting('t.q')::uuid, 700)::text, true);
 select set_config('t.q2', pg_temp.new_image(current_setting('t.q')::uuid, 800)::text, true);
-select set_config('t.preset', (select id::text from public.marketplace_review_presets where label_en = 'Blurry or low quality'), true);
+select set_config('t.preset', (select id::text from public.marketplace_seller_message_presets where action = 'product_reject' and label_en = 'Blurry or low quality'), true);
 select pg_temp.act_as('55555555-5555-4555-8555-555555555555');
 select is((select array_agg(e ->> 'result') from jsonb_array_elements(
     public.admin_marketplace_product_review_reject(current_setting('t.q')::uuid, null, 'both photos blurry', null, current_setting('t.preset')::uuid)) e),
@@ -343,39 +342,38 @@ reset role;
 select set_config('request.jwt.claims', '', true);
 
 -- ===========================================================================
--- G. Presets
+-- G. Presets (the PR 5 system, kind 'product_reject')
 -- ===========================================================================
 select pg_temp.act_as('55555555-5555-4555-8555-555555555555');
-select is((public.admin_marketplace_review_presets() ->> 'can_manage')::boolean, false, 'G1. a moderator reads the presets but cannot manage them');
-select is((select count(*)::int from jsonb_array_elements(public.admin_marketplace_review_presets() -> 'items') i where (i ->> 'is_active')::boolean), 5,
-  'G2. the five seeded presets are active');
-select throws_like($$ select public.admin_marketplace_review_preset_save(null, 'تسمية', 'Label', 'رسالة المالك', 'Owner message', true, 60) $$, 'mp:not_permitted%',
-  'G3. only a manager can create a preset');
+select is((select count(*)::int from jsonb_array_elements(public.admin_marketplace_review_presets())), 5,
+  'G1. a moderator reads the five active product-review presets');
+select throws_like($$ select public.admin_marketplace_seller_preset_save(null, 'product_reject', 'تسمية', 'Label', 'رسالة المالك', 'Owner message', true, 60, 'because') $$,
+  '%notification_templates.manage%', 'G2. only a notification-template manager can create one (same permission as PR 5)');
 select pg_temp.back();
 select pg_temp.act_as('70000001-0000-4000-8000-000000000001');
-select throws_like($$ select public.admin_marketplace_review_presets() $$, 'mp:not_permitted%', 'G4. a seller cannot read the presets');
+select throws_like($$ select public.admin_marketplace_review_presets() $$, 'mp:not_permitted%', 'G3. a seller cannot read them');
 select pg_temp.back();
 select pg_temp.act_as('11111111-1111-4111-8111-111111111111');
-select throws_like($$ select public.admin_marketplace_review_preset_save(null, '', 'Label', 'رسالة المالك', 'Owner message', true, 60) $$, 'mp:preset_invalid%',
-  'G5. an empty label is refused');
-select set_config('t.np', (public.admin_marketplace_review_preset_save(null, 'تسمية', 'Label', 'رسالة المالك', 'Owner message', true, 60) ->> 'id'), true);
+select set_config('t.np', public.admin_marketplace_seller_preset_save(null, 'product_reject', 'تسمية', 'Label', 'رسالة المالك', 'Owner message', true, 60, 'new preset')::text, true);
 select pg_temp.back();
-select is((select count(*)::int from public.marketplace_review_preset_events where preset_id = current_setting('t.np')::uuid and action = 'created'), 1,
-  'G6. a manager creates a preset and it is audited');
-select pg_temp.act_as('11111111-1111-4111-8111-111111111111');
-select is((public.admin_marketplace_review_preset_save(current_setting('t.np')::uuid, 'تسمية', 'Label', 'رسالة المالك', 'Owner message', true, 60) ->> 'changed')::boolean,
-  false, 'G7. saving the same content changes nothing');
-select public.admin_marketplace_review_preset_save(current_setting('t.np')::uuid, 'تسمية', 'Label', 'رسالة المالك', 'Owner message', false, 60);
-select pg_temp.back();
-select is((select action from public.marketplace_review_preset_events where preset_id = current_setting('t.np')::uuid order by id desc limit 1), 'deactivated',
-  'G8. deactivating is audited as such');
+select is((select action from public.marketplace_seller_preset_events where preset_id = current_setting('t.np')::uuid), 'created',
+  'G4. a manager creates a product-review preset and it is audited by the PR 5 trail');
 select pg_temp.act_as('55555555-5555-4555-8555-555555555555');
-select is((select count(*)::int from jsonb_array_elements(public.admin_marketplace_review_presets() -> 'items') i where i ->> 'id' = current_setting('t.np')), 0,
-  'G9. a moderator no longer sees a deactivated preset');
-select throws_like($$ select public.admin_marketplace_product_review_reject(current_setting('t.q')::uuid, array[current_setting('t.q1')::uuid], 'x reason', null, current_setting('t.np')::uuid) $$,
-  'mp:preset_not_found%', 'G10. ...and cannot use it');
+select is((select count(*)::int from jsonb_array_elements(public.admin_marketplace_review_presets())), 6, 'G5. the moderator sees it at once');
 select pg_temp.back();
-select throws_ok($$ update public.marketplace_review_preset_events set action = 'created' $$, '23514', null, 'G11. the preset trail is append-only');
+select pg_temp.act_as('11111111-1111-4111-8111-111111111111');
+select public.admin_marketplace_seller_preset_save(current_setting('t.np')::uuid, 'product_reject', 'تسمية', 'Label', 'رسالة المالك', 'Owner message', false, 60, 'switch off');
+select pg_temp.back();
+select set_config('t.approve_preset', (select id::text from public.marketplace_seller_message_presets where action = 'approve' limit 1), true);
+select pg_temp.act_as('55555555-5555-4555-8555-555555555555');
+select is((select count(*)::int from jsonb_array_elements(public.admin_marketplace_review_presets()) i where i ->> 'id' = current_setting('t.np')), 0,
+  'G6. a switched-off preset disappears for the moderator');
+select throws_like($$ select public.admin_marketplace_product_review_reject(current_setting('t.q')::uuid, array[current_setting('t.q1')::uuid], 'x reason', null, current_setting('t.np')::uuid) $$,
+  'mp:preset_not_found%', 'G7. ...and cannot be used');
+select throws_like($$ select public.admin_marketplace_product_review_reject(current_setting('t.q')::uuid, array[current_setting('t.q1')::uuid], 'x reason', null,
+    current_setting('t.approve_preset')::uuid) $$,
+  'mp:preset_not_found%', 'G8. a seller-transition preset (kind approve) cannot be used for a product rejection');
+select pg_temp.back();
 
 -- ===========================================================================
 -- H. Retention of a rejected image (media policy, unchanged)

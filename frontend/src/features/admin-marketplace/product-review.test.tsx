@@ -1,19 +1,16 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n } from "@/test/render";
-import { ProductReview, type ReviewImage, type ReviewProduct } from "./product-review";
-import type { ReviewPreset } from "./review-preset-manager";
+import { ProductReview, type ReviewImage, type ReviewPreset, type ReviewProduct } from "./product-review";
 
 const approveProduct = vi.fn();
 const approveImages = vi.fn();
 const rejectProduct = vi.fn();
-const savePreset = vi.fn();
 const refresh = vi.fn();
 vi.mock("@/server/actions/admin-marketplace", () => ({
   approveProductAction: (...a: unknown[]) => approveProduct(...a),
   approveImagesAction: (...a: unknown[]) => approveImages(...a),
   rejectProductAction: (...a: unknown[]) => rejectProduct(...a),
-  savePresetAction: (...a: unknown[]) => savePreset(...a),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push: vi.fn(), replace: vi.fn() }) }));
 
@@ -28,21 +25,20 @@ const product = (over: Partial<ReviewProduct> = {}): ReviewProduct => ({
   ...over,
 });
 const presets: ReviewPreset[] = [
-  { id: "pr1", sort_order: 10, label_ar: "غير واضحة", label_en: "Blurry", message_ar: "الصورة غير واضحة.", message_en: "The image is blurry.", is_active: true },
-  { id: "pr2", sort_order: 20, label_ar: "مخفية", label_en: "Hidden one", message_ar: "رسالة مخفية.", message_en: "Hidden message.", is_active: false },
+  { id: "pr1", label_ar: "غير واضحة", label_en: "Blurry", message_ar: "الصورة غير واضحة.", message_en: "The image is blurry." },
 ];
 const counts = { pending: 1, approved: 4, rejected: 2 };
 
-function view(over: { products?: ReviewProduct[]; canManagePresets?: boolean; locale?: "en" | "ar"; tab?: "pending" | "approved" | "rejected" } = {}) {
+function view(over: { products?: ReviewProduct[]; locale?: "en" | "ar"; tab?: "pending" | "approved" | "rejected" } = {}) {
   return renderWithI18n(
     <ProductReview tab={over.tab ?? "pending"} page={1} pages={1} counts={counts} products={over.products ?? [product()]}
-      presets={presets} canManagePresets={over.canManagePresets ?? false} />,
+      presets={presets} />,
     over.locale ?? "en",
   );
 }
 
 beforeEach(() => {
-  for (const f of [approveProduct, approveImages, rejectProduct, savePreset, refresh]) f.mockReset();
+  for (const f of [approveProduct, approveImages, rejectProduct, refresh]) f.mockReset();
 });
 
 describe("Product review", () => {
@@ -139,25 +135,5 @@ describe("Product review", () => {
     expect(screen.getByRole("heading", { name: "ورق جدران" })).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "صور ورق جدران" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /معتمدة/ })).toBeInTheDocument();
-  });
-
-  it("presets are managed only by someone allowed to, and every field is saved", async () => {
-    savePreset.mockResolvedValue({ ok: true });
-    view({ canManagePresets: true });
-    expect(screen.getByText("Hidden")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Add a message" }));
-    fireEvent.change(screen.getByLabelText("Name (Arabic)"), { target: { value: "تسمية" } });
-    fireEvent.change(screen.getByLabelText("Name (English)"), { target: { value: "Label" } });
-    fireEvent.change(screen.getByLabelText("Message (Arabic)"), { target: { value: "رسالة المالك" } });
-    fireEvent.change(screen.getByLabelText("Message (English)"), { target: { value: "Owner message" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() =>
-      expect(savePreset).toHaveBeenCalledWith({ id: null, labelAr: "تسمية", labelEn: "Label", messageAr: "رسالة المالك", messageEn: "Owner message", isActive: true, sortOrder: 100 }),
-    );
-  });
-
-  it("hides the preset manager from a viewer who cannot manage", () => {
-    view({ canManagePresets: false });
-    expect(screen.queryByText("Ready-made rejection messages")).not.toBeInTheDocument();
   });
 });

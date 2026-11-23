@@ -160,30 +160,3 @@ export async function rejectProductAction(input: RejectProductInput): Promise<Ad
   revalidatePath(MEDIA);
   return { ok: true, results: (data ?? []) as { id: string; result: string }[] };
 }
-
-export type PresetInput = {
-  id: string | null;
-  labelAr: string;
-  labelEn: string;
-  messageAr: string;
-  messageEn: string;
-  isActive: boolean;
-  sortOrder: number;
-};
-
-/** Creates or changes an owner-facing message preset (Super Admin; the database re-checks and audits). */
-export async function savePresetAction(input: PresetInput): Promise<AdminResult> {
-  const supabase = await getServerSupabase();
-  const { error } = await supabase.rpc("admin_marketplace_review_preset_save", {
-    p_id: (input.id ?? null) as never,
-    p_label_ar: input.labelAr,
-    p_label_en: input.labelEn,
-    p_message_ar: input.messageAr,
-    p_message_en: input.messageEn,
-    p_is_active: input.isActive,
-    p_sort_order: input.sortOrder,
-  });
-  if (error) return { ok: false, code: parseSellerError(error.message).code };
-  revalidatePath(MEDIA);
-  return { ok: true };
-}
