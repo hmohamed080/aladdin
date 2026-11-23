@@ -26,7 +26,9 @@
 -- 1. Columns, constraint, indexes
 -- ---------------------------------------------------------------------------
 alter table public.media_videos
-  add column marketplace_product_id uuid references public.marketplace_products (id) on delete cascade,
+  -- No foreign key on purpose: no existing table may reference a marketplace table (guard in test 122, K3); the
+  -- upload RPC checks the product, and marketplace products are archived, never hard-deleted.
+  add column marketplace_product_id uuid,
   add column seller_organization_id uuid references public.organizations (id) on delete cascade,
   add column review_status          text,
   add column reviewed_at            timestamptz,

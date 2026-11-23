@@ -4330,13 +4330,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "media_videos_marketplace_product_id_fkey"
-            columns: ["marketplace_product_id"]
-            isOneToOne: false
-            referencedRelation: "marketplace_products"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "media_videos_reviewed_by_fkey"
             columns: ["reviewed_by"]
             isOneToOne: false
