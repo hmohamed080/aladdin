@@ -9,6 +9,8 @@ import { MarketplaceComingSoonPage } from "@/features/landing-marketplace/market
 import { isMarketplacePreviewEnabled } from "@/lib/env";
 import { LOCALE_COOKIE, directionFor, resolveLocale } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/provider";
+import { ClosedState } from "@/features/marketplace/live/closed-state";
+import { placeFromParams } from "@/features/marketplace/live/delivery-model";
 import { PUBLIC_SORTS, loadPublicCatalogPage, loadPublicFacets, type PublicSort } from "@/server/queries/marketplace-public";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +25,12 @@ const KEY = /^[a-z0-9_]{1,64}$/;
 function price(raw: string | undefined): number | null {
   if (!raw || !/^\d{1,9}(\.\d{1,2})?$/.test(raw)) return null;
   return Number(raw);
+}
+
+const DAY_CHOICES = [2, 3, 5, 7];
+function days(raw: string | undefined): number | null {
+  const n = Number.parseInt(raw ?? "", 10);
+  return DAY_CHOICES.includes(n) ? n : null;
 }
 
 /** `f.<attribute>=a,b` → { attribute: [a, b] }, keys and values validated, bounded. */
@@ -56,7 +64,9 @@ export default async function MarketplacePage({ searchParams }: { searchParams: 
     page: Math.min(10000, Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1)),
     priceMin: price(sp.pmin),
     priceMax: price(sp.pmax),
-    inStock: sp.stock === "1",
+    freeShipping: sp.free === "1",
+    maxDays: days(sp.days),
+    place: placeFromParams(sp.gov, sp.area),
     attrs: attrs(sp),
   };
   const [page, facets] = await Promise.all([
@@ -67,6 +77,15 @@ export default async function MarketplacePage({ searchParams }: { searchParams: 
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const dir = directionFor(locale);
   const images = await marketplacePublicImageUrls(await getServerSupabase(), (page?.items ?? []).map((item) => item.image_id));
+  if (page?.open === false) {
+    return (
+      <I18nProvider locale={locale} dir={dir}>
+        <MarketplaceShell>
+          <ClosedState locale={locale} />
+        </MarketplaceShell>
+      </I18nProvider>
+    );
+  }
   return (
     <I18nProvider locale={locale} dir={dir}>
       <MarketplaceShell>
