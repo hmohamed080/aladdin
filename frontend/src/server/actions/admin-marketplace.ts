@@ -79,16 +79,10 @@ async function validateOne(supabase: Awaited<ReturnType<typeof getServerSupabase
   return { id: imageId, valid: v.valid, code: v.valid ? "valid" : v.reason };
 }
 
-export async function validateImagesAction(imageIds: string[]): Promise<AdminResult<{ results: { id: string; valid: boolean; code: string }[] }>> {
-  const ids = [...new Set(imageIds)].slice(0, 100);
-  const supabase = await getServerSupabase();
-  const results = [];
-  for (const id of ids) results.push(await validateOne(supabase, id));
-  revalidatePath(MEDIA);
-  return { ok: true, results };
-}
-
-/** Re-validates every selected image from its CURRENT bytes, then approves; an image that fails is not approved. */
+/**
+ * Approves explicitly chosen images (a pending image, or a rejected one being reconsidered). Every image is
+ * re-validated from its CURRENT bytes first; one that fails validation is reported, not approved.
+ */
 export async function approveImagesAction(imageIds: string[]): Promise<AdminResult<{ results: { id: string; result: string }[] }>> {
   const ids = [...new Set(imageIds)].slice(0, 100);
   if (!ids.length) return { ok: false, code: "images_invalid" };
@@ -100,20 +94,75 @@ export async function approveImagesAction(imageIds: string[]): Promise<AdminResu
   return { ok: true, results: (data ?? []) as { id: string; result: string }[] };
 }
 
-export async function rejectImagesAction(imageIds: string[], reason: string): Promise<AdminResult<{ results: { id: string; result: string }[] }>> {
-  const ids = [...new Set(imageIds)].slice(0, 100);
+/** The tick: re-validates every pending image of the product from its current bytes, then approves them all. */
+export async function approveProductAction(productId: string): Promise<AdminResult<{ results: { id: string; result: string }[] }>> {
   const supabase = await getServerSupabase();
-  const { data, error } = await supabase.rpc("admin_marketplace_media_reject", { p_image_ids: ids, p_reason: reason.trim() });
+  const { data: pending } = await supabase
+    .from("marketplace_product_images")
+    .select("id")
+    .eq("product_id", productId)
+    .eq("upload_state", "confirmed")
+    .eq("status", "pending")
+    .limit(100);
+  for (const row of pending ?? []) await validateOne(supabase, row.id);
+  const { data, error } = await supabase.rpc("admin_marketplace_product_review_approve", { p_product_id: productId });
   if (error) return { ok: false, code: parseSellerError(error.message).code };
   revalidatePath(MEDIA);
   return { ok: true, results: (data ?? []) as { id: string; result: string }[] };
 }
 
-export async function setMediaReadyAction(ready: boolean, reason: string): Promise<AdminResult<{ ready: boolean }>> {
+export type RejectProductInput = {
+  productId: string;
+  /** null = every pending image of the product */
+  imageIds: string[] | null;
+  /** internal: stays in the admin audit trail */
+  reason: string;
+  /** owner-facing custom text, used when no preset is chosen */
+  ownerMessage: string;
+  presetId: string | null;
+};
+
+/**
+ * The cross: rejects all pending images of the product, or only the chosen ones, with one internal reason and one
+ * owner-facing message (a preset or custom text). The database writes the audit trail and notifies the owner in-app.
+ */
+export async function rejectProductAction(input: RejectProductInput): Promise<AdminResult<{ results: { id: string; result: string }[] }>> {
   const supabase = await getServerSupabase();
-  const { data, error } = await supabase.rpc("admin_marketplace_set_media_verification_ready", { p_ready: ready, p_reason: reason.trim() });
+  const { data, error } = await supabase.rpc("admin_marketplace_product_review_reject", {
+    p_product_id: input.productId,
+    p_image_ids: (input.imageIds ?? null) as never,
+    p_reason: input.reason.trim(),
+    p_owner_message: input.presetId ? "" : input.ownerMessage.trim(),
+    p_preset_id: input.presetId ?? undefined,
+  });
   if (error) return { ok: false, code: parseSellerError(error.message).code };
   revalidatePath(MEDIA);
-  revalidatePath("/market");
-  return { ok: true, ready: Boolean(data) };
+  return { ok: true, results: (data ?? []) as { id: string; result: string }[] };
+}
+
+export type PresetInput = {
+  id: string | null;
+  labelAr: string;
+  labelEn: string;
+  messageAr: string;
+  messageEn: string;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+/** Creates or changes an owner-facing message preset (Super Admin; the database re-checks and audits). */
+export async function savePresetAction(input: PresetInput): Promise<AdminResult> {
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.rpc("admin_marketplace_review_preset_save", {
+    p_id: (input.id ?? null) as never,
+    p_label_ar: input.labelAr,
+    p_label_en: input.labelEn,
+    p_message_ar: input.messageAr,
+    p_message_en: input.messageEn,
+    p_is_active: input.isActive,
+    p_sort_order: input.sortOrder,
+  });
+  if (error) return { ok: false, code: parseSellerError(error.message).code };
+  revalidatePath(MEDIA);
+  return { ok: true };
 }

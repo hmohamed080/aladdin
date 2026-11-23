@@ -1,4 +1,7 @@
 - Acceptance (`nxossqhdfltcqdwvbewi`) is at 235 migrations, latest `20261121090003` (media caps, admin upload limits, notification templates applied 2026-11-22). The matching frontend is NOT deployed there yet. Production is untouched (last recorded 207).
+## Marketplace product review, PR 6 (draft PR, not deployed) - 2026-11-23
+- Branch `feat/mkt-product-review-20261123`: migration `20261123100001` (product-level review RPCs, owner message presets, image replacement, image verification always mandatory) is NOT applied to Acceptance or Production (local isolated stack only). Admin page `/admin/marketplace/media` is now "Product review" (one card per product, images in a scrollable strip); the media on/off card is gone. First emitter of `app.notify_from_template` (`marketplace.product.rejected`, owner only, on rejection only). Nothing deployed.
+
 ## Marketplace notification templates (draft PR, not deployed) - 2026-11-21
 - Branch `feat/mkt-notification-templates-20261121`: migration `20261121090003` (templates, history, `notifications.content`, six `marketplace.*` event types) is NOT applied to Acceptance or Production (local isolated stack only). Admin page `/admin/notification-templates`. No emitter calls it yet (PR 5 and PR 6).
 

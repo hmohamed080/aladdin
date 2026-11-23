@@ -3223,6 +3223,7 @@ export type Database = {
           moderation_reason: string | null
           object_key: string
           product_id: string
+          replaces_image_id: string | null
           sort_order: number
           status: string
           updated_at: string
@@ -3249,6 +3250,7 @@ export type Database = {
           moderation_reason?: string | null
           object_key: string
           product_id: string
+          replaces_image_id?: string | null
           sort_order?: number
           status?: string
           updated_at?: string
@@ -3275,6 +3277,7 @@ export type Database = {
           moderation_reason?: string | null
           object_key?: string
           product_id?: string
+          replaces_image_id?: string | null
           sort_order?: number
           status?: string
           updated_at?: string
@@ -9702,6 +9705,38 @@ export type Database = {
         Returns: Json
       }
       admin_marketplace_media_settings: { Args: never; Returns: Json }
+      admin_marketplace_product_review_approve: {
+        Args: { p_product_id: string }
+        Returns: Json
+      }
+      admin_marketplace_product_review_queue: {
+        Args: { p_limit?: number; p_offset?: number; p_tab?: string }
+        Returns: Json
+      }
+      admin_marketplace_product_review_reject: {
+        Args: {
+          p_image_ids: string[]
+          p_owner_message: string
+          p_preset_id?: string
+          p_product_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      admin_marketplace_product_review_summary: { Args: never; Returns: Json }
+      admin_marketplace_review_preset_save: {
+        Args: {
+          p_id: string
+          p_is_active: boolean
+          p_label_ar: string
+          p_label_en: string
+          p_message_ar: string
+          p_message_en: string
+          p_sort_order: number
+        }
+        Returns: Json
+      }
+      admin_marketplace_review_presets: { Args: never; Returns: Json }
       admin_marketplace_seller_approve: {
         Args: { p_organization_id: string; p_reason: string }
         Returns: string
@@ -11161,6 +11196,10 @@ export type Database = {
       }
       marketplace_seller_image_remove_finalize: {
         Args: { p_image_id: string }
+        Returns: Json
+      }
+      marketplace_seller_image_replace_request_upload: {
+        Args: { p_content_type: string; p_image_id: string }
         Returns: Json
       }
       marketplace_seller_image_request_upload: {
