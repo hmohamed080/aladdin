@@ -307,7 +307,7 @@ export async function setSellerPickupAction(
 
 /**
  * Saves the showroom-wide delivery settings and the terms of every covered place in one transaction:
- * preparation days, order cut-off, free-shipping minimum, pickup instructions, and per place the fee,
+ * preparation days, free-shipping minimum, pickup instructions, and per place the fee,
  * delivery duration, next-day option and free-shipping minimum. Returns what is still missing for publishing.
  */
 export async function saveSellerDeliveryTermsAction(

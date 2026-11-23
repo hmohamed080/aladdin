@@ -23,11 +23,10 @@ export type StoredRate = {
 /** The showroom-wide delivery settings as the database returns them. */
 export type StoredSettings = {
   preparation_days: number | null;
-  order_cutoff_time: string | null;
   free_shipping_min_egp: number | string | null;
   pickup_instructions: string | null;
 };
-export const EMPTY_SETTINGS: StoredSettings = { preparation_days: null, order_cutoff_time: null, free_shipping_min_egp: null, pickup_instructions: null };
+export const EMPTY_SETTINGS: StoredSettings = { preparation_days: null, free_shipping_min_egp: null, pickup_instructions: null };
 
 /* ---------------------------------------------------------------- areas */
 
@@ -179,12 +178,11 @@ export const unpricedCount = (rates: readonly StoredRate[]) => rates.filter((r) 
 
 /* ------------------------------------------------------------- showroom-wide */
 
-export type SettingsForm = { prep: string; cutoff: string; freeMin: string; pickupNote: string };
-export type SettingsProblem = "prep" | "cutoff" | "freeMin" | "pickupNote";
+export type SettingsForm = { prep: string; freeMin: string; pickupNote: string };
+export type SettingsProblem = "prep" | "freeMin" | "pickupNote";
 
 export const settingsFormFrom = (s: StoredSettings): SettingsForm => ({
   prep: numText(s.preparation_days),
-  cutoff: s.order_cutoff_time ?? "",
   freeMin: numText(s.free_shipping_min_egp),
   pickupNote: s.pickup_instructions ?? "",
 });
@@ -192,7 +190,6 @@ export const settingsFormFrom = (s: StoredSettings): SettingsForm => ({
 export function validateSettings(f: SettingsForm): SettingsProblem[] {
   const out: SettingsProblem[] = [];
   if (f.prep.trim() !== "" && parseDays(f.prep) === null) out.push("prep");
-  if (f.cutoff.trim() !== "" && !/^([01]\d|2[0-3]):[0-5]\d$/.test(f.cutoff.trim())) out.push("cutoff");
   if (f.freeMin.trim() !== "" && parseMinimum(f.freeMin) === null) out.push("freeMin");
   if (f.pickupNote.trim().length > 300) out.push("pickupNote");
   return out;
@@ -202,7 +199,6 @@ export function validateSettings(f: SettingsForm): SettingsProblem[] {
 export function toSettings(f: SettingsForm): Record<string, unknown> {
   return {
     preparation_days: f.prep.trim() === "" ? null : parseDays(f.prep),
-    order_cutoff_time: f.cutoff.trim() === "" ? null : f.cutoff.trim(),
     free_shipping_min_egp: f.freeMin.trim() === "" ? null : parseMinimum(f.freeMin),
     pickup_instructions: f.pickupNote.trim() === "" ? null : f.pickupNote.trim(),
   };

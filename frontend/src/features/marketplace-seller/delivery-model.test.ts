@@ -113,20 +113,20 @@ describe("showroom-wide settings", () => {
     expect(parseMinimum("1000001")).toBeNull();
   });
 
-  it("validates preparation days, cut-off, minimum and the pickup note", () => {
-    const ok = settingsFormFrom({ preparation_days: 2, order_cutoff_time: "14:30", free_shipping_min_egp: "5000.00", pickup_instructions: null });
-    expect(ok).toEqual({ prep: "2", cutoff: "14:30", freeMin: "5000", pickupNote: "" });
+  it("validates preparation days, minimum and the pickup note", () => {
+    const ok = settingsFormFrom({ preparation_days: 2, free_shipping_min_egp: "5000.00", pickup_instructions: null });
+    expect(ok).toEqual({ prep: "2", freeMin: "5000", pickupNote: "" });
     expect(validateSettings(ok)).toEqual([]);
-    expect(validateSettings({ prep: "40", cutoff: "25:00", freeMin: "0", pickupNote: "x".repeat(301) })).toEqual(["prep", "cutoff", "freeMin", "pickupNote"]);
-    expect(validateSettings({ prep: "", cutoff: "", freeMin: "", pickupNote: "" })).toEqual([]);
+    expect(validateSettings({ prep: "40", freeMin: "0", pickupNote: "x".repeat(301) })).toEqual(["prep", "freeMin", "pickupNote"]);
+    expect(validateSettings({ prep: "", freeMin: "", pickupNote: "" })).toEqual([]);
   });
 
   it("sends blanks as null so the stored value is cleared", () => {
-    expect(toSettings({ prep: "", cutoff: "", freeMin: "", pickupNote: "  " })).toEqual({
-      preparation_days: null, order_cutoff_time: null, free_shipping_min_egp: null, pickup_instructions: null,
+    expect(toSettings({ prep: "", freeMin: "", pickupNote: "  " })).toEqual({
+      preparation_days: null, free_shipping_min_egp: null, pickup_instructions: null,
     });
-    expect(toSettings({ prep: "0", cutoff: "09:05", freeMin: "250", pickupNote: " Ask at desk " })).toEqual({
-      preparation_days: 0, order_cutoff_time: "09:05", free_shipping_min_egp: 250, pickup_instructions: "Ask at desk",
+    expect(toSettings({ prep: "0", freeMin: "250", pickupNote: " Ask at desk " })).toEqual({
+      preparation_days: 0, free_shipping_min_egp: 250, pickup_instructions: "Ask at desk",
     });
   });
 });

@@ -2,7 +2,7 @@
 -- (20261123120001_marketplace_seller_delivery_payment_settings.sql).
 --
 --   A. SHAPE     — RLS, no client write grant, function privileges.
---   B. TERMS     — preparation days, cut-off, free-shipping minimum, per-area duration / next-day / minimum; validation.
+--   B. TERMS     — preparation days, free-shipping minimum, per-area duration / next-day / minimum; validation.
 --   C. PAYMENT   — InstaPay (full) next to the deposit; old callers keep working.
 --   D. FREE SHIP — per-product flag.
 --   E. READINESS — the missing-data contract consumed by the publication gate.
@@ -69,7 +69,7 @@ select is(public.marketplace_seller_commerce_readiness(current_setting('t.a')::u
     "missing": ["preparation_days_missing", "delivery_option_missing", "payment_method_missing"]}'::jsonb,
   'E1. nothing configured: preparation, a way to receive and a payment method are missing');
 select is(public.marketplace_seller_delivery_get(current_setting('t.a')::uuid) -> 'settings',
-  '{"preparation_days": null, "order_cutoff_time": null, "free_shipping_min_egp": null, "pickup_instructions": null}'::jsonb,
+  '{"preparation_days": null, "free_shipping_min_egp": null, "pickup_instructions": null}'::jsonb,
   'B1. the settings read is empty for a new showroom');
 select is(public.marketplace_seller_delivery_areas_save(current_setting('t.a')::uuid, jsonb_build_array(
     jsonb_build_object('governorate_key', 'cairo'),
@@ -82,26 +82,27 @@ select is(public.marketplace_seller_delivery_prices_save(current_setting('t.a'):
     jsonb_build_array(jsonb_build_object('governorate_key', 'cairo', 'fee_egp', 50))), '{"saved": 1}'::jsonb,
   'B3. the old prices save still works');
 select is(((public.marketplace_seller_delivery_terms_save(current_setting('t.a')::uuid,
-    jsonb_build_object('preparation_days', 2, 'order_cutoff_time', '14:30', 'free_shipping_min_egp', 5000, 'pickup_instructions', ' Ask at reception '),
+    jsonb_build_object('preparation_days', 2, 'free_shipping_min_egp', 5000, 'pickup_instructions', ' Ask at reception '),
     jsonb_build_array(
       jsonb_build_object('governorate_key', 'cairo', 'fee_egp', 60, 'duration_min_days', 1, 'duration_max_days', 3,
                          'next_day_available', true, 'next_day_fee_egp', 40),
       jsonb_build_object('governorate_key', 'cairo', 'area_key', current_setting('t.cairo_area'), 'fee_egp', 0,
                          'duration_min_days', 1, 'duration_max_days', 1, 'free_shipping_min_egp', 1000)))) -> 'settings'),
-  '{"preparation_days": 2, "order_cutoff_time": "14:30", "free_shipping_min_egp": 5000.00, "pickup_instructions": "Ask at reception"}'::jsonb,
-  'B4. terms save stores preparation, cut-off, minimum and trimmed pickup instructions');
+  '{"preparation_days": 2, "free_shipping_min_egp": 5000.00, "pickup_instructions": "Ask at reception"}'::jsonb,
+  'B4. terms save stores preparation, minimum and trimmed pickup instructions');
 select is((select r from jsonb_array_elements(public.marketplace_seller_delivery_get(current_setting('t.a')::uuid) -> 'rates') r where r ->> 'area_key' is null),
   '{"governorate_key":"cairo","area_key":null,"fee_egp":60.00,"duration_min_days":1,"duration_max_days":3,"next_day_available":true,"next_day_fee_egp":40.00,"free_shipping_min_egp":null}'::jsonb,
   'B5. the governorate row carries fee, duration and the next-day option');
 select is((select (r ->> 'free_shipping_min_egp')::numeric from jsonb_array_elements(public.marketplace_seller_delivery_get(current_setting('t.a')::uuid) -> 'rates') r where r ->> 'area_key' is not null), 1000.00,
   'B6. the area row carries its own free-shipping minimum');
-select is(public.marketplace_seller_delivery_terms_save(current_setting('t.a')::uuid, '{"order_cutoff_time": null}'::jsonb) -> 'settings' ->> 'preparation_days', '2',
+select is(public.marketplace_seller_delivery_terms_save(current_setting('t.a')::uuid, '{"free_shipping_min_egp": null}'::jsonb) -> 'settings' ->> 'preparation_days', '2',
   'B7. a missing key keeps the stored value (areas = null leaves places untouched)');
-select is(public.marketplace_seller_delivery_get(current_setting('t.a')::uuid) -> 'settings' -> 'order_cutoff_time', 'null'::jsonb,
-  'B8. an explicit null clears the cut-off');
+select is(public.marketplace_seller_delivery_get(current_setting('t.a')::uuid) -> 'settings' -> 'free_shipping_min_egp', 'null'::jsonb,
+  'B8. an explicit null clears the free-shipping minimum');
 
 select throws_ok($$select public.marketplace_seller_delivery_terms_save(current_setting('t.a')::uuid, '{"preparation_days": 31}'::jsonb)$$, '22023', 'mp:preparation_days_invalid', 'B9. preparation days above 30 are refused');
-select throws_ok($$select public.marketplace_seller_delivery_terms_save(current_setting('t.a')::uuid, '{"order_cutoff_time": "25:00"}'::jsonb)$$, '22023', 'mp:cutoff_invalid', 'B10. a bad cut-off time is refused');
+select is(public.marketplace_seller_delivery_terms_save(current_setting('t.a')::uuid, '{"order_cutoff_time": "14:30"}'::jsonb) -> 'settings' ? 'order_cutoff_time', false,
+  'B10. there is no order cut-off (the Marketplace runs 24h): the key is ignored and never stored or returned');
 select throws_ok($$select public.marketplace_seller_delivery_terms_save(current_setting('t.a')::uuid, '{"free_shipping_min_egp": 0}'::jsonb)$$, '22023', 'mp:free_shipping_invalid', 'B11. a zero free-shipping minimum is refused');
 select throws_ok($$select public.marketplace_seller_delivery_terms_save(current_setting('t.a')::uuid, '{}'::jsonb, jsonb_build_array(jsonb_build_object('governorate_key', 'cairo', 'duration_min_days', 3, 'duration_max_days', 1)))$$, '22023', 'mp:duration_invalid:1', 'B12. min above max duration is refused');
 select throws_ok($$select public.marketplace_seller_delivery_terms_save(current_setting('t.a')::uuid, '{}'::jsonb, jsonb_build_array(jsonb_build_object('governorate_key', 'cairo', 'duration_min_days', 3)))$$, '22023', 'mp:duration_invalid:1', 'B13. only one duration bound is refused');

@@ -8,8 +8,8 @@
 --   * preparation days (one number per showroom) + per-area delivery duration (min..max days):
 --     the site will show "arrives in X-Y days" = preparation + duration.
 --   * per-area next-day option with its own extra fee.
---   * one daily order cut-off time per showroom (Africa/Cairo wall-clock; orders placed after it count
---     from the next day).
+--   * NO daily order cut-off (owner decision 2026-11-23): the Marketplace runs 24 hours, so the estimate is
+--     always preparation_days + the place's duration, with no "after the cut-off counts from tomorrow" rule.
 --   * free shipping: a minimum order value (for all areas, or overridden per area) and/or a per-product flag.
 --   * pickup: the existing pickup switch plus free-text pickup instructions.
 --   * payment methods per showroom: cash on delivery, InstaPay (full), InstaPay deposit. DATA ONLY: the
@@ -36,8 +36,6 @@ create table public.marketplace_seller_delivery_settings (
   seller_organization_id uuid        primary key references public.organizations (id) on delete cascade,
   -- days the showroom needs to prepare an order (0 = ships the same day). null = not set yet.
   preparation_days       smallint,
-  -- daily order cut-off, Africa/Cairo wall-clock. null = no cut-off.
-  order_cutoff_time      time,
   -- orders at or above this value (EGP, excl. VAT) ship free to every covered place that has no threshold of its own
   free_shipping_min_egp  numeric(10,2),
   pickup_instructions    text,
@@ -49,9 +47,7 @@ create table public.marketplace_seller_delivery_settings (
   constraint ck_mp_delivery_settings_pickup check (pickup_instructions is null or char_length(btrim(pickup_instructions)) between 1 and 300)
 );
 comment on table public.marketplace_seller_delivery_settings is
-  'Per-showroom delivery settings: preparation days, daily order cut-off (Africa/Cairo), free-shipping minimum order value, pickup instructions. No client write grant; written only by marketplace_seller_delivery_terms_save.';
-comment on column public.marketplace_seller_delivery_settings.order_cutoff_time is
-  'Wall-clock time in Africa/Cairo. An order placed after it counts from the next day. null = no cut-off.';
+  'Per-showroom delivery settings: preparation days, free-shipping minimum order value, pickup instructions. No client write grant; written only by marketplace_seller_delivery_terms_save.';
 create trigger set_mp_delivery_settings_updated_at
   before update on public.marketplace_seller_delivery_settings
   for each row execute function app.set_updated_at();
@@ -184,7 +180,7 @@ revoke all on function app.marketplace_settings_event(uuid, text, jsonb) from pu
 --   delivery_area_unpriced          at least one covered place has no delivery fee
 --   delivery_area_duration_missing  at least one covered place has no delivery duration
 --   payment_method_missing          none of COD / InstaPay / InstaPay deposit is enabled
--- The order cut-off, free shipping, next-day options and pickup instructions are optional.
+-- Free shipping, next-day options and pickup instructions are optional.
 create or replace function app.marketplace_seller_commerce_missing(p_org uuid)
 returns text[]
 language sql
@@ -265,7 +261,6 @@ begin
       where l.organization_id = p_organization_id and l.is_active and l.supports_pickup),
     'settings', jsonb_build_object(
       'preparation_days', s.preparation_days,
-      'order_cutoff_time', to_char(s.order_cutoff_time, 'HH24:MI'),
       'free_shipping_min_egp', s.free_shipping_min_egp,
       'pickup_instructions', s.pickup_instructions),
     'free_shipping_product_count', (select count(*) from public.marketplace_free_shipping_products f where f.seller_organization_id = p_organization_id),
@@ -277,7 +272,7 @@ $$;
 -- 8. Delivery terms save: showroom settings + per-place fee / duration / next-day / free-shipping minimum
 -- ---------------------------------------------------------------------------
 -- p_settings (object; a missing key keeps the stored value, an explicit null clears it):
---   { preparation_days: 0..30, order_cutoff_time: "HH:MM", free_shipping_min_egp: >0..1000000, pickup_instructions: text<=300 }
+--   { preparation_days: 0..30, free_shipping_min_egp: >0..1000000, pickup_instructions: text<=300 }
 -- p_areas (array or null = leave places untouched). Each element REPLACES that place's terms (a missing key = cleared):
 --   { governorate_key, area_key?, fee_egp, duration_min_days, duration_max_days, next_day_available, next_day_fee_egp, free_shipping_min_egp }
 -- A place that is not covered is refused (this call can never widen the coverage). One transaction: any refusal
@@ -292,7 +287,6 @@ declare
   v_uid   uuid;
   s       public.marketplace_seller_delivery_settings;
   v_prep  smallint;
-  v_cut   time;
   v_free  numeric;
   v_note  text;
   e       jsonb;
@@ -320,7 +314,6 @@ begin
 
   select * into s from public.marketplace_seller_delivery_settings where seller_organization_id = p_organization_id;
   v_prep := s.preparation_days;
-  v_cut  := s.order_cutoff_time;
   v_free := s.free_shipping_min_egp;
   v_note := s.pickup_instructions;
 
@@ -329,13 +322,6 @@ begin
     elsif (p_settings ->> 'preparation_days') ~ '^[0-9]{1,2}$' and (p_settings ->> 'preparation_days')::integer <= 30 then
       v_prep := (p_settings ->> 'preparation_days')::smallint;
     else raise exception 'mp:preparation_days_invalid' using errcode = '22023';
-    end if;
-  end if;
-  if p_settings ? 'order_cutoff_time' then
-    if jsonb_typeof(p_settings -> 'order_cutoff_time') = 'null' then v_cut := null;
-    elsif (p_settings ->> 'order_cutoff_time') ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' then
-      v_cut := (p_settings ->> 'order_cutoff_time')::time;
-    else raise exception 'mp:cutoff_invalid' using errcode = '22023';
     end if;
   end if;
   if p_settings ? 'free_shipping_min_egp' then
@@ -358,10 +344,10 @@ begin
   end if;
 
   insert into public.marketplace_seller_delivery_settings as t
-    (seller_organization_id, preparation_days, order_cutoff_time, free_shipping_min_egp, pickup_instructions, updated_by)
-  values (p_organization_id, v_prep, v_cut, v_free, v_note, v_uid)
+    (seller_organization_id, preparation_days, free_shipping_min_egp, pickup_instructions, updated_by)
+  values (p_organization_id, v_prep, v_free, v_note, v_uid)
   on conflict (seller_organization_id) do update set
-    preparation_days = excluded.preparation_days, order_cutoff_time = excluded.order_cutoff_time,
+    preparation_days = excluded.preparation_days,
     free_shipping_min_egp = excluded.free_shipping_min_egp, pickup_instructions = excluded.pickup_instructions,
     updated_by = excluded.updated_by;
 
@@ -425,7 +411,7 @@ begin
   end if;
 
   perform app.marketplace_settings_event(p_organization_id, 'delivery_terms', jsonb_build_object(
-    'preparation_days', v_prep, 'order_cutoff_time', to_char(v_cut, 'HH24:MI'),
+    'preparation_days', v_prep,
     'free_shipping_min_egp', v_free, 'places_updated', v_n));
   return public.marketplace_seller_delivery_get(p_organization_id);
 end;

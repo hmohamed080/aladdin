@@ -75,7 +75,7 @@ describe("delivery settings editor", () => {
     expect(saveTerms).not.toHaveBeenCalled();
   });
 
-  it("refuses a delivery range with only one bound, a bad cut-off and a bad preparation value", () => {
+  it("refuses a delivery range with only one bound, and a bad preparation value", () => {
     renderWithI18n(<DeliveryEditor organizationId={ORG} initialRates={[PLACES[0]!]} initialPickup={false} />, "en");
     fireEvent.change(screen.getByLabelText(/Cairo \(All areas\) — Delivery takes from/), { target: { value: "2" } });
     fireEvent.change(screen.getByLabelText(/^Preparation days/), { target: { value: "99" } });
@@ -97,7 +97,6 @@ describe("delivery settings editor", () => {
     saveTerms.mockResolvedValue({ ok: true, missing: ["payment_method_missing"] });
     renderWithI18n(<DeliveryEditor organizationId={ORG} initialRates={PLACES} initialPickup={false} />, "en");
     fireEvent.change(screen.getByLabelText(/^Preparation days/), { target: { value: "٢" } });
-    fireEvent.change(screen.getByLabelText(/^Daily order cut-off time/), { target: { value: "14:30" } });
     fireEvent.change(screen.getByLabelText(/Free shipping from order value/), { target: { value: "5000" } });
     fireEvent.change(fee(/Cairo — Maadi/), { target: { value: "١٢٠٫٥" } });
     fireEvent.change(screen.getByLabelText(/Cairo \(All areas\) — Delivery takes from/), { target: { value: "1" } });
@@ -108,7 +107,7 @@ describe("delivery settings editor", () => {
     await waitFor(() => expect(saveTerms).toHaveBeenCalledTimes(1));
     expect(saveTerms).toHaveBeenCalledWith(
       ORG,
-      { preparation_days: 2, order_cutoff_time: "14:30", free_shipping_min_egp: 5000, pickup_instructions: null },
+      { preparation_days: 2, free_shipping_min_egp: 5000, pickup_instructions: null },
       [
         { governorate_key: "cairo", area_key: null, fee_egp: 80, ...NO_TERMS, duration_min_days: 1, duration_max_days: 3, next_day_available: true, next_day_fee_egp: 40 },
         { governorate_key: "cairo", area_key: "maadi", fee_egp: 120.5, ...NO_TERMS },

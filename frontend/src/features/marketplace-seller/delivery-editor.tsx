@@ -36,14 +36,13 @@ const ROW_PROBLEM_KEY: Record<PriceField, string> = {
 };
 const SETTINGS_PROBLEM_KEY: Record<SettingsProblem, string> = {
   prep: "prepInvalid",
-  cutoff: "cutoffInvalid",
   freeMin: "freeMinInvalid",
   pickupNote: "pickupNoteInvalid",
 };
 
 /**
  * The showroom's delivery settings on one screen (the places themselves are chosen on the Delivery areas
- * page): preparation days, daily order cut-off, a free-shipping minimum, then for each covered place the fee,
+ * page): preparation days, a free-shipping minimum, then for each covered place the fee,
  * how many days delivery takes, an optional next-day option with its fee and an optional own free-shipping
  * minimum. Everything is saved in one call and the database re-validates every value. Pickup from the
  * showroom is switched here too, and a checklist shows what still blocks publishing.
@@ -170,18 +169,6 @@ export function DeliveryEditor({
               onChange={(e) => setField({ prep: e.target.value })}
             />
             <span className="text-caption text-fg-secondary">{d("prepDaysHint")}</span>
-          </label>
-          <label className="flex flex-col gap-1 text-label text-fg">
-            {d("cutoff")}
-            <Input
-              id="order-cutoff"
-              type="time"
-              dir="ltr"
-              value={form.cutoff}
-              aria-invalid={settingsProblems.includes("cutoff") || undefined}
-              onChange={(e) => setField({ cutoff: e.target.value })}
-            />
-            <span className="text-caption text-fg-secondary">{d("cutoffHint")}</span>
           </label>
           <label className="flex flex-col gap-1 text-label text-fg">
             {d("freeMin")}

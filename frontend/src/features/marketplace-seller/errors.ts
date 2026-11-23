@@ -70,7 +70,6 @@ export const KNOWN_ERROR_CODES = new Set([
   "delivery_area_unknown",
   "pickup_invalid",
   "preparation_days_invalid",
-  "cutoff_invalid",
   "free_shipping_invalid",
   "pickup_instructions_invalid",
   "duration_invalid",
