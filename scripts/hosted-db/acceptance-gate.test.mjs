@@ -339,7 +339,7 @@ test("prod-catchup: every migration on this checkout between the latest applied 
 test("prod-catchup: pendingDrift names every newer migration the plan does not list and every plan version missing from the checkout", () => {
   const P = PC();
   assert.deepEqual(pendingDrift({ plan: "prod-catchup", localVersions: [...P.pending, "20261112090001"] }), { unplanned: [], missing: [] });
-  assert.deepEqual(pendingDrift({ plan: "prod-catchup", localVersions: [...P.pending, "20261123090001", "20261124090002"] }).unplanned, ["20261123090001", "20261124090002"]);
+  assert.deepEqual(pendingDrift({ plan: "prod-catchup", localVersions: [...P.pending, "20261130090001", "20261130090002"] }).unplanned, ["20261130090001", "20261130090002"]);
   assert.deepEqual(pendingDrift({ plan: "prod-catchup", localVersions: P.pending.slice(1) }).missing, [P.pending[0]]);
 });
 test("prod-catchup: PC_LATER is how later migrations (Marketplace PR 5 / PR 6) join the plan, and it is empty or strictly newer than 20261122090002", () => {
@@ -380,7 +380,7 @@ test("prod-catchup: the Acceptance gate refuses it and the Production gate refus
 test("prod-catchup: a push of only part of the pending list or one with an extra migration is refused (a push always sends everything)", () => {
   const P = PC();
   has(checkAcceptance({ target: "production", plan: "prod-catchup", list: list("prod-catchup"), dry: dry(P.pending.slice(0, 2)), localVersions: P.pending }), /dry run would push/);
-  has(checkAcceptance({ target: "production", plan: "prod-catchup", list: list("prod-catchup", [{ local: "20261123090001", remote: null }]), dry: dry([...P.pending, "20261123090001"]), localVersions: P.pending }), /pending is|dry run would push/);
+  has(checkAcceptance({ target: "production", plan: "prod-catchup", list: list("prod-catchup", [{ local: "20261130090001", remote: null }]), dry: dry([...P.pending, "20261130090001"]), localVersions: P.pending }), /pending is|dry run would push/);
 });
 test("prod-catchup: needs a restore-verified PRODUCTION snapshot; only the pinned one counts (fail closed) and an Acceptance snapshot never counts", () => {
   assert.equal(PC().freshBackup, true);
@@ -392,8 +392,8 @@ test("prod-catchup: needs a restore-verified PRODUCTION snapshot; only the pinne
   has(checkRecovery({ plan: "prod-catchup", label: Object.keys(RESTORE_VERIFIED_SNAPSHOTS).at(-1), forwardFixSha256: shas }), /not a pinned restore-verified PRODUCTION snapshot/);
   has(checkRecovery({ plan: "prod-catchup", label: "aladdin-production-20261123T000000Z", forwardFixSha256: shas }), /not a pinned restore-verified PRODUCTION snapshot/);
 });
-test("prod-catchup: recovery is three pinned forward-fixes in undo order (media-notify, marketplace, prod-catchup); a missing or altered one is refused", () => {
-  assert.deepEqual(PC().fixes, ["media-notify", "marketplace", "prod-catchup"]);
+test("prod-catchup: recovery is four pinned forward-fixes in undo order (mkt-seller-approval-v2, media-notify, marketplace, prod-catchup); a missing or altered one is refused", () => {
+  assert.deepEqual(PC().fixes, ["mkt-seller-approval-v2", "media-notify", "marketplace", "prod-catchup"]);
   for (const fx of PC().fixes) assert.ok(FORWARD_FIX[fx]?.sha256, fx);
   const shas = allShas();
   has(checkRecovery({ plan: "prod-catchup", label: "aladdin-production-x", forwardFixSha256: { ...shas, "prod-catchup": "0".repeat(64) } }), /forward-fix .*prod-catchup-restore-previous.sql/);
@@ -464,4 +464,14 @@ test("production scripts: Production only, plan prod-catchup only, hidden passwo
   assert.ok(apply.includes("APPLY $PLAN TO PRODUCTION") && apply.includes("aladdin-production-"));
   assert.ok(apply.includes('[ -e .git ]'), "works from a git worktree too");
   for (const f of ["acceptance-apply.sh", "acceptance-preflight.sh"]) assert.ok(!/prod-(batch1|catchup)/.test(readFileSync(here(`./${f}`), "utf8")), `${f} must not accept the Production plan`);
+});
+test("prod-catchup: PR 5 (20261123090001) is in PC_LATER and its forward-fix is pinned, undone first, guard first, never deletes user rows, replaces no function", () => {
+  assert.ok(PC_LATER.includes("20261123090001") && PC().pending.at(-1) === PC_LATER.at(-1));
+  const sql = readFileSync(here(FORWARD_FIX["mkt-seller-approval-v2"].file), "utf8");
+  const code = sql.split("\n").filter((l) => !l.startsWith("--")).join("\n");
+  assert.equal(PC().fixes[0], "mkt-seller-approval-v2");
+  assert.ok(code.indexOf("$guard$") < code.search(/\bDROP (TABLE|FUNCTION)\b/));
+  assert.ok(!/create or replace function/i.test(code), "20261123090001 only adds overloads, so nothing has to be re-created");
+  assert.ok(!/drop function (?!if exists)/i.test(code) && !/\b(delete|truncate|insert into)\b/i.test(code.replace(/\$guard\$[\s\S]*?\$guard\$/, "")));
+  assert.ok(sql.includes("begin;") && sql.trimEnd().endsWith("commit;"));
 });

@@ -7,7 +7,7 @@ Production (`kkpkgjrweysgvhvkhzun`) is behind main and Acceptance (`nxossqhdfltc
 
 ## Current decision
 - Acceptance first, Production only after: no workflow applies a hosted migration or deploys Production on a push to `main`.
-- Production LIVE state (read-only, 2026-11-23): 210 migrations, latest `20261112090001`. Pending = 27: `20261114090001`, `20261115090001..006`, `20261116090001`, `20261116100001..014` (Marketplace, 30 tables), `20261121090001..003` (media policy, admin limits, notification templates), `20261122090001..002` (registration gate). Acceptance: 237, latest `20261122090002`.
+- Production LIVE state (read-only, 2026-11-23): 210 migrations, latest `20261112090001`. Pending = 27 from main of 2026-11-23, plus `20261123090001` (Marketplace PR 5, #239) added to the plan (28 in all, Production 210 -> 238): `20261114090001`, `20261115090001..006`, `20261116090001`, `20261116100001..014` (Marketplace, 30 tables), `20261121090001..003` (media policy, admin limits, notification templates), `20261122090001..002` (registration gate). Acceptance: 237, latest `20261122090002`.
 - Production has 1,093 users; 54 have `users.status = 'active'` and 1,039 do not. Registration state classified read-only on 2026-11-23 with the branch order of `app.admin_user_registration_state` (aggregate counts only):
 
 | Derived state | Users | Signed in within 30 days | Never signed in |
@@ -29,14 +29,19 @@ Production (`kkpkgjrweysgvhvkhzun`) is behind main and Acceptance (`nxossqhdfltc
 - Fail-closed backup rule: `freshBackup`, needs `--backup-label aladdin-production-YYYYMMDDTHHMMSSZ` that is pinned in `PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS`. That registry is EMPTY, so the apply script stops before the password prompt today. An Acceptance snapshot never counts.
 
 ## Recovery
-Three pinned forward-fixes (sha256 in `FORWARD_FIX`), run in undo order as NEW migrations:
+Four pinned forward-fixes (sha256 in `FORWARD_FIX`), run in undo order as NEW migrations (0. is only needed because 20261123090001 is in the plan):
+0. `forward-fix/mkt-seller-approval-v2-remove.sql` (undoes 20261123090001, Marketplace PR 5 / #239: it adds only new overloads, 2 tables, columns and constraints on tables the plan creates; guard refuses once a seller was rejected, a preset or owner message was stored)
 1. `forward-fix/media-notify-remove.sql` (4 tables of 20261121090002/3, column `notifications.content`, notifications constraint, video cap trigger, 3 bucket limits back to 5 MiB, 4 permissions)
 2. `forward-fix/marketplace-remove.sql` (39 relations, 126 functions, 3 permissions, central media functions and constraint)
 3. `forward-fix/prod-catchup-restore-previous.sql` (NEW, the non-table part): 14 functions restored to the exact Production definitions (md5 of `pg_get_functiondef` and of the comment read live; pinned in the tests), showroom review trigger and guard with the owner-only ACL, `ck_verifications_reason_required`, the audit vocabulary, and drops the 5 functions the catch-up adds.
 
-Proof: Production's pre-state + the 27 migrations + the three files gives a catalog fingerprint identical to the pre-state (`node scripts/hosted-db/prod-catchup-scratch-proof.mjs`, scratch container only, always ROLLBACK, 2.9 s). The two table files refuse (RAISE) as soon as seller, product, order, import, stock or template rows exist. **Rows written after the push are recoverable ONLY from the restore-tested backup**; the forward-fixes restore objects, not data.
+Proof: Production's pre-state + the 27 migrations + 20261123090001 + the four files gives a catalog fingerprint identical to the pre-state (`node scripts/hosted-db/prod-catchup-scratch-proof.mjs`, scratch container only, always ROLLBACK, 2.9 s). The two table files refuse (RAISE) as soon as seller, product, order, import, stock or template rows exist. **Rows written after the push are recoverable ONLY from the restore-tested backup**; the forward-fixes restore objects, not data.
 
-## Updating the plan at execution time (Marketplace PR 5 / PR 6 and anything newer)
+## Versions in the plan and still pending
+- In the plan (`PC_LATER`): `20261123090001` seller approval v2 (PR 5, #239). Scratch proof: 1,644 changed objects, no catalog difference after all four forward-fixes, and none after undoing only this migration.
+- Still pending, NOT in the plan: Marketplace PR 6, 7, 8, 9 (each adds migrations newer than `20261123090001`). Preflight and apply refuse until each is added.
+
+## Updating the plan at execution time (PR 6-9 and anything newer)
 Any migration merged to main after `20261122090002` is NOT in the plan; preflight and apply refuse with the version list. To add them:
 1. In `acceptance-gate.mjs` append the versions to `PC_LATER` (ascending, all newer than `20261122090002`); the post contract becomes the last version, so that migration's `supabase/permissions/<version>.json` must exist.
 2. Append the functions/constraints/prefixes they add or change to `PC_LATER_CHANGED` (measure: `node scripts/hosted-db/prod-catchup-scratch-proof.mjs` fails with the unexpected keys).
@@ -53,7 +58,7 @@ Any migration merged to main after `20261122090002` is NOT in the plan; prefligh
 
 ## What is deferred
 - Whether Production backups run on a schedule.
-- PR 5 / PR 6 migrations (see above).
+- Marketplace PR 6, 7, 8, 9 migrations: not in the plan yet.
 
 ## Consequences
 - Until the apply, Production has no database-level registration protection and no Marketplace; it keeps working unchanged while the plan waits.

@@ -13,7 +13,7 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PLANS, FORWARD_FIX } from "./acceptance-gate.mjs";
+import { PLANS, FORWARD_FIX, PC_LATER } from "./acceptance-gate.mjs";
 
 const C = "supabase_db_aladdin_r2_rc2_fresh";
 const here = dirname(fileURLToPath(import.meta.url));
@@ -31,9 +31,17 @@ const missingPre = files.map(v).filter((x) => x <= P.latest && !present.includes
 let s = "\\set ON_ERROR_STOP on\n\\timing on\nbegin;\n";
 for (const f of files.filter((f) => missingPre.includes(v(f)))) s += `\\echo >>> pre ${f}\n${readFileSync(join(dir, f), "utf8")}\n`;
 s += `\\t on\n\\a\n\\o /tmp/pc_pre.json\n${fp}\n\\o\n\\t off\n`;
-for (const f of files.filter((f) => P.pending.includes(v(f)))) s += `\\echo >>> ${f}\n${readFileSync(join(dir, f), "utf8")}\n`;
+for (const f of files.filter((f) => P.pending.includes(v(f)))) {
+  s += `\\echo >>> ${f}\n${readFileSync(join(dir, f), "utf8")}\n`;
+  // state after the first 27, before the later migrations (PC_LATER)
+  if (v(f) === "20261122090002" && PC_LATER.length) s += `\\t on\n\\o /tmp/pc_base.json\n${fp}\n\\o\n\\t off\n`;
+}
 s += `\\t on\n\\o /tmp/pc_post.json\n${fp}\n\\o\n\\t off\n`;
-for (const fx of P.fixes) s += `\\echo >>> forward-fix ${FORWARD_FIX[fx].file}\n${strip(readFileSync(join(here, FORWARD_FIX[fx].file), "utf8"))}\n`;
+P.fixes.forEach((fx, i) => {
+  s += `\\echo >>> forward-fix ${FORWARD_FIX[fx].file}\n${strip(readFileSync(join(here, FORWARD_FIX[fx].file), "utf8"))}\n`;
+  // after undoing only the later migrations (the first fix) the catalog must equal the state after the first 27
+  if (i === 0 && PC_LATER.length) s += `\\t on\n\\o /tmp/pc_stage1.json\n${fp}\n\\o\n\\t off\n`;
+});
 s += `\\t on\n\\o /tmp/pc_after.json\n${fp}\n\\o\nrollback;\n`;
 const tmp = mkdtempSync(join(tmpdir(), "pc-proof-"));
 writeFileSync(join(tmp, "proof.sql"), s);
@@ -43,13 +51,19 @@ const out = run(["exec", C, "psql", "-U", "postgres", "-X", "-f", "/tmp/pc_proof
 const secs = ((Date.now() - t0) / 1000).toFixed(1);
 const sum = [...out.matchAll(/^Time: ([\d.]+) ms/gm)].reduce((a, m) => a + Number(m[1]), 0);
 console.log(`replayed ${missingPre.length} pre + ${P.pending.length} pending + ${P.fixes.length} forward-fixes in one transaction, ROLLED BACK; wall ${secs}s, statement time ${(sum / 1000).toFixed(2)}s, no error`);
-for (const n of ["pre", "post", "after"]) run(["cp", `${C}:/tmp/pc_${n}.json`, join(tmp, `${n}.json`)]);
+for (const n of ["pre", "post", "after", ...(PC_LATER.length ? ["base", "stage1"] : [])]) run(["cp", `${C}:/tmp/pc_${n}.json`, join(tmp, `${n}.json`)]);
 const cd = (...a) => spawnSync("node", [join(here, "catalog-diff.mjs"), ...a], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const a = cd(join(tmp, "pre.json"), join(tmp, "post.json"), "--expect-changed", P.changed.join(";"));
 console.log("pre -> post:", a.status === 0 ? a.stdout.trim().split("\n").at(-1) : `FAILED\n${a.stderr}`);
 const b = cd(join(tmp, "pre.json"), join(tmp, "after.json"));
 const bl = b.stdout.trim();
-console.log("pre -> after the three forward-fixes:", bl);
+console.log("pre -> after all the forward-fixes:", bl);
+let stage = true;
+if (PC_LATER.length) {
+  const c = cd(join(tmp, "base.json"), join(tmp, "stage1.json")).stdout.trim();
+  console.log(`after the 27 -> after undoing only ${PC_LATER.join(", ")} (${FORWARD_FIX[P.fixes[0]].file}):`, c);
+  stage = c === "no catalog differences";
+}
 const left = run(["exec", C, "psql", "-U", "postgres", "-Atc", "select count(*) from supabase_migrations.schema_migrations"]).trim();
 console.log(`container still has ${left} migrations (rolled back)`);
-process.exit(a.status === 0 && bl === "no catalog differences" ? 0 : 1);
+process.exit(a.status === 0 && bl === "no catalog differences" && stage ? 0 : 1);

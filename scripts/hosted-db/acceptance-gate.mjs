@@ -54,8 +54,8 @@ const PC_BASE = [
   "20261121090001", "20261121090002", "20261121090003",
   "20261122090001", "20261122090002"
 ];
-export const PC_LATER = []; // versions newer than 20261122090002 that this plan must also push (empty today)
-export const PC_LATER_CHANGED = []; // objects those later migrations add or change (function schema.name, or a key prefix ending in *)
+export const PC_LATER = ["20261123090001"]; // versions newer than 20261122090002 that this plan also pushes: 20261123090001 (PR 5, seller approval v2). PRs 6-9 append theirs here
+export const PC_LATER_CHANGED = ["public.admin_marketplace_seller_reject", "public.admin_marketplace_seller_presets", "public.admin_marketplace_seller_preset_save", "public.admin_marketplace_seller_overview_v2", "public.admin_marketplace_seller_history_v2"]; // 20261123090001 (PR 5); its other objects are covered by public.marketplace_* and the function names above // objects those later migrations add or change (function schema.name, or a key prefix ending in *)
 export const PC_PENDING = [...PC_BASE, ...PC_LATER];
 const MN_PENDING = ["20261121090001", "20261121090002", "20261121090003"];
 const MKT_PENDING = Array.from({ length: 14 }, (_, i) => `202611161000${String(i + 1).padStart(2, "0")}`);
@@ -239,7 +239,7 @@ export const PLANS = {
   // (PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS pins only aladdin-production-20261123T142725Z, restore PASS), so the plan is refused for any other label. "changed" was MEASURED, not written by hand: replay of the 27 on a scratch
   // database with scripts/hosted-db/catalog-fingerprint.sql before/after and catalog-diff.mjs (170 functions, the touched constraints/trigger, and prefixes for the new tables).
   // Run only through production-preflight.sh / production-apply.sh; the Acceptance scripts refuse it.
-  "prod-catchup": { target: "production", fixes: ["media-notify", "marketplace", "prod-catchup"], recovery: "forward-fix", freshBackup: true, applied: 210, latest: PROD_210, pending: PC_PENDING, preContract: PROD_210, postContract: PC_PENDING.at(-1),
+  "prod-catchup": { target: "production", fixes: ["mkt-seller-approval-v2", "media-notify", "marketplace", "prod-catchup"], recovery: "forward-fix", freshBackup: true, applied: 210, latest: PROD_210, pending: PC_PENDING, preContract: PROD_210, postContract: PC_PENDING.at(-1),
     changed: [
       "app.admin_user_registration_state",
       "app.admin_user_status_tab",
@@ -480,6 +480,8 @@ export const FORWARD_FIX = {
   // "media-notify" and "marketplace" forward-fixes (re-proved against Production's pre-state: Production pre-state + 27 migrations + the three files = identical catalog fingerprint).
   // Undo order: media-notify, marketplace, prod-catchup.
   "prod-catchup": { file: "forward-fix/prod-catchup-restore-previous.sql", sha256: "1137c10d511193a4cee599a1105b5a3bbb6ae714fdd5f04b753a932c3740ce7a" },
+  // mkt-seller-approval-v2: undoes 20261123090001 (PR 5, seller approval v2; PC_LATER) only: new overloads, 2 tables, columns and constraints, guard first. Undo order: this file first.
+  "mkt-seller-approval-v2": { file: "forward-fix/mkt-seller-approval-v2-remove.sql", sha256: "dec2cbd320c950a7b50add38142f9ea2ecba72abca3968f34912d47a0e105406" },
   verification: { file: "forward-fix/verification-restore-previous.sql", sha256: "a50cd460c243b3580927c1f8b8e84ec1cc1109048c9b08b055a06b470570fcac" },
   m1: { file: "forward-fix/m1-restore-previous.sql", sha256: "5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045" },
   m3a: { file: "forward-fix/m3a-restore-previous.sql", sha256: "d4161977e7664e3345d000ee87503fd3a5983935c81257dd082c0a5ef0b43ec3" },
