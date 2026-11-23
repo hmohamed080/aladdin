@@ -298,7 +298,8 @@ values ('b3f00000-0000-4000-8000-000000000001', 'b3000000-0000-4000-8000-0000000
 
 -- PR 7: a payment method and a way to deliver are publish conditions too
 insert into public.marketplace_seller_payment_settings (seller_organization_id, cod_enabled) values (current_setting('t.b')::uuid, true);
-insert into public.marketplace_delivery_rates (seller_organization_id, governorate_key, fee_egp) values (current_setting('t.b')::uuid, 'cairo', 50);
+insert into public.marketplace_delivery_rates (seller_organization_id, governorate_key, fee_egp, duration_min_days, duration_max_days) values (current_setting('t.b')::uuid, 'cairo', 50, 1, 2);
+insert into public.marketplace_seller_delivery_settings (seller_organization_id, preparation_days) values (current_setting('t.b')::uuid, 1);
 select is(app.marketplace_publication_blockers('b3000000-0000-4000-8000-000000000001'),
   array[]::text[],
   'E5. with everything else valid, nothing blocks publication (the media flag no longer exists)');
@@ -475,7 +476,7 @@ select is((select count(*)::int from public.marketplace_public_catalog() where s
 reset role;
 select is((select status from public.marketplace_products where id = 'b3000000-0000-4000-8000-000000000001'), 'unpublished',
   'G24b. suspension unpublished the product and reinstatement left it unpublished');
-update public.marketplace_platform_settings set media_verification_ready = true;
+update public.marketplace_product_images set status = 'verified' where id = 'b3f00000-0000-4000-8000-000000000001';
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"71000005-0000-4000-8000-000000000005","role":"authenticated"}';
 select is(public.marketplace_product_publish('b3000000-0000-4000-8000-000000000001'), 'published',

@@ -1,5 +1,5 @@
 -- pgTAP: Marketplace PR 7 - publication gate v2 and product form
--- (20261123110001_marketplace_publication_gate_v2.sql).
+-- (20261123130001_marketplace_publication_gate_v2.sql).
 --
 --   A. SWITCH       - admin open/close: permission, reason, audit with the acting admin, public reads follow it
 --   B. WITHDRAWAL   - stock-out withdraws a product from the storefront; restock brings it back
@@ -161,7 +161,8 @@ select ok('seller_no_payment_method' = any(app.marketplace_publication_blockers(
 select ok('seller_no_delivery' = any(app.marketplace_publication_blockers(current_setting('t.p')::uuid)),
   'E2. no delivery place or pickup blocks publication');
 insert into public.marketplace_seller_payment_settings (seller_organization_id, cod_enabled) values (current_setting('t.b')::uuid, true);
-insert into public.marketplace_delivery_rates (seller_organization_id, governorate_key, fee_egp) values (current_setting('t.b')::uuid, 'cairo', 50);
+insert into public.marketplace_delivery_rates (seller_organization_id, governorate_key, fee_egp, duration_min_days, duration_max_days) values (current_setting('t.b')::uuid, 'cairo', 50, 1, 2);
+insert into public.marketplace_seller_delivery_settings (seller_organization_id, preparation_days) values (current_setting('t.b')::uuid, 1);
 select ok(not ('seller_no_payment_method' = any(app.marketplace_publication_blockers(current_setting('t.p')::uuid)))
       and not ('seller_no_delivery' = any(app.marketplace_publication_blockers(current_setting('t.p')::uuid))),
   'E3. a cash-on-delivery method and a priced delivery place satisfy both');

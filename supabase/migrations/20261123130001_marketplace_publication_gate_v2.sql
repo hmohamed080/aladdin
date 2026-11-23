@@ -207,19 +207,22 @@ end
 $patch$;
 
 -- ---------------------------------------------------------------------------
--- 5. Gate: payment method + delivery are publish conditions (data that exists today)
+-- 5. Gate: payment method + delivery are publish conditions
 -- ---------------------------------------------------------------------------
+-- Both read app.marketplace_seller_commerce_missing (PR 8, 20261123120001), the single definition of "payment and delivery
+-- are set up". plpgsql, so the reference resolves when the function runs (that migration is applied after this one).
 create or replace function app.marketplace_seller_payment_ready(p_organization_id uuid)
-returns boolean language sql stable set search_path = '' as $$
-  select exists (select 1 from public.marketplace_seller_payment_settings s
-                 where s.seller_organization_id = p_organization_id and (s.cod_enabled or s.instapay_enabled));
+returns boolean language plpgsql stable set search_path = '' as $$
+begin
+  return not ('payment_method_missing' = any (app.marketplace_seller_commerce_missing(p_organization_id)));
+end;
 $$;
 
 create or replace function app.marketplace_seller_delivery_ready(p_organization_id uuid)
-returns boolean language sql stable set search_path = '' as $$
-  select exists (select 1 from public.marketplace_delivery_rates r where r.seller_organization_id = p_organization_id and r.fee_egp is not null)
-      or exists (select 1 from public.marketplace_stock_locations l
-                 where l.organization_id = p_organization_id and l.is_active and l.supports_pickup);
+returns boolean language plpgsql stable set search_path = '' as $$
+begin
+  return not exists (select 1 from unnest(app.marketplace_seller_commerce_missing(p_organization_id)) m where m <> 'payment_method_missing');
+end;
 $$;
 revoke all on function app.marketplace_seller_payment_ready(uuid), app.marketplace_seller_delivery_ready(uuid)
   from public, anon, authenticated, service_role;

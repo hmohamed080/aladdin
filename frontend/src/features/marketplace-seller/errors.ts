@@ -73,6 +73,7 @@ export const KNOWN_ERROR_CODES = new Set([
   "delivery_duplicate",
   "delivery_area_unknown",
   "pickup_invalid",
+  "store_setup_missing",
   "preparation_days_invalid",
   "free_shipping_invalid",
   "pickup_instructions_invalid",
@@ -80,7 +81,6 @@ export const KNOWN_ERROR_CODES = new Set([
   "next_day_invalid",
   "next_day_fee_invalid",
   "search_invalid",
-  "store_setup_missing",
 ]);
 
 export function errorKey(code: string): string {

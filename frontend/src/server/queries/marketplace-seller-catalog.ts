@@ -214,16 +214,9 @@ async function loadPublicationState(supabase: Client, productId: string): Promis
   };
 }
 
-/** Store-level setup for a product that does not exist yet (the same facts, read from the seller's settings). */
+/** Store-level setup for a product that does not exist yet: the same facts the publish gate reads (PR 8's readiness). */
 export async function loadStoreSetup(supabase: Client, organizationId: string): Promise<{ paymentReady: boolean; deliveryReady: boolean }> {
-  const [pay, delivery] = await Promise.all([
-    supabase.rpc("marketplace_seller_payment_settings_get", { p_organization_id: organizationId }),
-    supabase.rpc("marketplace_seller_delivery_get", { p_organization_id: organizationId }),
-  ]);
-  const p = (pay.data ?? {}) as { cod_enabled?: boolean; instapay_enabled?: boolean };
-  const d = (delivery.data ?? {}) as { rates?: { fee_egp: number | null }[]; pickup_available?: boolean };
-  return {
-    paymentReady: Boolean(p.cod_enabled || p.instapay_enabled),
-    deliveryReady: Boolean(d.pickup_available || (d.rates ?? []).some((r) => r.fee_egp !== null)),
-  };
+  const { data } = await supabase.rpc("marketplace_seller_commerce_readiness", { p_organization_id: organizationId });
+  const r = (data ?? {}) as { payment_complete?: boolean; delivery_complete?: boolean };
+  return { paymentReady: Boolean(r.payment_complete), deliveryReady: Boolean(r.delivery_complete) };
 }
