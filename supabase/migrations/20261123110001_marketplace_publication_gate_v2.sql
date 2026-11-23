@@ -5,6 +5,8 @@
 --              method enabled and a way to deliver (a priced delivery place or pickup). They join the blocker list
 --              (`seller_no_payment_method`, `seller_no_delivery`); the UI shows them as required fields, not as a
 --              blocker table. Reads the existing settings tables only; it does not write them (PR 8 owns them).
+--              They are required only at the moment a product becomes published, never retroactively: a published
+--              product is NOT unpublished (on save or otherwise) because its seller lacks them.
 --   2. MEDIA.  A product holds at most 5 live images (1 video + 4 images once the Marketplace video path exists).
 --   3. TYPE.   The product type is changeable; the category follows it (the category is derived from the type).
 --   4. STOCK.  Per-product low-stock threshold; in-app notifications to the showroom owner for low stock and out of
@@ -555,7 +557,10 @@ begin
 
   select status into v_status from public.marketplace_products where id = v_id;
   v_blockers := app.marketplace_publication_blockers(v_id);
-  if v_status = 'published' and cardinality(v_blockers) > 0 then
+  -- Payment method and delivery are conditions for BECOMING published only (owner decision 2026-11-23): a store that
+  -- later loses them keeps its published products, so they never count in the save-time unpublish decision.
+  if v_status = 'published' and cardinality(array(
+       select b from unnest(v_blockers) b where b not in ('seller_no_payment_method', 'seller_no_delivery'))) > 0 then
     update public.marketplace_products set status = 'unpublished' where id = v_id;
     insert into public.marketplace_product_status_events (product_id, organization_id, action, from_status, to_status, actor_user_id)
     values (v_id, v_org, 'unpublished', 'published', 'unpublished', v_uid);

@@ -8002,6 +8002,7 @@ export const en = {
       insufficient_stock: "Stock cannot go below zero or below what is reserved.",
       stock_changed: "The stock changed since you opened the page. The numbers were refreshed — please try again.",
       image_type_invalid: "Unsupported image type (JPG, PNG or WebP).",
+      store_setup_missing: "Set up a payment method and delivery for your store first, then publish.",
       too_many_images: "You reached the maximum number of images (30).",
       too_many_pending_uploads: "Too many uploads are waiting. Finish or cancel them first.",
       upload_rate_limited: "Too many uploads in the last hour. Please try again later.",

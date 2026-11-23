@@ -7767,6 +7767,7 @@ export const ar: Messages = {
       insufficient_stock: "لا يمكن أن تقل الكمية عن المحجوز أو عن صفر.",
       stock_changed: "تغيّر المخزون منذ فتحت الصفحة. تم تحديث الأرقام، حاول مرة أخرى.",
       image_type_invalid: "نوع الصورة غير مدعوم (JPG أو PNG أو WebP).",
+      store_setup_missing: "أعدّ طريقة دفع وخيار توصيل لمتجرك أولاً، ثم انشر المنتج.",
       too_many_images: "وصلت للحد الأقصى من الصور (30).",
       too_many_pending_uploads: "هناك عمليات رفع كثيرة معلّقة. أكملها أو ألغها أولًا.",
       upload_rate_limited: "عمليات رفع كثيرة خلال الساعة الأخيرة. حاول لاحقًا.",

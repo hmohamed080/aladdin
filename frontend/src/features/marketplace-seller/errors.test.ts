@@ -23,4 +23,11 @@ describe("PR 7 codes", () => {
     expect(errorKey("low_stock_invalid")).toBe("marketplaceSeller.error.low_stock_invalid");
     expect(parseSellerError("mp:low_stock_invalid")).toEqual({ code: "low_stock_invalid" });
   });
+
+  it("turns a publish refused for missing payment or delivery into one plain store-setup message", () => {
+    expect(parseSellerError("publication blocked: seller_no_payment_method, seller_no_delivery")).toEqual({ code: "store_setup_missing" });
+    expect(parseSellerError("publication blocked: seller_no_delivery")).toEqual({ code: "store_setup_missing" });
+    expect(parseSellerError("publication blocked: no_active_variant")).toEqual({ code: "unexpected" });
+    expect(errorKey("store_setup_missing")).toBe("marketplaceSeller.error.store_setup_missing");
+  });
 });

@@ -474,6 +474,7 @@ select is((select count(*)::int from public.marketplace_public_catalog() where s
 reset role;
 select is((select status from public.marketplace_products where id = 'b3000000-0000-4000-8000-000000000001'), 'unpublished',
   'G24b. suspension unpublished the product and reinstatement left it unpublished');
+update public.marketplace_platform_settings set media_verification_ready = true;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"71000005-0000-4000-8000-000000000005","role":"authenticated"}';
 select is(public.marketplace_product_publish('b3000000-0000-4000-8000-000000000001'), 'published',

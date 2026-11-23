@@ -531,7 +531,7 @@ export function ProductForm({
       </Section>
 
       {/* ---------------- Store setup: payment + delivery (set once for the whole store) ---------------- */}
-      {setupMissing ? (
+      {setupMissing && status !== "published" ? (
         <Section title={t("marketplaceSeller.form.storeSetup")} hint={t("marketplaceSeller.form.storeSetupHint")}>
           <ul className="flex flex-col gap-sm">
             {!setup.paymentReady ? (

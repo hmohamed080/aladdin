@@ -8,12 +8,13 @@
 --   E. GATE         - payment method and delivery are publish conditions; the publication-state read
 --   F. FORM         - changeable product type (category follows), per-product threshold, 5 image slots, list record
 --   G. GUARDS       - every public function that shows published products carries the gates
+--   H. NO RETRO     - payment/delivery are checked only when a product becomes published, never on a later save
 --
 -- Fixtures (seed-pilot): showroom B 91000005-...005 (owner 71000005), staff 55555555 (administrator).
 create extension if not exists pgtap;
 
 begin;
-select plan(44);
+select plan(47);
 
 update auth.users set email_confirmed_at = now()
   where id in ('71000005-0000-4000-8000-000000000005', '55555555-5555-4555-8555-555555555555', '11111111-1111-4111-8111-111111111111');
@@ -221,6 +222,32 @@ select is((select count(*)::int from pg_proc p where p.pronamespace = 'public'::
 select is((select count(*)::int from pg_proc p where p.proname in ('admin_marketplace_set_open', 'admin_marketplace_platform_status',
   'marketplace_seller_product_publication_state') and p.pronamespace = 'public'::regnamespace and not has_function_privilege('anon', p.oid, 'execute')
   and has_function_privilege('authenticated', p.oid, 'execute')), 3, 'G3. the new RPCs are executable by authenticated only');
+
+-- ===========================================================================
+-- H. A published product is not unpublished for the seller's setup
+-- ===========================================================================
+-- a published product is never unpublished for lacking payment/delivery (owner decision 2026-11-23): not on save either.
+-- The fixture product has other (unrelated) blockers, so the blocker list is stubbed for this check (rolled back with the test).
+select set_config('t.ev', (select count(*)::text from public.marketplace_product_status_events where product_id = current_setting('t.p')::uuid and action = 'unpublished'), true);
+create or replace function app.marketplace_publication_blockers(p_product_id uuid) returns text[]
+language sql stable set search_path = '' as $f$ select array['seller_no_payment_method', 'seller_no_delivery']::text[] $f$;
+set session_replication_role = replica;
+update public.marketplace_products set status = 'published', published_at = now() where id = current_setting('t.p')::uuid;
+set session_replication_role = origin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"71000005-0000-4000-8000-000000000005","role":"authenticated"}';
+select is((public.marketplace_seller_product_save(jsonb_build_object('id', current_setting('t.p'), 'name_ar', 'ورق حائط تجريبي', 'name_en', 'Gate V2 wallpaper')) ->> 'status'),
+  'published', 'H1. saving a published product of a seller with no payment method and no delivery keeps it published');
+reset role;
+select is((select count(*)::int from public.marketplace_product_status_events where product_id = current_setting('t.p')::uuid and action = 'unpublished'), current_setting('t.ev')::int,
+  'H2. ...and records no unpublish');
+create or replace function app.marketplace_publication_blockers(p_product_id uuid) returns text[]
+language sql stable set search_path = '' as $f$ select array['seller_no_payment_method', 'no_active_variant']::text[] $f$;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"71000005-0000-4000-8000-000000000005","role":"authenticated"}';
+select is((public.marketplace_seller_product_save(jsonb_build_object('id', current_setting('t.p'), 'name_ar', 'ورق حائط تجريبي', 'name_en', 'Gate V2 wallpaper')) ->> 'status'),
+  'unpublished', 'H3. any other blocker still unpublishes a published product on save');
+reset role;
 
 select * from finish();
 rollback;

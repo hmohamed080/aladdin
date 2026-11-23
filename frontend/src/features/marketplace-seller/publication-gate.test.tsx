@@ -118,6 +118,11 @@ describe("product page (PR 7)", () => {
     expect(save.mock.calls[0]![0]).toMatchObject({ id: "p1", product_type_key: "wallpaper" });
   });
 
+  it("shows no store-setup rows on a published product: payment and delivery are not required retroactively", () => {
+    renderForm("en", { product: product({ status: "published", publication: { ...product().publication!, paymentReady: false, deliveryReady: false } }) });
+    expect(screen.queryByText("Enable at least one payment method")).toBeNull();
+  });
+
   it("offers Publish only once the product is approved and unblocked", () => {
     const { unmount } = renderForm("en", { product: product() });
     expect(screen.queryByRole("button", { name: "Publish to the Marketplace" })).toBeNull();
@@ -149,5 +154,13 @@ describe("RowPublishToggle", () => {
     fireEvent.click(screen.getByRole("button"));
     await waitFor(() => expect(publish).toHaveBeenCalledWith("p1"));
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("explains a refused publish for missing payment/delivery in plain words (required at publish time only)", async () => {
+    publish.mockResolvedValue({ ok: false, code: "store_setup_missing" });
+    wrap("approved");
+    fireEvent.click(screen.getByRole("button"));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/payment method and delivery/);
+    expect(refresh).not.toHaveBeenCalled();
   });
 });

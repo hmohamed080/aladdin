@@ -6,6 +6,7 @@ export type SellerActionError = { code: string; detail?: string };
  * `unexpected`, so no raw database text ever reaches the screen.
  */
 export function parseSellerError(message: string | null | undefined): SellerActionError {
+  if (/^publication blocked:.*\bseller_no_(payment_method|delivery)\b/.test((message ?? "").trim())) return { code: "store_setup_missing" };
   const m = /^mp:([a-z_]+)(?::(.*))?$/.exec((message ?? "").trim());
   if (!m || !m[1]) return { code: "unexpected" };
   return m[2] ? { code: m[1], detail: m[2] } : { code: m[1] };
@@ -70,6 +71,7 @@ export const KNOWN_ERROR_CODES = new Set([
   "delivery_duplicate",
   "delivery_area_unknown",
   "pickup_invalid",
+  "store_setup_missing",
 ]);
 
 export function errorKey(code: string): string {
