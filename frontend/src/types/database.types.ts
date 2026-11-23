@@ -11300,6 +11300,22 @@ export type Database = {
         Args: { p_organization_id: string }
         Returns: Json
       }
+      marketplace_seller_commerce_readiness: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      marketplace_seller_delivery_terms_save: {
+        Args: { p_areas?: Json; p_organization_id: string; p_settings: Json }
+        Returns: Json
+      }
+      marketplace_seller_free_shipping_products_get: {
+        Args: { p_limit?: number; p_organization_id: string; p_search?: string }
+        Returns: Json
+      }
+      marketplace_seller_product_free_shipping_set: {
+        Args: { p_enabled: boolean; p_organization_id: string; p_product_id: string }
+        Returns: Json
+      }
       marketplace_seller_payment_settings_save: {
         Args: { p_organization_id: string; p_settings: Json }
         Returns: Json

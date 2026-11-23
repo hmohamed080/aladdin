@@ -165,7 +165,8 @@ select throws_like($$ select public.admin_marketplace_set_media_verification_rea
 -- publication is not blocked by anything once the seller also has payment and delivery set up (PR 7)
 reset role;
 insert into public.marketplace_seller_payment_settings (seller_organization_id, cod_enabled) values (current_setting('t.a')::uuid, true);
-insert into public.marketplace_delivery_rates (seller_organization_id, governorate_key, fee_egp) values (current_setting('t.a')::uuid, 'cairo', 50);
+insert into public.marketplace_delivery_rates (seller_organization_id, governorate_key, fee_egp, duration_min_days, duration_max_days) values (current_setting('t.a')::uuid, 'cairo', 50, 1, 2);
+insert into public.marketplace_seller_delivery_settings (seller_organization_id, preparation_days) values (current_setting('t.a')::uuid, 1);
 select is(app.marketplace_publication_blockers(current_setting('t.p')::uuid), array[]::text[],
   'D3. with a verified image and stock, nothing blocks publication (no media switch)');
 set local role authenticated;
