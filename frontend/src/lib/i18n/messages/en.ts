@@ -2922,6 +2922,7 @@ export const en = {
           revoked: "Showroom approval revoked",
         },
         product: { rejected: "Product rejected" },
+        stock: { low: "Product stock running low", out: "Product out of stock" },
       },
     },
     variables: "Available variables",

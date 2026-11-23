@@ -2855,6 +2855,7 @@ export const ar: Messages = {
           revoked: "سحب اعتماد المعرض",
         },
         product: { rejected: "رفض منتج" },
+        stock: { low: "مخزون المنتج على وشك النفاد", out: "نفاد مخزون المنتج" },
       },
     },
     variables: "المتغيرات المتاحة",
