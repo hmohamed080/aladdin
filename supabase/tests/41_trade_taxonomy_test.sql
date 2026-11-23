@@ -381,6 +381,9 @@ select is(
 -- wrapper that no longer mentions the relation) so Admin reads the same
 -- percentage; the entry follows the formula. Still informational only: its
 -- callers are my_profile_completion and the users.read-guarded Admin reads.
+-- `account_basics_set` (ADR-0026 onboarding) only forwards a professional's
+-- picks to user_trades_set, and `my_account_basics` lists the caller's own
+-- specialty keys back to them: a writer path and a self DISPLAY projection.
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('app', 'public')
@@ -388,7 +391,8 @@ select is(
       and p.proname not in ('user_trades_set', '_profile_public_directory',
                             '_job_applicants', 'profile_completion',
                             'job_match_rows', 'job_opportunities_page',
-                            'user_trade_specialties_set')),
+                            'user_trade_specialties_set',
+                            'account_basics_set', 'my_account_basics')),
   0::bigint,
   'and the ONLY functions that mention it are its writer and two DISPLAY projections — no capability, no can_* predicate');
 

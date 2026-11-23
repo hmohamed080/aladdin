@@ -11,7 +11,7 @@ Define how configuration and secrets are handled across Local, Staging, and Prod
 **Environments:** `Local` (developer machine + local Supabase) · `Staging` · `Production`. Development resembles production as closely as practical (12-factor).
 
 **Secret handling:**
-- Secrets live in each platform's secret store (Vercel, Supabase), **never in source control**. `.vercel/` — which `vercel link` fills with the project link and a pulled OIDC token — is gitignored.
+- Secrets live in each platform's secret store (Cloudflare Worker secrets, GitHub Environments, Supabase), **never in source control**.
 - `.env` files are gitignored; only `*.env.example` templates are committed, with placeholder values, documenting each variable's **purpose, exposure level (public/secret), and required/optional** status.
 - **No real Production secrets are used during foundation/dev tasks.**
 

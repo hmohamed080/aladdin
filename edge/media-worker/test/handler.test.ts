@@ -14,7 +14,8 @@ const BYTES = new TextEncoder().encode("%PDF-1.7 private certificate bytes");
 const SHA = "b".repeat(64);
 
 /** In-memory stand-in for the database's current state; tests mutate it to revoke. */
-type Db = { deleted: boolean; suspended: boolean; sessionRevoked: boolean; published: boolean; grant: Record<string, unknown> | null };
+type Db = { deleted: boolean; suspended: boolean; sessionRevoked: boolean; published: boolean; key?: string; grant: Record<string, unknown> | null;
+  publicGrant?: Record<string, unknown> };
 let db: Db;
 let calls: { private: number; public: number; closed: number };
 
@@ -24,13 +25,13 @@ function fakeAuthority(): MediaAuthority {
       calls.private++;
       // Mirrors media_edge_authorize: owner + session + active + not deleted + unexpired.
       if (db.deleted || db.suspended || db.sessionRevoked || r.viewer !== VIEWER || r.session !== SESSION
-        || r.key !== KEY || r.expiresAt < NOW - 5) return null;
+        || r.key !== (db.key ?? KEY) || r.expiresAt < NOW - 5) return null;
       return db.grant;
     },
     async authorizePublic(r) {
       calls.public++;
       if (!db.published || db.deleted || db.suspended || r.id !== ITEM) return null;
-      return { object: "portfolio/e9100000-0000-4000-8000-000000000001.png", contentType: "image/png", size: 4, sha256: "a".repeat(64) };
+      return db.publicGrant ?? { object: "portfolio/e9100000-0000-4000-8000-000000000001.png", contentType: "image/png", size: 4, sha256: "a".repeat(64) };
     },
     async authorizeVideo() { return null; },
     async close() { calls.closed++; },
@@ -139,6 +140,67 @@ describe("Mode P: private delivery", () => {
     }
   });
 
+  it("serves an ids-only key, and refuses one from another namespace's folder", async () => {
+    const id = "e9200000-0000-4000-8000-000000000002";
+    const object = `u/${VIEWER}/certificates/${id}/original.pdf`;
+    env.MEDIA_BUCKET = bucket({ [object]: BYTES, [`u/${VIEWER}/portfolio/${id}/original.pdf`]: BYTES,
+      [`u/${VIEWER}/certificates/${id}/v/card.webp`]: BYTES });
+    db.grant = { object, contentType: "application/pdf", size: BYTES.length, sha256: SHA };
+    const res = await get(await privateUrl());
+    expect(res.status).toBe(200);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(BYTES);
+    for (const grant of [{ object: `u/${VIEWER}/portfolio/${id}/original.pdf`, contentType: "application/pdf", size: BYTES.length, sha256: SHA },
+      { object: `u/${VIEWER}/certificates/${id}/v/card.webp`, contentType: "application/pdf", size: BYTES.length, sha256: SHA },
+      { object: `o/${VIEWER}/certificates/${id}/original.pdf`, contentType: "application/pdf", size: BYTES.length, sha256: SHA },
+      { object: `u/${VIEWER}/certificates/${id}/original.pdf/../x`, contentType: "application/pdf", size: BYTES.length, sha256: SHA }]) {
+      db.grant = grant;
+      expect((await get(await privateUrl())).status).toBe(404);
+    }
+  });
+
+  it("serves request photos and verification documents by their ids-only keys, and only those shapes", async () => {
+    const id = "e9200000-0000-4000-8000-000000000003";
+    const reqId = "e9200000-0000-4000-8000-000000000004";
+    const RKEY = `${VIEWER}/${reqId}/${id}.png`;
+    const VKEY = `${VIEWER}/${id}.pdf`;
+    const requestObject = `u/${VIEWER}/requests/${reqId}/${id}/original.png`;
+    const orgRequestObject = `o/${VIEWER}/requests/${reqId}/${id}/original.png`;
+    const verificationObject = `o/${VIEWER}/verification/${id}/original.pdf`;
+    env.MEDIA_BUCKET = bucket({ [requestObject]: BYTES, [orgRequestObject]: BYTES, [verificationObject]: BYTES });
+    const g = (object: string, contentType: string) => ({ object, contentType, size: BYTES.length, sha256: SHA });
+    for (const [ns, k, grant] of [["request", RKEY, g(requestObject, "image/png")], ["request", RKEY, g(orgRequestObject, "image/png")],
+      ["verification", VKEY, g(verificationObject, "application/pdf")]] as const) {
+      db.grant = grant; db.key = k;
+      const res = await get(await privateUrl({ ns, k }, `/m/${ns}/original`));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe(grant.contentType);
+      expect(res.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+    }
+    // A request photo cannot be served as a PDF; a verification document may not live under u/ or the requests folder.
+    for (const [ns, k, grant] of [["request", RKEY, g(requestObject, "application/pdf")],
+      ["verification", VKEY, g(`u/${VIEWER}/verification/${id}/original.pdf`, "application/pdf")],
+      ["verification", VKEY, g(`o/${VIEWER}/requests/${reqId}/${id}/original.pdf`, "application/pdf")],
+      ["verification", VKEY, g(`o/${VIEWER}/verification/${id}/v/card.pdf`, "application/pdf")],
+      ["request", RKEY, g(verificationObject, "image/png")]] as const) {
+      db.grant = grant; db.key = k;
+      expect((await get(await privateUrl({ ns, k }, `/m/${ns}/original`))).status).toBe(404);
+    }
+  });
+
+  it("carries a workspace only for request photos and organization media, never for verification or personal media", async () => {
+    const WS = "e9300000-0000-4000-8000-000000000005";
+    const id = "e9200000-0000-4000-8000-000000000003";
+    const key = `${VIEWER}/${WS}/${id}.png`;
+    const object = `o/${VIEWER}/requests/${WS}/${id}/original.png`;
+    env.MEDIA_BUCKET = bucket({ [object]: BYTES });
+    db.grant = { object, contentType: "image/png", size: BYTES.length, sha256: SHA }; db.key = key;
+    expect((await get(await privateUrl({ ns: "request", k: key, ws: WS }, "/m/request/original"))).status).toBe(200);
+    for (const ns of ["verification", "certificate"] as const) {
+      db.key = `${VIEWER}/${id}.pdf`;
+      expect((await get(await privateUrl({ ns, k: `${VIEWER}/${id}.pdf`, ws: WS }, `/m/${ns}/original`))).status).toBe(404);
+    }
+  });
+
   it("supports single byte ranges and HEAD", async () => {
     const url = await privateUrl();
     const part = await get(url, { range: "bytes=0-3" });
@@ -202,6 +264,44 @@ describe("Mode C: conditional public delivery", () => {
     expect(calls.public).toBe(0);
     env.PUBLIC_ROUTES = "off";
     expect((await get(url)).status).toBe(404);
+  });
+});
+
+describe("Mode C: Marketplace product photos", () => {
+  const ORG = "9c000000-cccc-4ccc-8ccc-000000000001";
+  const PRODUCT = "e9200000-0000-4000-8000-000000000001";
+  const object = `o/${ORG}/products/${PRODUCT}/${ITEM}/original.png`;
+
+  it("serves a deliverable Marketplace photo by image id from the organization products/ folder, and only that shape", async () => {
+    db.publicGrant = { object, contentType: "image/png", size: 4, sha256: "a".repeat(64) };
+    env.MEDIA_BUCKET = bucket({ [object]: new Uint8Array([137, 80, 78, 71]) });
+    const res = await get(`https://media.example.test/c/marketplace/${ITEM}/original`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    db.publicGrant = { ...db.publicGrant, object: `u/${VIEWER}/portfolio/${ITEM}/original.png` };
+    expect((await get(`https://media.example.test/c/marketplace/${ITEM}/original`)).status).toBe(404);
+    db.published = false;
+    expect((await get(`https://media.example.test/c/marketplace/${ITEM}/original`)).status).toBe(404);
+  });
+});
+
+describe("Mode P: Marketplace payment receipts", () => {
+  it("serves an InstaPay receipt from the buyer's documents folder, and never a receipt stored anywhere else", async () => {
+    const ORDER = "e9200000-0000-4000-8000-000000000011";
+    const id = "e9200000-0000-4000-8000-000000000012";
+    const key = `proofs/${ORDER}/${id}.png`;
+    const object = `u/${VIEWER}/certificates/${id}/original.png`;
+    env.MEDIA_BUCKET = bucket({ [object]: BYTES });
+    const g = (o: string, contentType = "image/png") => ({ object: o, contentType, size: BYTES.length, sha256: SHA });
+    db.grant = g(object); db.key = key;
+    const res = await get(await privateUrl({ ns: "marketplace", k: key }, "/m/marketplace/original"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+    for (const grant of [g(`u/${VIEWER}/portfolio/${id}/original.png`), g(`o/${VIEWER}/certificates/${id}/original.png`),
+      g(object, "application/pdf")]) {
+      db.grant = grant;
+      expect((await get(await privateUrl({ ns: "marketplace", k: key }, "/m/marketplace/original"))).status).toBe(404);
+    }
   });
 });
 

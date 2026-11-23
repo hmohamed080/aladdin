@@ -2,7 +2,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({ storage: { from: storageFrom } }) }));
-vi.mock("@/lib/env/storage", () => ({ readStorageEnv: () => ({ SUPABASE_SERVICE_ROLE_KEY: "local-test" }) }));
+vi.mock("@/lib/env/storage", () => ({ readStorageEnv: () => ({ SUPABASE_SERVICE_ROLE_KEY: "local-test", R2_STORAGE_ENABLED: false, MEDIA_LEGACY_STORAGE_WRITES: true }),
+  legacyStorageWritesOpen: (env: { R2_STORAGE_ENABLED: boolean; MEDIA_LEGACY_STORAGE_WRITES: boolean }) => !env.R2_STORAGE_ENABLED && env.MEDIA_LEGACY_STORAGE_WRITES }));
 vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_SUPABASE_URL: "https://test.invalid" }) }));
 
 const getUser = vi.fn();

@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { ORGANIZATION_IMAGE_MAX_BYTES } from "@/lib/storage/organization-image-assets";
 import { authorizeMediaUpload, verifyPendingMedia, removeMedia } from "@/server/storage/media";
 import type { UploadGrant } from "@/lib/storage/provider-types";
+import { imageMaxBytes } from "@/server/media/limits";
 
 /**
  * The Showroom's BUSINESS profile image (never the owner's personal avatar). Each step is one RPC that decides
@@ -19,7 +19,7 @@ const refresh = () => SETTINGS_PATHS.forEach((path) => revalidatePath(path));
 
 /** Step 1 - the pending metadata row and the server-generated key the browser must upload to. */
 export async function requestOrganizationImageUploadAction(orgId: string, contentType: string, expectedBytes?: number): Promise<OrganizationImageTicket> {
-  if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > ORGANIZATION_IMAGE_MAX_BYTES)) {
+  if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > (await imageMaxBytes("organization")))) {
     return { ok: false, code: "showroomSettings.image.errorSize" };
   }
   const supabase = await getServerSupabase();

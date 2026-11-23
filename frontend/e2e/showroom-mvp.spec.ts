@@ -423,7 +423,20 @@ test.describe("showroom workspace", () => {
 
     // RC2: the Showroom top bar carries the language toggle (named "Language", showing ع) next to the theme
     // switch; Settings > Appearance & language has the same control.
-    await page.locator("header").getByRole("button", { name: "Language", exact: true }).click();
+    const languageButton = page.locator("header").getByRole("button", { name: "Language", exact: true });
+    await expect(languageButton).toBeVisible();
+    // A press that lands before hydration is lost (the server-rendered button has no handler yet), which left <html dir>
+    // on ltr for the whole assertion window. Wait for React's props on the button; the press is never repeated, since a
+    // second press after a slow first one would toggle back to English.
+    await languageButton.evaluate(
+      (node) =>
+        new Promise<void>((resolve) => {
+          const hydrated = () => Object.keys(node).some((key) => key.startsWith("__reactProps$"));
+          const tick = () => (hydrated() ? resolve() : setTimeout(tick, 50));
+          tick();
+        }),
+    );
+    await languageButton.click();
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.locator("html")).toHaveAttribute("lang", "ar");
   });

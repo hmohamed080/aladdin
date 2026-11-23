@@ -7,9 +7,8 @@ create extension if not exists pgtap;
 begin;
 select plan(24);
 -- rc2: this fixture activates / approves showrooms directly, bypassing the seller-readiness triggers PR #84 added
--- (showroom_review_complete / showroom_activation_complete / showroom_product_publish_complete). They are disabled for this
+-- (showroom_activation_complete / showroom_product_publish_complete). They are disabled for this
 -- transaction only (rolled back with it); the readiness rules themselves are asserted in tests 92-94.
-alter table public.verifications disable trigger showroom_review_complete;
 alter table public.organizations disable trigger showroom_activation_complete;
 alter table public.products disable trigger showroom_product_publish_complete;
 

@@ -29,7 +29,7 @@ reset role;
 update public.business_creation_drafts set activity_type = 'not_a_real_activity' where user_id = '11800001-0000-4000-8000-000000000118';
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"11800001-0000-4000-8000-000000000118","role":"authenticated"}',true);
-select throws_ok($q$select public.business_draft_submit_v3()$q$,'22023','invalid showroom activity','submit_v3 fails after the organization insert');
+select throws_ok($q$select public.business_draft_submit_v3()$q$,'22023','invalid business activity','submit_v3 fails after the organization insert');
 reset role;
 select is((select count(*)::int from public.organizations where created_by='11800001-0000-4000-8000-000000000118'),0,'the failed submit leaves no organization');
 select is((select count(*)::int from public.memberships where user_id='11800001-0000-4000-8000-000000000118'),0,'the failed submit leaves no membership');

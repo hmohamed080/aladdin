@@ -127,6 +127,15 @@
    * The three brand primitives above do not move. Nothing about the brand
    * changes here — only the ground the workspace is drawn on.
    */
+  /* ---- Brand-landing scope (public landing `/` only) ----
+   * Owner-approved four-colour palette (design/tokens/colors.json -> brandLanding).
+   * Consumed only by features/landing-brand; every other tone there is a mix or
+   * an alpha of these four. Product UI keeps using the semantic tokens. */
+  --landing-navy: #071a2d;
+  --landing-sand: #d8c7a6;
+  --landing-terra: #b96f52;
+  --landing-cream: #f2e9d8;
+
   --quartz: #f4f3f0;
   --quartz-raised: #fdfcfb;
   --quartz-sunk: #eceae6;

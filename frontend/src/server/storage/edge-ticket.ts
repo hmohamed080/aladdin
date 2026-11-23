@@ -78,7 +78,7 @@ export async function privateMediaUrl(client: SupabaseClient, namespace: MediaNa
   const viewer = config ? await edgeViewer(client) : null;
   if (!config || !viewer) return applicationMediaUrl(namespace, key, options.workspace);
   const variant = options.variant ?? "original";
-  const ws = namespace === "product" || namespace === "organization" ? options.workspace ?? null : null;
+  const ws = namespace === "product" || namespace === "organization" || namespace === "request" ? options.workspace ?? null : null;
   const ticket = mintTicket(config.kid, config.secret, { v: 1, ns: namespace, k: key, var: variant,
     sub: viewer.sub, sid: viewer.sid, ws, exp: ticketExpiry(options.nowMs ?? Date.now()) });
   return `${config.origin}/m/${namespace}/${variant}?t=${ticket}`;
@@ -123,10 +123,10 @@ function recordedVariants(value: unknown): MediaVariant[] {
  * Public media by opaque id (portfolio item id, listed profile id). Edge URLs
  * carry no ticket and no key: the Worker re-checks eligibility on every request.
  */
-export function publicMediaUrl(namespace: "portfolio" | "avatar", id: string, onEdge: boolean, variant: EdgeVariant = "original"): string | null {
+export function publicMediaUrl(namespace: "portfolio" | "avatar" | "marketplace", id: string, onEdge: boolean, variant: EdgeVariant = "original"): string | null {
   const config = onEdge ? edgeConfig() : null;
   if (config?.publicEnabled) return `${config.origin}/c/${namespace}/${id}/${variant}`;
-  return namespace === "portfolio" ? `/p/media/${id}` : null;
+  return namespace === "portfolio" ? `/p/media/${id}` : namespace === "marketplace" ? `/market/media/${id}` : null;
 }
 
 /**
@@ -143,7 +143,7 @@ export function publicPortfolioSource(id: string, edgeVariants: readonly MediaVa
 }
 
 /** Currently public R2 items among `ids` and their recorded variants; empty while Mode C is off. */
-export async function publicEdgeSources(client: SupabaseClient, namespace: "portfolio" | "avatar", ids: readonly string[]): Promise<Map<string, MediaVariant[]>> {
+export async function publicEdgeSources(client: SupabaseClient, namespace: "portfolio" | "avatar" | "marketplace", ids: readonly string[]): Promise<Map<string, MediaVariant[]>> {
   const out = new Map<string, MediaVariant[]>();
   if (ids.length === 0 || !edgeConfig()?.publicEnabled) return out;
   for (let i = 0; i < ids.length; i += 100) {

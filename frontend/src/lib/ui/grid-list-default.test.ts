@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
  *   /home/work                installer-my-work-preview/installer-my-work-view.tsx       yes      grid
  *   /preview/installer-reviews installer-reviews-preview/installer-reviews-preview.tsx   yes      grid
  *   /home/reviews (Installer) installer-reviews/installer-reviews.tsx                   yes      grid
+ *   /market                   marketplace/live/live-catalog.tsx                          no       grid only (toggle removed, owner decision 2026-11-21)
  *   every other route         (no Grid / List toggle)                                     no       n/a
  */
 

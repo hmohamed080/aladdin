@@ -53,7 +53,7 @@ Before each run, read the remaining egress figure fresh and run the usage report
 | Worker free-plan limits | > 70 % of 100k requests/day; CPU p99 > 8 ms | Workers analytics (Owner) |
 | Auth request rate | `/auth/v1/user` > 1k/day after the session fix; any day > 3× its 7-day median | Supabase Logs Explorer over `auth_logs` / `edge_logs` (Owner for a schedule) |
 | Revocation canary | any **200** for a deleted (or unpublished) canary object; alert after 1 failure | Scheduled staging probe with a dedicated canary account: upload → fetch 200 → delete → fetch expects **404** right away through the app route and the Worker URL. Runs as a scheduled CI job every 15 min to 1 h (Owner: workflow, secrets and canary account) |
-| Vercel bandwidth | > 50 % of included Fast Data Transfer; any image-route bytes after cutover | Vercel Spend Management (Owner) |
+| Worker requests and CPU | > 50 % of the Workers Paid included requests or CPU time | Cloudflare → Workers & Pages → Metrics, billing notifications (Owner) |
 
 ## Rationale
 

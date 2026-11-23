@@ -115,9 +115,8 @@ describe("isAssetKeyForCaller", () => {
 });
 
 describe("the namespace policy", () => {
-  it("gives each namespace its own bucket, because the limits differ", () => {
+  it("gives each namespace its own bucket", () => {
     expect(ASSET_POLICY.portfolio.bucket).not.toBe(ASSET_POLICY.certificate.bucket);
-    expect(ASSET_POLICY.portfolio.maxBytes).not.toBe(ASSET_POLICY.certificate.maxBytes);
   });
 
   /**
@@ -129,7 +128,8 @@ describe("the namespace policy", () => {
     expect(ASSET_POLICY.portfolio).toEqual({
       bucket: "professional-portfolio",
       types: ["image/jpeg", "image/png", "image/webp"],
-      maxBytes: 5242880,
+      // 10 MiB since the 2026-11-19 media policy. The legacy Supabase bucket (closed for writes) keeps 5242880.
+      maxBytes: 10485760,
     });
     expect(ASSET_POLICY.certificate).toEqual({
       bucket: "professional-certificates",
@@ -161,7 +161,7 @@ describe("the namespace policy", () => {
   });
 
   it("refuses an oversized file and an empty one with different reasons", () => {
-    expect(validateAssetFile("portfolio", { type: "image/png", size: 5242881 })).toEqual({
+    expect(validateAssetFile("portfolio", { type: "image/png", size: 10485761 })).toEqual({
       ok: false,
       code: "assets.errors.tooLarge",
     });

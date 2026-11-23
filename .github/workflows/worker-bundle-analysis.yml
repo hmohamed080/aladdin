@@ -1,0 +1,68 @@
+# Worker bundle analysis (manual, read-only).
+#
+# Answers "what makes the Worker bundle ~30 MiB and slow to start?" with real numbers instead of guesses:
+#   - the bundle size and its gzip size, as wrangler would upload it (dry run: nothing is deployed);
+#   - bytes per npm package / app area / route entry (frontend/scripts/analyze-worker-bundle.mjs);
+#   - the startup CPU profile from `wrangler check startup` (what runs when a cold isolate boots).
+# Results go to the job summary and to a downloadable artifact. No secrets, no deploy, no Cloudflare login.
+name: worker-bundle-analysis
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    env:
+      NEXT_PUBLIC_APP_ENV: production
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Enable pnpm (corepack, pinned to packageManager)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter frontend cf:build
+      - name: Bundle the Worker (dry run, no upload)
+        working-directory: frontend
+        run: pnpm exec wrangler deploy --env production --dry-run --outdir "$RUNNER_TEMP/worker" --metafile "$RUNNER_TEMP/worker/meta.json"
+      - name: Size, gzip size and breakdown
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/worker"
+          {
+            echo "## Worker size"
+            echo
+            echo "| File | Raw | Gzip |"
+            echo "|---|--:|--:|"
+            for f in "$out/worker.js" .open-next/server-functions/default/frontend/handler.mjs; do
+              [ -f "$f" ] && echo "| \`$(basename "$f")\` | $(stat -c %s "$f" | numfmt --to=iec) | $(gzip -9 -c "$f" | wc -c | numfmt --to=iec) |"
+            done
+            echo
+            # The handler holds almost all of the code; analyse it (banners) and wrangler's view of the whole bundle.
+            node scripts/analyze-worker-bundle.mjs .open-next/server-functions/default/frontend/handler.mjs --metafile "$out/meta.json"
+          } | tee "$RUNNER_TEMP/analysis.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Startup CPU profile (what a cold isolate runs before the first request)
+        working-directory: frontend
+        continue-on-error: true
+        run: |
+          pnpm exec wrangler check startup --env production --outfile "$RUNNER_TEMP/startup.cpuprofile" | tee "$RUNNER_TEMP/startup.txt"
+          { echo; echo "## Startup profile"; echo; echo '```'; cat "$RUNNER_TEMP/startup.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: worker-bundle-analysis
+          path: |
+            ${{ runner.temp }}/analysis.md
+            ${{ runner.temp }}/worker/meta.json
+            ${{ runner.temp }}/startup.cpuprofile
+            ${{ runner.temp }}/startup.txt
+          if-no-files-found: warn

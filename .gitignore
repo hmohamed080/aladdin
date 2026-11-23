@@ -109,3 +109,6 @@ test-results/
 .dev.vars*
 !.dev.vars.example
 cloudflare-env.d.ts
+
+# Local fake OTP delivery outbox (PHONE_OTP_DELIVERY=outbox): holds test codes, never committed
+.local/

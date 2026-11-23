@@ -4,14 +4,14 @@ import { SECURITY_HEADERS } from "./src/lib/security/response-headers";
 
 // Set by open-next.config.ts `buildCommand` for the Cloudflare Workers build only.
 // That build swaps the image engine (sharp cannot load in workerd) so the Worker
-// bundle never contains sharp; Vercel and `next build` keep the Node module.
+// bundle never contains sharp; the plain `next build` keeps the Node module.
 const WORKERS_BUILD = process.env.ALADDIN_BUILD_TARGET === "workers";
 const IMAGE_RUNTIME = /[\\/]server[\\/]storage[\\/]image-processing[\\/]runtime\.ts$/;
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Revocable media must never enter the optimizer cache, even through a crafted URL.
-  images: { localPatterns: ["assets", "brand", "demo", "images", "installer-auth", "landing-v2", "preview", "_next/static/media"]
+  images: { qualities: [65, 75], localPatterns: ["assets", "brand", "demo", "images", "installer-auth", "landing-brand", "landing-v2", "preview", "_next/static/media"]
     .map((directory) => ({ pathname: `/${directory}/**`, search: "" })) },
   // App Router is the default in Next 15. No Vite, no custom SPA routing.
   webpack(config, { webpack, isServer }) {
@@ -29,19 +29,18 @@ const nextConfig: NextConfig = {
     return config;
   },
 
-  // Baseline security headers on every response, on Vercel and on Workers (security audit 2026-10-22).
+  // Baseline security headers on every response (security audit 2026-10-22).
   async headers() {
     return [{ source: "/:path*", headers: [...SECURITY_HEADERS] }];
   },
 
-  // Compatibility for links shared while the installer phone + password pages
-  // were a temporary preview: permanent (308) redirects to the promoted routes.
+  // Compatibility for links to routes that moved: permanent (308) redirects to the promoted routes.
   // The query string is carried over by Next.js as-is; the destination pages
   // validate anything they read from it (e.g. `next` via sanitizeNext).
+  // The retired phone entry pages (`/installer/*`, `/showroom/sign-in|sign-up`, `/temporary/craftsman/*`,
+  // ADR-0025) have no redirect any more. all of them answer 404 (the two /showroom ones through route handlers, so the dynamic /showroom/[page] guard never sees them).
   async redirects() {
     return [
-      { source: "/temporary/craftsman/sign-up", destination: "/installer/sign-up", permanent: true },
-      { source: "/temporary/craftsman/sign-in", destination: "/installer/sign-in", permanent: true },
       // Showroom V2 was reviewed under /preview/showroom-suite-v2; it now lives at /showroom (links stay valid).
       { source: "/preview/showroom-suite-v2", destination: "/showroom", permanent: true },
       { source: "/preview/showroom-suite-v2/:path*", destination: "/showroom/:path*", permanent: true },

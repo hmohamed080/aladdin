@@ -25,7 +25,12 @@ const administrator = acc(80, ALL.filter((p) => p !== "roles.manage"));
 const superAdmin = acc(100, ALL);
 
 vi.mock("@/server/authorization/admin", () => ({ requireAdminRoute: (...a: unknown[]) => requireAdminRoute(...a) }));
-vi.mock("@/server/queries/admin-directory", () => ({ loadUserDetail: (...a: unknown[]) => loadUserDetail(...a) }));
+const loadUnappliedApproval = vi.fn(async (..._a: unknown[]): Promise<{ id: string; status: string; verificationType: string } | null> => null);
+vi.mock("@/server/queries/admin-directory", () => ({
+  loadUserDetail: (...a: unknown[]) => loadUserDetail(...a),
+  loadUnappliedApproval: (...a: unknown[]) => loadUnappliedApproval(...a),
+}));
+vi.mock("@/server/actions/admin-forms", () => ({ approveVerificationAction: vi.fn(), rejectVerificationAction: vi.fn(), adminInitiateVerificationAction: vi.fn() }));
 vi.mock("@/server/queries/admin-rbac", () => ({ loadStaffRanks: (...a: unknown[]) => loadStaffRanks(...a) }));
 vi.mock("@/server/queries/admin-preview", () => ({
   previewUserPointsLedger: vi.fn(async () => null),
@@ -58,7 +63,6 @@ function detail(id: string, over: Partial<AdminUserDetail> = {}): AdminUserDetai
   return {
     id,
     displayName: { name: "Some Person", nameAr: null, nameEn: null },
-    username: null,
     email: "person@example.test",
     phone: null,
     accountType: null,
@@ -95,6 +99,8 @@ beforeEach(() => {
   requireAdminRoute.mockReset();
   requireAdminRoute.mockResolvedValue(administrator);
   loadUserDetail.mockReset();
+  loadUnappliedApproval.mockReset();
+  loadUnappliedApproval.mockResolvedValue(null);
   loadStaffRanks.mockReset();
   loadStaffRanks.mockResolvedValue(new Map([[SUPER_ID, 100], [CALLER_ID, 80]]));
 });
@@ -140,5 +146,87 @@ describe("User Details - rank-aware Suspend", () => {
     await renderPage(ORDINARY_ID);
     expect(suspendButtons()).toHaveLength(0);
     expect(screen.getAllByRole("button", { name: /^restore$/i }).length).toBeGreaterThan(0);
+  });
+});
+
+describe("User Details - real Verify / Reject", () => {
+  const open = (status: string, verificationType = "professional", id = "99999999-9999-4999-8999-999999999999") => ({
+    id,
+    verificationType,
+    requestedAccountType: "installer_technician",
+    status,
+    reason: null,
+    submittedAt: "2026-10-30T10:00:00Z",
+    decidedAt: null,
+    reviewerName: null,
+    initiatedByAdmin: false,
+    events: [],
+  });
+  const approve = () => screen.queryAllByRole("button", { name: /approve/i });
+
+  it("offers live Approve / Reject when the account has an open request", async () => {
+    loadUserDetail.mockResolvedValue({ ok: true, data: detail(ORDINARY_ID, { status: "pending_verification", verifications: [open("submitted")] }) });
+    await renderPage(ORDINARY_ID);
+    expect(approve()).toHaveLength(1);
+    expect(approve()[0]!.getAttribute("aria-disabled")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^reject$/i })).toHaveLength(1);
+  });
+
+  it("shows them disabled, with the reason, for a pending account that has no open request (approval already applied)", async () => {
+    loadUserDetail.mockResolvedValue({ ok: true, data: detail(ORDINARY_ID, { status: "pending_verification", accountType: "installer_technician", verifications: [open("approved")] }) });
+    await renderPage(ORDINARY_ID);
+    expect(approve()[0]!.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  const resume = () => screen.queryAllByRole("button", { name: /complete approval/i });
+  const reject = () => screen.queryAllByRole("button", { name: /^reject$/i });
+
+  const unapplied = { id: "99999999-9999-4999-8999-999999999997", status: "approved", verificationType: "professional" };
+
+  it.each(["pending_verification", "active"])("RECOVERY (%s account): an approved-but-unapplied request offers only Complete approval", async (status) => {
+    loadUserDetail.mockResolvedValue({ ok: true, data: detail(ORDINARY_ID, { status: status as AdminUserDetail["status"], accountType: "installer_technician", verificationState: "verified", verifications: [open("approved")] }) });
+    loadUnappliedApproval.mockResolvedValueOnce(unapplied);
+    await renderPage(ORDINARY_ID);
+    expect(loadUnappliedApproval).toHaveBeenCalledWith(expect.anything(), ORDINARY_ID);
+    expect(resume()).toHaveLength(1);
+    expect(reject()).toHaveLength(0);
+    expect(approve().filter((b) => /^approve$/i.test(b.textContent?.trim() ?? ""))).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /start verification/i })).toBeNull();
+  });
+
+  it("no recovery button when the approval was applied (the lookup finds nothing) or the lookup failed", async () => {
+    loadUserDetail.mockResolvedValue({ ok: true, data: detail(ORDINARY_ID, { status: "active", accountType: "installer_technician", verifications: [open("approved")] }) });
+    loadUnappliedApproval.mockResolvedValueOnce(null);
+    await renderPage(ORDINARY_ID);
+    expect(resume()).toHaveLength(0);
+  });
+
+  it("RECOVERY is hidden without users.verify", async () => {
+    requireAdminRoute.mockResolvedValue(acc(50, ["users.read"]));
+    loadUserDetail.mockResolvedValue({ ok: true, data: detail(ORDINARY_ID, { status: "active", accountType: null, verifications: [open("approved")] }) });
+    loadUnappliedApproval.mockResolvedValueOnce(unapplied);
+    await renderPage(ORDINARY_ID);
+    expect(resume()).toHaveLength(0);
+  });
+
+  it("an open request wins over recovery (normal Approve / Reject)", async () => {
+    loadUserDetail.mockResolvedValue({ ok: true, data: detail(ORDINARY_ID, { status: "pending_verification", accountType: null, verifications: [open("submitted"), open("approved", "professional", "99999999-9999-4999-8999-999999999998")] }) });
+    await renderPage(ORDINARY_ID);
+    expect(loadUnappliedApproval).not.toHaveBeenCalled();
+    expect(resume()).toHaveLength(0);
+    expect(reject()).toHaveLength(1);
+  });
+
+  it("ignores business verification (its own queue) and decided requests", async () => {
+    loadUserDetail.mockResolvedValue({ ok: true, data: detail(ORDINARY_ID, { verifications: [open("submitted", "business"), open("rejected")] }) });
+    await renderPage(ORDINARY_ID);
+    expect(approve()).toHaveLength(0);
+  });
+
+  it("is hidden without users.verify, even with an open request", async () => {
+    requireAdminRoute.mockResolvedValue(acc(50, ["users.read"]));
+    loadUserDetail.mockResolvedValue({ ok: true, data: detail(ORDINARY_ID, { status: "pending_verification", verifications: [open("submitted")] }) });
+    await renderPage(ORDINARY_ID);
+    expect(approve()).toHaveLength(0);
   });
 });

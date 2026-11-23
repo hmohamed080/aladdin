@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { CheckIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
 import { landingBlockContent, landingLogos } from "./landing-block-content";
@@ -17,8 +17,12 @@ function RoleIllustration({ index, small = false }: { index: number; small?: boo
     style={{ backgroundPosition: `${(index % 3) * 50}% ${index < 3 ? 0 : 100}%` }} />;
 }
 
-/** The reference's complete post-hero composition, scoped to the preview. */
-export function LandingEcosystem() {
+/**
+ * The reference's complete post-hero composition, scoped to the preview.
+ * `marketplaceSlot` is an optional, server-gated node rendered between the
+ * videos and the brands; the default is nothing, so the composition is unchanged.
+ */
+export function LandingEcosystem({ marketplaceSlot = null }: { marketplaceSlot?: ReactNode } = {}) {
   const { locale, dir } = useI18n();
   const t = landingBlockContent[locale];
   const [detail, setDetail] = useState<LandingDetail | null>(null);
@@ -55,6 +59,7 @@ export function LandingEcosystem() {
           </div>
         </section>
         <LandingVideos />
+        {marketplaceSlot}
         <section id="brands" className={styles.brandsSection} aria-labelledby="brands-heading">
           <div className={`${styles.sectionHeading} ${styles.brandHeading}`}>
             <h2 id="brands-heading" className={styles.heading}>{t.brands}</h2>

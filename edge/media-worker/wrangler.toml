@@ -8,8 +8,8 @@ compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = false
 
-# Option A (aladdindecore.com DNS moved to a Cloudflare Free zone): a Workers
-# Custom Domain. Option B (DNS stays on Vercel): deploy pages/ instead; see README.
+# A Workers Custom Domain on the aladdindecore.com Cloudflare zone (DNS moved there
+# on 2026-10-27). The pages/ template (DNS at an external provider) is obsolete.
 routes = [{ pattern = "media.aladdindecore.com", custom_domain = true }]
 
 [vars]

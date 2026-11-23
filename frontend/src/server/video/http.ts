@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { VideoUploadError, type VideoErrorCode } from "./uploads";
 
 const STATUS: Record<VideoErrorCode, number> = {
-  not_allowed: 403, invalid: 400, limit: 409, rate_limited: 429, not_found: 404, incomplete: 409, unavailable: 503,
+  not_allowed: 403, invalid: 400, too_large: 413, limit: 409, rate_limited: 429, not_found: 404, incomplete: 409, unavailable: 503,
 };
 const NO_STORE = { "cache-control": "private, no-store" };
 

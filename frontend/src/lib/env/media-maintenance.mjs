@@ -9,6 +9,7 @@ const schema = z.object({
   R2_ACCESS_KEY_ID: z.string().min(1).optional(),
   R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   R2_PRIVATE_BUCKET: z.string().min(1).optional(),
+  MEDIA_MIGRATION_APPROVED_PROJECT: z.string().regex(/^[a-z]{20}$/).optional(),
 });
 export function readMaintenanceEnv() {
   return schema.parse({
@@ -18,5 +19,6 @@ export function readMaintenanceEnv() {
     R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID || undefined,
     R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY || undefined,
     R2_PRIVATE_BUCKET: process.env.R2_PRIVATE_BUCKET || undefined,
+    MEDIA_MIGRATION_APPROVED_PROJECT: process.env.MEDIA_MIGRATION_APPROVED_PROJECT || undefined,
   });
 }

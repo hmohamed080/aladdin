@@ -10,7 +10,6 @@ export type MyIdentity = {
   displayName: string;
   /** Only an explicit profile_set_display_name call sets this — never the account-creation fallback. */
   displayNameConfirmed: boolean;
-  username: string | null;
   phoneCountryIso2: string | null;
   phoneNational: string | null;
   phoneE164: string | null;
@@ -49,7 +48,7 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "display_name, display_name_confirmed_at, username, phone_country_iso2, phone_national, phone_e164, phone_verified_at, avatar_media_id, cover_media_id",
+      "display_name, display_name_confirmed_at, phone_country_iso2, phone_national, phone_e164, phone_verified_at, avatar_media_id, cover_media_id",
     )
     .eq("user_id", user.id)
     .maybeSingle();
@@ -89,7 +88,6 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
   return {
     displayName: profile.display_name,
     displayNameConfirmed: profile.display_name_confirmed_at !== null,
-    username: profile.username,
     phoneCountryIso2: profile.phone_country_iso2,
     phoneNational: profile.phone_national,
     phoneE164: profile.phone_e164,
@@ -102,8 +100,9 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
   };
 });
 
+// Phase 1 (account identity): the username criterion is gone. A database that still returns "username" in `missing`
+// (before migration M1) is tolerated: unknown items are dropped by `isCompletionItem` below.
 export const PROFILE_COMPLETION_ITEMS = [
-  "username",
   "avatar",
   "phone",
   "locality",

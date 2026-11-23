@@ -28,11 +28,19 @@ function server(plan: { uploaded?: number[]; state?: string } = {}, resumeId: st
 beforeEach(() => store.clear());
 
 describe("checkVideoFile", () => {
-  it("refuses wrong types and empty files, and only R2's own object limit on size", () => {
+  it("refuses wrong types, empty files and anything over the 100 MB per-file cap", () => {
     expect(() => checkVideoFile(file(10, "video/x-msvideo"))).toThrow(expect.objectContaining({ code: "type" }));
     expect(() => checkVideoFile(file(0))).toThrow(expect.objectContaining({ code: "size" }));
     expect(() => checkVideoFile({ type: "video/mp4", size: VIDEO_STORAGE_MAX_BYTES + 1 } as File)).toThrow(expect.objectContaining({ code: "size" }));
-    expect(checkVideoFile({ type: "video/mp4", size: 40 * 1024 ** 3 } as File)).toBe("video/mp4");
+    expect(checkVideoFile({ type: "video/mp4", size: VIDEO_STORAGE_MAX_BYTES } as File)).toBe("video/mp4");
+    expect(VIDEO_STORAGE_MAX_BYTES).toBe(100 * 1024 * 1024);
+  });
+
+  it("takes the stored limit of the place as its cap (a browser hint)", () => {
+    const big = { type: "video/mp4", size: 150 * 1024 * 1024 } as File;
+    expect(() => checkVideoFile(big)).toThrow(expect.objectContaining({ code: "size" }));
+    expect(checkVideoFile(big, 200 * 1024 * 1024)).toBe("video/mp4");
+    expect(() => checkVideoFile(big, 120 * 1024 * 1024)).toThrow(expect.objectContaining({ code: "size" }));
   });
 });
 

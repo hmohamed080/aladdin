@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { businessDetailsSchema, showroomIdentityError, validBusinessPhone } from "@/lib/onboarding/business-details";
+import { businessActivityError, businessDetailsSchema, showroomIdentityError, validBusinessPhone } from "@/lib/onboarding/business-details";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadBusinessCreationAccess } from "@/server/queries/business-creation-access";
 import { loadMandatoryBusinessSetup } from "@/server/queries/business-setup";
@@ -107,6 +107,8 @@ export async function saveBusiness(input: BusinessInput): Promise<BusinessAction
   if (v.step === "identity" && (v.displayName?.trim().length ?? 0) < 2) return { ok: false, code: "onboarding.error.businessNameRequired" };
   if (v.step === "identity" && legalNameMissing(v.legalName)) return { ok: false, code: "onboarding.error.legalNameRequired" };
   if (orgType === "showroom_dealer" && v.step === "identity") { const error = showroomIdentityError(v); if (error) return { ok: false, code: error }; }
+  // Another business type's activity is never stored for this one.
+  if (v.activityType && businessActivityError(orgType, v.activityType)) return { ok: false, code: "onboarding.error.activityRequired" };
   // Links belong to a showroom only: for any other effective type they are ignored entirely (never validated, never stored),
   // so a link typed before the type was switched cannot reach another kind of business.
   // For a showroom they are required to finish the identity step, and whatever is entered is validated on any step.

@@ -59,8 +59,9 @@ set local request.jwt.claims = '{"sub":"c0000000-0000-4000-8000-0000000000c1","r
 -- removed consumer_onboarding_pending/persona_onboarding_pending as return
 -- values of my_registration_state() — once account_type_completed_at is set,
 -- the only remaining gate before access_ready/active_personal is username.
-select is(public.my_registration_state(), 'username_pending',
-  'consumer with the account-type step done but no username resolves to username_pending');
+-- P1 M1: a username is no longer registration data, so the state is access_ready (was username_pending).
+select is(public.my_registration_state(), 'access_ready',
+  'consumer with the account-type step done but no username resolves to access_ready');
 
 select lives_ok(
   $$ select public.individual_save_consumer('planning', array['flooring','lighting'], 'cairo', 'new_cairo', '100_250k') $$,
@@ -95,8 +96,9 @@ reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"d0000000-0000-4000-8000-0000000000d1","role":"authenticated"}';
 
-select is(public.my_registration_state(), 'username_pending',
-  'professional with the account-type step done but no username resolves to username_pending');
+-- P1 M1: a username is no longer registration data, so the state is access_ready (was username_pending).
+select is(public.my_registration_state(), 'access_ready',
+  'professional with the account-type step done but no username resolves to access_ready');
 
 -- A professional cannot complete the consumer branch.
 select throws_ok(

@@ -5,7 +5,6 @@ import { listUsers, listOrganizations } from "@/server/queries/admin";
 import { previewReviewQueue } from "@/server/queries/admin-preview";
 import { listAdminStaff } from "@/server/queries/admin-rbac";
 import { can, meets, type AdminAccess } from "@/lib/permissions/admin";
-import { PREVIEW_ORG_REQUESTS } from "@/features/admin-preview/fixtures";
 import type { PaletteItem } from "@/features/admin-preview/command-palette-search";
 import type { Messages } from "@/lib/i18n/messages/en";
 
@@ -47,13 +46,6 @@ export async function loadAdminPaletteItems(access: AdminAccess, m: Messages): P
       label: o.name,
       secondary: orgTypeLabels[o.orgType] ?? o.orgType,
       href: `/admin/organizations/${o.id}`,
-    })),
-    ...PREVIEW_ORG_REQUESTS.map((r): PaletteItem => ({
-      id: `orgreq-${r.id}`,
-      group: "reviews",
-      label: r.orgName,
-      secondary: pal.orgRequest.replace("{name}", r.requesterName),
-      href: `/admin/review/org-request/${r.id}`,
     })),
     ...queue.flatMap((item): PaletteItem[] => {
       if (item.kind === "verification") {

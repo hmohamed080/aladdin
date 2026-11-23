@@ -1,0 +1,62 @@
+/* Aladdin brand 2026 — SCOPED palette layer for the public landing page and the
+   Marketplace preview. It re-points the tokens those surfaces already consume to
+   the approved four-colour palette; nothing outside an element carrying `.brand`
+   changes, so the workspace (/b2b, /home, /admin) keeps the existing design system.
+   Promoting this to the global token files is a separate design-system change.
+
+   Palette (approved):
+     Deep Navy        #071A2D  headings, navbar, footer, dark surfaces
+     Warm Sand        #D8C7A6  secondary tone, logo detail, hairlines
+     Muted Terracotta #B96F52  buttons, highlights, CTAs
+     Soft Cream       #F2E9D8  page and section backgrounds
+
+   The semantic aliases (--accent-solid, --fg, …) are re-declared here because the
+   :root versions are resolved at :root and would not follow a re-scoped raw token. */
+.brand {
+  --brand-navy: #071a2d;
+  --brand-sand: #d8c7a6;
+  --brand-terracotta: #b96f52;
+  --brand-cream: #f2e9d8;
+  /* Palette names the landing modules read directly. Declared here, not in
+     tokens.css, so the rest of the app keeps its current tokens. */
+  --deep-navy: var(--brand-navy);
+  --soft-cream: var(--brand-cream);
+  --accent-edge: var(--brand-navy);
+  /* Derived, so small text stays legible on cream (AA) while remaining on-palette. */
+  --brand-terracotta-ink: color-mix(in srgb, var(--brand-terracotta) 60%, var(--brand-navy));
+  --brand-terracotta-deep: color-mix(in srgb, var(--brand-terracotta) 82%, var(--brand-navy));
+
+  /* raw tokens the landing modules read */
+  --plaster: var(--brand-cream);
+  --limestone: var(--brand-cream);
+  --sand: var(--brand-sand);
+  --ink: var(--brand-navy);
+  --shell-deep: var(--brand-navy);
+  --basalt: var(--brand-navy);
+  --stone: color-mix(in srgb, var(--brand-navy) 74%, var(--brand-cream));
+  --stone-muted: color-mix(in srgb, var(--brand-navy) 66%, var(--brand-cream));
+  --bronze: var(--brand-sand);
+  --bronze-ink: var(--brand-terracotta-ink);
+  --lumen: var(--brand-terracotta);
+  --lumen-deep: var(--brand-terracotta-deep);
+  --lumen-ink: var(--brand-terracotta-ink);
+  --lumen-soft: color-mix(in srgb, var(--brand-terracotta) 55%, var(--brand-cream));
+  --quartz-raised: #ffffff;
+  --quartz-line: color-mix(in srgb, var(--brand-sand) 65%, var(--brand-cream));
+  --quartz-line-strong: var(--brand-sand);
+  --line-light: color-mix(in srgb, var(--brand-sand) 65%, var(--brand-cream));
+
+  /* semantic aliases used by shared primitives (Button, ButtonLink, …) */
+  --fg: var(--brand-navy);
+  --fg-secondary: var(--stone);
+  --fg-muted: var(--stone-muted);
+  --surface: #ffffff;
+  --border: var(--quartz-line);
+  --border-strong: var(--quartz-line-strong);
+  --primary: var(--brand-navy);
+  --primary-foreground: var(--brand-cream);
+  --accent: var(--brand-terracotta-ink);
+  --accent-solid: var(--brand-terracotta);
+  --on-accent: #ffffff;
+  --focus: var(--brand-terracotta-ink);
+}

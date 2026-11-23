@@ -16,8 +16,8 @@ export const dynamic = "force-dynamic";
 /**
  * Admin Settings — Phase 0D. Two sections:
  *
- *  1. **Profile** — Photo · Full Name · Username · Phone · Email. Name, username
- *     and phone are the signed-in Admin's own real values (`auth.getUser()` +
+ *  1. **Profile** — Photo · Full Name · Phone · Email. Name and
+ *     phone are the signed-in Admin's own real values (`auth.getUser()` +
  *     `profiles`); Save is a Preview dialog and never writes.
  *  2. **Security → Change password** (PD-014) — Current · New · Confirm · Save,
  *     with the REAL password policy and strength meter. Nothing is wired: no
@@ -37,11 +37,9 @@ export default async function PreviewSettingsPage() {
   const roleLabels = m.admin.roleLabel as Record<string, string>;
   const roleNames = access.roles.map((r) => (r.isSystem ? (roleLabels[r.key] ?? r.name) : r.name));
   let displayName = "";
-  let username = "";
   if (authUser) {
-    const { data: profile } = await supabase.from("profiles").select("display_name, username").eq("user_id", authUser.id).maybeSingle();
+    const { data: profile } = await supabase.from("profiles").select("display_name").eq("user_id", authUser.id).maybeSingle();
     displayName = profile?.display_name ?? "";
-    username = profile?.username ?? "";
   }
 
   return (
@@ -60,9 +58,6 @@ export default async function PreviewSettingsPage() {
         <div className="grid gap-md tablet:grid-cols-2">
           <LabeledField label={st.fullName} htmlFor="settings-name">
             <Input id="settings-name" defaultValue={displayName} />
-          </LabeledField>
-          <LabeledField label={st.username} htmlFor="settings-username" hint={st.usernameHint}>
-            <Input id="settings-username" dir="ltr" defaultValue={username} placeholder={st.notProvided} />
           </LabeledField>
           <LabeledField label={st.phone} htmlFor="settings-phone">
             <Input id="settings-phone" dir="ltr" defaultValue={authUser?.phone ?? ""} placeholder={st.notProvided} />

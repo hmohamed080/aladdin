@@ -4,7 +4,6 @@ import { useActionState, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { chooseAccountTypeAction, type AccountTypeChoiceState } from "@/server/actions/registration";
 import { CHOICE_GROUPS, CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
-import { UsernameStep } from "@/features/onboarding/username-step";
 import { Card } from "@/components/ui/primitives";
 import { LabeledField, Select, SubmitButton } from "@/components/ui/controls";
 import { Brand } from "@/components/layout/brand";
@@ -13,39 +12,14 @@ const initial: AccountTypeChoiceState = { ok: false };
 
 /**
  * Canonical password auth's minimal finish-registration screen (see
- * `app/auth/finish-registration/page.tsx`'s doc comment).
- * `needsAccountType` covers the rarer gap (the pending-registration write
- * never landed at all — see `savePendingRegistration`'s best-effort
- * comment); the far more common case is `needsAccountType={false}` — the
- * account type WAS recorded, only the username claim lost a race — which
- * renders the same minimal `UsernameStep` the canonical
- * `/onboarding/username` page uses.
+ * `app/auth/finish-registration/page.tsx`'s doc comment): the rare gap where the
+ * pending-registration write never landed, so the account type is still missing
+ * (see `savePendingRegistration`'s best-effort comment).
  */
-export function FinishRegistrationScreen({
-  needsAccountType,
-  usernameUnavailable = false,
-}: {
-  needsAccountType: boolean;
-  /**
-   * The username chosen at sign-up lost the post-OTP claim (23505). Only
-   * changes the explanation — never whether the name was reserved or taken.
-   */
-  usernameUnavailable?: boolean;
-}) {
+export function FinishRegistrationScreen() {
   const { t } = useI18n();
   const [state, dispatch] = useActionState(chooseAccountTypeAction, initial);
   const [accountTypeKey, setAccountTypeKey] = useState("");
-
-  if (!needsAccountType) {
-    return usernameUnavailable ? (
-      <UsernameStep
-        titleKey="registration.username.unavailableTitle"
-        subtitleKey="registration.username.unavailableSubtitle"
-      />
-    ) : (
-      <UsernameStep />
-    );
-  }
 
   return (
     <Card className="flex flex-col gap-lg p-lg tablet:p-xl">

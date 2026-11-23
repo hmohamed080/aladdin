@@ -40,8 +40,12 @@ describe("shared authentication boundaries", () => {
             form.set(String(i), "a");
         expect(authFormWithinLimit(form)).toBe(false);
     });
-    it.each([registrationSchema, resetPasswordSchema])("bounds confirmation on shared signup and reset schemas", schema => {
-        expect(schema.safeParse({ displayName: "Sam", email: "sam@example.test", username: "samuser", accountType: "showroom_dealer", token: "123456", password: "green-tiles-on-roof", confirmPassword: "x".repeat(1000000) }).success).toBe(false);
+    it("bounds confirmation on the reset schema", () => {
+        expect(resetPasswordSchema.safeParse({ email: "sam@example.test", token: "123456", password: "green-tiles-on-roof", confirmPassword: "x".repeat(1000000) }).success).toBe(false);
+    });
+    it("bounds the password on the shared signup schema", () => {
+        expect(registrationSchema.safeParse({ displayName: "Sam", email: "sam@example.test", accountType: "showroom_dealer", password: "x".repeat(1000000) }).success).toBe(false);
+        expect(registrationSchema.safeParse({ displayName: "Sam", email: "sam@example.test", accountType: "showroom_dealer", password: "green-tiles-on-roof" }).success).toBe(true);
     });
 });
 describe("selected-country phone validation", () => {

@@ -13,9 +13,9 @@ describe("landing role dialog registration link", () => {
   const roles = landingBlockContent.ar.roles;
   const installer = roles.findIndex((r) => r.title === "للصنايعية والفنيين");
 
-  it("sends the installers role to the phone sign-up", () => {
+  it("sends the installers role to the main sign-up with that type chosen", () => {
     render(<LandingDetails detail={installer} onClose={() => {}} />);
-    expect(screen.getByRole("link", { name: landingBlockContent.ar.register, hidden: true })).toHaveAttribute("href", "/installer/sign-up");
+    expect(screen.getByRole("link", { name: landingBlockContent.ar.register, hidden: true })).toHaveAttribute("href", "/auth/sign-up?type=installer_technician");
   });
 
   it.each(roles.map((r, i) => [r.title, i] as const).filter(([, i]) => i !== installer))(

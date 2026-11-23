@@ -1,17 +1,17 @@
 /**
  * `/api/backend/*` on the Cloudflare-hosted frontend (ADR-0021).
  *
- * On Vercel (retired, ADR-0024), `vercel.json` rewrote `/api/backend(/.*)?` to the FastAPI service
- * inside the same deployment. On Workers the Worker forwards the request to
- * FastAPI unchanged, through one of two transports:
+ * The Worker forwards the request to FastAPI unchanged, through one of two
+ * transports:
  *   - the `BACKEND` service binding to the `aladdin-backend` Worker, which runs
  *     FastAPI in a Cloudflare Container (ADR-0022). Preferred: that Worker has
  *     no public hostname, and a binding call never leaves Cloudflare;
- *   - otherwise `BACKEND_ORIGIN`, a separate public origin (Vercel until cutover).
+ *   - otherwise `BACKEND_ORIGIN`, a separate public origin (unused while both
+ *     Workers bind `BACKEND`).
  * Either way the request keeps its
  * path, method, body, query and headers, so the browser keeps calling the
  * app's own origin (no CORS, no cross-site cookies) and FastAPI keeps receiving
- * `/api/backend/...` exactly as it does behind the Vercel rewrite.
+ * `/api/backend/...` (the public contract, `app.main.API_PREFIX`).
  *
  * Pure function of (request, config): no Next.js, no bindings, so the Worker
  * entry can run it before the app and it is unit-tested on its own.
@@ -59,7 +59,7 @@ export function backendRequest(request: Request, target: URL): Request {
   // FastAPI authenticates the Authorization bearer only; the session cookies (which
   // hold the refresh token) never leave for another origin (security audit 2026-10-22).
   headers.delete("cookie");
-  // What a Vercel rewrite tells the service about the original request.
+  // What a same-origin reverse proxy tells the service about the original request.
   headers.set("x-forwarded-host", incoming.host);
   headers.set("x-forwarded-proto", incoming.protocol.replace(":", ""));
   const connectingIp = request.headers.get("cf-connecting-ip");

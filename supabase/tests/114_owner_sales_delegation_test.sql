@@ -22,7 +22,6 @@ select plan(34);
 -- Fixture organizations are approved directly as the DB owner; the showroom
 -- seller-readiness triggers are disabled for this transaction only (rolled back),
 -- as in 27_account_workspace_model_test.sql.
-alter table public.verifications disable trigger showroom_review_complete;
 alter table public.organizations disable trigger showroom_activation_complete;
 
 -- ---------------------------------------------------------------------------

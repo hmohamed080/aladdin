@@ -17,8 +17,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ENVIRONMENTS = ("local", "staging", "production")
 # Same rule as the web app's REDIS_KEY_ENV (frontend/src/lib/env/cache.ts).
 _REDIS_KEY_ENV = re.compile(r"[a-z0-9-]{1,24}")
-# Vercel sets VERCEL_ENV on every deployment. A Preview deployment is staging.
-_FROM_VERCEL = {"production": "production", "preview": "staging", "development": "local"}
 
 
 class Settings(BaseSettings):
@@ -30,10 +28,8 @@ class Settings(BaseSettings):
     )
 
     # APP_ENV: local | staging | production. Read through `environment`, which also
-    # consults VERCEL_ENV so a deployment can never run as `local`.
+    # consults CLOUDFLARE_APPLICATION_ID so a deployment can never run as `local`.
     app_env: str = ""
-    # Set by Vercel itself (production | preview | development); never set by hand.
-    vercel_env: str = ""
     # Set by the Cloudflare Containers runtime in every container (ADR-0022); never
     # set by hand. Its presence alone means "deployed on Cloudflare".
     cloudflare_application_id: str = ""
@@ -101,21 +97,15 @@ class Settings(BaseSettings):
     def environment(self) -> str:
         """The effective environment.
 
-        On a Vercel deployment VERCEL_ENV decides whenever APP_ENV is unset or says
-        `local`: a deployed service must never skip the secret check below. An
-        unknown VERCEL_ENV counts as production (fail closed). A Cloudflare
+        A deployed service must never skip the secret check below. A Cloudflare
         container says nothing about its environment, so one without an explicit
-        staging/production APP_ENV is production (the backend Worker also refuses
-        to start a container without APP_ENV; this is the second lock).
+        staging/production APP_ENV is production (fail closed; the backend Worker
+        also refuses to start a container without APP_ENV, so this is the second lock).
         """
         explicit = self.app_env.strip().lower()
-        vercel = self.vercel_env.strip().lower()
-        deployed = _FROM_VERCEL.get(vercel, "production") if vercel else None
-        if deployed is None and self.cloudflare_application_id.strip():
-            deployed = "production"
-        if deployed in {"staging", "production"} and explicit in {"", "local"}:
-            return deployed
-        return explicit or deployed or "local"
+        if self.cloudflare_application_id.strip() and explicit in {"", "local"}:
+            return "production"
+        return explicit or "local"
 
     @property
     def is_production_like(self) -> bool:

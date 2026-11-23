@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SHOWROOM_GROUPS } from "./navigation";
@@ -34,10 +34,22 @@ describe("Showroom navigation shares one persistent layout", () => {
     expect(existsSync(join(APP, "showroom", "(app)"))).toBe(false);
   });
 
-  it("the public Showroom sign-in/up pages stay outside the workspace shell", () => {
+  it("no Showroom sign-in/up page lives inside the workspace shell: they were retired (ADR-0025) and no longer redirect either", () => {
     const outside = readdirSync(join(APP, "showroom"));
-    expect(outside).toEqual(expect.arrayContaining(["sign-in", "sign-up"]));
     expect(outside).not.toContain("home");
+    // The public entry pages are gone as route segments and as redirects: the old URLs answer 404 through the route handlers below.
+    const config = readFileSync(join(APP, "..", "..", "next.config.ts"), "utf8");
+    expect(config).not.toContain('source: "/showroom/sign-in"');
+    expect(config).not.toContain('source: "/showroom/sign-up"');
+    // Each retired path is a route handler that answers 404, never a page: a page would sit under the Showroom guard, and the
+    // path would otherwise fall into /showroom/[page], whose guard redirects a logged-out visitor to sign-in.
+    for (const retired of ["sign-in", "sign-up"]) {
+      const dir = join(GROUP, "showroom", retired);
+      expect(readdirSync(dir)).toEqual(["route.ts"]);
+      expect(readFileSync(join(dir, "route.ts"), "utf8")).toContain("status: 404");
+    }
+    expect(outside).not.toContain("sign-in");
+    expect(outside).not.toContain("sign-up");
   });
 
   it("every sidebar destination is served from the shared group", () => {

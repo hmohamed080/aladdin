@@ -148,7 +148,6 @@ async function registerSalesperson(page: Page, request: APIRequestContext, name:
   const email = `s13-${stamp}@example.test`;
   await registerWithPassword(page, request, {
     email,
-    username: `s13${stamp}`.slice(0, 24),
     displayName: name,
     accountType: /sales team/i,
     landing: /\/home(\/|$|\?)/,

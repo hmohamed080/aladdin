@@ -2,7 +2,9 @@
 
 **Purpose.** Lists every secret and variable the Cloudflare migration needs, per environment. For each one it gives where it is set, the least-privilege scope of each token, and whether it already exists. **Names only: no value belongs in this file, in Git or in a chat.** Values live in the GitHub Environment, in Cloudflare, or in the owner's password manager.
 
-**Current decision.** Preview first (acceptance Supabase `nxossqhdfltcqdwvbewi` and the acceptance R2 buckets), Production later, after the approvals in the [cutover plan](cloudflare-frontend-cutover-plan.md). The live Supabase project `kkpkgjrweysgvhvkhzun` never gets a credential in a preview location: the preview workflow refuses its URL (`.github/workflows/cloudflare-frontend-preview.yml`, step "Refuse the live Supabase project").
+**Status 2026-10-28:** both stages are done; the production Workers serve aladdindecore.com and Vercel is retired. The table below is the record of what was set up.
+
+**Original decision.** Preview first (acceptance Supabase `nxossqhdfltcqdwvbewi` and the acceptance R2 buckets), Production later, after the approvals in the [cutover plan](cloudflare-frontend-cutover-plan.md). The live Supabase project `kkpkgjrweysgvhvkhzun` never gets a credential in a preview location: the preview workflow refuses its URL (`.github/workflows/cloudflare-frontend-preview.yml`, step "Refuse the live Supabase project").
 
 **Status key:** ✅ exists (confirmed) · ❔ unknown, could not be read from here · ⬜ to create · — not needed.
 
@@ -26,7 +28,6 @@ Secret values and the list of Worker secrets are not readable through that MCP. 
 | Turnstile widget hostnames | https://dash.cloudflare.com/?to=/:account/turnstile → widget → **Hostname Management** |
 | Supabase acceptance project settings | https://supabase.com/dashboard/project/nxossqhdfltcqdwvbewi/settings/api-keys (keys); `…/auth/url-configuration` (redirect URLs); SQL editor for the `media_edge_worker` role |
 | Upstash Redis REST URL and token | https://console.upstash.com → database → **REST API** |
-| Vercel (rollback host, untouched) | https://vercel.com/aladdin8/aladdin-staging/settings/environment-variables |
 
 ### Gotcha: `wrangler deploy` and dashboard variables
 
@@ -107,7 +108,7 @@ Names come from `backend/.env.example` and `backend/app/config.py`. The containe
 
 | Name | Kind | Notes | Status |
 |---|---|---|---|
-| `APP_ENV` | var | **Must be set explicitly to `staging`** (later `production`). The config derives the environment from `VERCEL_ENV` on Vercel. Off Vercel, an unset `APP_ENV` means `local`, which skips the deployed-config checks (`backend/app/config.py`, `environment`). | ⬜ |
+| `APP_ENV` | var | **Must be set explicitly to `staging`** (later `production`). In a Cloudflare container an unset or `local` value counts as `production` (fail closed, `backend/app/config.py`, `environment`), so a staging container must say `staging`. | ⬜ |
 | `SUPABASE_URL` | var | acceptance project URL | ⬜ |
 | `SUPABASE_ANON_KEY` | var (public) | acceptance anon key | ⬜ |
 | `SUPABASE_JWT_SECRET` | **secret** | optional: legacy HS256 only; ES256 tokens verify through JWKS | — unless needed |
@@ -148,7 +149,7 @@ Does not exist yet. Template: `edge/media-worker/wrangler.toml`; steps: `edge/me
 | Item | Where | Status |
 |---|---|---|
 | GitHub Environment `cloudflare-production` (used by `.github/workflows/cloudflare-production.yml`): required reviewers = owner, deployment branch `main` only; secret `CLOUDFLARE_API_TOKEN` (production scope above, plus **Containers: Edit** for the backend); variables `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_PRODUCTION_ENABLED` (`false` until the deploy GO), `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (live project, no defaults) and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (the `aladdin-production` widget) | GitHub → Settings → Environments | ⬜ |
-| First cutover, frontend Worker secrets only: `SUPABASE_SERVICE_ROLE_KEY`, `TURNSTILE_SECRET_KEY`, `AUTH_PASSWORD_PREVIEW_GRANT_SECRET` (declared in `secrets.required`, so the deploy refuses without them). The backend's `SUPABASE_URL`/`SUPABASE_ANON_KEY` are public live values uploaded by the workflow. R2, media-edge and Redis secrets wait for their own approvals. | `wrangler secret put <NAME> --env production` (owner, hidden prompt) | ⬜ |
+| First cutover, frontend Worker secrets only: `SUPABASE_SERVICE_ROLE_KEY`, `TURNSTILE_SECRET_KEY`, `AUTH_PASSWORD_PREVIEW_GRANT_SECRET` and, since Redis was approved for Production (2026-11-15), `REDIS_REST_TOKEN` (declared in `secrets.required`, so the deploy refuses without them). The backend's `SUPABASE_URL`/`SUPABASE_ANON_KEY` are public live values uploaded by the workflow. R2, media-edge and Redis secrets wait for their own approvals. | `wrangler secret put <NAME> --env production` (owner, hidden prompt) | ⬜ |
 | Production bucket `aladdin-media-private`, its CORS ([r2/cors-production-private.json](r2/cors-production-private.json)) and lifecycle ([r2/lifecycle-private.json](r2/lifecycle-private.json)) | Cloudflare R2 | ⬜ |
 | A production R2 credential per consumer (frontend, transcode), each scoped to `aladdin-media-private` only | R2 → Manage API tokens | ⬜ |
 | Worker `aladdin-frontend-production`: every secret in section 2 with **live** values (live Supabase service role, new grant secret, production Turnstile, production R2 keys, ticket secret, Redis token) and `R2_PRODUCTION_WRITES_APPROVED=true` only on approval | Worker settings / `wrangler secret put --env production` | ⬜ |
@@ -162,10 +163,9 @@ Does not exist yet. Template: `edge/media-worker/wrangler.toml`; steps: `edge/me
 
 - Every token above has an expiry. Rotate R2 credentials and the ticket key using the media Worker README's two-key rotation (`k1` → `k2`).
 - Delete the R2 admin token and the DNS token when their stage ends.
-- When Vercel is retired (stage 15), delete its environment variables last, after the Cloudflare equivalents have run in production for the agreed period.
+- Vercel was retired on 2026-10-28 and its project deleted with its variables ([ADR-0024](../decisions/ADR-0024-vercel-retired.md)).
 
 ## Related
 
 - [Cloudflare frontend guide](../guides/cloudflare-frontend.md): variables per environment.
-- `Vercel environment variables` (removed; see [ADR-0024](../decisions/ADR-0024-vercel-retired.md)): the rollback host's names.
 - [R2 audit](r2/README.md), [DNS export](dns-records-aladdindecore-2026-10-22.md), [cutover plan](cloudflare-frontend-cutover-plan.md).

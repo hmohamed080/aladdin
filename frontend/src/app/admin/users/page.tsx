@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/server/auth/session";
-import { loadUsersDirectory } from "@/server/queries/admin-directory";
+import { loadUsersDirectory, loadPendingUserVerifications } from "@/server/queries/admin-directory";
 import { parseUsersDirectoryParams, pageWindow, USER_ACCOUNT_TYPES } from "@/features/admin-preview/directory-params";
 import { localizedName, type AdminDirectoryUser } from "@/features/admin-preview/directory-mappers";
 import { GOVERNORATES } from "@/lib/onboarding/persona-fields";
@@ -15,10 +15,12 @@ import { DataTable, RecordCell, Monogram, type Column } from "@/components/ui/da
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
 import { RowIconLink, RowIconDisabled } from "@/features/admin-preview/row-icon-button";
-import { RowIconAction } from "@/features/admin-preview/row-icon-action";
+import { UserVerificationControls } from "@/features/admin/user-verification-controls";
+import { canStartVerification, isProfileIncomplete } from "@/lib/admin/verification-status";
+import { can } from "@/lib/permissions/admin";
 import { AutoFilters, SortableHeader } from "@/features/admin-preview/auto-filters";
 import { TablePagination } from "@/features/admin-preview/table-pagination";
-import { EyeIcon, SettingsIcon, WhatsAppIcon, CheckIcon, XIcon } from "@/components/ui/icons";
+import { EyeIcon, SettingsIcon, WhatsAppIcon } from "@/components/ui/icons";
 import { requireAdminRoute } from "@/server/authorization/admin";
 import { loadStaffRanks } from "@/server/queries/admin-rbac";
 import { canSuspendUser, staffRankOf } from "@/features/admin-rbac/eligibility";
@@ -46,9 +48,9 @@ function filterHref(keep: Record<string, string | undefined>, overrides: Record<
  * into a safe default. Field sources: docs/admin/ADMIN_USERS_ORGS_READ_AUDIT.md.
  *
  * Last Active has no authoritative source (product activity is not tracked),
- * so it says so rather than showing a sign-in time under that label. Row
- * actions are still Preview dialogs (mutations are Phase 1B-B); the shell's
- * banner says so. The eye opens `/p/[profileId]` — the PROFILE id — only when
+ * so it says so rather than showing a sign-in time under that label. Suspend /
+ * Restore and Approve / Reject are real (Approve / Reject act on the account's open verification request —
+ * see `UserVerificationControls`); the remaining row actions are links. The eye opens `/p/[profileId]` — the PROFILE id — only when
  * `profile_public_directory` will actually render it.
  */
 export default async function PreviewUsersPage({
@@ -67,6 +69,11 @@ export default async function PreviewUsersPage({
   const m = getMessages(locale);
   const params = parseUsersDirectoryParams(await searchParams);
   const result = await loadUsersDirectory(supabase, params);
+  // Verify / Reject are drawn only for a holder of `users.verify` (the RPCs re-check it) and act on the person's
+  // OPEN verification request — one bounded read for this page's rows, never one per row.
+  const canVerify = can(access, "users.verify");
+  const pendingByUser =
+    result.ok && canVerify ? await loadPendingUserVerifications(supabase, result.data.rows.map((u) => u.id)) : new Map();
 
   const d = m.admin.preview.directory;
   const t = m.admin.preview.users;
@@ -75,6 +82,17 @@ export default async function PreviewUsersPage({
   const governorateLabels = m.onboarding.consumer.governorates as Record<string, string>;
   const cityLabels = m.onboarding.consumer.cities as Record<string, string>;
   const verificationStateLabels = t.verificationState;
+  const registrationLabels = t.registrationState as Record<string, string>;
+  // ADR-0031: the legacy `pending_verification` user status is shown by what the person actually did. Only a person whose
+  // derived registration is NOT finished reads "did not finish registration"; one who finished is simply active (not blocked).
+  const registrationFinished = (u: { registrationState?: string | null }) =>
+    u.registrationState === "access_ready" || u.registrationState === "active_personal";
+  const accountStatusLabel = (u: { status: string; registrationState?: string | null }) =>
+    u.status !== "pending_verification"
+      ? (statusLabels[u.status] ?? u.status)
+      : registrationFinished(u)
+        ? (statusLabels.active ?? u.status)
+        : t.userStatusPendingLabel;
   const flagLabels = t.flagLabels;
   const cols = t.columns;
   const rowActionLabels = t.rowActions;
@@ -106,8 +124,8 @@ export default async function PreviewUsersPage({
         return (
           <span className="flex min-w-0 items-center gap-1.5">
             <RecordCell wrap title={name} href={`/admin/users/${u.id}`} avatar={<Monogram name={name} size={28} />} />
-            {u.flags.length > 0 ? (
-              <span title={u.flags.map((f) => flagLabels[f]).join(", ")} aria-hidden="true" className="shrink-0 text-warning">
+            {u.flags.length > 0 || isProfileIncomplete(u) ? (
+              <span title={[...u.flags.map((f) => flagLabels[f]), ...(isProfileIncomplete(u) ? [`${flagLabels.profile_incomplete} (${u.completion}%)`] : [])].join(", ")} aria-hidden="true" className="shrink-0 text-warning">
                 ●
               </span>
             ) : null}
@@ -188,6 +206,18 @@ export default async function PreviewUsersPage({
       cell: (u) => <StatusBadge status={u.verificationState} label={verificationStateLabels[u.verificationState]} />,
     },
     {
+      key: "registration",
+      header: cols.registration,
+      minWidth: "9rem",
+      nowrap: true,
+      cell: (u) =>
+        u.registrationState ? (
+          <StatusBadge status={u.registrationState} label={registrationLabels[u.registrationState] ?? u.registrationState} />
+        ) : (
+          <span className="text-fg-muted">—</span>
+        ),
+    },
+    {
       key: "registered",
       header: <SortableHeader field="registered" label={cols.registered} isDefault />,
       minWidth: "8.5rem",
@@ -200,7 +230,7 @@ export default async function PreviewUsersPage({
       header: cols.status,
       minWidth: "7.5rem",
       nowrap: true,
-      cell: (u) => <StatusBadge status={u.status} label={statusLabels[u.status] ?? u.status} />,
+      cell: (u) => <StatusBadge status={u.status === "pending_verification" && registrationFinished(u) ? "active" : u.status} label={accountStatusLabel(u)} />,
     },
     {
       key: "lastActive",
@@ -234,8 +264,9 @@ export default async function PreviewUsersPage({
       header: cols.flags,
       minWidth: "10rem",
       secondary: true,
-      cell: (u) =>
-        u.flags.length === 0 ? (
+      cell: (u) => {
+        const incomplete = isProfileIncomplete(u);
+        return u.flags.length === 0 && !incomplete ? (
           <span className="text-fg-muted">—</span>
         ) : (
           <span className="flex flex-wrap gap-1">
@@ -244,8 +275,16 @@ export default async function PreviewUsersPage({
                 {flagLabels[f]}
               </Badge>
             ))}
+            {incomplete ? (
+              <Badge tone="warning">
+                <span data-testid="profile-incomplete-warning">
+                  {flagLabels.profile_incomplete} ({u.completion}%)
+                </span>
+              </Badge>
+            ) : null}
           </span>
-        ),
+        );
+      },
     },
     {
       key: "actions",
@@ -270,26 +309,8 @@ export default async function PreviewUsersPage({
               <RowIconDisabled label={platform.viewOnPlatform} reason={platform.notListed} Icon={EyeIcon} />
             )}
             <RowIconLink href={`/admin/users/${u.id}`} label={platform.manage} Icon={SettingsIcon} />
-            {u.status === "pending_verification" ? (
-              <>
-                <RowIconAction
-                  label={rowActionLabels.verify}
-                  icon={<CheckIcon size={16} />}
-                  tone="success"
-                  title={m.admin.preview.userOverview.verify}
-                  confirmLabel={m.admin.preview.userOverview.verify}
-                  confirmVariant="primary"
-                />
-                <RowIconAction
-                  label={rowActionLabels.reject}
-                  icon={<XIcon size={16} />}
-                  tone="danger"
-                  title={m.admin.preview.review.rejectTitle}
-                  body={m.admin.preview.review.rejectBody}
-                  confirmLabel={rowActionLabels.reject}
-                  confirmVariant="danger"
-                />
-              </>
+            {canVerify && (u.status === "pending_verification" || pendingByUser.has(u.id) || canStartVerification(u)) ? (
+              <UserVerificationControls subjectId={u.id} pending={pendingByUser.get(u.id) ?? null} compact canInitiate={canStartVerification(u)} />
             ) : null}
             {canSuspendUser(access, caller?.id ?? "", { userId: u.id, staffRank: staffRankOf(staffRanks, u.id) }) ? (
               <SuspensionAction m={m} subjectType="user" subjectId={u.id} suspended={u.status === "suspended"} compact />
@@ -371,6 +392,8 @@ export default async function PreviewUsersPage({
           { value: "verified", label: t.statusTabs.verified, count: counts.verified },
           { value: "suspended", label: t.statusTabs.suspended, count: counts.suspended },
           { value: "rejected", label: t.statusTabs.rejected, count: counts.rejected },
+          // The count is derived per verified account, so the database only evaluates it when this view is open.
+          { value: "attention", label: t.statusTabs.attention, count: params.status === "attention" ? total : undefined },
         ]}
       />
 

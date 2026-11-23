@@ -17,7 +17,8 @@ import { PUBLIC_ACCOUNTS } from "@/lib/taxonomy/accounts";
 type Enums = Database["public"]["Enums"];
 type Raw = string | string[] | undefined;
 
-export const USER_STATUS_TABS = ["pending", "verified", "suspended", "rejected"] as const;
+/** `attention` is DERIVED by the database: a verified account whose authoritative profile completion is below 100. */
+export const USER_STATUS_TABS = ["pending", "verified", "suspended", "rejected", "attention"] as const;
 export const USER_VERIFICATION_STATES = ["unverified", "pending", "verified", "rejected"] as const;
 /**
  * The account-type filter: the nine public accounts by the key `app.user_account_type` returns (the persona for a
@@ -26,7 +27,7 @@ export const USER_VERIFICATION_STATES = ["unverified", "pending", "verified", "r
 export const USER_ACCOUNT_TYPES = [...PUBLIC_ACCOUNTS.map((a) => (a.persona ?? a.orgType) as string), "none"] as const;
 export type UserAccountTypeFilter = string;
 export const USER_SORTS = ["registered:desc", "registered:asc", "completeness:desc", "completeness:asc"] as const;
-export const ORG_STATUS_TABS = ["pending", "verified", "suspended"] as const;
+export const ORG_STATUS_TABS = ["pending", "verified", "suspended", "rejected"] as const;
 export const ORG_SORTS = ["registered:desc", "registered:asc"] as const;
 
 export type UserStatusTab = (typeof USER_STATUS_TABS)[number];
