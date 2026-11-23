@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getServerSupabase } from "@/lib/supabase/server";
-import { PUBLIC_PAGE_SIZE, type Facets, type PublicPage, type PublicProduct, type PublicSort } from "@/features/marketplace/live/public-contract";
+import { PUBLIC_PAGE_SIZE, type BuyerPlace, type DeliveryTerms, type Facets, type PublicPage, type PublicProduct, type PublicSeller, type PublicSort } from "@/features/marketplace/live/public-contract";
 
 /**
  * Public Marketplace reads (Migration 09). Each RPC is granted to anon and
@@ -20,25 +20,66 @@ export async function loadPublicCatalogPage(params: {
   page: number;
   priceMin?: number | null;
   priceMax?: number | null;
-  inStock?: boolean;
   /** attribute key → option keys */
   attrs?: Record<string, string[]>;
+  /** only products that ship free (one unit, to the chosen place when there is one) */
+  freeShipping?: boolean;
+  /** only products whose estimate starts within this many days */
+  maxDays?: number | null;
+  /** the buyer's place; without it the estimate is the showroom's fastest..slowest range */
+  place?: BuyerPlace | null;
+  /** public slug of one showroom (its storefront) */
+  seller?: string | null;
+  limit?: number;
 }): Promise<PublicPage | null> {
   const supabase = await getServerSupabase();
-  const { data, error } = await supabase.rpc("marketplace_public_catalog_page", {
+  const limit = params.limit ?? PUBLIC_PAGE_SIZE;
+  const { data, error } = await supabase.rpc("marketplace_public_browse", {
     p_category: params.category || undefined,
     p_type: params.type || undefined,
     p_query: params.query?.slice(0, 100) || undefined,
     p_sort: params.sort,
-    p_limit: PUBLIC_PAGE_SIZE,
-    p_offset: (Math.max(1, params.page) - 1) * PUBLIC_PAGE_SIZE,
+    p_limit: limit,
+    p_offset: (Math.max(1, params.page) - 1) * limit,
     p_price_min: params.priceMin ?? undefined,
     p_price_max: params.priceMax ?? undefined,
-    p_in_stock: params.inStock ?? false,
     p_attrs: params.attrs && Object.keys(params.attrs).length ? params.attrs : undefined,
+    p_free_shipping: params.freeShipping ?? false,
+    p_max_days: params.maxDays ?? undefined,
+    p_governorate: params.place?.gov || undefined,
+    p_area: params.place?.area || undefined,
+    p_seller: params.seller || undefined,
   });
   if (error || !data) return null;
   return data as unknown as PublicPage;
+}
+
+/** `false` only when the platform team closed the Marketplace; a failed read counts as open (the pages then show their own empty state). */
+export async function loadPublicOpen(): Promise<boolean> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_public_status");
+  if (error || !data) return true;
+  return (data as { open?: boolean }).open !== false;
+}
+
+export async function loadPublicSeller(slug: string): Promise<PublicSeller | null> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_public_seller", { p_slug: slug });
+  if (error || !data) return null;
+  return data as unknown as PublicSeller;
+}
+
+/** The delivery-details block of one product for one buyer place (and, optionally, one variant). */
+export async function loadPublicDelivery(slug: string, place: BuyerPlace | null, sku?: string | null): Promise<DeliveryTerms | null> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_public_delivery", {
+    p_slug: slug,
+    p_governorate: place?.gov || undefined,
+    p_area: place?.area || undefined,
+    p_sku: sku || undefined,
+  });
+  if (error || !data) return null;
+  return data as unknown as DeliveryTerms;
 }
 
 /**

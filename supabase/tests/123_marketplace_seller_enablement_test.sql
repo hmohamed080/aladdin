@@ -80,8 +80,9 @@ select is(
 select is(
   (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname like '%marketplace%' and has_function_privilege('anon', p.oid, 'execute')),
-  array['marketplace_public_cart', 'marketplace_public_catalog', 'marketplace_public_catalog_page', 'marketplace_public_facets', 'marketplace_public_product'],
-  'A5. anon can execute exactly the public-read functions (catalog, page, facets, product — and the cart read from Migration 12)');
+  array['marketplace_public_browse', 'marketplace_public_cart', 'marketplace_public_catalog', 'marketplace_public_catalog_page', 'marketplace_public_delivery',
+         'marketplace_public_facets', 'marketplace_public_product', 'marketplace_public_seller', 'marketplace_public_status'],
+  'A5. anon can execute exactly the public-read functions (catalog, page, facets, product, the cart read from Migration 12 — and browse, delivery, seller, status from PR 9)');
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace,
           unnest(array['anon', 'authenticated', 'service_role']) r
@@ -374,10 +375,11 @@ select is(
 set local role anon;
 select is(
   (select array_agg(k order by k) from jsonb_object_keys(public.marketplace_public_product('sel-wallpaper-b')) k),
+  -- PR 9 added seller_slug / seller_official / ships_free / stock_left (public, no stock ledger data)
   -- Migration 09 added the public seller and taxonomy names and the cover image id (still no keys, stock or admin data)
   array['attributes', 'brand', 'category_key', 'category_name_ar', 'category_name_en', 'cover_image_id',
         'description_ar', 'description_en', 'images', 'name_ar', 'name_en', 'product_type_key',
-        'product_type_name_ar', 'product_type_name_en', 'published_at', 'seller_name', 'slug', 'variants'],
+        'product_type_name_ar', 'product_type_name_en', 'published_at', 'seller_name', 'seller_official', 'seller_slug', 'ships_free', 'slug', 'stock_left', 'variants'],
   'G8. the detail document has exactly the approved top-level keys');
 select ok(
   (select position('object_key' in t) = 0 and position('storage_bucket' in t) = 0 and position('seller_organization_id' in t) = 0
