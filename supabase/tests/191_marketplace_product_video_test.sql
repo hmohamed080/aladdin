@@ -185,6 +185,11 @@ select lives_ok(format($q$select public.admin_marketplace_video_review(%L, 'reje
   'D10. the reviewer rejects with reason and AR/EN message');
 select is((select review_status || '/' || review_reason from public.admin_marketplace_product_videos(current_setting('t.p')::uuid) where id = current_setting('t.v1')::uuid),
   'rejected/blurry footage', 'D11. the reviewer sees the internal reason');
+reset role;
+select is((select count(*)::int from public.notifications where event_type = 'marketplace.product.rejected'
+             and subject_id = current_setting('t.p')::uuid and recipient_user_id = :'hana'::uuid), 1,
+  'D11b. the seller manager is notified of the rejection, in-app');
+set local role authenticated;
 set local request.jwt.claims = :'c_hana';
 select is((select review_status || '/' || review_message_en || '/' || review_message_ar from public.marketplace_product_video_list(current_setting('t.p')::uuid) where id = current_setting('t.v1')::uuid),
   'rejected/The video is blurry/الفيديو غير واضح', 'D12. the seller sees the status and both messages');

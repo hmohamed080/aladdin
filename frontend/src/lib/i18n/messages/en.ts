@@ -8087,6 +8087,7 @@ export const en = {
       title: "Product videos",
       subtitle: "Videos sellers uploaded for their Marketplace products. Watch each one, then approve it or reject it with a reason and a message to the seller.",
       empty: "No videos are waiting for review.",
+      waitingLink: "Product videos waiting for review: {count}",
       approve: "Approve",
       reject: "Reject",
       confirmReject: "Reject video",

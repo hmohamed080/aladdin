@@ -4,6 +4,7 @@ import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { AdminHeader } from "@/features/admin/parts";
 import { StatePanel } from "@/components/ui/primitives";
+import { ButtonLink } from "@/components/ui/controls";
 import { marketplacePrivateImageUrls } from "@/server/media/marketplace-public-images";
 import { ProductReview, type ReviewCounts, type ReviewPreset, type ReviewProduct, type ReviewTab } from "@/features/admin-marketplace/product-review";
 import { requireAdminRoute } from "@/server/authorization/admin";
@@ -53,6 +54,9 @@ export default async function AdminProductReviewPage({
     );
   }
 
+  // Product videos wait on their own page (same permission); a failed read just hides the link.
+  const pendingVideos = await supabase.rpc("admin_marketplace_pending_videos", { p_limit: 200 });
+  const videosWaiting = (pendingVideos.data ?? []).reduce((n, r) => n + Number(r.pending_count), 0);
   const counts = summaryRes.data as unknown as ReviewCounts;
   const queue = queueRes.data as unknown as { total: number; items: QueuedProduct[] };
   // PR 5's one preset system: the image rejection reasons are the presets whose action is image_reject
@@ -68,6 +72,13 @@ export default async function AdminProductReviewPage({
   return (
     <div className="flex flex-col gap-lg">
       <AdminHeader locale={locale} title={m.media.title} subtitle={m.media.subtitle} />
+      {videosWaiting > 0 ? (
+        <div>
+          <ButtonLink size="sm" variant="outline" href="/admin/marketplace/videos">
+            {m.videos.waitingLink.replace("{count}", String(videosWaiting))}
+          </ButtonLink>
+        </div>
+      ) : null}
       <ProductReview
         tab={tab}
         page={page}

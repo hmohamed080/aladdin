@@ -351,6 +351,9 @@ declare
   v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
   v_ar text := nullif(btrim(coalesce(p_message_ar, '')), '');
   v_en text := nullif(btrim(coalesce(p_message_en, '')), '');
+  v_owner uuid;
+  v_org text;
+  v_prod public.marketplace_products;
 begin
   if (select auth.uid()) is null then
     raise exception 'authentication required' using errcode = '42501';
@@ -393,6 +396,25 @@ begin
     case when p_decision = 'reject'
       then jsonb_build_object('reason', v_reason, 'message_ar', v_ar, 'message_en', v_en, 'was', v.review_status)
       else jsonb_build_object('was', v.review_status) end);
+
+  -- The seller's managers hear about a rejection, in-app (never about an approval), through the same template and
+  -- recipients as the product image review (PR 6): active members with org.manage of the seller organization.
+  if p_decision = 'reject' then
+    select * into v_prod from public.marketplace_products where id = v.marketplace_product_id;
+    select o.name into v_org from public.organizations o where o.id = v.seller_organization_id;
+    for v_owner in
+      select distinct m.user_id from public.memberships m
+        join public.membership_capabilities c on c.membership_id = m.id and c.capability_key = 'org.manage'
+       where m.organization_id = v.seller_organization_id and m.status = 'active'
+    loop
+      perform app.notify_from_template(
+        v_owner, v.seller_organization_id, 'marketplace.product.rejected', 'marketplace_product', v.marketplace_product_id,
+        '/showroom/marketplace/products/' || v.marketplace_product_id::text || '/edit',
+        jsonb_build_object('showroom_name', coalesce(v_org, '')),
+        jsonb_build_object('product_name', coalesce(v_prod.name_ar, v_prod.name_en), 'message', v_ar),
+        jsonb_build_object('product_name', coalesce(v_prod.name_en, v_prod.name_ar), 'message', v_en));
+    end loop;
+  end if;
 end;
 $$;
 
