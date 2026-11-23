@@ -22,6 +22,8 @@ export default async function ProfessionalReviewPage() {
 
   const data = await getIndividualOnboardingData();
   if (!data || data.selectedTrack !== "professional") redirect("/onboarding");
+  // Craftsmen are verified from /home/profile; the separate review step is retired for them only.
+  if (data.selectedPersona === "installer_technician") redirect("/home/profile");
 
   return <ProfessionalReview answers={data.professional} />;
 }

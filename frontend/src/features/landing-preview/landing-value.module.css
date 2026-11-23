@@ -132,7 +132,7 @@
      the copy just moves to sit under it instead of on top of it. */
   .overlay {
     position: static;
-    background: #0c1922;
+    background: var(--deep-navy);
     padding-block: 1.75rem;
   }
 

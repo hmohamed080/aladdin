@@ -47,6 +47,7 @@ class DirStore:
         self.root = root
         self.url_base = url_base
         self.aborted: list[tuple[str, str]] = []
+        self.deleted: list[str] = []
         self.types: dict[str, str] = {}
         self.downloads: list[str] = []
         self.presigned: list[tuple[str, int]] = []
@@ -79,6 +80,10 @@ class DirStore:
         count = sum(1 for p in target.rglob("*") if p.is_file()) if target.exists() else 0
         shutil.rmtree(target, ignore_errors=True)
         return count
+
+    def delete_object(self, key: str) -> None:
+        self.deleted.append(key)
+        (self.root / key).unlink(missing_ok=True)
 
     def abort_multipart(self, key: str, upload_id: str) -> None:
         self.aborted.append((key, upload_id))
@@ -569,6 +574,8 @@ def _probe_then_no_poster(seen: list[list[str]]) -> vt.Runner:
 def test_an_original_larger_than_the_disk_is_read_from_r2_and_segments_leave_the_disk(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
+    # Placeholder bytes, not media: output verification has its own real-ffmpeg tests.
+    monkeypatch.setattr(vt, "verify_published", lambda *_a, **_k: None)
     store = DirStore(tmp_path / "bucket")
     store.put(f"video/{VIDEO_ID}/original", b"x" * 1000)
     _free(monkeypatch, vt.OUTPUT_HEADROOM_BYTES + 999)  # the original does not fit
@@ -587,7 +594,8 @@ def test_an_original_larger_than_the_disk_is_read_from_r2_and_segments_leave_the
     )
 
     assert result is not None and result.outcome == "ready", result
-    assert store.downloads == []  # never copied to disk
+    # the original is never copied to disk (verification fetches only output files)
+    assert not [k for k in store.downloads if k.endswith("/original")]
     assert [k for k, _ in store.presigned] == [f"video/{VIDEO_ID}/original"] * 3
     probe_args, poster_args = ran
     assert probe_args[probe_args.index("-i") + 1].startswith("https://r2.test/")
@@ -612,6 +620,8 @@ def test_an_original_larger_than_the_disk_is_read_from_r2_and_segments_leave_the
 def test_a_fitting_original_is_still_read_from_local_disk_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
+    # Placeholder bytes, not media: output verification has its own real-ffmpeg tests.
+    monkeypatch.setattr(vt, "verify_published", lambda *_a, **_k: None)
     store = DirStore(tmp_path / "bucket")
     store.put(f"video/{VIDEO_ID}/original", b"x" * 1000)
     _free(monkeypatch, vt.OUTPUT_HEADROOM_BYTES + 1000)
@@ -624,7 +634,8 @@ def test_a_fitting_original_is_still_read_from_local_disk_only(
         transcoder=_fake_transcode([]),
     )
     assert result is not None and result.outcome == "ready"
-    assert store.downloads == [f"video/{VIDEO_ID}/original"] and store.presigned == []
+    originals = [k for k in store.downloads if k.endswith("/original")]
+    assert originals == [f"video/{VIDEO_ID}/original"] and store.presigned == []
     assert all(a[a.index("-protocol_whitelist") + 1] == "file" for a in ran)
 
 
@@ -843,7 +854,7 @@ def test_real_transcode_reads_the_original_over_http_and_uploads_segments_as_it_
         server.close()
 
     assert result is not None and result.outcome == "ready", result
-    assert store.downloads == []
+    assert not [k for k in store.downloads if k.endswith("/original")]
     assert server.requests and all(
         r.startswith(f"/bucket/video/{VIDEO_ID}/original?") for r in server.requests
     )
@@ -859,3 +870,184 @@ def test_real_transcode_reads_the_original_over_http_and_uploads_segments_as_it_
         uris = [line for line in playlist.splitlines() if line and not line.startswith("#")]
         assert len(uris) >= 5 and all(f"{name}/{u}" in files for u in uris)
     assert list(work.iterdir()) == []
+
+
+# --- Media policy: constant quality, 30 fps cap, original deleted only after verification ---
+
+
+def test_h264_uses_constant_quality_under_the_rendition_max_rate():
+    info = vt.Probe(duration=5, width=1920, height=1080, has_audio=True)
+    args = vt.transcode_command(
+        Path("/s"), "video/mp4", Path("/o"), info, vt.plan_renditions(1920, 1080)
+    )
+    assert args.count("-crf:v:0") == 1 and args[args.index("-crf:v:0") + 1] == "22"
+    assert "-b:v:0" not in args and "-maxrate:v:0" in args
+    assert [r[0] for r in vt.plan_renditions(1920, 1080)] == ["360p", "720p", "1080p"]
+
+
+def test_frame_rate_is_capped_at_30_without_duplicating_slower_sources():
+    fast = vt.Probe(duration=5, width=1920, height=1080, has_audio=False, fps=60.0)
+    slow = vt.Probe(duration=5, width=1920, height=1080, has_audio=False, fps=24.0)
+    unknown = vt.Probe(duration=5, width=1920, height=1080, has_audio=False)
+    renditions = vt.plan_renditions(1920, 1080)
+
+    def graph(info: vt.Probe) -> str:
+        args = vt.transcode_command(Path("/s"), "video/mp4", Path("/o"), info, renditions)
+        return args[args.index("-filter_complex") + 1]
+
+    assert graph(fast).count("fps=30") == len(renditions)
+    assert "fps=" not in graph(slow) and "fps=" not in graph(unknown)
+
+
+def test_probe_reads_the_frame_rate():
+    info = vt.probe(
+        Path("/x"),
+        "video/mp4",
+        fixed(
+            probe_output(
+                [
+                    {
+                        "codec_type": "video",
+                        "width": 1280,
+                        "height": 720,
+                        "avg_frame_rate": "60000/1001",
+                    }
+                ]
+            )
+        ),
+    )
+    assert info.fps == pytest.approx(59.94, abs=0.01)
+
+
+def test_s3_store_deletes_only_a_videos_original_one_key_at_a_time():
+    deleted: list[dict[str, str]] = []
+
+    class Client:
+        def delete_object(self, **kwargs: str) -> None:
+            deleted.append(kwargs)
+
+    store = vt.S3VideoStore(Client(), "b")
+    store.delete_object(f"video/{VIDEO_ID}/original")
+    assert deleted == [{"Bucket": "b", "Key": f"video/{VIDEO_ID}/original"}]
+    for key in [f"video/{VIDEO_ID}/rev/master.m3u8", "video/x/original", "original", ""]:
+        with pytest.raises(ValueError):
+            store.delete_object(key)
+
+
+def _real_sample(tmp_path: Path) -> Path:
+    source = tmp_path / "sample.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=25:duration=6",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=6",
+            "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-shortest", str(source),
+        ],
+        check=True,
+    )  # fmt: skip
+    return source
+
+
+def _claim(source: Path) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": VIDEO_ID,
+            "content_type": "video/mp4",
+            "size_bytes": source.stat().st_size,
+            "attempts": 1,
+        }
+    ]
+
+
+@pytest.mark.skipif(not HAS_FFMPEG, reason="ffmpeg not installed")
+def test_the_original_is_deleted_after_the_output_is_verified(tmp_path: Path):
+    source = _real_sample(tmp_path)
+    store = DirStore(tmp_path / "bucket")
+    store.put(f"video/{VIDEO_ID}/original", source.read_bytes())
+    jobs = FakeJobs(claim=_claim(source))
+    result = vt.process_one(jobs, store, workdir=tmp_path)
+    assert result is not None and result.outcome == "ready", result
+    assert store.deleted == [f"video/{VIDEO_ID}/original"]
+    assert f"video/{VIDEO_ID}/original" not in store.keys()
+    # the playable output stays: playlists, segments, poster
+    revision = jobs.last("video_job_finish")["p_revision"]
+    assert f"video/{VIDEO_ID}/{revision}/master.m3u8" in store.keys()
+    assert f"video/{VIDEO_ID}/{revision}/poster.jpg" in store.keys()
+    # verification ran before the video was reported ready and before the original went
+    assert [n for n, _ in jobs.calls].index("video_job_finish") < len(jobs.calls)
+
+
+@pytest.mark.skipif(not HAS_FFMPEG, reason="ffmpeg not installed")
+def test_a_failed_verification_retries_and_keeps_the_original(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    source = _real_sample(tmp_path)
+    store = DirStore(tmp_path / "bucket")
+    store.put(f"video/{VIDEO_ID}/original", source.read_bytes())
+    jobs = FakeJobs(claim=_claim(source))
+
+    def broken(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError("the published output does not decode cleanly")
+
+    monkeypatch.setattr(vt, "verify_published", broken)
+    result = vt.process_one(jobs, store, workdir=tmp_path)
+    assert result is not None and result.outcome == "retry"
+    assert jobs.last("video_job_fail")["p_retry"] is True
+    assert "video_job_finish" not in [n for n, _ in jobs.calls]
+    assert store.deleted == [] and f"video/{VIDEO_ID}/original" in store.keys()
+
+
+@pytest.mark.skipif(not HAS_FFMPEG, reason="ffmpeg not installed")
+def test_a_missing_poster_finishes_the_video_but_keeps_the_original(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    source = _real_sample(tmp_path)
+    store = DirStore(tmp_path / "bucket")
+    store.put(f"video/{VIDEO_ID}/original", source.read_bytes())
+    jobs = FakeJobs(claim=_claim(source))
+    real = vt.verify_published
+
+    def without_poster(store_, prefix, names, published, info, has_poster, *rest: Any) -> None:  # noqa: ANN001
+        real(store_, prefix, names, published, info, False, *rest)  # the poster did not come out
+
+    monkeypatch.setattr(vt, "verify_published", without_poster)
+    result = vt.process_one(jobs, store, workdir=tmp_path)
+    assert result is not None and result.outcome == "ready"
+    assert store.deleted == [] and f"video/{VIDEO_ID}/original" in store.keys()
+
+
+@pytest.mark.skipif(not HAS_FFMPEG, reason="ffmpeg not installed")
+def test_verification_notices_a_truncated_object_and_a_lost_audio_track(tmp_path: Path):
+    source = _real_sample(tmp_path)
+    store = DirStore(tmp_path / "bucket")
+    store.put(f"video/{VIDEO_ID}/original", source.read_bytes())
+    jobs = FakeJobs(claim=_claim(source))
+    assert vt.process_one(jobs, store, workdir=tmp_path).outcome == "ready"  # type: ignore[union-attr]
+    revision = jobs.last("video_job_finish")["p_revision"]
+    prefix = f"video/{VIDEO_ID}/{revision}/"
+    names = ["360p", "720p"]
+    published = {
+        k[len(prefix) :]: (store.root / k).stat().st_size
+        for k in store.keys()
+        if k.startswith(prefix)
+    }
+    info = vt.Probe(duration=6, width=1280, height=720, has_audio=True, fps=25)
+    work = tmp_path / "w"
+    work.mkdir()
+    vt.verify_published(store, prefix, names, published, info, True, "h264", vt.run, work)
+
+    truncated = dict(published)
+    truncated["720p/seg_00000.m4s"] += 1
+    with pytest.raises(RuntimeError, match="missing or truncated"):
+        vt.verify_published(store, prefix, names, truncated, info, True, "h264", vt.run, work)
+
+    def video_only(args: Any, _timeout: int) -> subprocess.CompletedProcess[bytes]:
+        body = json.dumps({"streams": [{"codec_type": "video", "codec_name": "h264"}]}).encode()
+        return subprocess.CompletedProcess([], 0, body, b"")
+
+    with pytest.raises(RuntimeError, match="audio track"):
+        vt.verify_published(store, prefix, names, published, info, True, "h264", video_only, work)
+    # the poster is the last thing the original waits for
+    with pytest.raises(vt.OriginalKept):
+        vt.verify_published(store, prefix, names, published, info, False, "h264", vt.run, work)

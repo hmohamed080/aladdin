@@ -6,7 +6,7 @@
  * uploaded, and by the frontend tests on every change. It checks two things:
  *   1. the committed Wrangler config: production Workers have no public address yet,
  *      the frontend reaches the backend through the BACKEND binding, Turnstile is
- *      pinned to the live hostnames, R2 and Redis stay off for the first cutover,
+ *      pinned to the live hostnames, R2-only media flags are on and Redis stays off,
  *      the required secrets are declared, and nothing points at an acceptance resource;
  *   2. with `--live-values`, the build-time values in the environment: the live Supabase
  *      project only, never the acceptance project or a secret key.
@@ -19,6 +19,8 @@ import { fileURLToPath } from "node:url";
 
 export const LIVE_SUPABASE_URL = "https://kkpkgjrweysgvhvkhzun.supabase.co";
 export const LIVE_HOSTNAMES = ["aladdindecore.com", "www.aladdindecore.com"];
+/** Production media flags in the committed config: R2 takes every new upload, Supabase Storage takes none. */
+export const R2_ONLY_FLAGS = { R2_STORAGE_ENABLED: "true", R2_PRODUCTION_WRITES_APPROVED: "true", MEDIA_LEGACY_STORAGE_WRITES: "false" };
 const ACCEPTANCE_MARKERS = ["nxossqhdfltcqdwvbewi", "acceptance", "cf-preview", "-preview", "workers.dev"];
 
 /** Strips `//` and `/* *\/` comments outside strings, then trailing commas. */
@@ -78,11 +80,24 @@ export function checkFrontend(config) {
   if (hosts.length === 0) problems.push(`${label}: TURNSTILE_ALLOWED_HOSTNAMES must pin the live hostnames`);
   for (const host of LIVE_HOSTNAMES) if (hosts.length && !hosts.includes(host)) problems.push(`${label}: TURNSTILE_ALLOWED_HOSTNAMES must include ${host}`);
   for (const host of hosts) if (host !== "aladdindecore.com" && !host.endsWith(".aladdindecore.com")) problems.push(`${label}: Turnstile hostname outside aladdindecore.com: ${host}`);
-  for (const flag of ["R2_STORAGE_ENABLED", "R2_PRODUCTION_WRITES_APPROVED", "REDIS_CACHE_ENABLED", "VIDEO_ENABLED", "MEDIA_EDGE_DELIVERY_ENABLED"]) {
-    if (flag in vars && vars[flag] !== "false") problems.push(`${label}: ${flag} must stay "false" at first cutover`);
+  // R2-only media: new uploads go to R2 and Supabase Storage writes stay closed. A committed config that reopens them
+  // (flags off, or legacy writes on) would let a routine redeploy silently resume Supabase writes, so it is refused.
+  for (const [flag, want] of Object.entries(R2_ONLY_FLAGS)) {
+    if (vars[flag] !== want) problems.push(`${label}: ${flag} must be "${want}" (R2-only media; Supabase Storage writes stay closed)`);
   }
-  for (const flag of ["R2_STORAGE_ENABLED", "R2_PRODUCTION_WRITES_APPROVED", "REDIS_CACHE_ENABLED"]) {
-    if (!(flag in vars)) problems.push(`${label}: ${flag} must be set to "false" explicitly`);
+  for (const flag of ["VIDEO_ENABLED", "MEDIA_EDGE_DELIVERY_ENABLED"]) {
+    if (flag in vars && vars[flag] !== "false") problems.push(`${label}: ${flag} must stay "false" until its own approval`);
+  }
+  // Redis (owner-approved 2026-11-15, ADR-0019): explicit either way. When on it must use the REST transport (TCP does not
+  // work on Workers), the `production` key prefix (so it never touches the preview's entries) and a token that is a
+  // required secret, so a deploy without the token is refused instead of silently running without the cache.
+  if (!("REDIS_CACHE_ENABLED" in vars)) problems.push(`${label}: REDIS_CACHE_ENABLED must be set explicitly ("true" or "false")`);
+  if (vars.REDIS_CACHE_ENABLED === "true") {
+    if (!/^https:\/\/[a-z0-9-]+\.upstash\.io\/?$/.test(String(vars.REDIS_REST_URL ?? ""))) problems.push(`${label}: REDIS_REST_URL must be the https://<name>.upstash.io REST URL when Redis is on`);
+    if (vars.REDIS_KEY_ENV !== "production") problems.push(`${label}: REDIS_KEY_ENV must be "production" when Redis is on`);
+    requiredSecrets(env, ["REDIS_REST_TOKEN"], label, problems);
+  } else if (vars.REDIS_CACHE_ENABLED !== "false") {
+    problems.push(`${label}: REDIS_CACHE_ENABLED must be "true" or "false"`);
   }
   requiredSecrets(env, ["SUPABASE_SERVICE_ROLE_KEY", "TURNSTILE_SECRET_KEY", "AUTH_PASSWORD_PREVIEW_GRANT_SECRET"], label, problems);
   return problems;
@@ -131,16 +146,201 @@ export function checkLiveValues(values) {
   return problems;
 }
 
-function main() {
-  const root = fileURLToPath(new URL("../../", import.meta.url));
-  const problems = [
-    ...checkFrontend(parseJsonc(readFileSync(`${root}frontend/wrangler.jsonc`, "utf8"))),
-    ...checkBackend(parseJsonc(readFileSync(`${root}edge/backend-worker/wrangler.jsonc`, "utf8"))),
-  ];
-  if (process.argv.includes("--live-values")) problems.push(...checkLiveValues(process.env));
-  for (const problem of problems) console.error(`check-cloudflare-production: ${problem}`);
-  if (problems.length) process.exit(1);
-  console.log("check-cloudflare-production: OK");
+/**
+ * The committed config turns R2-only writes on, so a stage that deploys at once (`frontend`) would activate them
+ * on live Production. It is refused until the owner sets R2_CUTOVER_APPROVED=true. `check`, `backend` and
+ * `frontend-upload` (a version with 0% of traffic) are unaffected; promoting is a separate manual step.
+ */
+export function checkCutoverStage(stage, approved) {
+  if (stage === "frontend" && approved !== "true") {
+    return ["stage=frontend goes live immediately with R2-only writes on: it needs the GitHub variable R2_CUTOVER_APPROVED=true (owner's final cutover approval). Use stage=frontend-upload"];
+  }
+  return [];
 }
 
-if (process.argv[1] && resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])) main();
+/**
+ * MEDIA MODES for a Production release. Production is R2-ONLY today (2026-11-12): R2_STORAGE_ENABLED=true, R2_PRODUCTION_WRITES_APPROVED=true,
+ * MEDIA_LEGACY_STORAGE_WRITES=false, and Supabase Storage writes must never be re-enabled by a release. A release picks a mode:
+ *   match-live  (default) FAIL-CLOSED: reads the ACTIVE Production Worker version(s) from the Cloudflare API, takes their three media flags and
+ *               carries exactly those on the command line, so a release of unrelated changes cannot move a media write path. Any problem
+ *               (no token, API error, no active version, a flag missing, active versions that disagree) stops the run before anything is built.
+ *   r2-only     no overrides: the committed R2-only flags (the cutover config; promotion needs its own approval).
+ * In EVERY mode MEDIA_LEGACY_STORAGE_WRITES must be "false": there is no mode that reopens Supabase Storage writes (the old `legacy-hold` mode
+ * was removed for that reason). After an upload, `--verify-version <id>` proves the uploaded version carries the live version's flags, and it is
+ * the check to run again immediately before promoting.
+ */
+export const MEDIA_MODES = ["match-live", "r2-only"];
+export const MEDIA_FLAGS = Object.keys(R2_ONLY_FLAGS);
+const CLOUDFLARE_API = "https://api.cloudflare.com/client/v4";
+
+/** The three media flags carried by a Worker version's bindings (plain text bindings only); a flag that is absent is `undefined`. */
+export function mediaFlagsFromBindings(bindings) {
+  const flags = Object.fromEntries(MEDIA_FLAGS.map((flag) => [flag, undefined]));
+  for (const binding of Array.isArray(bindings) ? bindings : []) {
+    if (binding && MEDIA_FLAGS.includes(binding.name) && binding.type === "plain_text" && typeof binding.text === "string") flags[binding.name] = binding.text;
+  }
+  return flags;
+}
+
+async function cloudflareGet(path, { token, base, fetchImpl }) {
+  const response = await fetchImpl(`${base}${path}`, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
+  if (!response.ok) throw new Error(`Cloudflare API ${path.split("/").slice(-1)[0]} answered HTTP ${response.status}`);
+  const body = await response.json();
+  if (!body || body.success !== true || typeof body.result !== "object" || body.result === null) throw new Error("Cloudflare API answered an unexpected body");
+  return body.result;
+}
+
+/** The media flags of one Worker version, read from its bindings. Throws on any API problem; never returns a guess. */
+export async function fetchVersionMediaFlags({ accountId, token, worker, versionId, fetchImpl = fetch, base = CLOUDFLARE_API }) {
+  if (!accountId || !token || !worker || !versionId) throw new Error("account id, API token, worker name and version id are all required");
+  const result = await cloudflareGet(`/accounts/${accountId}/workers/scripts/${worker}/versions/${versionId}`, { token, base, fetchImpl });
+  return mediaFlagsFromBindings(result.resources?.bindings);
+}
+
+/**
+ * The media flags of the ACTIVE Production deployment: every version that serves traffic (percentage > 0) must carry identical, complete flags.
+ * Returns { flags, versionIds }. Throws (fail closed) on a missing token, API error, no active version, an incomplete flag set or disagreement.
+ */
+export async function fetchLiveMediaFlags({ accountId, token, worker, fetchImpl = fetch, base = CLOUDFLARE_API }) {
+  if (!accountId || !token || !worker) throw new Error("CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN and the Worker name are required to read the live Worker");
+  const result = await cloudflareGet(`/accounts/${accountId}/workers/scripts/${worker}/deployments`, { token, base, fetchImpl });
+  const active = Array.isArray(result.deployments) ? result.deployments[0] : undefined;
+  const versions = (Array.isArray(active?.versions) ? active.versions : []).filter((v) => Number(v?.percentage) > 0 && typeof v?.version_id === "string");
+  if (!versions.length) throw new Error(`${worker} has no active deployment with a version serving traffic`);
+  const perVersion = [];
+  for (const version of versions) {
+    perVersion.push(await fetchVersionMediaFlags({ accountId, token, worker, versionId: version.version_id, fetchImpl, base }));
+  }
+  const first = perVersion[0];
+  for (const flag of MEDIA_FLAGS) {
+    if (first[flag] !== "true" && first[flag] !== "false") throw new Error(`the live version does not carry ${flag} as "true" or "false" (got ${JSON.stringify(first[flag])})`);
+    if (perVersion.some((flags) => flags[flag] !== first[flag])) throw new Error(`the active versions disagree on ${flag}: a gradual rollout with different media flags is in progress`);
+  }
+  return { flags: first, versionIds: versions.map((v) => v.version_id) };
+}
+
+/** The `--var NAME:value` arguments a mode adds to wrangler, one array element each. match-live needs the live flags; r2-only adds none. */
+export function mediaModeArgs(mode, liveFlags) {
+  if (mode === "r2-only") return [];
+  if (mode === "match-live") {
+    if (!liveFlags) throw new Error("match-live needs the live Worker's media flags");
+    return MEDIA_FLAGS.flatMap((flag) => ["--var", `${flag}:${liveFlags[flag]}`]);
+  }
+  throw new Error(`unknown media mode: ${mode}`);
+}
+
+/** The media flags the Worker would carry: the committed vars with the mode's own wrangler arguments applied on top. */
+export function effectiveMediaFlags(config, mode, liveFlags) {
+  const vars = { ...(config.env?.production?.vars ?? {}) };
+  const args = mediaModeArgs(mode, liveFlags);
+  for (let i = 0; i < args.length; i += 2) {
+    const [name, ...rest] = args[i + 1].split(":");
+    vars[name] = rest.join(":");
+  }
+  return Object.fromEntries(MEDIA_FLAGS.map((flag) => [flag, vars[flag]]));
+}
+
+/** Refuses a release whose effective media flags are not the mode's promise, or that would ever reopen Supabase Storage writes. */
+export function checkMediaMode(config, mode, liveFlags) {
+  if (!MEDIA_MODES.includes(mode)) return [`media_mode must be one of ${MEDIA_MODES.join(", ")} (got "${mode}")`];
+  if (mode === "match-live" && !liveFlags) return ["media_mode=match-live: the live Worker's media flags could not be read, so nothing is uploaded"];
+  const got = effectiveMediaFlags(config, mode, liveFlags);
+  const problems = [];
+  if (got.MEDIA_LEGACY_STORAGE_WRITES !== "false") {
+    problems.push(`media_mode=${mode}: MEDIA_LEGACY_STORAGE_WRITES would be "${got.MEDIA_LEGACY_STORAGE_WRITES}": a release never reopens Supabase Storage writes`);
+  }
+  if (mode === "r2-only") {
+    for (const [flag, value] of Object.entries(R2_ONLY_FLAGS)) {
+      if (got[flag] !== value) problems.push(`media_mode=r2-only: ${flag} would be "${got[flag]}", must be "${value}"`);
+    }
+  } else {
+    for (const flag of MEDIA_FLAGS) {
+      if (got[flag] !== liveFlags[flag]) problems.push(`media_mode=match-live: ${flag} would be "${got[flag]}", the live Worker has "${liveFlags[flag]}"`);
+    }
+  }
+  return problems;
+}
+
+/** Proves an uploaded (or about to be promoted) version carries exactly the live flags, and never legacy writes. Returns problems. */
+export function checkVersionMatchesLive(versionFlags, liveFlags) {
+  const problems = [];
+  for (const flag of MEDIA_FLAGS) {
+    if (versionFlags[flag] !== liveFlags[flag]) problems.push(`${flag} is ${JSON.stringify(versionFlags[flag])} on the version but ${JSON.stringify(liveFlags[flag])} on the live Worker`);
+  }
+  if (versionFlags.MEDIA_LEGACY_STORAGE_WRITES !== "false") problems.push(`MEDIA_LEGACY_STORAGE_WRITES is ${JSON.stringify(versionFlags.MEDIA_LEGACY_STORAGE_WRITES)} on the version: it must be "false"`);
+  return problems;
+}
+
+function liveReadParams(config) {
+  const worker = config.env?.production?.name;
+  return {
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+    token: process.env.CLOUDFLARE_API_TOKEN,
+    worker,
+    // The API base is overridable ONLY so the tests can point it at a local stand-in; the workflow never sets it.
+    base: process.env.CLOUDFLARE_API_BASE || CLOUDFLARE_API,
+  };
+}
+
+async function main() {
+  const root = fileURLToPath(new URL("../../", import.meta.url));
+  const frontendConfig = parseJsonc(readFileSync(`${root}frontend/wrangler.jsonc`, "utf8"));
+  const problems = [
+    ...checkFrontend(frontendConfig),
+    ...checkBackend(parseJsonc(readFileSync(`${root}edge/backend-worker/wrangler.jsonc`, "utf8"))),
+  ];
+  problems.push(...checkCutoverStage(process.env.STAGE, process.env.R2_CUTOVER_APPROVED));
+  if (process.argv.includes("--live-values")) problems.push(...checkLiveValues(process.env));
+
+  const argAfter = (flag) => {
+    const at = process.argv.indexOf(flag);
+    return at === -1 ? null : process.argv[at + 1];
+  };
+  const argsMode = argAfter("--media-var-args");
+  const verifyMode = argAfter("--verify-media-mode");
+  const versionId = argAfter("--verify-version");
+  const mode = argsMode ?? verifyMode;
+
+  // match-live reads the ACTIVE Production version; any failure leaves `live` undefined and checkMediaMode refuses.
+  let live;
+  if (mode === "match-live" || versionId !== null) {
+    try {
+      live = await fetchLiveMediaFlags(liveReadParams(frontendConfig));
+    } catch (error) {
+      problems.push(`cannot read the live Worker: ${error.message}`);
+    }
+  }
+  if (mode !== null) problems.push(...checkMediaMode(frontendConfig, mode, live?.flags));
+  if (mode !== null && !problems.length && verifyMode !== null) {
+    console.log(`Release media mode: ${mode}`);
+    if (live) console.log(`  live version(s): ${live.versionIds.join(", ")}`);
+    for (const [flag, value] of Object.entries(effectiveMediaFlags(frontendConfig, mode, live?.flags))) console.log(`  ${flag} = ${value}`);
+  }
+  if (versionId !== null && live) {
+    try {
+      const uploaded = await fetchVersionMediaFlags({ ...liveReadParams(frontendConfig), versionId });
+      problems.push(...checkVersionMatchesLive(uploaded, live.flags).map((problem) => `version ${versionId}: ${problem}`));
+      if (!problems.length) {
+        console.log(`Version ${versionId} carries the live media flags (live version(s): ${live.versionIds.join(", ")}):`);
+        for (const [flag, value] of Object.entries(uploaded)) console.log(`  ${flag} = ${value}`);
+      }
+    } catch (error) {
+      problems.push(`cannot read version ${versionId}: ${error.message}`);
+    }
+  }
+  for (const problem of problems) console.error(`check-cloudflare-production: ${problem}`);
+  if (problems.length) process.exit(1);
+  if (argsMode !== null) {
+    // Machine output only: the workflow reads these lines, so nothing else is printed in this mode.
+    for (const arg of mediaModeArgs(argsMode, live?.flags)) console.log(arg);
+    return;
+  }
+  if (verifyMode === null && versionId === null) console.log("check-cloudflare-production: OK");
+}
+
+if (process.argv[1] && resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])) {
+  main().catch((error) => {
+    console.error(`check-cloudflare-production: ${error.message}`);
+    process.exit(1);
+  });
+}

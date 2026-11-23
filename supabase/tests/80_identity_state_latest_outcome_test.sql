@@ -6,9 +6,8 @@ create extension if not exists pgtap;
 begin;
 select plan(24);
 -- rc2: this fixture activates / approves showrooms directly, bypassing the seller-readiness triggers PR #84 added
--- (showroom_review_complete / showroom_activation_complete / showroom_product_publish_complete). They are disabled for this
+-- (showroom_activation_complete / showroom_product_publish_complete). They are disabled for this
 -- transaction only (rolled back with it); the readiness rules themselves are asserted in tests 92-94.
-alter table public.verifications disable trigger showroom_review_complete;
 alter table public.organizations disable trigger showroom_activation_complete;
 alter table public.products disable trigger showroom_product_publish_complete;
 
@@ -54,7 +53,6 @@ begin
   update public.verifications set submitted_at = timestamptz '2026-01-01 00:00:00+00' + (p_minute || ' minutes')::interval
    where id = (select id from _ids where k = p_key);
   alter table public.verifications enable trigger user;
-alter table public.verifications disable trigger showroom_review_complete;
 end $$;
 create function public.t80_state() returns table (st text, rid uuid, prop jsonb, rsn text, locked boolean, nm text)
 language sql as $$

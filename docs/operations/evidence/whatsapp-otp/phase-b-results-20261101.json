@@ -1,0 +1,69 @@
+{
+  "phase": "B",
+  "environment": "acceptance",
+  "recorded_on": "2026-11-01",
+  "note": "Versions, counts and booleans only. No secret, token, e-mail, phone number or code.",
+  "supabase": {
+    "project_ref": "nxossqhdfltcqdwvbewi",
+    "method": "plain supabase db push (dry run first); no --include-all, no history repair, no ledger rename, no MCP apply_migration",
+    "applied_before": 197,
+    "applied_after": 199,
+    "repo_count": 199,
+    "applied": ["20261030090001", "20261030090002"],
+    "latest_applied": "20261030090002",
+    "unchanged_after_push": ["auth settings", "13 disputed function rights", "alias census (0)", "profiles with phone (4) / verified (0)", "default function privileges"],
+    "new_function_rights": {
+      "public_rpcs_service_role_only": ["phone_signup_attach", "phone_signup_invalidate", "phone_signup_start", "phone_signup_verify", "phone_verification_invalidate", "phone_verification_purge", "phone_verification_start", "phone_verification_verify"],
+      "internal_helpers_no_api_role_execute": 5,
+      "anon_or_authenticated_or_public_execute": false
+    },
+    "hosted_function_count": { "before": 697, "after": 711 }
+  },
+  "frontend": {
+    "worker": "aladdin-frontend-preview",
+    "workflow_run": 41310152606,
+    "commit": "b29a316909fb5dc66e9170c1936faec106f247a2",
+    "rollback_target_code_version": "da4eb8c9-f4f2-4434-9184-d92d9b18a90f",
+    "versions_in_order": [
+      { "id": "c5c7f845-aad6-4a4c-a87b-f9c4fc965519", "at": "2026-11-01T13:15:23Z", "note": "integrated build deployed, no PHONE_* secrets" },
+      { "id": "5d54e2c3-9a65-4677-b9d1-3a602c695ef8", "at": "2026-11-01T13:21:34Z", "note": "seven PHONE_* secrets, flags false" },
+      { "id": "52ed32b4-f38f-4219-a0a1-273b25082681", "at": "2026-11-01T13:36:10Z", "note": "B7: both flags true" },
+      { "id": "dbe1a188-1583-410b-a5b5-f06bbd92f402", "at": "after B9", "note": "B9: flags false, PHONE_OTP_DELIVERY=off (final, 100%)" }
+    ],
+    "stale_var_WHATSAPP_OTP_TEMPLATE_present": false
+  },
+  "worker": {
+    "name": "aladdin-whatsapp-otp-preview",
+    "active_version": "6eb9364d-aa89-4e30-9005-a516ac0cd29f",
+    "changed_during_phase_b": false,
+    "WHATSAPP_DELIVERY_ENABLED": "false"
+  },
+  "b6_ui_checks_by_owner": ["sign-up page", "phone sign-up shows unavailable message", "sign-in page", "Google/Facebook buttons visible", "mobile layout"],
+  "b6_authentication_tested": false,
+  "b7_b8_dry_run": {
+    "config_changes_audited": 3,
+    "owner_sign_up_attempts_reaching_code_screen": 1,
+    "owner_resend_requested": true,
+    "challenges": [
+      { "purpose": "signup_proof", "created_at": "2026-11-01T13:38:18Z", "invalidated_why": "delivery_failed", "consumed": false },
+      { "purpose": "signup_proof", "created_at": "2026-11-01T13:39:22Z", "invalidated_why": "delivery_failed", "consumed": false, "note": "owner-requested resend" }
+    ],
+    "signup_grants": 0,
+    "auth_users_before_and_after": 13,
+    "alias_guard_observations": 0,
+    "d1_whatsapp_hook_events_rows": 0,
+    "whatsapp_message_received": false,
+    "worker_503_evidence": "inferred from delivery_failed; Worker logs were not read"
+  },
+  "b9_safe_state": {
+    "enabled": false,
+    "signup_enabled": false,
+    "alias_guard_mode": "off",
+    "config_log_rows": 6,
+    "open_challenges": 0,
+    "PHONE_VERIFICATION_ENABLED": "false (written by operator; secret values are not readable)",
+    "PHONE_SIGNUP_VERIFICATION_ENABLED": "false (written by operator)",
+    "PHONE_OTP_DELIVERY": "off (written by operator)"
+  },
+  "untouched": ["Production", "Auth providers/hooks", "Worker delivery flag", "PR merges (PR #127 still draft)"]
+}

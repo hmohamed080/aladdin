@@ -1,91 +1,187 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
-import {
-  requestPasswordSignUp,
-  resendPasswordSignUpCode,
-  verifyPasswordSignUp,
-  type PasswordAuthState,
-} from "@/server/actions/auth-password-preview";
+import { continueToSignIn, forgetPendingRegistration, resendPasswordSignUpCode, verifyPasswordSignUp, type PasswordAuthState } from "@/server/actions/auth-password-preview";
+import { requestSignUp, resendPhoneSignUpCode, verifyPhoneSignUp } from "@/server/actions/sign-up";
+import type { PhoneSignUpState } from "@/server/auth/phone-sign-up";
+import type { OAuthAvailability } from "@/server/auth/entry-oauth";
 import { AuthCard } from "@/features/auth/auth-card";
-import { Input, LabeledField, SubmitButton, Checkbox, ResendButton, Button, Select } from "@/components/ui/controls";
+import { EntryOAuthButtons, OrDivider, hasOAuthProvider } from "@/features/entry-auth/oauth-buttons";
+import { Input, SubmitButton, ResendButton, Button, Select } from "@/components/ui/controls";
 import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "./password-input";
-import { PasswordStrengthMeter } from "./password-strength-meter";
 import { TurnstileWidget } from "./turnstile-widget";
 import { DISPLAY_NAME_MAX_LENGTH } from "./password-policy";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
 
-const initial: PasswordAuthState = { ok: false };
+const initial: PhoneSignUpState = { ok: false };
+const initialEmail: PasswordAuthState = { ok: false };
 const RESEND_COOLDOWN_SECONDS = 30;
+// The phone verification authority enforces its own resend cooldown (app.phone_verification_config.resend_cooldown, 60 s by default) and
+// answers "too many attempts" before that. The button must not re-enable earlier than the authority will accept, so the phone path counts 60 s.
+const PHONE_RESEND_COOLDOWN_SECONDS = 60;
+const NO_PROVIDERS: OAuthAvailability = { google: false, facebook: false };
+const CONSENT_TYPES = ["terms", "privacy", "pilot"] as const;
 
-/**
- * Registration — Architecture B (docs/frontend/auth-password-preview.md
- * §Registration architecture): full name + email + username + account type
- * (one dropdown) + password + confirm, gated by the
- * three required consents, submitted in ONE call to `signUp()`
- * (`requestPasswordSignUp`), which sets the password atomically. The OTP
- * step that follows ONLY ever collects the 6-digit confirmation code — there
- * is no password field on it, no hidden `<input type="hidden" name="password">`,
- * and resend (`resendPasswordSignUpCode`) takes just the email. The password
- * therefore never survives past this component's own Step-1 submit; it is
- * never held in React state across a step transition, never in the URL,
- * never in a cookie, never in `localStorage`/`sessionStorage`.
- *
- * The Step-2 message is deliberately NEUTRAL ("if this email can continue
- * registration…"), never an unconditional "we sent a code to {email}" — an
- * email that already belongs to a CONFIRMED account is normalized by the
- * server action into the exact same response a genuine new signup gets (see
- * `isAccountExistsError` in the server action module), so the UI must never
- * imply a code was definitely sent. The same screen always keeps the "Sign
- * in" link visible (via `AuthCard`'s footer) and adds an explicit hint +
- * "Forgot password?" link, so someone who already has a confirmed account
- * and never receives a code has an immediate, non-suspicious way out instead
- * of waiting indefinitely on a code that GoTrue never actually sent.
- */
-/**
- * `next` is set only when the person arrived from an employee invitation
- * (`/auth/invite/...`); it rides the verify step so a brand-new user returns to
- * the invitation after the email code instead of landing on generic onboarding.
- */
-export function PasswordSignUpForm({ next }: { next?: string } = {}) {
+type Field = "contact" | "password" | "displayName" | "accountType" | "form";
+
+/** Which field a server code belongs to, so the message renders under it. */
+function fieldFor(code: string | undefined): Field | null {
+  if (!code) return null;
+  if (/error\.(contactInvalid|invalidEmail|phoneExists|accountExists|whatsappNumberInvalid|whatsappUnavailable)$/.test(code)) return "contact";
+  if (/error\.password/.test(code)) return "password";
+  if (/error\.fullName/.test(code)) return "displayName";
+  if (/error\.accountTypeRequired$/.test(code)) return "accountType";
+  return "form";
+}
+
+/** Codes after which the pending phone sign-up is gone and the form must be filled again. */
+const PHONE_RESTART_CODES = new Set([
+  "authPasswordPreview.error.phoneCodeExpired",
+  "authPasswordPreview.error.phoneExists",
+]);
+
+/** The two answers that mean "this email / number already has an account" — they carry a way to log in instead. */
+const EXISTING_ACCOUNT_CODES = new Set([
+  "authPasswordPreview.error.accountExists",
+  "authPasswordPreview.error.phoneExists",
+]);
+
+/** The small red "!" at the end of a field that is in error (decorative: the message below is the accessible text). */
+function ErrorMark() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-danger" fill="currentColor">
+      <circle cx="8" cy="8" r="8" />
+      <rect x="7.25" y="3.5" width="1.5" height="5.5" rx="0.75" fill="white" />
+      <circle cx="8" cy="11.5" r="0.95" fill="white" />
+    </svg>
+  );
+}
+
+function FieldError({ code, contact }: { code?: string; contact?: string }) {
   const { t } = useI18n();
-  const [sendState, dispatchSend] = useActionState(requestPasswordSignUp, initial);
-  const [resendState, dispatchResend] = useActionState(resendPasswordSignUpCode, initial);
-  const [verifyState, dispatchVerify] = useActionState(verifyPasswordSignUp, initial);
+  const [handingOff, startHandOff] = useTransition();
+  if (!code) return null;
+  if (EXISTING_ACCOUNT_CODES.has(code)) {
+    // A pale-red notice under the field (not a dead end): "<this is already registered>. To access this account, Sign in or Recover your password".
+    // "Sign in" calls the `continueToSignIn` server action with ONLY the typed email / number (the sign-up password never travels with it), which
+    // carries it to the sign-in field through an httpOnly cookie and navigates there. Only an email has a password to recover by email.
+    const handOff = () => {
+      const data = new FormData();
+      data.set("contact", contact ?? "");
+      startHandOff(async () => {
+        await continueToSignIn(data);
+      });
+    };
+    const link = "font-semibold text-fg underline underline-offset-2 hover:text-accent";
+    return (
+      <div role="alert" data-existing-account className="rounded-md bg-danger/10 px-md py-3 text-body leading-relaxed text-fg-secondary">
+        {t(code)} {t("authPasswordPreview.error.existingAccountAccess")}{" "}
+        {/* type=button + inline reset: the auth stage styles every submit button in a form as the big primary button. */}
+        <button type="button" onClick={handOff} disabled={handingOff} className={link} style={{ minHeight: 0, width: "auto", fontSize: "inherit", background: "none" }}>
+          {t("authPasswordPreview.error.existingAccountSignIn")}
+        </button>
+        {code.endsWith("accountExists") ? (
+          <>
+            {" "}{t("authPasswordPreview.error.existingAccountOr")}{" "}
+            <Link href="/auth/forgot-password" className={link}>
+              {t("authPasswordPreview.error.existingAccountRecover")}
+            </Link>
+          </>
+        ) : null}
+      </div>
+    );
+  }
+  return <p role="alert" className="text-label text-danger">{t(code)}</p>;
+}
 
-  const [editingEmail, setEditingEmail] = useState(false);
+/**
+ * Registration, Instagram style: Google / Facebook first, then ONE "Mobile
+ * number or email" field, password, full name and (unless the landing
+ * page already chose it) the account type,
+ * and a single agreement line for the three consents. Every account type may use either:
+ *
+ *   * email → the canonical signUp() + 6-digit EMAIL code (Architecture B,
+ *     docs/frontend/auth-password-preview.md); the password goes to signUp()
+ *     exactly once and is never re-collected on the code step;
+ *   * mobile number → a 6-digit WHATSAPP code (server/auth/phone-sign-up.ts);
+ *     the account is created only after the code is verified.
+ *
+ * The password rules appear only as an error if a password is refused. The
+ * three consents are still recorded server-side: submitting the form under
+ * the agreement line is the acceptance, and the hidden fields say so.
+ *
+ * An email or mobile number that already has an account is answered with a
+ * warning under the field and a "Log in instead" button (a server action that
+ * carries what was typed to /auth/sign-in through an httpOnly cookie, never the
+ * URL), so nobody waits for a code that will never come. The email code step
+ * keeps the "Forgot password?" way out for the other reasons a code can be late.
+ *
+ * An unfinished email registration in this browser (`pendingEmail`, the
+ * server-side routing cookie) reopens straight on the code step after a refresh
+ * or a closed tab; there is no separate "continue registration" page.
+ *
+ * `next` is set only when the person arrived from an employee invitation
+ * (`/auth/invite/...`); it rides the email verify step so a brand-new user
+ * returns to the invitation after the code.
+ */
+export function PasswordSignUpForm({
+  initialAccountType = "",
+  next,
+  providers = NO_PROVIDERS,
+  pendingEmail = null,
+}: { initialAccountType?: string; next?: string; providers?: OAuthAvailability; pendingEmail?: string | null } = {}) {
+  const { t } = useI18n();
+  const [sendState, dispatchSend] = useActionState(requestSignUp, initial);
+  const [emailResendState, dispatchEmailResend] = useActionState(resendPasswordSignUpCode, initialEmail);
+  const [emailVerifyState, dispatchEmailVerify] = useActionState(verifyPasswordSignUp, initialEmail);
+  const [phoneResendState, dispatchPhoneResend] = useActionState(resendPhoneSignUpCode, initial);
+  const [phoneVerifyState, dispatchPhoneVerify] = useActionState(verifyPhoneSignUp, initial);
+
+  const [editing, setEditing] = useState(false);
   const [cooldown, setCooldown] = useState(0);
-  const [displayName, setDisplayName] = useState("");
-  const [username, setUsername] = useState("");
-  const [accountTypeKey, setAccountTypeKey] = useState("");
+  const [values, setValues] = useState({ contact: "", displayName: "", accountType: initialAccountType });
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [consents, setConsents] = useState({ terms: false, privacy: false, pilot: false });
+  const [restartCode, setRestartCode] = useState<string | undefined>();
 
-  const emailRef = useRef<HTMLInputElement>(null);
-
-  const codeSent = sendState.ok && !editingEmail;
-  const email = sendState.email ?? "";
-  const allConsented = consents.terms && consents.privacy && consents.pilot;
+  // This browser started an email registration and has not verified it (refresh, closed tab, lost connection): reopen its code step.
+  // `pendingEmail` is the server-side httpOnly routing cookie, never the URL; it is only set when a code was really sent.
+  // Only for the address that was already pending when this page loaded: a sign-up submitted from this form sets a NEW cookie and the page re-renders
+  // with it, and that must never bring an older address's code step back after a failed replacement submission.
+  const [pendingAtLoad] = useState(pendingEmail);
+  const restoredEmail = pendingEmail && pendingEmail === pendingAtLoad && !sendState.ok ? pendingEmail : null;
+  const codeSent = restoredEmail !== null || (sendState.ok && !editing);
+  const channel = restoredEmail ? "email" : (sendState.channel ?? "email");
+  const contact = restoredEmail ?? sendState.email ?? "";
+  const errorField = fieldFor(sendState.ok ? undefined : sendState.code);
+  const errorFor = (field: Field) => (errorField === field ? sendState.code : undefined);
+  const set = (key: keyof typeof values) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: e.target.value }));
 
   useEffect(() => {
     if (sendState.ok) {
-      setEditingEmail(false);
-      setCooldown(RESEND_COOLDOWN_SECONDS);
-      // The password only ever needs to exist for the ONE signUp() submit
-      // above — clear it from React state immediately once that step is
-      // behind us, rather than merely leaving it unused.
+      setEditing(false);
+      setCooldown(sendState.channel === "phone" ? PHONE_RESEND_COOLDOWN_SECONDS : RESEND_COOLDOWN_SECONDS);
+      // The password only needs to exist for the ONE submit above.
       setPassword("");
-      setConfirmPassword("");
+      setRestartCode(undefined);
     }
   }, [sendState]);
 
+  // The pending phone sign-up is gone (expired, or the number was
+  // taken meanwhile): back to the filled-in form, with the reason on top.
   useEffect(() => {
-    if (resendState.ok) setCooldown(RESEND_COOLDOWN_SECONDS);
-  }, [resendState]);
+    if (phoneVerifyState.code && PHONE_RESTART_CODES.has(phoneVerifyState.code)) {
+      setRestartCode(phoneVerifyState.code);
+      setEditing(true);
+    }
+  }, [phoneVerifyState]);
+
+  useEffect(() => {
+    if (phoneResendState.ok) setCooldown(PHONE_RESEND_COOLDOWN_SECONDS);
+    else if (emailResendState.ok) setCooldown(RESEND_COOLDOWN_SECONDS);
+  }, [emailResendState, phoneResendState]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -93,120 +189,175 @@ export function PasswordSignUpForm({ next }: { next?: string } = {}) {
     return () => clearTimeout(id);
   }, [cooldown]);
 
-  useEffect(() => {
-    if (editingEmail) emailRef.current?.focus();
-  }, [editingEmail]);
+  const footer = (
+    <p>
+      {t("authPasswordPreview.signUp.haveAccount")}{" "}
+      <Link prefetch={false} href="/auth/sign-in" className="font-semibold text-accent hover:underline">
+        {t("authPasswordPreview.signUp.signInLink")}
+      </Link>
+    </p>
+  );
+  const badge = initialAccountType
+    ? `${t("authPasswordPreview.accountTypeLocked")}: ${t(`onboarding.accountType.types.${initialAccountType}`)}`
+    : undefined;
 
-  const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  if (codeSent) {
+    return (
+      <AuthCard
+        centered
+        title={t(channel === "phone" ? "authPasswordPreview.signUp.codeStepPhoneTitle" : "authPasswordPreview.signUp.codeStepTitle")}
+        subtitle={channel === "phone" ? t("authPasswordPreview.signUp.codeStepPhone", { phone: contact }) : t("authPasswordPreview.signUp.codeStepSubtitle", { email: contact })}
+        badge={badge}
+        footer={footer}
+      >
+        {channel === "phone" ? (
+          <div className="flex flex-col gap-md" data-sign-up-step="phone-code">
+            <form action={dispatchPhoneVerify} className="flex flex-col gap-sm" noValidate>
+              <label htmlFor="token" className="sr-only">{t("authPasswordPreview.codeLabel")}</label>
+              <OtpInput id="token" name="token" autoFocus error={Boolean(phoneVerifyState.code)} />
+              <FieldError code={phoneVerifyState.code} />
+              {/* The account's first password sign-in is CAPTCHA-protected by GoTrue. */}
+              <TurnstileWidget action="phone-sign-up-session" appearance="interaction-only" resetKey={phoneVerifyState} />
+              <SubmitButton className="w-full" pendingLabel={t("authPasswordPreview.signUp.verifying")}>
+                {t("authPasswordPreview.signUp.verify")}
+              </SubmitButton>
+            </form>
+            <div className="flex flex-wrap items-center justify-between gap-sm border-t pt-md">
+              <form action={dispatchPhoneResend} className="flex flex-wrap items-center gap-sm">
+                <TurnstileWidget action="sign-up-resend" appearance="interaction-only" resetKey={phoneResendState} />
+                <ResendButton cooldown={cooldown} />
+              </form>
+              <Button type="button" variant="ghost" size="sm" className="whitespace-nowrap" onClick={() => setEditing(true)}>
+                {t("authPasswordPreview.signUp.startOver")}
+              </Button>
+            </div>
+            {phoneResendState.code && !phoneResendState.ok ? <FieldError code={phoneResendState.code} /> : null}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-md" data-sign-up-step="email-code">
+            {/* No password field exists on this step — verifyPasswordSignUp only
+                takes the email + the 6-digit code. */}
+            <form action={dispatchEmailVerify} className="flex flex-col gap-sm" noValidate>
+              <input type="hidden" name="email" value={contact} />
+              {next ? <input type="hidden" name="next" value={next} /> : null}
+              <label htmlFor="token" className="sr-only">{t("authPasswordPreview.codeLabel")}</label>
+              <OtpInput id="token" name="token" autoFocus error={Boolean(emailVerifyState.code) && !emailVerifyState.ok} />
+              {emailVerifyState.code && !emailVerifyState.ok ? <FieldError code={emailVerifyState.code} /> : null}
+              <SubmitButton className="w-full" pendingLabel={t("authPasswordPreview.signUp.verifying")}>
+                {t("authPasswordPreview.signUp.verify")}
+              </SubmitButton>
+            </form>
+            <div className="flex flex-wrap items-center justify-between gap-sm border-t pt-md">
+              <form action={dispatchEmailResend} className="flex flex-wrap items-center gap-sm">
+                <input type="hidden" name="email" value={contact} />
+                <TurnstileWidget action="sign-up-resend" resetKey={emailResendState} />
+                <ResendButton cooldown={cooldown} />
+              </form>
+              {restoredEmail ? (
+                /* Restored from the routing cookie: forget it and show a clean form (nothing server-side changes). */
+                <form action={forgetPendingRegistration}>
+                  <Button type="submit" variant="ghost" size="sm" className="whitespace-nowrap">
+                    {t("authPasswordPreview.changeEmail")}
+                  </Button>
+                </form>
+              ) : (
+                <Button type="button" variant="ghost" size="sm" className="whitespace-nowrap" onClick={() => setEditing(true)}>
+                  {t("authPasswordPreview.changeEmail")}
+                </Button>
+              )}
+            </div>
+            {/* Never leave the caller waiting on a code GoTrue never sent (an
+                already-confirmed email): a neutral way out. */}
+            <p className="text-label text-fg-muted">
+              {t("authPasswordPreview.signUp.noCodeHint")}{" "}
+              <Link href="/auth/forgot-password" className="font-medium text-accent hover:underline">
+                {t("authPasswordPreview.signIn.forgotPassword")}
+              </Link>
+            </p>
+          </div>
+        )}
+      </AuthCard>
+    );
+  }
 
   return (
-    <AuthCard
-      title={t("authPasswordPreview.signUp.title")}
-      subtitle={t("authPasswordPreview.signUp.subtitle")}
-      footer={
-        <p>
-          {t("authPasswordPreview.signUp.haveAccount")}{" "}
-          <Link href="/auth/sign-in" className="font-medium text-accent hover:underline">
-            {t("authPasswordPreview.signUp.signInLink")}
-          </Link>
-        </p>
-      }
-    >
-      {!codeSent ? (
-        <form action={dispatchSend} className="flex flex-col gap-md" noValidate>
-          <LabeledField
-            label={t("authPasswordPreview.fullNameLabel")}
-            htmlFor="displayName"
-            error={
-              sendState.code === "authPasswordPreview.error.fullNameRequired" ||
-              sendState.code === "authPasswordPreview.error.fullNameTooLong"
-                ? t(sendState.code)
-                : undefined
-            }
-          >
-            <Input
-              id="displayName"
-              name="displayName"
-              type="text"
-              autoComplete="name"
-              required
-              maxLength={DISPLAY_NAME_MAX_LENGTH}
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder={t("authPasswordPreview.fullNamePlaceholder")}
-              aria-invalid={
-                sendState.code === "authPasswordPreview.error.fullNameRequired" ||
-                sendState.code === "authPasswordPreview.error.fullNameTooLong"
-                  ? true
-                  : undefined
-              }
-            />
-          </LabeledField>
+    <AuthCard centered title={t("authPasswordPreview.signUp.title")} subtitle={t("authPasswordPreview.signUp.subtitle")} badge={badge} footer={footer}>
+      {hasOAuthProvider(providers) ? (
+        <>
+          <EntryOAuthButtons next={next} accountType={initialAccountType || undefined} providers={providers} />
+          <OrDivider label={t("authPasswordPreview.signUp.or")} />
+        </>
+      ) : null}
 
-          <LabeledField
-            label={t("authPasswordPreview.emailLabel")}
-            htmlFor="email"
-            error={
-              sendState.code === "authPasswordPreview.error.invalidEmail" ||
-              sendState.code === "authPasswordPreview.error.sendFailed" ||
-              sendState.code === "authPasswordPreview.error.rateLimited"
-                ? t(sendState.code)
-                : undefined
-            }
-          >
-            <Input
-              ref={emailRef}
-              id="email"
-              name="email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              required
-              defaultValue={email}
-              placeholder={t("authPasswordPreview.emailPlaceholder")}
-              aria-invalid={sendState.code === "authPasswordPreview.error.invalidEmail" ? true : undefined}
-            />
-          </LabeledField>
+      <form action={dispatchSend} className="flex flex-col gap-sm" noValidate data-sign-up-step="details">
+        <FieldError code={restartCode} contact={values.contact} />
 
-          <LabeledField
-            label={t("registration.username.label")}
-            htmlFor="username"
-            hint={t("registration.username.hint")}
-            error={
-              sendState.code === "registration.error.usernameShape" || sendState.code === "registration.error.usernameUnavailable"
-                ? t(sendState.code)
-                : undefined
-            }
-          >
-            <Input
-              id="username"
-              name="username"
-              type="text"
-              autoComplete="username"
-              required
-              dir="ltr"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder={t("registration.username.placeholder")}
-            />
-          </LabeledField>
+        <label htmlFor="contact" className="sr-only">{t("authPasswordPreview.signUp.contactLabel")}</label>
+        <div className="relative">
+          <Input
+            id="contact"
+            name="contact"
+            type="text"
+            inputMode="email"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            dir="ltr"
+            required
+            value={values.contact}
+            onChange={set("contact")}
+            placeholder={t("authPasswordPreview.signUp.contactLabel")}
+            aria-invalid={errorField === "contact" || undefined}
+            className={errorField === "contact" ? "pr-10" : undefined}
+          />
+          {errorField === "contact" ? <ErrorMark /> : null}
+        </div>
+        <FieldError code={errorFor("contact")} contact={values.contact} />
 
-          <LabeledField
-            label={t("authPasswordPreview.accountTypeLabel")}
-            htmlFor="accountType"
-            hint={accountTypeKey ? t(`onboarding.accountType.types.${accountTypeKey}Desc`) : undefined}
-            error={sendState.code === "authPasswordPreview.error.accountTypeRequired" ? t(sendState.code) : undefined}
-          >
-            {/* One dropdown over the same ordered registration taxonomy. Coming
-                Soon types stay visible but are disabled options; the server
-                action re-checks every submitted key regardless. */}
+        <label htmlFor="password" className="sr-only">{t("authPasswordPreview.passwordLabel")}</label>
+        <PasswordInput
+          id="password"
+          name="password"
+          autoComplete="new-password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder={t("authPasswordPreview.passwordLabel")}
+          aria-invalid={errorField === "password" || undefined}
+        />
+        <FieldError code={errorFor("password")} />
+
+        <label htmlFor="displayName" className="sr-only">{t("authPasswordPreview.fullNameLabel")}</label>
+        <Input
+          id="displayName"
+          name="displayName"
+          type="text"
+          autoComplete="name"
+          required
+          maxLength={DISPLAY_NAME_MAX_LENGTH}
+          value={values.displayName}
+          onChange={set("displayName")}
+          placeholder={t("authPasswordPreview.fullNameLabel")}
+          aria-invalid={errorField === "displayName" || undefined}
+        />
+        <FieldError code={errorFor("displayName")} />
+
+        {initialAccountType ? (
+          /* Type chosen on the landing page: no selector (the badge names it);
+             the server action still validates the key. */
+          <input type="hidden" name="accountType" value={initialAccountType} />
+        ) : (
+          <>
+            <label htmlFor="accountType" className="sr-only">{t("authPasswordPreview.accountTypeLabel")}</label>
+            {/* One dropdown over the ordered registration taxonomy. Coming Soon
+                types stay visible but disabled; the server re-checks every key. */}
             <Select
               id="accountType"
               name="accountType"
               required
-              value={accountTypeKey}
-              onChange={(e) => setAccountTypeKey(e.target.value)}
-              aria-invalid={sendState.code === "authPasswordPreview.error.accountTypeRequired" ? true : undefined}
+              value={values.accountType}
+              onChange={set("accountType")}
+              aria-invalid={errorField === "accountType" || undefined}
             >
               <option value="" disabled>
                 {t("authPasswordPreview.accountTypePlaceholder")}
@@ -221,117 +372,34 @@ export function PasswordSignUpForm({ next }: { next?: string } = {}) {
                 );
               })}
             </Select>
-          </LabeledField>
+            <FieldError code={errorFor("accountType")} />
+          </>
+        )}
 
-          <LabeledField
-            label={t("authPasswordPreview.passwordLabel")}
-            htmlFor="password"
-            error={sendState.code && sendState.code.startsWith("authPasswordPreview.error.password") ? t(sendState.code) : undefined}
-          >
-            <PasswordInput
-              id="password"
-              name="password"
-              autoComplete="new-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </LabeledField>
-          <PasswordStrengthMeter value={password} context={[email]} />
+        {CONSENT_TYPES.map((type) => (
+          <input key={type} type="hidden" name={`consent_${type}`} value="on" />
+        ))}
+        <p className="mt-xs text-center text-label text-fg-muted" data-sign-up-agreement>
+          {t("authPasswordPreview.signUp.agreementPrefix")}{" "}
+          <Link href="/legal/terms" prefetch={false} target="_blank" className="font-semibold text-fg-secondary hover:underline">
+            {t("entryAuth.terms")}
+          </Link>{" "}
+          {t("entryAuth.and")}{" "}
+          <Link href="/legal/privacy" prefetch={false} target="_blank" className="font-semibold text-fg-secondary hover:underline">
+            {t("entryAuth.privacy")}
+          </Link>
+          . {t("authPasswordPreview.signUp.agreementSuffix")}
+        </p>
 
-          <LabeledField
-            label={t("authPasswordPreview.confirmPasswordLabel")}
-            htmlFor="confirmPassword"
-            error={mismatch || sendState.code === "authPasswordPreview.error.passwordMismatch" ? t("authPasswordPreview.error.passwordMismatch") : undefined}
-          >
-            <PasswordInput
-              id="confirmPassword"
-              name="confirmPassword"
-              autoComplete="new-password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              aria-invalid={mismatch ? true : undefined}
-            />
-          </LabeledField>
+        {/* An email sign-up hands this token to GoTrue's signUp(); a mobile
+            sign-up checks it with Siteverify before any WhatsApp code is sent. */}
+        <TurnstileWidget action="sign-up" resetKey={sendState} />
+        <FieldError code={errorFor("form")} />
 
-          <fieldset className="flex flex-col gap-2.5 rounded-md border border-strong/70 bg-surface-2/40 p-md">
-            <legend className="px-1 text-label font-medium text-fg-secondary">{t("authPasswordPreview.consent.heading")}</legend>
-            <Checkbox id="consent_terms" name="consent_terms" checked={consents.terms} onChange={(v) => setConsents((c) => ({ ...c, terms: v }))}>
-              {t("authPasswordPreview.consent.terms")}
-            </Checkbox>
-            <Checkbox id="consent_privacy" name="consent_privacy" checked={consents.privacy} onChange={(v) => setConsents((c) => ({ ...c, privacy: v }))}>
-              {t("authPasswordPreview.consent.privacy")}
-            </Checkbox>
-            <Checkbox id="consent_pilot" name="consent_pilot" checked={consents.pilot} onChange={(v) => setConsents((c) => ({ ...c, pilot: v }))}>
-              {t("authPasswordPreview.consent.pilot")}
-            </Checkbox>
-            {sendState.code === "authPasswordPreview.error.consentRequired" ? (
-              <p role="alert" className="text-label text-danger">{t("authPasswordPreview.error.consentRequired")}</p>
-            ) : (
-              <p className="text-label text-fg-muted">{t("authPasswordPreview.consent.note")}</p>
-            )}
-          </fieldset>
-
-          <TurnstileWidget action="sign-up" resetKey={sendState} />
-          {sendState.code === "authPasswordPreview.error.captchaRequired" ||
-          sendState.code === "authPasswordPreview.error.captchaRejected" ? (
-            <p role="alert" className="text-label text-danger">
-              {t(sendState.code)}
-            </p>
-          ) : null}
-
-          <SubmitButton className="w-full" pendingLabel={t("authPasswordPreview.signUp.submitting")} disabled={!allConsented || mismatch}>
-            {t("authPasswordPreview.signUp.submit")}
-          </SubmitButton>
-        </form>
-      ) : (
-        <div className="flex flex-col gap-md">
-          <p role="status" className="rounded-md border border-success/40 bg-success/10 px-md py-2.5 text-body text-success">
-            {t("authPasswordPreview.signUp.codeStepSubtitle", { email })}
-          </p>
-
-          {/* No password field exists anywhere on this step — verifyPasswordSignUp
-              only ever takes the email + the 6-digit code (see the module doc
-              comment). */}
-          <form action={dispatchVerify} className="flex flex-col gap-md" noValidate>
-            <input type="hidden" name="email" value={email} />
-            {next ? <input type="hidden" name="next" value={next} /> : null}
-            <LabeledField
-              label={t("authPasswordPreview.codeLabel")}
-              htmlFor="token"
-              error={verifyState.code && !verifyState.ok ? t(verifyState.code) : undefined}
-            >
-              <OtpInput id="token" name="token" autoFocus error={Boolean(verifyState.code) && !verifyState.ok} />
-            </LabeledField>
-            <SubmitButton className="w-full" pendingLabel={t("authPasswordPreview.signUp.verifying")}>
-              {t("authPasswordPreview.signUp.verify")}
-            </SubmitButton>
-          </form>
-
-          <div className="flex items-center justify-between gap-sm border-t pt-md">
-            <form action={dispatchResend} className="flex items-center gap-sm">
-              <input type="hidden" name="email" value={email} />
-              <TurnstileWidget action="sign-up-resend" resetKey={resendState} />
-              <ResendButton cooldown={cooldown} />
-            </form>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setEditingEmail(true)}>
-              {t("authPasswordPreview.changeEmail")}
-            </Button>
-          </div>
-
-          {/* §5 — never leave the caller waiting indefinitely on a code that,
-              for an email that already belongs to a confirmed account, GoTrue
-              never actually sent. A visible, neutral way out — never phrased
-              as "you already have an account." */}
-          <p className="text-label text-fg-muted">
-            {t("authPasswordPreview.signUp.noCodeHint")}{" "}
-            <Link href="/auth/forgot-password" className="font-medium text-accent hover:underline">
-              {t("authPasswordPreview.signIn.forgotPassword")}
-            </Link>
-          </p>
-        </div>
-      )}
+        <SubmitButton className="w-full" pendingLabel={t("authPasswordPreview.signUp.submitting")}>
+          {t("authPasswordPreview.signUp.submit")}
+        </SubmitButton>
+      </form>
     </AuthCard>
   );
 }

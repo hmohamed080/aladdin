@@ -56,7 +56,7 @@ async function fixtures() {
 
 /** The contract both engines must keep: identical verification and variant results. */
 const engines: Array<[string, () => ImageProcessor]> = [
-  ["sharp (Node / Vercel)", () => sharpImageProcessor],
+  ["sharp (Node)", () => sharpImageProcessor],
   ["Cloudflare Images (Workers)", () => createCloudflareImageProcessor(fakeImagesBinding().binding)],
 ];
 
@@ -193,3 +193,33 @@ function animatedWebp(): Uint8Array {
   const n = riff.length;
   return new Uint8Array([..."RIFF"].map((c) => c.charCodeAt(0)).concat([n & 255, (n >> 8) & 255, 0, 0], riff));
 }
+
+describe("Cloudflare Images re-encoded original", () => {
+  it("bounds BOTH width and height, so the 2560 long-edge ceiling holds for portrait photos", async () => {
+    const seen: Array<{ width: number; height?: number; fit: string }> = [];
+    const binding: ImagesBindingLike = {
+      async info(stream) {
+        const meta = await sharp(await read(stream)).metadata();
+        return { format: `image/${meta.format}`, width: meta.width, height: meta.height };
+      },
+      input(stream) {
+        return {
+          transform: (options) => ({
+            async output({ format, quality }) {
+              seen.push(options);
+              // like the real binding: scale-down fits inside the width x height box, never enlarges
+              const data = await sharp(await read(stream)).resize({ width: options.width, height: options.height, fit: "inside", withoutEnlargement: true })
+                .jpeg({ quality }).toBuffer();
+              expect(format).toBe("image/jpeg");
+              return { image: () => new Response(new Uint8Array(data)).body! };
+            },
+          }),
+        };
+      },
+    };
+    const portrait = await solid(2000, 4000).jpeg().toBuffer();
+    const out = await createCloudflareImageProcessor(binding).reencodeOriginal(new Uint8Array(portrait), "image/jpeg", 10 * 1024 * 1024);
+    expect(seen[0]).toMatchObject({ width: 2560, height: 2560, fit: "scale-down" });
+    expect([out.width, out.height]).toEqual([1280, 2560]);
+  });
+});

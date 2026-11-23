@@ -3,6 +3,7 @@ const mocks = vi.hoisted(() => ({ rpc: vi.fn(), authorize: vi.fn(), verify: vi.f
 vi.mock("next/cache", () => ({ revalidatePath: mocks.refresh }));
 vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({ rpc: mocks.rpc }) }));
 vi.mock("@/server/storage/media", () => ({ authorizeMediaUpload: mocks.authorize, verifyPendingMedia: mocks.verify, removeMedia: mocks.remove }));
+vi.mock("@/server/media/limits", async () => { const { DEFAULT_IMAGE_LIMITS: d } = await import("@/lib/media/limits"); return { imageMaxBytes: async (p: keyof typeof d) => d[p], invalidateMediaLimitCache: () => undefined }; });
 import { requestOrganizationImageUploadAction, confirmOrganizationImageUploadAction, removeOrganizationImageAction } from "./organization-image";
 beforeEach(() => { vi.resetAllMocks(); mocks.rpc.mockResolvedValue({ data: "key.png", error: null }); mocks.authorize.mockResolvedValue({ provider: "supabase", token: "synthetic" }); });
 it("requires the caller RPC before issuing a provider upload grant", async () => {

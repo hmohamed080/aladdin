@@ -16,7 +16,7 @@ describe("installer settings preview", () => {
     renderWithI18n(<InstallerSettingsPreview theme="light" sidebarMode="expanded" />);
     expect(screen.getByRole("heading", { name: "الإعدادات", level: 1 })).toBeInTheDocument();
     for (const name of ["البيانات الشخصية", "الخصوصية والأمان", "الإشعارات", "إعدادات الحساب", "طرق تسجيل الدخول", "الجلسات النشطة", "الأجهزة الموثوقة", "استعادة الحساب", "تغيير كلمة المرور"]) expect(screen.getByRole("heading", { name })).toBeInTheDocument();
-    expect(screen.getByLabelText("اسم المستخدم")).toHaveValue("ahmed123");
+    expect(screen.queryByLabelText("اسم المستخدم")).not.toBeInTheDocument(); // no application username (Phase 1)
     expect(screen.getByLabelText("رقم الهاتف")).toHaveAttribute("type", "tel");
     fireEvent.click(screen.getAllByRole("button", { name: "الدولة" })[0]!);
     expect(within(screen.getByRole("listbox", { name: "الدولة" })).getAllByRole("option").length).toBeGreaterThan(200);

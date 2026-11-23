@@ -51,6 +51,7 @@ export function ConfirmDialog({
   wide = false,
   triggerIconOnly = false,
   triggerTone = "neutral",
+  renderTrigger,
   children,
 }: {
   trigger: string;
@@ -81,6 +82,11 @@ export function ConfirmDialog({
    */
   triggerIconOnly?: boolean;
   triggerTone?: keyof typeof ICON_TONES;
+  /**
+   * Replace the built-in trigger button (e.g. with a switch). It must call `open` on activation. Focus returns to whatever held it when the
+   * dialog opened, which is that custom trigger.
+   */
+  renderTrigger?: (p: { open: () => void }) => ReactNode;
   children?: ReactNode | ((state: FormState) => ReactNode);
 }) {
   const { t } = useI18n();
@@ -153,7 +159,9 @@ export function ConfirmDialog({
 
   return (
     <>
-      {triggerIconOnly && triggerIcon ? (
+      {renderTrigger ? (
+        renderTrigger({ open: () => setOpen(true) })
+      ) : triggerIconOnly && triggerIcon ? (
         <button
           ref={triggerRef}
           type="button"

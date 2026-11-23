@@ -1,12 +1,34 @@
 # Aladdin - Cloudflare PRODUCTION Workers (ADR-0021, ADR-0022), Phase D of the release plan.
 #
-# Manual only, from `main` only, one stage per run. Deploys the `production` environments with NO public
-# address: no route, no custom domain, no workers.dev. It never touches Vercel, DNS or aladdindecore.com.
+# Manual only, from `main` only, one stage per run. Deploys the `production` environments. Their public
+# hostnames (Custom Domains aladdindecore.com and www on the frontend, since the 2026-10-27 cutover) are managed
+# in the Cloudflare dashboard, not here; the Workers declare no route and no workers.dev. It never touches DNS.
 #
 #   stage = check     builds and bundles both Workers (dry run). Uploads nothing. The default.
 #   stage = backend   deploys `aladdin-backend-production` (FastAPI in a Container). Run first.
+#   stage = frontend-upload  UPLOAD-ONLY: builds and uploads the frontend as a NEW VERSION that is NOT deployed (serves 0% of traffic;
+#                     users are unaffected). Test it on the live hostname with the request header
+#                       Cloudflare-Workers-Version-Overrides: aladdin-frontend-production="<version id>"
+#                     (only requests that carry it reach the new version), then promote it by hand with
+#                       wrangler versions deploy <version id>@100% --env production
+#                     which is the user-facing activation and needs its own approval. Never promotes by itself.
 #   stage = frontend  deploys `aladdin-frontend-production`. Refuses to run unless the backend Worker already
-#                     exists, because the frontend's BACKEND service binding points at it.
+#                     exists, because the frontend's BACKEND service binding points at it. It also refuses unless the WhatsApp OTP
+#                     Worker exists (the OTP_WORKER service binding). Goes live immediately: prefer frontend-upload first.
+#
+# MEDIA MODE (input `media_mode`, frontend stages only). Production is R2-ONLY today (R2_STORAGE_ENABLED=true, R2_PRODUCTION_WRITES_APPROVED=true,
+# MEDIA_LEGACY_STORAGE_WRITES=false) and NO mode ever reopens Supabase Storage writes (the old `legacy-hold` mode was removed).
+#   match-live  (default) FAIL-CLOSED. Reads the ACTIVE Production Worker version(s) from the Cloudflare API and carries exactly their three media
+#               flags as `--var` overrides on every frontend wrangler command, so an unrelated release cannot move a media write path. Any problem
+#               reading them (no token, API error, no active version, a missing flag, versions that disagree) stops the run before anything is built.
+#   r2-only     no overrides: the committed R2-only flags (the cutover config).
+# Before anything is built the "Release flags" step prints the effective flags, and after an upload the "Verify uploaded version" step reads the NEW
+# version's bindings back and fails unless they equal the live version's. Run the same check again right before promoting:
+#   CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... node frontend/scripts/check-cloudflare-production.mjs --verify-version <version id>
+#
+# R2-only media is ON in the committed config (R2_STORAGE_ENABLED / R2_PRODUCTION_WRITES_APPROVED true, legacy writes
+# closed). A version uploaded by frontend-upload serves 0% of traffic, so nothing goes live; stage=frontend (immediate
+# deploy) is refused unless the environment variable R2_CUTOVER_APPROVED is "true".
 #
 # SAFE BY DEFAULT: nothing is uploaded unless the GitHub Environment `cloudflare-production` has the variable
 # CLOUDFLARE_PRODUCTION_ENABLED set to exactly "true". Without it every stage builds and bundles only.
@@ -22,11 +44,11 @@
 #
 # Worker secrets: the backend's SUPABASE_URL and SUPABASE_ANON_KEY are the live project's public values and
 # are uploaded with the backend version. The frontend's SUPABASE_SERVICE_ROLE_KEY, TURNSTILE_SECRET_KEY and
-# AUTH_PASSWORD_PREVIEW_GRANT_SECRET are set by the owner with `wrangler secret put <NAME> --env production`
+# AUTH_PASSWORD_PREVIEW_GRANT_SECRET and REDIS_REST_TOKEN are set by the owner with `wrangler secret put <NAME> --env production`
 # (never in GitHub); `wrangler deploy` refuses the frontend until all three exist.
 #
-# Rollback: `wrangler rollback --env production` or `wrangler delete --env production` per Worker. No traffic
-# reaches either Worker until a hostname is attached in a later, separately approved step.
+# Rollback: `wrangler rollback --env production` per Worker, or roll back to an earlier version in the
+# dashboard (Deployments). Never `wrangler delete` the frontend: it serves the live site.
 
 name: Cloudflare production
 
@@ -34,10 +56,15 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "check = build and bundle only; backend first, then frontend"
+        description: "check = build and bundle only; backend first; frontend-upload = new version, no traffic; frontend = deploy and go live"
         type: choice
-        options: [check, backend, frontend]
+        options: [check, backend, frontend-upload, frontend]
         default: check
+      media_mode:
+        description: "Frontend stages: match-live = carry exactly the ACTIVE Production version's media flags (fail closed); r2-only = the committed R2-only flags. No mode reopens Supabase Storage writes"
+        type: choice
+        options: [match-live, r2-only]
+        default: match-live
 
 concurrency:
   group: cloudflare-production
@@ -54,6 +81,10 @@ jobs:
     environment: cloudflare-production
     env:
       STAGE: ${{ inputs.stage }}
+      MEDIA_MODE: ${{ inputs.media_mode }}
+      # Set to "true" by the owner at the final cutover approval; until then stage=frontend (immediate deploy) is refused. Job-level so every
+      # invocation of the production guard (config check, release-flags check, the sourced media helper) sees the same approval.
+      R2_CUTOVER_APPROVED: ${{ vars.R2_CUTOVER_APPROVED }}
       NEXT_PUBLIC_APP_ENV: production
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -64,6 +95,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Cloudflare account preflight (fail closed on a missing or different account)
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/r2-account-preflight.mjs
       - name: Enable pnpm (corepack, pinned to packageManager)
         run: |
           corepack enable
@@ -76,6 +111,12 @@ jobs:
             "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/settings")
           [ "$status" = "200" ] || { echo "The live project does not accept NEXT_PUBLIC_SUPABASE_ANON_KEY (HTTP $status)"; exit 1; }
           echo "Stage: $STAGE, upload: $UPLOAD" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Release flags (effective media flags must be exactly the chosen mode, before anything is built or uploaded)
+        if: inputs.stage != 'backend'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: node frontend/scripts/check-cloudflare-production.mjs --verify-media-mode "$MEDIA_MODE" | tee -a "$GITHUB_STEP_SUMMARY"
       - run: pnpm install --frozen-lockfile
 
       # Backend: FastAPI image + Worker, no public address.
@@ -103,7 +144,7 @@ jobs:
 
       # Frontend: OpenNext build with the live public values, then the Worker, no public address.
       - name: Backend Worker must exist before the frontend
-        if: inputs.stage == 'frontend' && env.UPLOAD == 'true'
+        if: (inputs.stage == 'frontend' || inputs.stage == 'frontend-upload') && env.UPLOAD == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -111,13 +152,55 @@ jobs:
           status=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/aladdin-backend-production/settings")
           [ "$status" = "200" ] || { echo "aladdin-backend-production is not deployed (HTTP $status): run stage=backend first"; exit 1; }
+      - name: WhatsApp OTP Worker must exist before the frontend (service binding OTP_WORKER)
+        if: (inputs.stage == 'frontend' || inputs.stage == 'frontend-upload') && env.UPLOAD == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/aladdin-whatsapp-otp-production/settings")
+          [ "$status" = "200" ] || { echo "aladdin-whatsapp-otp-production is not deployed (HTTP $status): deploy the private OTP Worker (P-6) first"; exit 1; }
       - name: Build the frontend for Workers
         if: inputs.stage != 'backend'
         run: pnpm --filter frontend cf:build
       - name: Frontend bundle (dry run)
         if: inputs.stage != 'backend'
         working-directory: frontend
-        run: pnpm exec wrangler deploy --env production --dry-run --outdir "$RUNNER_TEMP/frontend"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          source ../frontend/scripts/production-media-vars.sh
+          pnpm exec wrangler deploy --env production --dry-run --outdir "$RUNNER_TEMP/frontend" "${MEDIA_VARS[@]}"
+      - name: Upload aladdin-frontend-production as an UNDEPLOYED version (0% of traffic)
+        if: inputs.stage == 'frontend-upload' && env.UPLOAD == 'true'
+        working-directory: frontend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          source ../frontend/scripts/production-media-vars.sh
+          pnpm exec wrangler versions upload --env production --message "upload-only ${GITHUB_SHA::12} ($MEDIA_MODE)" \
+            --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            "${MEDIA_VARS[@]}" | tee "$RUNNER_TEMP/upload.txt"
+          {
+            echo "### Frontend version uploaded, NOT deployed (0% of traffic)"
+            grep -i "version id" "$RUNNER_TEMP/upload.txt" || true
+            echo "Test with the header Cloudflare-Workers-Version-Overrides: aladdin-frontend-production=\"<version id>\"; before promoting run node frontend/scripts/check-cloudflare-production.mjs --verify-version <version id>, then wrangler versions deploy <version id>@100% --env production (separate approval)."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify the uploaded version carries the live media flags (fails the run otherwise; do NOT promote a version this step rejected)
+        if: inputs.stage == 'frontend-upload' && env.UPLOAD == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          version_id=$(grep -i "version id" "$RUNNER_TEMP/upload.txt" | grep -Eo '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -n 1)
+          [ -n "$version_id" ] || { echo "::error::could not read the uploaded version id from the wrangler output"; exit 1; }
+          node frontend/scripts/check-cloudflare-production.mjs --verify-version "$version_id" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Deploy aladdin-frontend-production
         if: inputs.stage == 'frontend' && env.UPLOAD == 'true'
         working-directory: frontend
@@ -126,7 +209,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         # Server code reads the public Supabase values at runtime too.
         run: |
+          source ../frontend/scripts/production-media-vars.sh
           pnpm exec wrangler deploy --env production \
             --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
-            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            "${MEDIA_VARS[@]}"
           pnpm exec wrangler secret list --env production --format json | jq -r '.[].name' | sort | tee -a "$GITHUB_STEP_SUMMARY"

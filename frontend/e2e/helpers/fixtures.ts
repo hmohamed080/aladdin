@@ -6,7 +6,7 @@ import { E2E_PASSWORD } from "./auth";
  * Direct LOCAL-DB fixtures for specs whose subject is NOT registration itself
  * (the legacy onboarding steps, the passwordless → password migration). The
  * canonical `/auth/sign-up` is password + Turnstile and applies the account
- * type and username at sign-up, so it can no longer produce these
+ * type at sign-up, so it can no longer produce these
  * intermediate states. Seeding them directly — the same way the product
  * seeds and pgTAP fixtures create identities — keeps those specs about their
  * own subject. LOCAL TEST DB ONLY (docker exec psql); never production.
@@ -20,7 +20,7 @@ type FixtureOptions = {
   locale?: "en" | "ar";
 };
 
-/** A confirmed account with NO account type and NO username yet. Returns its user id. */
+/** A confirmed account with NO account type yet. Returns its user id. */
 export function createConfirmedAccount(
   email: string,
   { password = true, consented = true, locale = "en" }: FixtureOptions = {},

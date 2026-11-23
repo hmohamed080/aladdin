@@ -113,21 +113,16 @@ MEDIA_EDGE_LIVE_ADMIN_URL=postgres://postgres:postgres@127.0.0.1:54322/postgres 
    `wrangler.toml`.
 4. **R2.** A private bucket (no public access, no `r2.dev`), lifecycle rule
    expiring `pending/` after 2 days. Bind it as `MEDIA_BUCKET`.
-5. **Hostname `media.aladdindecore.com`** (feasible; checked 2026-10-19). The
-   `aladdindecore.com` zone is served by Vercel DNS (`ns1/ns2.vercel-dns.com`),
-   and a Workers Custom Domain needs a Cloudflare zone (CNAME/partial setup is
-   Business plan and up). Two free ways:
-   - **B, recommended first:** a Cloudflare **Pages** project (`pages/`) running
-     the same bundle. Add `media.aladdindecore.com` as its custom domain, then
-     one DNS record in Vercel: `media CNAME aladdin-media.pages.dev`. Nothing
-     else in the zone changes.
-   - **A:** move the `aladdindecore.com` nameservers to a Cloudflare Free zone
-     (recreate the Vercel A/CNAME records and every MX/TXT record first) and use
-     `wrangler.toml`'s Custom Domain. Adds Cloudflare WAF and rate-limit rules,
-     but touches the whole domain, including email.
+5. **Hostname `media.aladdindecore.com`.** Since 2026-10-27 the
+   `aladdindecore.com` zone is on Cloudflare, so use `wrangler.toml`'s Workers
+   Custom Domain (option A below). The Pages template in `pages/` (option B) was
+   only needed while DNS was on Vercel and is kept for reference.
+   - **A:** a Workers Custom Domain on the Cloudflare zone (`wrangler.toml`).
+   - **B (obsolete):** a Cloudflare **Pages** project (`pages/`) running the same
+     bundle behind a CNAME at an external DNS provider.
    Workers Paid (D5, $5/month) is needed for production volume either way.
 6. **Ticket key.** Generate 32 random bytes, base64url. `wrangler secret put
-   TICKET_KEYS` with `{"k1":"<secret>"}`. In Vercel set
+   TICKET_KEYS` with `{"k1":"<secret>"}`. On the frontend Worker set
    `MEDIA_EDGE_TICKET_KID=k1` and `MEDIA_EDGE_TICKET_SECRET=<secret>` (secret),
    `MEDIA_EDGE_ORIGIN=https://<media-hostname>`.
 7. **Deploy** `wrangler deploy` from this directory; then set
@@ -178,6 +173,6 @@ role, local R2 and Hyperdrive `localConnectionString`:
   in-region; more from distant edges). Free plan limits (100k Worker requests and
   100k Hyperdrive queries a day, 10 ms CPU) fail hard; production needs Workers
   Paid ($5/month). R2 Class B reads stay within the free tier at the plan's
-  scale estimate; image bytes leave Vercel and Supabase entirely.
-- Legacy `provider='supabase'` rows keep using the application proxy (Vercel
+  scale estimate; image bytes leave the web app and Supabase entirely.
+- Legacy `provider='supabase'` rows keep using the application proxy (web app
   bandwidth) until migrated.

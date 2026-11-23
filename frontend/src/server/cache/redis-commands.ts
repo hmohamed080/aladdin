@@ -5,7 +5,7 @@ import type { createClient } from "@redis/client";
  * The only Redis commands the application sends, behind one interface so the
  * transport can change with the host (ADR-0019 "Workers runtime"):
  *   * TCP (`@redis/client`, one multiplexed connection per warm Node instance)
- *     on Vercel and locally;
+ *     on Node (local development and tests);
  *   * Upstash's HTTPS REST API (plain `fetch`, one request per command) where
  *     a socket may not outlive the request that opened it (Cloudflare Workers).
  * Add a command here only when a caller needs it.

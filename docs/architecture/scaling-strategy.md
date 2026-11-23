@@ -12,7 +12,7 @@ Ship the modular monolith. Reach for the next rung only when a measured bottlene
 
 | Pressure | First response (cheap) | Later option (documented, not built) |
 |---|---|---|
-| Web app CPU/latency | Vercel autoscaling; more Server Component caching | Edge runtime for hot routes |
+| Web app CPU/latency | Workers scale per request; more Server Component caching | edge caching for hot routes |
 | DB read load | Indexes, query tuning, Postgres FTS/`pg_trgm` | Supabase read replicas |
 | Vector search cost | `pgvector` with proper filters/indexes | Dedicated vector store (only if pgvector proves insufficient) |
 | Heavy async volume | More worker instances; Supabase Queues | Extract a worker service; managed queue |

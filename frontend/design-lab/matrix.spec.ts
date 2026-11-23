@@ -69,7 +69,7 @@ const ACCOUNTS = [
      They authenticate, but hold no ACTIVE membership in the pilot database this
      harness runs against, so the B2B layout resolves them to Personal — which is
      the correct, designed behaviour for a caller who can work in no business
-     (see `app/b2b/layout.tsx`). Captured against `/home` rather than dropped,
+     (see `app/(workspace)/b2b/layout.tsx`). Captured against `/home` rather than dropped,
      because "an account with no org lands somewhere coherent and on-system" is
      itself part of what this pass has to keep true. */
   {

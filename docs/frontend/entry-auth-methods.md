@@ -1,5 +1,7 @@
 # Showroom and Installer entry pages: Google, Facebook, email and phone
 
+> **Superseded 2026-10-28 (ADR-0025).** The showroom and installer entry pages are retired. They redirected to `/auth/*` until 2026-11-15; the redirects are removed, all of them answer 404 in the app (`/showroom/sign-in|sign-up` through route handlers, because the dynamic `/showroom/[page]` guard would otherwise redirect a logged-out visitor), and Cloudflare blocks them (403) at the edge. Google and Facebook now sit on `/auth/sign-in` and `/auth/sign-up` (general flow in `src/server/auth/entry-oauth.ts`; an open `?type=` is applied after the server re-checks it). See [ADR-0025](../decisions/ADR-0025-one-field-sign-in-whatsapp-sign-up.md). The text below is kept as history.
+
 Pages: `/showroom/sign-in`, `/showroom/sign-up`, `/installer/sign-in`, `/installer/sign-up`.
 
 Each page offers, in order: Google and Facebook (only the providers switched on in Supabase Auth render), then a Phone | Email switch over the password forms. Phone stays the default, so the existing phone + password flow is unchanged. `?method=email` opens the email tab.

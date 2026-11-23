@@ -63,7 +63,7 @@ cron */10 ───────────────────────�
 - **Durable coordination:** Postgres alone. The Durable Object stores only its alarm. A duplicate start finds nothing to claim and exits within seconds. A lost container leaves a lease that expires (≤ 15 min) and is reclaimed on the next kick.
 - **Concurrency:** `TRANSCODE_SLOTS` (2) equals `max_instances`. Each kick starts at most one new container: the first idle slot. A backlog therefore gains a second worker on the next kick.
 - **Why not a Queue?** A Cloudflare Queue would be a second job store that has to agree with `media_videos`. The database already queues. The Redis wake-up list (ADR-0019) stays for the `--loop` hosts. Containers need no long-lived listener, because `wake()` replaces `BLPOP`.
-- **Why not cron alone?** Cron alone means up to 10 minutes' latency, and each tick costs a start. The cron stays as the safety net for expired leases, retries and the purge. `wake()` gives immediate starts. When the frontend runs on Workers (ADR-0021), wire `wake()` through a service binding. A Vercel-hosted app has no binding, so it waits for the cron.
+- **Why not cron alone?** Cron alone means up to 10 minutes' latency, and each tick costs a start. The cron stays as the safety net for expired leases, retries and the purge. `wake()` gives immediate starts. The frontend runs on Workers (ADR-0021), so `wake()` can go through a service binding.
 - **Long jobs and the 6-hour inactivity cap:** the alarm wakes the object every 5 minutes while the container runs and renews a 30-minute inactivity timeout. A multi-hour transcode is therefore never stopped as idle. When the container exits, the alarm stops rescheduling.
 
 ## Monitoring
@@ -161,7 +161,7 @@ Two caveats:
 
 **The new ceiling, with its arithmetic:**
 - **Disk:** none in size. Usable disk is 20 GB − ≈ 0.5 GB image = 19.5 GB. A local read needs `size + 1 GiB ≤ 19.5 GB`, so originals up to **≈ 18.4 GB** are read from disk. That is 2.5× the old 7.5 GB, because the outputs no longer accumulate. Anything larger is streamed and needs only the 1 GiB headroom.
-- **Object:** R2's 5 TiB object limit (ADR-0020) is the only byte ceiling left.
+- **Object:** uploads are capped at 100 MB per file (ADR-0030, which supersedes ADR-0020's "no cap"); R2's 5 TiB object limit is far above it. The arithmetic below remains the worker's technical headroom.
 - **Wall time:** a single transcode must finish within the URL's 7-day maximum: 604,800 s. At the measured 1.0–2.2 × real time for 1080p, that is about **76–168 h of source in one job**, roughly 3–7 days of video. ffmpeg's own budget (`8 s × duration + 600 s`) reaches 7 days at about 21 h of source. For a longer video, ffmpeg's timeout, not the URL, would still allow the run. The run then depends on no reconnect being needed after day 7. 4K decode is slower than the 1080p measurement, so for 4K use the low end.
 - **Restarts:** platform restarts still cost an attempt each (see the caveats above). For multi-day jobs that is the more likely limit.
 

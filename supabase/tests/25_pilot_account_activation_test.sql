@@ -165,8 +165,9 @@ select is(
 -- removed organization_setup_pending as a return value of
 -- my_registration_state() — once account_type_completed_at is set, the only
 -- remaining gate before access_ready is the mandatory username step.
-select is(public.my_registration_state(), 'username_pending',
-  'the owner/manager with no username yet resolves to username_pending');
+-- P1 M1: a username is no longer registration data, so the state is access_ready (was username_pending).
+select is(public.my_registration_state(), 'access_ready',
+  'the owner/manager with no username yet resolves to access_ready');
 -- The generic choice carries no approved business type, so it is not a first-business
 -- registration and cannot open a draft: business creation is database-enforced
 -- (20260928090001_business_creation_entitlement.sql). A concrete approved type chosen

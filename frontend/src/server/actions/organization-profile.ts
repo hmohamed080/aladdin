@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { validateBusinessLocation } from "@/lib/location/business-location";
+import { normalizeSocialLink, normalizeSocialLinks, SOCIAL_PLATFORMS, type SocialLinks, type SocialPlatform } from "@/lib/onboarding/social-links";
 import { mapOrgI18nError } from "@/server/actions/error-mapping";
 import type { FormState } from "@/server/actions/sales-forms";
 
@@ -31,6 +32,50 @@ export async function saveLegalNameAction(orgId: string, raw: string): Promise<L
   }
   SETTINGS_PATHS.forEach((path) => revalidatePath(path));
   return { ok: true, value: data ?? value };
+}
+
+export type SocialLinksResult =
+  | { ok: true; links: SocialLinks }
+  | { ok: false; code: "invalid" | "required" | "forbidden" | "failed" };
+
+/** Edits the showroom's links. The database re-validates and refuses to clear the last link (`links_required`). */
+export async function saveSocialLinksAction(orgId: string, raw: Partial<Record<SocialPlatform, string>>): Promise<SocialLinksResult> {
+  const checked = normalizeSocialLinks(raw);
+  if (!checked.ok) return { ok: false, code: "invalid" };
+  const links = checked.links;
+  if (!SOCIAL_PLATFORMS.some((p) => links[p] !== null)) return { ok: false, code: "required" };
+  const supabase = await getServerSupabase();
+  // The generated argument types are non-nullable; the RPC takes NULL for "no link".
+  const nullable = (v: string | null) => v as string;
+  const { data, error } = await supabase.rpc("organization_social_links_set", {
+    p_org_id: orgId,
+    p_facebook_url: nullable(links.facebook),
+    p_instagram_url: nullable(links.instagram),
+    p_tiktok_url: nullable(links.tiktok),
+    p_website_url: nullable(links.website),
+  });
+  if (error) {
+    if (error.code === "42501") return { ok: false, code: "forbidden" };
+    if (error.code === "22023") return { ok: false, code: error.hint === "links_required" ? "required" : "invalid" };
+    return { ok: false, code: "failed" };
+  }
+  SETTINGS_PATHS.forEach((path) => revalidatePath(path));
+  const payload = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null;
+  // A returned value is trusted only when it is itself a valid https link for that platform.
+  const pick = (platform: SocialPlatform, fallback: string | null) => {
+    const v = payload?.[`${platform}_url`];
+    if (v === null) return null;
+    return typeof v === "string" && v.startsWith("https://") && normalizeSocialLink(platform, v).ok ? v : fallback;
+  };
+  return {
+    ok: true,
+    links: {
+      facebook: pick("facebook", links.facebook),
+      instagram: pick("instagram", links.instagram),
+      tiktok: pick("tiktok", links.tiktok),
+      website: pick("website", links.website),
+    },
+  };
 }
 
 function field(fd: FormData, key: string): string {

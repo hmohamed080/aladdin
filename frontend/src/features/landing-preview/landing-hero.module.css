@@ -197,6 +197,7 @@
      `--lumen-soft`), paired with `--basalt` for contrast — see `--on-accent`
      in tokens.css. Unchanged this pass. */
   background: var(--lumen);
+  box-shadow: 0 0 0 1px var(--accent-edge);
   color: var(--basalt);
 }
 
@@ -391,7 +392,7 @@
      one locale's word order silently under-covers the other. A small shadow
      keeps every label readable regardless of which part of the surface is
      under it. */
-  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 5px color-mix(in srgb, var(--deep-navy) 55%, transparent);
 }
 
 .proofStrip li {

@@ -2,7 +2,7 @@
 #
 # Manual only. Builds the app with OpenNext for the `preview` environment in frontend/wrangler.jsonc
 # (Worker `aladdin-frontend-preview`, workers.dev, no custom domain) and uploads it. It never touches
-# Vercel, DNS, aladdindecore.com, the live Supabase project or any Production resource.
+# DNS, aladdindecore.com, the live Supabase project or any Production resource.
 #
 # SAFE BY DEFAULT: nothing is uploaded unless the GitHub Environment `cloudflare-preview` has the variable
 # CLOUDFLARE_PREVIEW_ENABLED set to exactly "true". Without it the run builds and bundles only.
@@ -53,6 +53,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Cloudflare account preflight (fail closed on a missing or different account)
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/r2-account-preflight.mjs
       - name: Enable pnpm (corepack, pinned to packageManager)
         run: |
           corepack enable

@@ -1,6 +1,6 @@
 /**
  * Baseline security headers on every app response, on both hosts (next.config.ts
- * `headers()`). Neither Vercel nor the Cloudflare Worker adds them by itself.
+ * `headers()`). The Cloudflare Worker does not add them by itself.
  *
  * - `X-Frame-Options: SAMEORIGIN`: no other site may frame the app (clickjacking
  *   on Sign In, Server Action forms and the B2B workspace). The app only frames

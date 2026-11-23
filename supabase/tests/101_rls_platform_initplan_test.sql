@@ -10,7 +10,7 @@ select is((select count(*)::int from pg_policies
               and qual !~ '^\(\s*SELECT app\.is_platform\('), 0,
   'every platform-staff policy calls is_platform through a scalar sub-select');
 select is((select count(*)::int from pg_policies where qual ~ '^\(\s*SELECT app\.is_platform\('), 20,
-  'the twenty platform-staff read policies are still present');
+  'the twenty platform-staff read policies are still present (user_specialties added by 20261029090001, dropped by 20261029090002, ADR-0026)');
 
 insert into public.user_service_areas(user_id, governorate_key)
 values ('11111111-1111-4111-8111-111111111111', 'cairo'),

@@ -4,12 +4,13 @@
  * `allowed_mime_types` / `file_size_limit`, the metadata-row ownership model and the two-image
  * limit in the database (20261015090020) decide. Pure on purpose: no Supabase client.
  */
+import { IMAGE_MAX_BYTES } from "@/lib/media/upload-limits";
 export const REQUEST_IMAGE_BUCKET = "purchase-request-images";
 /**
  * The bucket's `file_size_limit`: the ceiling of the PREPARED upload
  * (`resizeImageForUpload(file, UPLOAD_RESIZE_PROFILES.request)`), not of the photo a person picks.
  */
-export const REQUEST_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const REQUEST_IMAGE_MAX_BYTES = IMAGE_MAX_BYTES;
 export const REQUEST_IMAGE_MAX_PER_ITEM = 2;
 export const REQUEST_IMAGE_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 

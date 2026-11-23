@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { passwordSchema, registrationSchema, resetPasswordSchema, PASSWORD_MIN_LENGTH, PASSWORD_MAX_BYTES, passwordByteLength } from "./password-policy";
+import { staffRegistrationSchema, registrationIssueCode, passwordSchema, registrationSchema, resetPasswordSchema, PASSWORD_MIN_LENGTH, PASSWORD_MAX_BYTES, passwordByteLength } from "./password-policy";
 
 describe("passwordSchema", () => {
   it("rejects a password shorter than the minimum", () => {
@@ -41,21 +41,27 @@ describe("passwordSchema", () => {
 });
 
 describe("registrationSchema", () => {
-  const base = { displayName: "Mona Adel", email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: "a-very-long-passphrase-1" };
+  const base = { displayName: "Mona Adel", email: "person@example.test", accountType: "installer_technician", password: "a-very-long-passphrase-1" };
 
-  it("accepts matching password/confirmPassword", () => {
-    const result = registrationSchema.safeParse({ ...base, confirmPassword: base.password });
-    expect(result.success).toBe(true);
+  it("accepts a complete registration with no confirm-password", () => {
+    expect(registrationSchema.safeParse(base).success).toBe(true);
   });
 
-  it("rejects a mismatched confirmation", () => {
-    const result = registrationSchema.safeParse({ ...base, confirmPassword: "a-different-passphrase-1" });
-    expect(result.success).toBe(false);
+  it("has no age attestation, username or birth date field: stray values are stripped, never required", () => {
+    const parsed = registrationSchema.safeParse({ ...base, ageConfirmed: false, username: "x", birthDate: "2015-01-01" });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(Object.keys(parsed.data).sort()).toEqual(["accountType", "displayName", "email", "password"]);
   });
 
   it("rejects an invalid email", () => {
-    const result = registrationSchema.safeParse({ email: "not-an-email", password: base.password, confirmPassword: base.password });
-    expect(result.success).toBe(false);
+    expect(registrationSchema.safeParse({ ...base, email: "not-an-email" }).success).toBe(false);
+  });
+});
+
+describe("staff registration", () => {
+  it("needs only name, email and password (no age attestation)", () => {
+    const staff = { displayName: "Mona Adel", email: "person@example.test", password: "a-very-long-passphrase-1" };
+    expect(staffRegistrationSchema.safeParse(staff).success).toBe(true);
   });
 });
 
@@ -78,5 +84,16 @@ describe("resetPasswordSchema", () => {
       confirmPassword: "a-very-long-passphrase-1",
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("registrationIssueCode", () => {
+  it("never shows a raw validator message", () => {
+    expect(registrationIssueCode({ message: "Expected string, received null", path: ["accountType"] })).toBe("authPasswordPreview.error.accountTypeRequired");
+    expect(registrationIssueCode({ message: "Invalid email", path: ["email"] })).toBe("authPasswordPreview.error.invalidEmail");
+  });
+
+  it("keeps the schema's own message key", () => {
+    expect(registrationIssueCode({ message: "authPasswordPreview.error.passwordCommon", path: ["password"] })).toBe("authPasswordPreview.error.passwordCommon");
   });
 });

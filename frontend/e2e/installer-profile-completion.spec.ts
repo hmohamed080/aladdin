@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { test, expect, type Page } from "@playwright/test";
-import { stubTurnstileWhenOffline } from "./helpers/auth";
+import { registerWithPhone } from "./helpers/phone-sign-up";
 
 /**
  * Installer profile completion across every surface that shows it, driven through the approved
@@ -13,7 +13,7 @@ import { stubTurnstileWhenOffline } from "./helpers/auth";
  *      `/home/settings` is the installer settings page, which does not display completion).
  *
  * The expectation is NOT read from `my_profile_completion()`. It is counted from the raw tables by
- * the canonical Installer rule — four shared items (username, photo, phone, confirmed name) plus the
+ * the canonical Installer rule — three shared items (photo, phone, confirmed name; the username criterion was removed in Phase 1) plus the
  * five the approved page asks for (experience, specialties, availability, a primary governorate/city,
  * at least one portfolio project) — so a regression in the database function shows up as a
  * disagreement between the DB and the three screens, not as a self-confirming number.
@@ -23,8 +23,7 @@ import { stubTurnstileWhenOffline } from "./helpers/auth";
  */
 
 const DB = process.env.E2E_DB_CONTAINER ?? "supabase_db_aladdin";
-const PASSWORD = "green-tiles-on-roof";
-const TOTAL_ITEMS = 9;
+const TOTAL_ITEMS = 8; // was 9 before the username criterion was removed (migration M1)
 
 function sql(query: string): string {
   // Argument array, no shell: the container name comes from the environment and the SQL goes in on stdin.
@@ -44,8 +43,7 @@ function uniquePhone(): string {
 function doneItems(userId: string): string[] {
   const out = sql(`
     select coalesce(string_agg(k, ',' order by k), '') from (
-      select 'username' k from public.profiles where user_id = '${userId}' and username is not null
-      union all select 'avatar' from public.profiles where user_id = '${userId}' and avatar_media_id is not null
+      select 'avatar' k from public.profiles where user_id = '${userId}' and avatar_media_id is not null
       union all select 'phone' from public.profiles where user_id = '${userId}' and phone_e164 is not null
       union all select 'display_name' from public.profiles where user_id = '${userId}' and display_name_confirmed_at is not null
       union all select 'years_experience' from public.individual_onboarding where user_id = '${userId}' and coalesce(prof_years_experience, 0) > 0
@@ -60,7 +58,7 @@ function doneItems(userId: string): string[] {
   return out ? out.split(",") : [];
 }
 
-const ALL_ITEMS = ["activities", "availability", "avatar", "display_name", "location", "phone", "portfolio", "username", "years_experience"];
+const ALL_ITEMS = ["activities", "availability", "avatar", "display_name", "location", "phone", "portfolio", "years_experience"];
 
 function expectedFor(done: string[]): { percent: number; missing: string[] } {
   return { percent: Math.round((100 * done.length) / TOTAL_ITEMS), missing: ALL_ITEMS.filter((k) => !done.includes(k)) };
@@ -91,16 +89,7 @@ async function pngBytes(page: Page, colour: string): Promise<Buffer> {
 }
 
 async function register(page: Page, name: string, phone: string): Promise<void> {
-  await stubTurnstileWhenOffline(page);
-  await page.goto("/installer/sign-up");
-  await page.getByLabel("الاسم الكامل").fill(name);
-  // Scoped by name: the sign-up page also has a labelled tab panel for the phone method.
-  await page.locator('input[name="phone"]').fill(phone);
-  await page.getByLabel("كلمة المرور", { exact: true }).fill(PASSWORD);
-  await page.getByRole("checkbox").check();
-  await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30_000 });
-  await page.getByRole("button", { name: "إنشاء الحساب" }).click();
-  await page.waitForURL(/\/home(\/|$)/, { waitUntil: "commit", timeout: 30_000 });
+  await registerWithPhone(page, { phone, name });
 }
 
 /** What each surface shows right now, as numbers. `null` = the surface is not drawn (hidden at 100%). */
@@ -150,11 +139,15 @@ test.describe("Installer profile completion — one figure on every surface", ()
 
     // The rule itself, at the start: only the shared items the sign-up gives can be done.
     const start = doneItems(userId);
-    for (const item of ["years_experience", "availability", "activities", "location", "portfolio", "avatar"]) {
+    // ADR-0026: "Complete your account" collects the location and the specialties (activities) at sign-up, so a brand-new installer already has
+    // those two; everything else still has to be done on the profile page.
+    for (const item of ["years_experience", "availability", "portfolio", "avatar"]) {
       expect(start, `a brand-new installer has not done ${item}`).not.toContain(item);
     }
+    for (const item of ["activities", "location"]) expect(start, `sign-up collected ${item}`).toContain(item);
     const first = await expectAgreement(page, userId, "after sign-up");
-    expect(first.percent).toBeLessThan(50);
+    // Not 50: sign-up now already collects the location and the specialties (ADR-0026). What matters is that it is incomplete and every surface agrees.
+    expect(first.percent).toBeLessThan(100);
 
     // Fill the approved page through its real controls and save.
     await page.goto("/home/profile");
@@ -165,8 +158,8 @@ test.describe("Installer profile completion — one figure on every surface", ()
     await page.locator("button#governorate").click();
     await page.getByRole("listbox").getByRole("option").first().click();
     await page.getByRole("button", { name: "Within a week" }).click();
-    // "Save draft" stays on the page and reports the result; "Save and continue" would redirect to /home.
-    await page.getByTestId("profile-save-draft").click();
+    // "Save changes" stays on /home/profile and reports the result.
+    await page.getByTestId("profile-save").click();
     await expect(page.getByTestId("profile-save-message")).toBeVisible({ timeout: 20_000 });
 
     const afterForm = doneItems(userId);

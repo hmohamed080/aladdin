@@ -6,6 +6,11 @@
 # hashes and object names only (no row data). The password is read at a hidden prompt and never echoed.
 #   bash scripts/hosted-db/production-post-migration-check.sh
 # Test mode (Claude, local only): POSTCHECK_DB_URL=postgresql://...@127.0.0.1:PORT/postgres
+# DISABLED 2026-11-08: this check encodes the old 191-version baseline (latest 20261024090011). Production has 203 applied
+# (latest 20261107090003) and will have 207; it would fail on a correct database and its fingerprint no longer matches.
+# Use production-p2-push.sh (its own gates and post-push history check) and `supabase migration list --linked` instead.
+echo "production-post-migration-check.sh is obsolete (expects 191 versions). Do not use it; see docs/operations/WHATSAPP_OTP_PRODUCTION_ROLLOUT_CHECKLIST.md Gate M." >&2
+exit 2
 set -euo pipefail
 export LC_ALL=C
 PROD="kkpkgjrweysgvhvkhzun"; EXPECT_COUNT=191; EXPECT_LATEST="20261024090011"

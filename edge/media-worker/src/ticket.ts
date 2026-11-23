@@ -7,7 +7,7 @@ export const TICKET_PREFIX = "aladdin.media-edge.v1.";
 export const MAX_TICKET_TTL_SECONDS = 120;
 export const CLOCK_SKEW_SECONDS = 5;
 
-export const NAMESPACES = ["avatar", "portfolio", "certificate", "product", "organization"] as const;
+export const NAMESPACES = ["avatar", "portfolio", "certificate", "product", "organization", "request", "verification", "marketplace"] as const;
 export const VARIANTS = ["original", "thumb", "card", "full"] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 export type Variant = (typeof VARIANTS)[number];
@@ -18,7 +18,8 @@ export type TicketClaims = {
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const KEY = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/){0,2}[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:jpg|jpeg|png|webp|pdf)$/;
+// Marketplace payment receipts carry a proofs/ prefix (Migration 14).
+const KEY = /^(?:proofs\/)?(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/){0,2}[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:jpg|jpeg|png|webp|pdf)$/;
 const KID = /^[a-z0-9]{1,16}$/;
 const B64URL = /^[A-Za-z0-9_-]+$/;
 
@@ -75,8 +76,8 @@ function validClaims(value: unknown): value is TicketClaims {
     && (NAMESPACES as readonly unknown[]).includes(c.ns) && (VARIANTS as readonly unknown[]).includes(c.var)
     && isObjectKey(c.k) && isUuid(c.sub) && isUuid(c.sid) && (c.ws === null || isUuid(c.ws))
     && typeof c.exp === "number" && Number.isSafeInteger(c.exp)
-    // Workspace is only meaningful for organization media; personal media never carries one.
-    && ((c.ns === "product" || c.ns === "organization") || c.ws === null);
+    // Workspace is only meaningful for organization media and purchase-request photos (another workspace may be a recipient); personal media never carries one.
+    && ((c.ns === "product" || c.ns === "organization" || c.ns === "request") || c.ws === null);
 }
 
 /**

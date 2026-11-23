@@ -18,12 +18,12 @@ Three environments, 12-factor (dev resembles prod): **Local · Staging · Produc
 | Concern | Rule |
 |---|---|
 | **Config source** | one validated module per service — `frontend/src/lib/env` (Zod), `backend/app/config.py` (Pydantic). Never `process.env`/`os.getenv`/`load_dotenv` in app code. |
-| **Secrets** | in each platform's secret store (Vercel/Supabase); **never in source**. Only `*.env.example` templates committed (placeholder values + purpose/exposure/required). |
+| **Secrets** | in each platform's secret store (Cloudflare Worker secrets, GitHub Environments, Supabase); **never in source**. Only `*.env.example` templates committed (placeholder values + purpose/exposure/required). |
 | **Exposure classes** | Public (`NEXT_PUBLIC_*`, anon key) → browser+server · Server secret (`service_role`, `OPENAI_API_KEY`, OCR/WhatsApp/email keys) → server/worker only · Platform secret (DB URL, Sentry DSN) → platform store. |
 | **Fail-fast** | missing required config → startup failure; no silent defaults for security-sensitive values. |
 | **Prod safety** | no real Production secrets in dev/foundation tasks; migrations promote Local → Staging → Production (never dashboard edits). |
 
-Targets ([ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md), superseding ADR-0004 on hosting): **Vercel Services** for both the web app and the FastAPI service, declared in the repository-root `vercel.json` · Supabase (data) · OpenAI · Azure Document Intelligence (OCR candidate) · Sentry. Worker host undecided until the first worker is implemented.
+Targets ([ADR-0021](../decisions/ADR-0021-cloudflare-workers-frontend.md), [ADR-0022](../decisions/ADR-0022-fastapi-cloudflare-containers.md), [ADR-0024](../decisions/ADR-0024-vercel-retired.md)): **Cloudflare Workers** for the web app (`frontend/wrangler.jsonc`) and **Cloudflare Containers** for the FastAPI service (`edge/backend-worker`) · Supabase (data) · OpenAI · Azure Document Intelligence (OCR candidate) · Sentry. Worker host undecided until the first worker is implemented.
 
 ## 2. CI/CD strategy
 
@@ -39,7 +39,7 @@ Targets ([ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md), supers
 **Gate:** a PR cannot merge unless all CI jobs are green. Branch protection on `main` requires review + green CI ([`09_pull_request_and_review.md`](09_pull_request_and_review.md)).
 
 ### CD (later, per release)
-- Merge to `main` → deploy **Staging** (one Vercel deployment carrying both services + Supabase staging migrations).
+- Preview Workers (Acceptance data) deploy from GitHub Actions; **Production** deploys through the manual `Cloudflare production` workflow from `main`, behind the owner's approval.
 - Tagged release (`vX.Y.Z`) → promote to **Production** after Staging verification ([`release-strategy.md`](../development/release-strategy.md)).
 - Migrations run through the migration workflow in each environment; backward-compatible (expand→backfill→contract).
 

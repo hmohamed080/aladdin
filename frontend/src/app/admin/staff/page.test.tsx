@@ -50,6 +50,11 @@ vi.mock("@/server/actions/admin-rbac", () => ({
   setStaffDisabledAction: vi.fn(),
   unassignRoleAction: vi.fn(),
 }));
+vi.mock("@/server/queries/staff-invitations", () => ({ listStaffInvitations: vi.fn(async () => []) }));
+vi.mock("@/server/actions/staff-invitation", () => ({
+  createStaffInvitationAction: vi.fn(),
+  revokeStaffInvitationAction: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }),
   usePathname: () => "/admin/staff",
@@ -167,14 +172,21 @@ describe("Admin Staff - Administrator role boundary", () => {
     expect(within(rowOf(container, "Mo Derator")).queryAllByRole("button").length).toBeGreaterThan(0);
   });
 
-  it("the Invite Admin Staff dialog carries no role picker, so it cannot grant Super Admin", async () => {
-    await renderPage();
-    const trigger = screen.getByRole("button", { name: en.admin.preview.staff.invite });
-    expect(trigger).toBeTruthy();
-    // the invite form's own fields: name + email only (the role pickers all live in per-row Change/Add role dialogs)
-    const dialog = trigger.parentElement as HTMLElement;
-    expect(dialog.querySelectorAll("select")).toHaveLength(0);
-    expect(dialog.textContent ?? "").not.toContain(names.super_admin);
+  it("Invite Admin Staff on the Staff tab is only a link to the Invitations tab: no inline role picker", async () => {
+    const { container } = await renderPage();
+    const entry = screen.getByRole("link", { name: en.admin.preview.staff.invite });
+    expect(entry.getAttribute("href")).toBe("/admin/staff?tab=invitations");
+    expect(entry.parentElement?.querySelectorAll("select")).toHaveLength(0);
+    expect(container.textContent ?? "").not.toContain(en.staffInvitation.admin.linkTitle);
+  });
+
+  it("on the Invitations tab an Administrator is offered only roles BELOW their rank: never Super Admin, never their own role", async () => {
+    await renderPage({ tab: "invitations" });
+    const picker = document.getElementById("invite-role") as HTMLSelectElement;
+    const offered = [...picker.options].map((o) => o.textContent);
+    expect(offered).toEqual([names.moderator, names.support]);
+    expect(offered).not.toContain(names.super_admin);
+    expect(offered).not.toContain(names.administrator);
   });
 
   it("has no Create role or Edit role control without roles.manage", async () => {

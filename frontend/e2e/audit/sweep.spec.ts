@@ -50,7 +50,7 @@ test("sweep anonymous", async ({ page }) => {
   await sweep(page, "anonymous", [
     "/auth/sign-in", "/auth/sign-up", "/auth/forgot-password", "/auth/forgot-password/verify", "/auth/forgot-password/reset", "/auth/forgot-password/success",
     "/auth/recovery", "/auth/support", "/auth/verify", "/auth/finish-registration", "/auth/invite/not-a-token",
-    "/installer/sign-in", "/installer/sign-up", "/legal/privacy", "/legal/terms", "/preview/landing",
+    "/legal/privacy", "/legal/terms", "/preview/landing",
     "/preview/auth-password/sign-in", "/preview/auth-password/sign-up", "/preview/installer-account", "/preview/installer-dashboard",
     "/b2b", "/home", "/business/applications", "/home/independent-publishing", "/admin", "/onboarding",
   ], false);

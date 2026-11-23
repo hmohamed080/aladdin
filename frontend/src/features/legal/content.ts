@@ -5,7 +5,7 @@ import type { Locale } from "@/lib/i18n/locales";
  * (docs/frontend/legal-pages.md). Every statement here describes what the
  * product actually does today — the data the registration, profile, business,
  * catalogue, jobs, chat and sign-in flows store, the providers that process it
- * (Supabase, Vercel, Cloudflare Turnstile, Google, Meta), the cookies the app
+ * (Supabase, Cloudflare, Resend, Google, Meta), the cookies the app
  * sets, and the request-based deletion process. Change the copy when the
  * behaviour changes, and bump that document's date in LEGAL_UPDATED_AT.
  */
@@ -43,7 +43,7 @@ const privacyEn: LegalDocument = {
       blocks: [
         p("Data you give us when you create and use an account:"),
         list(
-          "Account details: full name, email address and/or mobile phone number, username, the account type you choose (for example Showroom or Installer) and your password. Passwords are stored only as a secure hash by our authentication provider; we never see or store them in plain text.",
+          "Account details: full name, email address and/or mobile phone number, the account type you choose (for example Showroom or Installer), and your password. We no longer collect a date of birth or a username. Any values stored earlier are being removed as part of a scheduled clean-up. Passwords are stored only as a secure hash by our authentication provider; we never see or store them in plain text.",
           "Profile details you add: display name, profile photo, trade and specialties, service areas, availability, portfolio images and certificates.",
           "Business details if you register a business: business name and legal name, business type, branches and their addresses and phone numbers, business photo and description, and verification information you submit.",
           "Content you create: products, prices, offers, purchase requests, quotations, job posts and applications, reviews, saved items and searches, and messages you send to other users.",
@@ -66,7 +66,7 @@ const privacyEn: LegalDocument = {
       heading: "3. How we use your data",
       blocks: [
         list(
-          "To create your account, verify your email with a one-time code, sign you in and keep your account secure.",
+          "To create your account, verify your email or mobile number with a one-time code, sign you in and keep your account secure.",
           "To run the features you use: your profile and business page, the catalogue, offers, purchase requests and quotations, jobs, messages, reviews, points and notifications.",
           "To show your public profile or business information to other users where the feature is designed to be public (for example a business listing or a professional profile).",
           "To verify businesses and professionals, and to prevent fraud, spam and abuse.",
@@ -90,8 +90,9 @@ const privacyEn: LegalDocument = {
         p("Only with the service providers that run Aladdin for us, under their data-processing terms, and only for the purposes above:"),
         list(
           "Supabase — database, authentication, file storage and email codes. Our database is hosted in the European Union (Paris region).",
-          "Vercel — hosting and delivery of the website and application.",
-          "Cloudflare (Turnstile) — bot protection on sign-up and code requests.",
+          "Cloudflare — hosting and delivery of the website and application, and bot protection (Turnstile) on sign-up, sign-in and code requests.",
+          "Resend — sending account emails, such as the link that confirms a contact email you add.",
+          "Meta (WhatsApp) — sending the one-time code that verifies a mobile number when you sign up with one.",
           "Google and Meta (Facebook) — only if you choose to sign in with them.",
         ),
         p("Other Aladdin users see the information you choose to publish or send to them. We may also disclose data when required by law or to protect the rights and safety of our users."),
@@ -117,7 +118,7 @@ const privacyEn: LegalDocument = {
         list(
           "Sign-in session cookies that keep you signed in.",
           "A language cookie that remembers whether you use Arabic or English.",
-          "Short-lived cookies used during password recovery, which expire within minutes.",
+          "Short-lived cookies used during password recovery and mobile-number sign-up, which expire within minutes.",
           "Cloudflare Turnstile may set cookies needed for bot protection.",
         ),
         p("We do not use advertising or third-party analytics cookies."),
@@ -145,7 +146,7 @@ const privacyEn: LegalDocument = {
     {
       id: "children",
       heading: "11. Children",
-      blocks: [p("Aladdin is a professional service for adults. It is not intended for anyone under 18, and we do not knowingly collect data from children.")],
+      blocks: [p("Aladdin is a professional service for adults. The service is intended for people aged 18 or older. It is not intended for anyone under 18, and we do not knowingly collect data from children.")],
     },
     {
       id: "transfers",
@@ -183,7 +184,7 @@ const privacyAr: LegalDocument = {
       blocks: [
         p("بيانات تقدّمها لنا عند إنشاء حسابك واستخدامه:"),
         list(
-          "بيانات الحساب: الاسم الكامل، والبريد الإلكتروني و/أو رقم الموبايل، واسم المستخدم، ونوع الحساب الذي تختاره (مثل معرض أو صنايعي)، وكلمة المرور. تُحفظ كلمات المرور مشفّرة تشفيرًا أحادي الاتجاه لدى مزوّد خدمة الدخول، ولا نراها أو نحفظها كنص واضح أبدًا.",
+          "بيانات الحساب: الاسم الكامل، والبريد الإلكتروني و/أو رقم الموبايل، ونوع الحساب الذي تختاره (مثل معرض أو صنايعي)، وكلمة المرور. لم نعد نجمع تاريخ الميلاد أو اسم المستخدم. وأي قيم سبق حفظها تُحذف ضمن عملية تنظيف مجدولة. تُحفظ كلمات المرور مشفّرة تشفيرًا أحادي الاتجاه لدى مزوّد خدمة الدخول، ولا نراها أو نحفظها كنص واضح أبدًا.",
           "بيانات الملف الشخصي التي تضيفها: الاسم الظاهر، وصورة الملف، والحرفة والتخصصات، ومناطق الخدمة، وأوقات التوفر، وصور الأعمال والشهادات.",
           "بيانات النشاط التجاري إذا سجّلت نشاطًا: الاسم التجاري والاسم القانوني، ونوع النشاط، والفروع وعناوينها وأرقام هواتفها، وصورة النشاط ووصفه، وبيانات التوثيق التي ترسلها.",
           "المحتوى الذي تنشئه: المنتجات والأسعار والعروض وطلبات الشراء وعروض الأسعار وإعلانات الوظائف والتقديمات والتقييمات والعناصر وعمليات البحث المحفوظة والرسائل التي ترسلها للمستخدمين الآخرين.",
@@ -206,7 +207,7 @@ const privacyAr: LegalDocument = {
       heading: "٣. كيف نستخدم بياناتك",
       blocks: [
         list(
-          "لإنشاء حسابك، وتأكيد بريدك برمز لمرة واحدة، وتسجيل دخولك، والحفاظ على أمان حسابك.",
+          "لإنشاء حسابك، وتأكيد بريدك أو رقم موبايلك برمز لمرة واحدة، وتسجيل دخولك، والحفاظ على أمان حسابك.",
           "لتشغيل الخصائص التي تستخدمها: ملفك وصفحة نشاطك، والكتالوج، والعروض، وطلبات الشراء وعروض الأسعار، والوظائف، والرسائل، والتقييمات، والنقاط، والإشعارات.",
           "لعرض ملفك العام أو بيانات نشاطك للمستخدمين الآخرين حيث تكون الخاصية مصممة لتكون عامة (مثل صفحة النشاط أو الملف المهني).",
           "لتوثيق الأنشطة التجارية والمهنيين، ومنع الاحتيال والرسائل المزعجة وإساءة الاستخدام.",
@@ -228,8 +229,9 @@ const privacyAr: LegalDocument = {
         p("فقط مع مزوّدي الخدمات الذين يشغّلون علاء الدين لصالحنا، وفق شروط معالجة البيانات الخاصة بهم، وللأغراض المذكورة أعلاه فقط:"),
         list(
           "Supabase — قاعدة البيانات وخدمة الدخول وتخزين الملفات ورموز البريد. قاعدة بياناتنا مستضافة في الاتحاد الأوروبي (منطقة باريس).",
-          "Vercel — استضافة الموقع والتطبيق وتوصيلهما.",
-          "Cloudflare (Turnstile) — الحماية من البرامج الآلية عند التسجيل وطلب الرموز.",
+          "Cloudflare — استضافة الموقع والتطبيق وتوصيلهما، والحماية من البرامج الآلية (Turnstile) عند التسجيل والدخول وطلب الرموز.",
+          "Resend — إرسال رسائل البريد الخاصة بالحساب، مثل رابط تأكيد بريد التواصل الذي تضيفه.",
+          "Meta (واتساب) — إرسال الرمز الذي يؤكد رقم موبايلك عند التسجيل به.",
           "Google وMeta (Facebook) — فقط إذا اخترت الدخول من خلالهما.",
         ),
         p("يرى مستخدمو علاء الدين الآخرون المعلومات التي تختار نشرها أو إرسالها إليهم. وقد نفصح عن البيانات إذا تطلّب القانون ذلك أو لحماية حقوق مستخدمينا وسلامتهم."),
@@ -255,7 +257,7 @@ const privacyAr: LegalDocument = {
         list(
           "كوكيز جلسة الدخول التي تُبقيك مسجّلًا.",
           "كوكي اللغة الذي يتذكر استخدامك للعربية أو الإنجليزية.",
-          "كوكيز قصيرة العمر تُستخدم أثناء استعادة كلمة المرور وتنتهي خلال دقائق.",
+          "كوكيز قصيرة العمر تُستخدم أثناء استعادة كلمة المرور والتسجيل برقم الموبايل وتنتهي خلال دقائق.",
           "قد يضع Cloudflare Turnstile كوكيز لازمة للحماية من البرامج الآلية.",
         ),
         p("لا نستخدم كوكيز إعلانية أو كوكيز تحليلات من جهات أخرى."),
@@ -279,7 +281,7 @@ const privacyAr: LegalDocument = {
     {
       id: "children",
       heading: "١١. الأطفال",
-      blocks: [p("علاء الدين خدمة مهنية للبالغين، وغير موجهة لمن هم دون ١٨ عامًا، ولا نجمع عن قصد بيانات الأطفال.")],
+      blocks: [p("علاء الدين خدمة مهنية للبالغين. الخدمة موجهة لمن بلغ ١٨ عامًا أو أكثر. الخدمة غير موجهة لمن هم دون ١٨ عامًا، ولا نجمع عن قصد بيانات الأطفال.")],
     },
     {
       id: "transfers",
@@ -344,7 +346,7 @@ const deletionEn: LegalDocument = {
       blocks: [
         list(
           "Your sign-in account and every sign-in method linked to it (email, phone number, Google, Facebook).",
-          "Your profile: name, username, contact details, profile photo, trade, service areas, availability, portfolio and certificates.",
+          "Your profile: name, contact details, profile photo, trade, service areas, availability, portfolio and certificates.",
           "Your saved items and searches, notifications, points, job applications, reviews you wrote, consent records and messages you sent.",
           "Files you uploaded, such as profile, portfolio, certificate, product and business images.",
           "Businesses where you are the only member, with their branches, products and offers.",
@@ -418,7 +420,7 @@ const deletionAr: LegalDocument = {
       blocks: [
         list(
           "حساب الدخول وكل طرق الدخول المرتبطة به (البريد، رقم الهاتف، Google، Facebook).",
-          "ملفك الشخصي: الاسم واسم المستخدم وبيانات التواصل وصورة الملف والحرفة ومناطق الخدمة وأوقات التوفر وصور الأعمال والشهادات.",
+          "ملفك الشخصي: الاسم وبيانات التواصل وصورة الملف والحرفة ومناطق الخدمة وأوقات التوفر وصور الأعمال والشهادات.",
           "العناصر وعمليات البحث المحفوظة، والإشعارات، والنقاط، والتقديم على الوظائف، والتقييمات التي كتبتها، وسجلات الموافقة، والرسائل التي أرسلتها.",
           "الملفات التي رفعتها، مثل صور الملف والأعمال والشهادات والمنتجات والنشاط التجاري.",
           "الأنشطة التجارية التي تكون أنت عضوها الوحيد، مع فروعها ومنتجاتها وعروضها.",
@@ -469,7 +471,7 @@ const termsEn: LegalDocument = {
       heading: "2. Who can use Aladdin",
       blocks: [
         list(
-          "You must be at least 18 years old and able to enter into a binding agreement.",
+          "You must be at least 18 years old and able to enter into a binding agreement. We do not ask for or collect your date of birth.",
           "If you register or act for a business, you confirm that you are authorised to act for it, and the business is also bound by these Terms.",
           "You may not use Aladdin if we have previously suspended or removed your account, unless we agree otherwise.",
         ),
@@ -600,7 +602,7 @@ const termsAr: LegalDocument = {
       heading: "٢. من يمكنه استخدام علاء الدين",
       blocks: [
         list(
-          "يجب ألا يقل عمرك عن ١٨ عامًا وأن تكون أهلًا لإبرام اتفاق ملزم.",
+          "يجب ألا يقل عمرك عن ١٨ عامًا وأن تكون أهلًا لإبرام اتفاق ملزم. ولا نطلب تاريخ ميلادك ولا نجمعه.",
           "إذا سجّلت نشاطًا تجاريًا أو تصرفت نيابةً عنه فأنت تؤكد أنك مخوّل بذلك، ويلتزم النشاط أيضًا بهذه الشروط.",
           "لا يجوز لك استخدام علاء الدين إذا سبق أن أوقفنا حسابك أو أزلناه، إلا إذا وافقنا على غير ذلك.",
         ),
@@ -721,8 +723,8 @@ export type LegalDocumentKey = keyof typeof DOCUMENTS;
 
 /** When each document last changed (ISO date). */
 export const LEGAL_UPDATED_AT: Record<LegalDocumentKey, string> = {
-  terms: "2026-10-18",
-  privacy: "2026-10-17",
+  terms: "2026-11-10",
+  privacy: "2026-11-10",
   dataDeletion: "2026-10-17",
 };
 

@@ -29,7 +29,6 @@ test.describe("Admin referral location correction", () => {
     const email = `locfix-${stamp}@example.test`;
     await registerWithPassword(page, request, {
       email,
-      username: `locfix${stamp}`.slice(0, 24),
       displayName: "Location Fix Referrer",
       accountType: /sales team/i,
       landing: /\/home(\/|$|\?)/,

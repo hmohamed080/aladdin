@@ -162,3 +162,20 @@ The existing implementation was checked against the brief. Status: **Met** means
 | Disabled in Production until acceptance (flag default off) | Met for the web app; **fixed** for the backend, which used Redis whenever `REDIS_URL` was set. It now honours the same `REDIS_CACHE_ENABLED` switch (default false); a guard test checks `.env.example` and every `wrangler.jsonc` environment | `backend/app/config.py:56`, `cache.ts:14`; tests `test_coordination.py:32`, `redis-guards.test.ts:67` |
 
 **Live check.** `curl -s https://alert-bedbug-148148.upstash.io/ping` from the coding sandbox on 2026-10-22: **not reachable**. The agent proxy refused the CONNECT tunnel (`403`, `connect_rejected`), so no PING reached Upstash and the database's state was not verified from here.
+
+## Revision 2026-11-15 — Redis approved for Production
+
+**Owner decision (2026-11-15):** Redis is switched on in Production, on the **same Free Upstash database as the preview** (`alert-bedbug-148148`, REST transport), with the key prefix `REDIS_KEY_ENV=production`, so the two environments never read each other's entries. Nothing else about what Redis may hold changes: still no authorization, no tenant data, no bytes (see "What Redis must never hold").
+
+- **Config:** `frontend/wrangler.jsonc` `env.production.vars`: `REDIS_CACHE_ENABLED=true`, `REDIS_REST_URL`, `REDIS_KEY_ENV=production`. `REDIS_REST_TOKEN` is a Worker secret and is listed in `secrets.required`, so a deploy without it is refused instead of running without the cache. The guard `scripts/check-cloudflare-production.mjs` (and its tests) now require the REST URL, the `production` prefix and the secret whenever Redis is on.
+- **Shared quota:** the 500,000 commands a month are shared by preview and Production. New uses are layered so Redis is asked rarely: the landing counts read isolate memory, then the Cloudflare data-centre cache, and only then Redis (PR on `fix/landing-stats-shared-cache-20261115`). Watch `cache.redis_budget` (50% / 80%) and `/api/health`; if the budget is a problem, move Production to its own database (a new REST URL, same prefix) with no data migration.
+- **Rollback:** set `REDIS_CACHE_ENABLED` to `false` (and promote the version). Reads go back to Postgres, rate limits count in memory.
+- **Activation order:** set the secret first (`wrangler secret put REDIS_REST_TOKEN --env production`, the normal read-write token), then deploy. The code runs without Redis when it is unreachable, so a wrong token degrades to the old behaviour, not to an outage.
+
+## Revision 2026-11-15 (b) - Redis off on the preview
+
+**Owner decision (2026-11-15):** the preview Worker no longer uses Redis (`REDIS_CACHE_ENABLED=false`, its REST URL and `cf-preview` prefix removed from `wrangler.jsonc`), so Production gets the whole Free quota of 500,000 commands a month. The preview falls back to Postgres reads and in-memory rate limits, which is the documented fallback. The "Shared quota" point of the revision above no longer applies; the production-only prefix and guards stay.
+
+## Revision 2026-11-16 - per-client limits for the public Marketplace
+
+Two public, unauthenticated Marketplace paths are limited per CLIENT (HMAC-hashed IP, never the raw address): `market-media` 600/min (the image route, only the fallback for photos the page did not already give as Worker URLs) and `market-quote` 40/min (one read RPC per call). Key shape `aladdin:{env}:v1:rl:global:{hash}`; with Redis off (the preview) the same window counts per instance in memory, and without the identifier secret the call degrades to "allowed". An abuse brake, never an authorization input. They add Redis commands only in Production while the Marketplace is open; the facets memo (60 s, per isolate) adds none.

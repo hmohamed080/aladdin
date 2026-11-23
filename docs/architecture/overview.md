@@ -10,10 +10,10 @@ One-page orientation to how Aladdin is built. Start here, then follow links.
 
 Aladdin is a **modular monolith** (ADR-0001): one Next.js web app, one Supabase data platform, one specialized FastAPI AI/document service, and background workers where async work is required.
 
-Both application services deploy through **Vercel Services** from one repository-root `vercel.json` (ADR-0009), so they share an origin: `/api/backend/*` routes to FastAPI, everything else to Next.js.
+Both application services run on Cloudflare (ADR-0021, ADR-0022, ADR-0024): Next.js on a Worker, FastAPI in a Container reached through the Worker's `BACKEND` binding, so they share an origin: `/api/backend/*` routes to FastAPI, everything else to Next.js.
 
 ```
-          ┌═══════════════ one Vercel project ═══════════════┐
+          ┌═════════════ Cloudflare (one origin) ════════════┐
           ║                                                  ║
           ║ ┌──────────────────────────────────────────────┐ ║
   Users   ║ │  Next.js (App Router) — services.frontend    │ ║
@@ -60,4 +60,4 @@ New capabilities default to the Next.js + Supabase path; FastAPI is chosen only 
 
 ## Related files
 
-`system-context.md` · `module-boundaries.md` · `data-flow.md` · `realtime-and-background-jobs.md` · `scaling-strategy.md` · ADR-0001 · [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)
+`system-context.md` · `module-boundaries.md` · `data-flow.md` · `realtime-and-background-jobs.md` · `scaling-strategy.md` · ADR-0001 · [ADR-0024](../decisions/ADR-0024-vercel-retired.md)

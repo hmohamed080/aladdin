@@ -62,7 +62,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             <p className="px-3 pb-2 text-label font-semibold uppercase tracking-wide text-fg-muted">
               {m.admin.title}
             </p>
-            <AdminSidebar access={access} />
+            {/* The list scrolls on its own: the rail is pinned under the header, so on a short window (or with many
+                permitted areas) the entries below the fold would otherwise be unreachable. Title and role badge stay put. */}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-testid="admin-sidebar-scroll">
+              <AdminSidebar access={access} />
+            </div>
             <div className="mt-auto px-3 pt-lg">
               {roleLabel ? <Badge tone="accent">{roleLabel}</Badge> : null}
             </div>

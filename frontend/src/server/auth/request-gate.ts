@@ -78,10 +78,6 @@ export function needsNetworkValidatedSession(path: string): boolean {
 export function isSignedOutEntryPath(path: string): boolean {
   return (
     path === "/auth/sign-in" ||
-    path === "/auth/sign-up" ||
-    path === "/installer/sign-in" ||
-    path === "/installer/sign-up" ||
-    path === "/showroom/sign-in" ||
-    path === "/showroom/sign-up"
+    path === "/auth/sign-up"
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { SocialLinksCard, displayLink } from "@/features/onboarding/social-links-card";
+import { normalizeSocialLink, socialLinksError, SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/onboarding/social-links";
 import { PhoneField } from "@/components/ui/phone-field";
 import { splitE164 } from "@/lib/contact/phone";
-import { SHOWROOM_ACTIVITIES, showroomIdentityError, businessAddressSchema, businessAddressWords, businessDetailsSchema, type SHOWROOM_ACTIVITIES_TYPE } from "@/lib/onboarding/business-details";
+import { businessActivitiesOf, businessActivityError, showroomIdentityError, businessAddressSchema, businessAddressWords, businessDetailsSchema, type SHOWROOM_ACTIVITIES_TYPE } from "@/lib/onboarding/business-details";
 import { useI18n } from "@/lib/i18n/context";
 import { Input, Select, Textarea, LabeledField } from "@/components/ui/controls";
 import { CountedTextarea } from "@/components/ui/counted-textarea";
@@ -15,6 +17,8 @@ import type { BusinessAnswers } from "@/server/queries/onboarding";
 import { APPLICATION_ORG_TYPES, applicationOrgTypeFrom, type ApplicationOrgType } from "@/lib/onboarding/account-types";
 import { GOVERNORATE_OPTIONS, type LocationOption } from "@/lib/installer/location-data";
 import { businessCitiesOf, CUSTOM_CITY_MAX, CUSTOM_CITY_MIN } from "@/lib/location/business-location";
+import { BasicsSpecialtiesField, useSpecialtyOptions, type SpecialtySource } from "@/features/onboarding/basics-fields";
+import { saveBusinessBasicsStep } from "@/server/actions/account-basics";
 
 /**
  * Business creation — "create my showroom", not "create an organization".
@@ -35,7 +39,10 @@ import { businessCitiesOf, CUSTOM_CITY_MAX, CUSTOM_CITY_MIN } from "@/lib/locati
  * State lives in the database (hydrated on load), so the wizard resumes across
  * refresh and sign-out.
  */
-type Step = "identity" | "type" | "location" | "branch" | "review";
+type Step = "identity" | "type" | "location" | "basics" | "branch" | "review";
+
+/** What the owner still owes of the account basics (ADR-0026), asked as a step of this wizard. */
+export type BusinessBasics = { phone: boolean; specialties: boolean; source: SpecialtySource | null };
 
 /** The "Other" choice in the city list. A UI control only: it is never sent or stored as a city. */
 const OTHER_VALUE = "__other__";
@@ -56,6 +63,8 @@ type BState = {
   otherCity: boolean;
   cityCustomName: string;
   primaryBranchName: string;
+  /** Showroom links as typed (normalised by the server action on every save). */
+  links: Record<SocialPlatform, string>;
 };
 
 export function BusinessFlow({
@@ -63,12 +72,19 @@ export function BusinessFlow({
   presetOrgType,
   draftId: initialDraftId,
   typeChoices = APPLICATION_ORG_TYPES.filter((k) => k !== "contractor_company"),
+  basics = null,
 }: {
   answers: BusinessAnswers;
   presetOrgType: ApplicationOrgType | null;
   draftId: string | null;
   /** The org types this applicant may apply for (a Contractor: only a contractor organization). */
   typeChoices?: readonly ApplicationOrgType[];
+  /**
+   * Phone and specialties still missing from the owner's account basics: a step
+   * of this wizard (owner decision 2026-10-29), never a separate page. The
+   * location is the business's own, so it is not asked twice.
+   */
+  basics?: BusinessBasics | null;
 }) {
   const { t, locale } = useI18n();
   const [pending, start] = useTransition();
@@ -89,25 +105,53 @@ export function BusinessFlow({
     otherCity: Boolean(answers.cityCustomName),
     cityCustomName: answers.cityCustomName ?? "",
     primaryBranchName: answers.primaryBranchName ?? "",
+    links: {
+      facebook: answers.facebookUrl ?? "",
+      instagram: answers.instagramUrl ?? "",
+      tiktok: answers.tiktokUrl ?? "",
+      website: answers.websiteUrl ?? "",
+    },
   });
+  // Set by a Next pressed while the links block the identity step; the card then shows its messages.
+  const [showLinkErrors, setShowLinkErrors] = useState(false);
+  // A new object per blocked Next, so pressing Next twice moves focus back to the link both times.
+  const [linkFocus, setLinkFocus] = useState<{ platform: SocialPlatform } | null>(null);
+  useEffect(() => {
+    if (linkFocus) document.getElementById(`blinks-${linkFocus.platform}`)?.focus();
+  }, [linkFocus]);
 
   // The type step exists only when the type is still unknown. A person who chose
   // "Showroom" to sign up is never asked what kind of business they are building.
   const typePreselected = Boolean(applicationOrgTypeFrom(answers.orgType) ?? presetOrgType);
-  const steps: Step[] = typePreselected
-    ? ["identity", "location", "branch", "review"]
-    : ["identity", "type", "location", "branch", "review"];
+  const askBasics = Boolean(basics && (basics.phone || basics.specialties));
+  const steps: Step[] = [
+    "identity",
+    ...(typePreselected ? [] : (["type"] as const)),
+    "location",
+    ...(askBasics ? (["basics"] as const) : []),
+    "branch",
+    "review",
+  ];
+  const specialtyOptions = useSpecialtyOptions(basics?.source ?? null);
+  const [ownerPhone, setOwnerPhone] = useState<string | null>(answers.contactPhone ?? null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const basicsDone = () => (!basics?.phone || Boolean(ownerPhone)) && (!basics?.specialties || picked.length > 0);
 
   const showroom = state.orgType === "showroom_dealer";
   const [phoneInvalid, setPhoneInvalid] = useState(false);
   const savedPhone = splitE164(state.contactPhone);
   // BOTH names are required to leave the identity step: the business (trading) name and the legal / registered name.
-  const identityDone = (s: BState) => s.displayName.trim().length >= 2 && s.legalName.trim().length >= 2 && s.description.trim().length <= 250 && (!showroom || (!phoneInvalid && !showroomIdentityError(s)));
+  // The business activity is asked with the identity when the type is already known, else with the type (stack: account basics / ADR-0026).
+  const activities = businessActivitiesOf(state.orgType);
+  const identityFieldsDone = (s: BState) => s.displayName.trim().length >= 2 && s.legalName.trim().length >= 2 && s.description.trim().length <= 250 && (!showroom || (!phoneInvalid && !showroomIdentityError(s))) && (!typePreselected || !businessActivityError(s.orgType, s.activityType));
+  // A showroom also needs at least one valid link and no invalid one. Next stays pressable for the links so a
+  // press can say what is missing; it never advances past them (see persistAdvance).
+  const identityDone = (s: BState) => identityFieldsDone(s) && (!showroom || !socialLinksError(s.links));
   // Every new business needs a governorate, a city (or custom city) and a detailed address.
   const locationDone = (s: BState) =>
     !!s.governorate && businessAddressSchema.safeParse(s.detailedAddress).success &&
     (s.otherCity ? s.cityCustomName.trim().length >= CUSTOM_CITY_MIN : Boolean(s.city));
-  const typeDone = (s: BState) => !!s.orgType;
+  const typeDone = (s: BState) => !!s.orgType && !businessActivityError(s.orgType, s.activityType);
 
   const [step, setStep] = useState<number>(() => {
     if (!identityDone(state)) return 0;
@@ -148,9 +192,35 @@ export function BusinessFlow({
     city: s.otherCity ? null : s.city,
     cityCustomName: s.otherCity ? s.cityCustomName.trim() || null : null,
     primaryBranchName: s.primaryBranchName.trim() || null,
+    // v3 saves REPLACE all four links (an omitted one is cleared), so every save sends all four, on every step.
+    // Only a showroom has links: after the type was switched away from it, blanks are sent so the typed values never travel.
+    facebookUrl: s.orgType === "showroom_dealer" ? s.links.facebook : "",
+    instagramUrl: s.orgType === "showroom_dealer" ? s.links.instagram : "",
+    tiktokUrl: s.orgType === "showroom_dealer" ? s.links.tiktok : "",
+    websiteUrl: s.orgType === "showroom_dealer" ? s.links.website : "",
   });
 
-  const persistAdvance = () =>
+  /** Show the card's messages and move focus to the first invalid link, or Instagram when none is valid. */
+  const flagLinks = () => {
+    setShowLinkErrors(true);
+    const invalid = SOCIAL_PLATFORMS.find((p) => !normalizeSocialLink(p, state.links[p]).ok);
+    setLinkFocus({ platform: invalid ?? "instagram" });
+  };
+
+  const persistAdvance = () => {
+    if (current === "identity" && showroom && socialLinksError(state.links)) {
+      setError(null);
+      flagLinks();
+      return;
+    }
+    // Showroom chosen AFTER step 1 (no preselected type): step 1 never showed its showroom fields, so send the
+    // person back there now rather than letting submit fail at the end.
+    if (current === "type" && state.orgType === "showroom_dealer" && !identityDone(state)) {
+      setError(null);
+      goto("identity");
+      if (socialLinksError(state.links)) flagLinks();
+      return;
+    }
     start(async () => {
       setError(null);
       const res = await saveBusiness({ ...toInput(state), step: current === "identity" || current === "location" ? current : undefined });
@@ -161,8 +231,21 @@ export function BusinessFlow({
       if (res.draftId) setDraftId(res.draftId);
       setStep((x) => Math.min(x + 1, steps.length - 1));
     });
+  };
 
   const back = () => setStep((x) => Math.max(x - 1, 0));
+
+  // The basics step saves to the account itself (not the business draft).
+  const saveBasicsAdvance = () =>
+    start(async () => {
+      setError(null);
+      const res = await saveBusinessBasicsStep({ phone: ownerPhone, specialties: picked });
+      if (!res.ok) {
+        setError(res.code ?? "accountBasics.error.saveFailed");
+        return;
+      }
+      setStep((x) => Math.min(x + 1, steps.length - 1));
+    });
 
   const submit = () =>
     start(async () => {
@@ -174,16 +257,56 @@ export function BusinessFlow({
 
   const canContinue =
     current === "identity"
-      ? identityDone(state)
+      ? identityFieldsDone(state)
       : current === "type"
         ? typeDone(state)
         : current === "location"
           ? locationDone(state)
-          : true;
+          : current === "basics"
+            ? basicsDone()
+            : true;
+
+  const descriptionBlock = (
+    <>
+      <LabeledField label={t("onboarding.business.identity.descriptionLabel")} htmlFor="bdesc" optional={t("common.optional")}>
+        <CountedTextarea
+          id="bdesc"
+          value={state.description}
+          max={DESCRIPTION_MAX_CHARS}
+          unitLabel={t("showroomSettings.description.chars")}
+          counterTestId="business-description-count"
+          placeholder={t("onboarding.business.identity.descriptionPlaceholder")}
+          onChange={(e) => set({ description: e.target.value })}
+        />
+        {isWithinDescriptionLimit(state.description) ? null : (
+          <p role="alert" className="mt-1 text-label text-danger">{t("onboarding.error.descriptionTooLong")}</p>
+        )}
+      </LabeledField>
+      <p className="text-label text-fg-secondary text-end" dir="ltr" aria-live="polite">{state.description.length} / 250</p>
+      {state.description.trim().length > 250 ? <InlineError>{t("onboarding.error.descriptionTooLong")}</InlineError> : null}
+    </>
+  );
+
+  // The links the review will save, in platform order, as host + path.
+  const addedLinks = SOCIAL_PLATFORMS.flatMap((p) => {
+    const r = normalizeSocialLink(p, state.links[p]);
+    return r.ok && r.url ? [displayLink(r.url)] : [];
+  });
 
   const progress = (
     <WizardProgress current={step} total={steps.length} label={t(`onboarding.business.step.${current}`)} />
   );
+
+  const activityField = activities.length ? (
+    <LabeledField label={t("onboarding.business.identity.activityLabel")} htmlFor="bactivity">
+      <Select id="bactivity" required value={state.activityType ?? ""} onChange={(e) => set({ activityType: (e.target.value || null) as SHOWROOM_ACTIVITIES_TYPE })}>
+        <option value="">{t("onboarding.business.location.choose")}</option>
+        {activities.map((value) => (
+          <option key={value} value={value}>{t(`onboarding.business.activities.${value}`)}</option>
+        ))}
+      </Select>
+    </LabeledField>
+  ) : null;
 
   return (
     <WizardShell
@@ -217,45 +340,42 @@ export function BusinessFlow({
               onChange={(e) => set({ legalName: e.target.value })}
             />
           </LabeledField>
-          {showroom ? <LabeledField label={t("onboarding.business.identity.activityLabel")} htmlFor="bactivity"><Select id="bactivity" required value={state.activityType ?? ""} onChange={e => set({activityType: e.target.value as SHOWROOM_ACTIVITIES_TYPE})}><option value="">{t("onboarding.business.location.choose")}</option>{SHOWROOM_ACTIVITIES.map(value => <option key={value} value={value}>{t(`onboarding.business.activities.${value}`)}</option>)}</Select></LabeledField> : null}
-          <LabeledField label={t("onboarding.business.identity.descriptionLabel")} htmlFor="bdesc" optional={t("common.optional")}>
-            <CountedTextarea
-              id="bdesc"
-              value={state.description}
-              max={DESCRIPTION_MAX_CHARS}
-              unitLabel={t("showroomSettings.description.chars")}
-              counterTestId="business-description-count"
-              placeholder={t("onboarding.business.identity.descriptionPlaceholder")}
-              onChange={(e) => set({ description: e.target.value })}
-            />
-            {isWithinDescriptionLimit(state.description) ? null : (
-              <p role="alert" className="mt-1 text-label text-danger">{t("onboarding.error.descriptionTooLong")}</p>
-            )}
-          </LabeledField>
-          <p className="text-label text-fg-secondary text-end" dir="ltr" aria-live="polite">{state.description.length} / 250</p>
-          {state.description.trim().length > 250 ? <InlineError>{t("onboarding.error.descriptionTooLong")}</InlineError> : null}
+          {typePreselected ? activityField : null}
+          {/* Required fields first, optional last: a showroom's optional description moves below its links card. */}
+          {showroom ? null : descriptionBlock}
           {showroom ? <section className="flex flex-col gap-md border-t border-strong pt-lg" aria-labelledby="business-contact-heading">
             <h2 id="business-contact-heading" className="text-title text-fg">{t("onboarding.business.identity.contactSection")}</h2>
             <LabeledField label={t("onboarding.business.identity.phoneLabel")} htmlFor="bphone"><PhoneField id="bphone" defaultCountryIso2={savedPhone?.countryIso2} defaultNational={savedPhone?.national} onChange={phone => set({contactPhone: phone?.e164 ?? null})} onInvalidChange={setPhoneInvalid} compact /></LabeledField>
             <LabeledField label={t("onboarding.business.identity.emailLabel")} htmlFor="bemail" optional={t("common.optional")}><Input id="bemail" type="email" dir="ltr" autoComplete="email" maxLength={254} value={state.contactEmail} aria-invalid={!businessDetailsSchema.safeParse(state).success || undefined} onChange={e => set({contactEmail:e.target.value})}/>{!businessDetailsSchema.safeParse(state).success ? <InlineError>{t("onboarding.error.contactInvalid")}</InlineError> : null}</LabeledField>
+            <SocialLinksCard
+              idPrefix="blinks"
+              values={state.links}
+              onChange={(p, v) => setState((s) => ({ ...s, links: { ...s.links, [p]: v } }))}
+              showErrors={showLinkErrors}
+              focusPlatform={linkFocus?.platform ?? null}
+            />
           </section> : null}
+          {showroom ? descriptionBlock : null}
         </div>
       ) : null}
 
       {current === "type" ? (
-        <LabeledField label={t("onboarding.business.type.label")} htmlFor="btype">
-          <div id="btype" className="grid gap-2.5 tablet:grid-cols-2">
-            {typeChoices.map((k) => (
-              <ChoiceCard
-                key={k}
-                selected={state.orgType === k}
-                title={t(`onboarding.business.orgTypes.${k}`)}
-                description={t(`onboarding.business.orgTypeDesc.${k}`)}
-                onSelect={() => set({ orgType: k })}
-              />
-            ))}
-          </div>
-        </LabeledField>
+        <div className="flex flex-col gap-md">
+          <LabeledField label={t("onboarding.business.type.label")} htmlFor="btype">
+            <div id="btype" className="grid gap-2.5 tablet:grid-cols-2">
+              {typeChoices.map((k) => (
+                <ChoiceCard
+                  key={k}
+                  selected={state.orgType === k}
+                  title={t(`onboarding.business.orgTypes.${k}`)}
+                  description={t(`onboarding.business.orgTypeDesc.${k}`)}
+                  onSelect={() => set({ orgType: k, activityType: k === state.orgType ? state.activityType : null })}
+                />
+              ))}
+            </div>
+          </LabeledField>
+          {activityField}
+        </div>
       ) : null}
 
       {current === "location" ? (
@@ -336,11 +456,14 @@ export function BusinessFlow({
                 value: state.orgType ? t(`onboarding.business.orgTypes.${state.orgType}`) : t("onboarding.consumer.notSet"),
                 to: (typePreselected ? "identity" : "type") as Step,
               },
+              ...(activities.length
+                ? [{ label: t("onboarding.business.identity.activityLabel"), value: state.activityType ? t(`onboarding.business.activities.${state.activityType}`) : t("onboarding.consumer.notSet"), to: (typePreselected ? "identity" : "type") as Step }]
+                : []),
               ...(showroom
                 ? [
-                    { label: t("onboarding.business.identity.activityLabel"), value: state.activityType ? t(`onboarding.business.activities.${state.activityType}`) : t("onboarding.consumer.notSet"), to: "identity" as Step },
                     { label: t("onboarding.business.identity.phoneLabel"), value: state.contactPhone ?? t("onboarding.consumer.notSet"), to: "identity" as Step, ltr: true },
                     { label: t("onboarding.business.identity.emailLabel"), value: state.contactEmail.trim() || t("onboarding.consumer.notSet"), to: "identity" as Step, ltr: true },
+                    { label: t("onboarding.business.review.links"), value: addedLinks.length ? addedLinks : t("onboarding.consumer.notSet"), to: "identity" as Step, ltr: true },
                   ]
                 : []),
               ...(state.description.trim()
@@ -360,7 +483,9 @@ export function BusinessFlow({
               <div key={r.label} className="flex items-start justify-between gap-3 py-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <dt className="text-label text-fg-muted">{r.label}</dt>
-                  <dd className="break-words text-body text-fg" dir={"ltr" in r && r.ltr ? "ltr" : undefined}>{r.value}</dd>
+                  <dd className="break-words text-body text-fg" dir={"ltr" in r && r.ltr ? "ltr" : undefined}>
+                    {Array.isArray(r.value) ? r.value.map((line) => <span key={line} className="block">{line}</span>) : r.value}
+                  </dd>
                 </div>
                 <button
                   type="button"
@@ -381,11 +506,33 @@ export function BusinessFlow({
         </div>
       ) : null}
 
+      {current === "basics" && basics ? (
+        <div className="flex flex-col gap-md">
+          {basics.phone ? (
+            <LabeledField label={t("onboarding.business.basics.phoneLabel")} htmlFor="ownerPhone">
+              <PhoneField
+                id="ownerPhone"
+                defaultCountryIso2={splitE164(ownerPhone)?.countryIso2}
+                defaultNational={splitE164(ownerPhone)?.national}
+                onChange={(phone) => setOwnerPhone(phone?.e164 ?? null)}
+                compact
+              />
+            </LabeledField>
+          ) : null}
+          {basics.specialties ? (
+            <div className="flex flex-col gap-xs">
+              <p className="text-label font-semibold text-fg">{t("onboarding.business.basics.specialtiesLabel")}</p>
+              <BasicsSpecialtiesField options={specialtyOptions} picked={picked} onChange={setPicked} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {error ? <InlineError>{t(error)}</InlineError> : null}
 
       <FlowActions
         onBack={step > 0 ? back : undefined}
-        onPrimary={current === "review" ? submit : persistAdvance}
+        onPrimary={current === "review" ? submit : current === "basics" ? saveBasicsAdvance : persistAdvance}
         primaryLabel={current === "review" ? t("onboarding.business.review.submit") : t("onboarding.continue")}
         primaryDisabled={current === "review" ? !typeDone(state) || !identityDone(state) || !locationDone(state) : !canContinue}
         pending={pending}

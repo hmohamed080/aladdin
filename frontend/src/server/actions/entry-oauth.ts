@@ -2,18 +2,17 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { entryCallbackUrl, entrySignInPath, isEntryKind, isOAuthProvider } from "@/server/auth/entry-oauth";
+import { entryCallbackUrl, isOAuthProvider, OAUTH_SIGN_IN_PATH } from "@/server/auth/entry-oauth";
 
 /**
- * Starts Google/Facebook sign-in or sign-up from a Showroom/Installer entry
- * page. The callback URL is built on the CURRENT request's own origin — never
- * a caller-supplied value — and Supabase must list it as an allowed redirect.
+ * Starts Google/Facebook sign-in or sign-up from /auth/sign-in or
+ * /auth/sign-up. The callback URL is built on the CURRENT request's own
+ * origin — never a caller-supplied value — and Supabase must list it as an
+ * allowed redirect.
  */
 export async function startEntryOAuth(formData: FormData): Promise<void> {
-  const kind = formData.get("kind");
   const provider = formData.get("provider");
-  if (!isEntryKind(kind)) redirect("/auth/sign-in");
-  if (!isOAuthProvider(provider)) redirect(`${entrySignInPath(kind)}?error=oauth`);
+  if (!isOAuthProvider(provider)) redirect(`${OAUTH_SIGN_IN_PATH}?error=oauth`);
 
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "127.0.0.1:3000";
@@ -25,7 +24,7 @@ export async function startEntryOAuth(formData: FormData): Promise<void> {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: entryCallbackUrl(`${proto}://${host}`, kind, formData.get("next")),
+        redirectTo: entryCallbackUrl(`${proto}://${host}`, formData.get("next"), formData.get("accountType")),
         skipBrowserRedirect: true,
         ...(provider === "google" ? { queryParams: { prompt: "select_account" } } : {}),
       },
@@ -34,5 +33,5 @@ export async function startEntryOAuth(formData: FormData): Promise<void> {
   } catch {
     url = undefined;
   }
-  redirect(url ?? `${entrySignInPath(kind)}?error=oauth`);
+  redirect(url ?? `${OAUTH_SIGN_IN_PATH}?error=oauth`);
 }

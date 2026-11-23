@@ -175,8 +175,8 @@ select is(
     where n.nspname in ('public', 'app')
       and regexp_replace(lower(p.prosrc), '[[:space:]]+', ' ', 'g') ~ '(update (only )?(public[.])?profiles |insert into (public[.])?profiles[ (])'
       and p.prosrc ~* 'phone_(e164|national|country_iso2)'),
-  array['public.installer_phone_change_begin', 'public.installer_phone_change_settle', 'public.profile_set_phone', 'public.secondary_phone_make_primary'],
-  'the only functions in public/app that write profiles.phone_* are profile_set_phone, the two service-only phone-change journal functions (M3) and PR #88''s secondary_phone_make_primary (which the identity guard keeps from moving an alias account''s login phone)');
+  array['public.installer_phone_change_begin', 'public.installer_phone_change_settle', 'public.phone_signup_attach', 'public.phone_verification_verify', 'public.profile_set_phone', 'public.secondary_phone_make_primary'],
+  'the only functions in public/app that write profiles.phone_* are profile_set_phone, the two service-only phone-change journal functions (M3), PR #88''s secondary_phone_make_primary (which the identity guard keeps from moving an alias account''s login phone) and, since Phase B1, phone_verification_verify and, since R1, phone_signup_attach (both service-only; they write ONLY phone_verified_at, never the number - see 119_ and 120_phone_*_authority_test.sql)');
 
 -- ===========================================================================
 -- 7. Function contract unchanged

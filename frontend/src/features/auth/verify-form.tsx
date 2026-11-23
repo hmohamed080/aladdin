@@ -47,7 +47,7 @@ export function VerifyForm({ next }: { next: string }) {
       subtitle={t("auth.verifySubtitle")}
       footer={
         <p>
-          <Link href="/auth/sign-in" className="text-fg-muted hover:text-fg hover:underline">
+          <Link prefetch={false} href="/auth/sign-in" className="text-fg-muted hover:text-fg hover:underline">
             {t("support.backToSignIn")}
           </Link>
         </p>

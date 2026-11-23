@@ -16,6 +16,7 @@ import { loadBusinessVerificationDetail } from "@/server/queries/business-verifi
 import { loadNotes } from "@/server/queries/admin-operations";
 import { NotesPanel } from "@/features/admin-ops/panels";
 import { BvStatusBadge, BvSubmissionList } from "@/features/business-verification/parts";
+import { OrganizationLinks } from "@/features/business-verification/organization-links";
 import { BvAdminActions } from "@/features/business-verification/admin-actions";
 
 export const dynamic = "force-dynamic";
@@ -128,6 +129,7 @@ export default async function AdminBusinessVerificationDetailPage({ params }: { 
                 </span>
               </Field>
             ) : null}
+            <OrganizationLinks links={org} t={t} />
             <Field label={t("businessVerification.admin.reviewer")}>{d.reviewerName ?? "—"}</Field>
             <Field label={t("businessVerification.admin.columns.submitted")}>{formatDate(d.submittedAt, locale)}</Field>
           </dl>
