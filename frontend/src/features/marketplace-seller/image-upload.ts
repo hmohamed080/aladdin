@@ -5,12 +5,21 @@ import { partitionUploadBatch, type UploadRejection } from "@/lib/media/upload-l
 import { imageHintBytes, loadMediaLimitHints, videoHintBytes } from "@/lib/media/limits-client";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { MARKETPLACE_IMAGE_ALLOWED_TYPES } from "@/lib/storage/marketplace-images";
-import { confirmImageUploadAction, removeImageAction, requestImageUploadAction } from "@/server/actions/marketplace-seller";
+import {
+  confirmImageUploadAction,
+  removeImageAction,
+  requestImageReplacementAction,
+  requestImageUploadAction,
+} from "@/server/actions/marketplace-seller";
 
 /** The image formats and size the `marketplace` media namespace accepts (Migration 13). */
 export const ACCEPTED_IMAGE_TYPES: readonly string[] = MARKETPLACE_IMAGE_ALLOWED_TYPES;
-/** Upload keys a product may hold open at once (Migration 07 abuse limit). */
-export const MAX_IMAGES_PER_BATCH = 10;
+/**
+ * A product holds up to 5 media slots: 5 images, or 1 video and 4 images (PR 7). The database enforces the same limit
+ * on live images. The video path itself stays off (see MARKETPLACE_VIDEO_UPLOADS_ENABLED).
+ */
+export const MAX_MEDIA_SLOTS = 5;
+export const MAX_IMAGES_PER_BATCH = MAX_MEDIA_SLOTS;
 
 export type UploadFailure = { name: string; code: string };
 
@@ -64,6 +73,26 @@ export async function uploadProductImages(
   }
   onProgress?.(null);
   return failures;
+}
+
+/**
+ * Replaces ONE approved image with a new file. The new image waits for review like any upload; the old one stays live
+ * until the new one is approved (then the old one is deleted). Resolves to a failure code, or null on success.
+ */
+export async function replaceProductImage(imageId: string, file: File): Promise<string | null> {
+  await loadMediaLimitHints();
+  const problem = imageFileProblem(file, imageHintBytes("marketplace"));
+  if (problem) return problem;
+  const ticket = await requestImageReplacementAction(imageId, file.type, file.size);
+  if (!ticket.ok) return ticket.code;
+  try {
+    await uploadWithGrant(ticket.grant, file);
+  } catch {
+    await removeImageAction(ticket.imageId);
+    return "upload_failed";
+  }
+  const confirmed = await confirmImageUploadAction(ticket.imageId);
+  return confirmed.ok ? null : confirmed.code;
 }
 
 const REJECTION_CODE: Record<UploadRejection, string> = {

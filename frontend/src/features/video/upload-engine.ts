@@ -1,6 +1,6 @@
 import {
   VIDEO_PARTS_PER_REQUEST, VIDEO_STORAGE_MAX_BYTES, VIDEO_UPLOAD_CONCURRENCY,
-  isVideoType, type VideoContentType, type VideoScope,
+  isVideoType, videoLimitPlace, type VideoContentType, type VideoScope,
 } from "@/lib/media/video-policy";
 import { loadMediaLimitHints, videoHintBytes } from "@/lib/media/limits-client";
 
@@ -111,7 +111,7 @@ export async function uploadVideo(options: UploadOptions): Promise<string> {
   const putPart = options.putPart ?? xhrPut;
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   await loadMediaLimitHints();
-  const contentType = checkVideoFile(file, videoHintBytes(options.scope));
+  const contentType = checkVideoFile(file, videoHintBytes(videoLimitPlace(options.scope)));
 
   let plan: Plan | null = null;
   const previous = rememberedUpload(file);

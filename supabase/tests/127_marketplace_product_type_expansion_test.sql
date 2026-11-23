@@ -185,10 +185,9 @@ select is((select count(*)::int from t_saved s
                             or b in ('no_active_variant', 'variant_without_option_combination', 'invalid_variant_price'))), 0,
   'D4. readiness reports NO missing field for any new type (a complete form is complete)');
 select is((select count(*)::int from t_saved s
-           where 'media_verification_not_available' = any(public.marketplace_seller_product_readiness(s.product_id))
-             and 'no_verified_primary_image' = any(public.marketplace_seller_product_readiness(s.product_id))
+           where 'no_verified_primary_image' = any(public.marketplace_seller_product_readiness(s.product_id))
              and 'no_available_stock' = any(public.marketplace_seller_product_readiness(s.product_id))), 9,
-  'D5. ...only stock / media blockers remain, and publication stays closed (media verification off)');
+  'D5. ...only stock / image blockers remain, and publication stays closed');
 select is((select public.marketplace_seller_product_get(product_id) -> 'attributes' ->> 'paint_base' from t_saved where type_key = 'paint'),
   'plastic_emulsion', 'D6. the saved paint reads back its attributes by key');
 select is((select public.marketplace_seller_product_get(product_id) -> 'variants' -> 0 -> 'attributes' ->> 'pack_volume' from t_saved where type_key = 'paint'),

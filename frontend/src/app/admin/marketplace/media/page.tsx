@@ -4,31 +4,34 @@ import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { AdminHeader } from "@/features/admin/parts";
 import { StatePanel } from "@/components/ui/primitives";
+import { ButtonLink } from "@/components/ui/controls";
 import { marketplacePrivateImageUrls } from "@/server/media/marketplace-public-images";
-import { MediaModeration, type MediaItem, type MediaSettings } from "@/features/admin-marketplace/media-moderation";
+import { ProductReview, type ReviewCounts, type ReviewPreset, type ReviewProduct, type ReviewTab } from "@/features/admin-marketplace/product-review";
 import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZE = 48;
-const STATUSES = ["pending", "verified", "rejected"] as const;
-type Status = (typeof STATUSES)[number];
+const PAGE_SIZE = 12;
+const TABS = ["pending", "approved", "rejected"] as const;
+
+type QueuedImage = Omit<ReviewProduct["images"][number], "previewUrl"> & { object_key: string };
+type QueuedProduct = Omit<ReviewProduct, "images"> & { images: QueuedImage[] };
 
 /**
- * Media moderation queue. Previews are /api/media URLs read under the MODERATOR'S
- * OWN session (the marketplace media resolver admits marketplace_media.moderate);
- * no service credential is involved and nothing here is public.
+ * Product review (admin). One card per product with all its images side by side. Previews are /api/media URLs read
+ * under the MODERATOR'S OWN session (the marketplace media resolver admits marketplace_media.moderate); no service
+ * credential is involved and nothing here is public.
  */
-export default async function AdminMarketplaceMediaPage({
+export default async function AdminProductReviewPage({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string; page?: string }>;
 }) {
   // Console door for this route (the route table in lib/permissions/admin.ts); the page's RPCs still re-check
-  // marketplace_sellers.* / marketplace_media.moderate and the refusal panel shows without them.
+  // marketplace_media.moderate and the refusal panel shows without it.
   await requireAdminRoute("/admin/marketplace/media");
   const sp = await searchParams;
-  const status: Status = (STATUSES as readonly string[]).includes(sp.status ?? "") ? (sp.status as Status) : "pending";
+  const tab: ReviewTab = (TABS as readonly string[]).includes(sp.status ?? "") ? (sp.status as ReviewTab) : "pending";
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
 
   const supabase = await getServerSupabase();
@@ -36,12 +39,13 @@ export default async function AdminMarketplaceMediaPage({
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const m = getMessages(locale).adminMarketplace;
 
-  const [settingsRes, queueRes] = await Promise.all([
-    supabase.rpc("admin_marketplace_media_settings"),
-    supabase.rpc("admin_marketplace_media_queue", { p_status: status, p_limit: PAGE_SIZE, p_offset: (page - 1) * PAGE_SIZE }),
+  const [summaryRes, queueRes, presetsRes] = await Promise.all([
+    supabase.rpc("admin_marketplace_product_review_summary"),
+    supabase.rpc("admin_marketplace_product_review_queue", { p_tab: tab, p_limit: PAGE_SIZE, p_offset: (page - 1) * PAGE_SIZE }),
+    supabase.rpc("admin_marketplace_seller_presets"),
   ]);
-  if (settingsRes.error || queueRes.error) {
-    const denied = settingsRes.error?.code === "42501" || queueRes.error?.code === "42501";
+  if (summaryRes.error || queueRes.error || presetsRes.error) {
+    const denied = [summaryRes.error, queueRes.error, presetsRes.error].some((e) => e?.code === "42501");
     return (
       <div className="flex flex-col gap-lg">
         <AdminHeader locale={locale} title={m.media.title} subtitle={m.media.subtitle} />
@@ -50,21 +54,38 @@ export default async function AdminMarketplaceMediaPage({
     );
   }
 
-  const settings = settingsRes.data as unknown as MediaSettings;
-  const queue = queueRes.data as unknown as { total: number; items: Omit<MediaItem, "previewUrl">[] };
+  // Product videos wait on their own page (same permission); a failed read just hides the link.
+  const pendingVideos = await supabase.rpc("admin_marketplace_pending_videos", { p_limit: 200 });
+  const videosWaiting = (pendingVideos.data ?? []).reduce((n, r) => n + Number(r.pending_count), 0);
+  const counts = summaryRes.data as unknown as ReviewCounts;
+  const queue = queueRes.data as unknown as { total: number; items: QueuedProduct[] };
+  // PR 5's one preset system: the image rejection reasons are the presets whose action is image_reject
+  const presets = ((presetsRes.data ?? []) as unknown as (ReviewPreset & { action: string })[]).filter((p) => p.action === "image_reject");
   // Card-size previews through the media Worker (or /api/media), re-checking the moderator permission on every read.
-  const previews = await marketplacePrivateImageUrls(supabase, queue.items.map((i) => i.object_key), "card");
-  const items: MediaItem[] = queue.items.map((i) => ({ ...i, previewUrl: previews.get(i.object_key) ?? null }));
+  const keys = queue.items.flatMap((p) => p.images.map((i) => i.object_key));
+  const previews = await marketplacePrivateImageUrls(supabase, keys, "card");
+  const products: ReviewProduct[] = queue.items.map((p) => ({
+    ...p,
+    images: p.images.map((i) => ({ ...i, previewUrl: previews.get(i.object_key) ?? null })),
+  }));
 
   return (
     <div className="flex flex-col gap-lg">
       <AdminHeader locale={locale} title={m.media.title} subtitle={m.media.subtitle} />
-      <MediaModeration
-        status={status}
+      {videosWaiting > 0 ? (
+        <div>
+          <ButtonLink size="sm" variant="outline" href="/admin/marketplace/videos">
+            {m.videos.waitingLink.replace("{count}", String(videosWaiting))}
+          </ButtonLink>
+        </div>
+      ) : null}
+      <ProductReview
+        tab={tab}
         page={page}
         pages={Math.max(1, Math.ceil(Number(queue.total) / PAGE_SIZE))}
-        settings={settings}
-        items={items}
+        counts={counts}
+        products={products}
+        presets={presets}
       />
     </div>
   );

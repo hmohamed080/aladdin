@@ -4,25 +4,38 @@ import { useI18n } from "@/lib/i18n/context";
 import { Input, LabeledField, Select } from "@/components/ui/controls";
 import { cn } from "@/lib/ui/cn";
 import type { AttrValue, AttributeField } from "./form-model";
+import { RED_FIELD } from "./red-field";
 
 /**
  * One dynamic specification field, drawn from its DATABASE definition: an option
  * list, a multi-choice, a number / measurement with its display unit, a yes/no,
  * or free text. Nothing here knows which product type it belongs to.
  */
-export function AttributeInput({
-  field,
-  value,
-  onChange,
-  idPrefix,
-  disabled,
-}: {
+export function AttributeInput({ invalid, ...props }: AttributeInputProps) {
+  return (
+    <div className={cn(invalid && RED_FIELD)} data-invalid={invalid ? "true" : undefined}>
+      <AttributeControl {...props} />
+    </div>
+  );
+}
+
+type AttributeInputProps = {
   field: AttributeField;
   value: AttrValue | undefined;
   onChange: (v: AttrValue) => void;
   idPrefix: string;
   disabled?: boolean;
-}) {
+  /** A required field that is still empty: drawn in red. */
+  invalid?: boolean;
+};
+
+function AttributeControl({
+  field,
+  value,
+  onChange,
+  idPrefix,
+  disabled,
+}: Omit<AttributeInputProps, "invalid">) {
   const { t, locale } = useI18n();
   const ar = locale === "ar";
   const id = `${idPrefix}-${field.key}`;

@@ -9,7 +9,7 @@ import { cn } from "@/lib/ui/cn";
 import { finishPendingImageRemovalsAction, removeImageAction, updateImagesAction } from "@/server/actions/marketplace-seller";
 import { errorKey } from "./errors";
 import { UPLOAD_VIDEO_TYPES } from "@/lib/media/upload-limits";
-import { ACCEPTED_IMAGE_TYPES, MARKETPLACE_VIDEO_UPLOADS_ENABLED, uploadMediaBatch } from "./image-upload";
+import { ACCEPTED_IMAGE_TYPES, MARKETPLACE_VIDEO_UPLOADS_ENABLED, MAX_MEDIA_SLOTS, replaceProductImage, uploadMediaBatch } from "./image-upload";
 import type { SellerProductImage } from "@/server/queries/marketplace-seller-catalog";
 
 type Arranged = SellerProductImage;
@@ -44,6 +44,8 @@ export function ImagesPanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const replaceRef = useRef<HTMLInputElement>(null);
+  const replaceTarget = useRef<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   // A server refresh (after an upload) brings new signed URLs: take them unless the seller is mid-arrangement.
@@ -51,11 +53,30 @@ export function ImagesPanel({
     if (!dirty) setItems(images.filter((i) => i.uploadState === "confirmed"));
   }, [images, dirty]);
 
+  const full = items.length >= MAX_MEDIA_SLOTS;
+
   const upload = async (files: FileList | File[]) => {
     setMessage(null);
-    const failures = await uploadMediaBatch(productId, Array.from(files), setBusy);
+    // Only the free slots are used: the rest of the batch is reported, never silently dropped.
+    const all = Array.from(files);
+    const room = Math.max(0, MAX_MEDIA_SLOTS - items.length);
+    const failures = await uploadMediaBatch(productId, all.slice(0, room), setBusy);
+    for (const f of all.slice(room)) failures.push({ name: f.name, code: "too_many_images" });
     // Every refused file is listed: one oversize file never hides the others, and never stops them.
     if (failures.length > 0) setMessage({ tone: "error", text: failures.map((f) => `${f.name}: ${t(errorKey(f.code))}`).join(" · ") });
+    setDirty(false);
+    router.refresh();
+  };
+
+  const replace = async (file: File) => {
+    const id = replaceTarget.current;
+    replaceTarget.current = null;
+    if (!id) return;
+    setMessage(null);
+    setBusy(file.name);
+    const code = await replaceProductImage(id, file);
+    setBusy(null);
+    setMessage(code ? { tone: "error", text: t(errorKey(code)) } : { tone: "ok", text: t("marketplaceSeller.image.replaceSent") });
     setDirty(false);
     router.refresh();
   };
@@ -141,6 +162,9 @@ export function ImagesPanel({
           </button>
         </p>
         <p className="text-label text-fg-muted">{t("marketplaceSeller.image.hint")}</p>
+        <p className={cn("text-label", full ? "text-danger" : "text-fg-muted")} data-testid="image-slots">
+          {full ? t("marketplaceSeller.image.limitReached") : t("marketplaceSeller.image.slots", { used: items.length, max: MAX_MEDIA_SLOTS })}
+        </p>
         <input
           ref={inputRef}
           type="file"
@@ -158,6 +182,19 @@ export function ImagesPanel({
           </p>
         ) : null}
       </div>
+
+      <input
+        ref={replaceRef}
+        type="file"
+        accept={ACCEPTED_IMAGE_TYPES.join(",")}
+        className="sr-only"
+        aria-label={t("marketplaceSeller.image.replace")}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void replace(file);
+          e.target.value = "";
+        }}
+      />
 
       {pendingRemovals > 0 ? (
         <div role="alert" className="flex flex-wrap items-center gap-sm rounded-md border border-warning/40 bg-warning/10 px-md py-sm">
@@ -212,6 +249,19 @@ export function ImagesPanel({
                 {!img.isPrimary && !img.variantId ? (
                   <Button size="sm" variant="ghost" onClick={() => makePrimary(img.id)}>
                     {t("marketplaceSeller.image.makePrimary")}
+                  </Button>
+                ) : null}
+                {img.status === "verified" ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={pending || Boolean(busy)}
+                    onClick={() => {
+                      replaceTarget.current = img.id;
+                      replaceRef.current?.click();
+                    }}
+                  >
+                    {t("marketplaceSeller.image.replace")}
                   </Button>
                 ) : null}
                 <Button size="sm" variant="danger" onClick={() => remove(img.id)} disabled={pending}>

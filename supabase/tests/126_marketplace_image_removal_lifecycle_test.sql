@@ -80,8 +80,8 @@ select ok((select pg_get_constraintdef(oid) from pg_constraint where conname = '
 select is((select count(*)::int from information_schema.role_table_grants
            where table_schema = 'public' and grantee in ('anon', 'authenticated') and privilege_type <> 'SELECT'
              and table_name like 'marketplace\_%'), 0, 'A5. still no client write grant on any marketplace table');
-select is((select media_verification_ready from public.marketplace_platform_settings where singleton), false,
-  'A6. media_verification_ready is still false');
+select is(app.marketplace_media_verification_ready(), true,
+  'A6. image verification is always mandatory (no media switch since 20261123100001)');
 select ok(pg_get_constraintdef((select oid from pg_constraint where conname = 'ck_marketplace_images_upload_state')) like '%deleting%',
   'A7. upload_state admits the deleting state');
 
@@ -302,10 +302,19 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
 select is(public.media_storage_resolve('marketplace', (select object_key from public.marketplace_product_images where id = current_setting('t.fresh1')::uuid), 'upload') ->> 'state', 'pending',
   'H3. a fresh key is usable by the catalogue manager');
--- fill to the pending cap of 10 (fresh1 is #1)
-select public.marketplace_seller_image_request_upload(current_setting('t.p')::uuid, 'image/png') from generate_series(1, 9);
+-- PR 7: a product holds at most 5 live images, un-uploaded keys included (fill the remaining slots)
+do $$ begin
+  for i in 1..5 loop
+    begin
+      perform public.marketplace_seller_image_request_upload(current_setting('t.p')::uuid, 'image/png');
+    exception when others then
+      if sqlerrm not like 'mp:too_many_images%' then raise; end if;
+      exit;
+    end;
+  end loop;
+end $$;
 select throws_like($$ select public.marketplace_seller_image_request_upload(current_setting('t.p')::uuid, 'image/png') $$,
-  'mp:too_many_pending_uploads%', 'H4. at most 10 un-uploaded keys per product at once');
+  'mp:too_many_images%', 'H4. at most 5 live image slots per product at once');
 reset role;
 -- hourly cap per organization: 200 withdrawn rows created in the last hour
 insert into public.marketplace_product_images (product_id, object_key, sort_order, is_primary, status, upload_state)
@@ -343,8 +352,8 @@ select is((select count(*)::int from public.marketplace_product_status_events
   'I2. ...with an audit event naming the actor');
 select is((select count(*)::int from public.marketplace_public_catalog() where slug like 'removal-lifecycle-product-%'), 0,
   'I3. and it is not in the public catalogue');
-select is((select media_verification_ready from public.marketplace_platform_settings where singleton), false,
-  'I4. media_verification_ready is still false at the end');
+select is(app.marketplace_media_verification_ready(), true,
+  'I4. image verification is still mandatory at the end');
 
 -- ===========================================================================
 -- J. Central cleanup

@@ -21,7 +21,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(119);
+select plan(121);
 
 update auth.users set email_confirmed_at = now()
   where id in ('70000001-0000-4000-8000-000000000001', '71000005-0000-4000-8000-000000000005',
@@ -80,8 +80,9 @@ select is(
 select is(
   (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname like '%marketplace%' and has_function_privilege('anon', p.oid, 'execute')),
-  array['marketplace_public_cart', 'marketplace_public_catalog', 'marketplace_public_catalog_page', 'marketplace_public_facets', 'marketplace_public_product'],
-  'A5. anon can execute exactly the public-read functions (catalog, page, facets, product — and the cart read from Migration 12)');
+  array['marketplace_public_browse', 'marketplace_public_cart', 'marketplace_public_catalog', 'marketplace_public_catalog_page', 'marketplace_public_delivery',
+         'marketplace_public_facets', 'marketplace_public_product', 'marketplace_public_seller', 'marketplace_public_status'],
+  'A5. anon can execute exactly the public-read functions (catalog, page, facets, product, the cart read from Migration 12 — and browse, delivery, seller, status from PR 9)');
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace,
           unnest(array['anon', 'authenticated', 'service_role']) r
@@ -103,8 +104,8 @@ select is(
   array['administrator', 'moderator', 'super_admin'], 'A9. read adds Moderator; Support has neither');
 select is((select count(*)::int from public.marketplace_seller_accounts), 0,
   'A10. nobody is approved by default (the migration seeds no seller)');
-select is((select media_verification_ready from public.marketplace_platform_settings), false,
-  'A11. media verification is OFF by default (publication closed)');
+select is(app.marketplace_media_verification_ready(), true,
+  'A11. image verification is always mandatory (no switch since 20261123100001)');
 select is(
   (select bool_and(p.prosecdef) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname in ('admin_marketplace_seller_approve', 'admin_marketplace_seller_suspend',
@@ -280,11 +281,11 @@ insert into public.marketplace_variant_attribute_values (variant_id, attribute_i
 select 'b3100000-0000-4000-8000-000000000001', id, 53 from public.marketplace_attribute_definitions where key = 'roll_width';
 
 select ok(
-  (select 'no_available_stock' = any(b) and 'no_verified_primary_image' = any(b) and 'media_verification_not_available' = any(b)
+  (select 'no_available_stock' = any(b) and 'no_verified_primary_image' = any(b) and not ('media_verification_not_available' = any(b))
           and not ('seller_not_approved' = any(b)) and not ('seller_organization_not_eligible' = any(b))
           and not (exists (select 1 from unnest(b) x where x like 'missing\_%'))
    from (select app.marketplace_publication_blockers('b3000000-0000-4000-8000-000000000001') b) q),
-  'E4. an approved seller with complete fields still lacks stock, a verified image and the media flag');
+  'E4. an approved seller with complete fields still lacks stock and a verified image (no media flag any more)');
 
 -- stock + verified primary image
 insert into public.marketplace_stock_locations (id, organization_id, key, name_ar, name_en)
@@ -295,9 +296,13 @@ insert into public.marketplace_product_images (id, product_id, object_key, sort_
 values ('b3f00000-0000-4000-8000-000000000001', 'b3000000-0000-4000-8000-000000000001',
         'orgs/b/products/b1/main.webp', 0, true, 'verified');
 
+-- PR 7: a payment method and a way to deliver are publish conditions too
+insert into public.marketplace_seller_payment_settings (seller_organization_id, cod_enabled) values (current_setting('t.b')::uuid, true);
+insert into public.marketplace_delivery_rates (seller_organization_id, governorate_key, fee_egp, duration_min_days, duration_max_days) values (current_setting('t.b')::uuid, 'cairo', 50, 1, 2);
+insert into public.marketplace_seller_delivery_settings (seller_organization_id, preparation_days) values (current_setting('t.b')::uuid, 1);
 select is(app.marketplace_publication_blockers('b3000000-0000-4000-8000-000000000001'),
-  array['media_verification_not_available'],
-  'E5. with everything else valid, the ONLY remaining blocker is the media-verification flag (fail closed)');
+  array[]::text[],
+  'E5. with everything else valid, nothing blocks publication (the media flag no longer exists)');
 update public.marketplace_platform_settings set media_verification_ready = true;
 select is(cardinality(app.marketplace_publication_blockers('b3000000-0000-4000-8000-000000000001')), 0,
   'E6. once media verification is declared ready and all else is valid, nothing blocks publication');
@@ -311,13 +316,11 @@ update public.marketplace_product_images set status = 'verified' where id = 'b3f
 -- ===========================================================================
 -- F. Publish / unpublish RPC
 -- ===========================================================================
-update public.marketplace_platform_settings set media_verification_ready = false;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"71000005-0000-4000-8000-000000000005","role":"authenticated"}';
-select throws_ok($$ select public.marketplace_product_publish('b3000000-0000-4000-8000-000000000001') $$,
-  '23514', null, 'F1. publication is refused while the media-verification flag is off');
+select throws_ok($$ select public.admin_marketplace_set_media_verification_ready(false, 'try to switch it off') $$,
+  '42501', null, 'F1. the old media switch is gone: nobody can turn verification off (a seller is refused outright)');
 reset role;
-update public.marketplace_platform_settings set media_verification_ready = true;
 
 set local role anon;
 select throws_ok($$ select public.marketplace_product_publish('b3000000-0000-4000-8000-000000000001') $$,
@@ -372,10 +375,11 @@ select is(
 set local role anon;
 select is(
   (select array_agg(k order by k) from jsonb_object_keys(public.marketplace_public_product('sel-wallpaper-b')) k),
+  -- PR 9 added seller_slug / seller_official / ships_free / stock_left (public, no stock ledger data)
   -- Migration 09 added the public seller and taxonomy names and the cover image id (still no keys, stock or admin data)
   array['attributes', 'brand', 'category_key', 'category_name_ar', 'category_name_en', 'cover_image_id',
         'description_ar', 'description_en', 'images', 'name_ar', 'name_en', 'product_type_key',
-        'product_type_name_ar', 'product_type_name_en', 'published_at', 'seller_name', 'slug', 'variants'],
+        'product_type_name_ar', 'product_type_name_en', 'published_at', 'seller_name', 'seller_official', 'seller_slug', 'ships_free', 'slug', 'stock_left', 'variants'],
   'G8. the detail document has exactly the approved top-level keys');
 select ok(
   (select position('object_key' in t) = 0 and position('storage_bucket' in t) = 0 and position('seller_organization_id' in t) = 0
@@ -390,10 +394,11 @@ select is((select (public.marketplace_public_product('sel-wallpaper-b')->'varian
 select is((select primary_image_id from public.marketplace_public_catalog() where slug = 'sel-wallpaper-b'),
   'b3f00000-0000-4000-8000-000000000001'::uuid, 'G12. with media verification ready the primary image ID is exposed (an ID, not a key)');
 reset role;
-update public.marketplace_platform_settings set media_verification_ready = false;
+-- an image that is not verified is never exposed (the media switch no longer exists)
+update public.marketplace_product_images set status = 'pending' where id = 'b3f00000-0000-4000-8000-000000000001';
 set local role anon;
 select is((select primary_image_id from public.marketplace_public_catalog() where slug = 'sel-wallpaper-b'), null,
-  'G13. while media verification is not ready no image reference leaves the database');
+  'G13. an image that is not verified leaves no image reference in the public catalogue');
 select is(jsonb_array_length(public.marketplace_public_product('sel-wallpaper-b')->'images'), 0,
   'G14. ...in the detail document either');
 select ok((select count(*) <= 60 from public.marketplace_public_catalog(null, null, 100000, 0)),
@@ -435,14 +440,14 @@ select is(public.marketplace_public_product('sel-wallpaper-a') is null, true,
   'K11. ...nor in the public detail');
 reset role;
 
--- stock-out after publication: still listed, no longer purchasable, NOT archived
+-- stock-out after publication (PR 7): WITHDRAWN from the storefront (not shown as sold out), NOT archived
 select applied from public.marketplace_stock_apply(current_setting('t.b')::uuid, 'b3100000-0000-4000-8000-000000000001',
   'b3200000-0000-4000-8000-000000000001', 'correction', -20, 'sel-b-zero-000001', 'sold elsewhere', 'manual');
 set local role anon;
-select is((select in_stock from public.marketplace_public_catalog() where slug = 'sel-wallpaper-b'), false,
-  'G18. after a stock-out the product stays listed with in_stock = false');
-select is((public.marketplace_public_product('sel-wallpaper-b')->'variants'->0->>'purchasable')::boolean, false,
-  'G19. ...and its variant is not purchasable');
+select is((select count(*)::int from public.marketplace_public_catalog() where slug = 'sel-wallpaper-b'), 0,
+  'G18. after a stock-out the product is withdrawn from the public catalogue');
+select is(public.marketplace_public_product('sel-wallpaper-b') is null, true,
+  'G19. ...and from its public page');
 reset role;
 select is((select status from public.marketplace_products where id = 'b3000000-0000-4000-8000-000000000001'), 'published',
   'G20. a stock-out does not archive or unpublish the product');
@@ -466,8 +471,16 @@ set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","r
 select public.admin_marketplace_seller_reinstate('91000005-1111-4111-8111-000000000005', 'review closed');
 reset role;
 set local role anon;
-select is((select count(*)::int from public.marketplace_public_catalog() where slug = 'sel-wallpaper-b'), 1,
-  'G24. reinstating restores visibility (the product kept its published state)');
+select is((select count(*)::int from public.marketplace_public_catalog() where slug = 'sel-wallpaper-b'), 0,
+  'G24. reinstating does NOT restore visibility: the product stays unpublished (PR 7)');
+reset role;
+select is((select status from public.marketplace_products where id = 'b3000000-0000-4000-8000-000000000001'), 'unpublished',
+  'G24b. suspension unpublished the product and reinstatement left it unpublished');
+update public.marketplace_product_images set status = 'verified' where id = 'b3f00000-0000-4000-8000-000000000001';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"71000005-0000-4000-8000-000000000005","role":"authenticated"}';
+select is(public.marketplace_product_publish('b3000000-0000-4000-8000-000000000001'), 'published',
+  'G24c. the seller republishes manually after reinstatement');
 reset role;
 update public.organizations set status = 'suspended' where id = current_setting('t.b')::uuid;
 set local role anon;
@@ -493,7 +506,7 @@ set local role anon;
 select is((select count(*)::int from public.marketplace_public_catalog() where slug = 'sel-wallpaper-b'), 0,
   'G29. an unpublished product is not public');
 reset role;
-update public.marketplace_platform_settings set media_verification_ready = true;
+update public.marketplace_product_images set status = 'verified' where id = 'b3f00000-0000-4000-8000-000000000001';
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"71000005-0000-4000-8000-000000000005","role":"authenticated"}';
 select is(public.marketplace_product_publish('b3000000-0000-4000-8000-000000000001'), 'published',

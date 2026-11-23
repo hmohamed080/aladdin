@@ -45,13 +45,6 @@ export async function saveSellerProductAction(
   return { ok: true, ...r };
 }
 
-export async function productReadinessAction(productId: string): Promise<SellerResult<{ blockers: string[] }>> {
-  const supabase = await getServerSupabase();
-  const { data, error } = await supabase.rpc("marketplace_seller_product_readiness", { p_product_id: productId });
-  if (error) return { ok: false, ...fail(error) };
-  return { ok: true, blockers: (data ?? []) as string[] };
-}
-
 export async function publishProductAction(productId: string): Promise<SellerResult<{ status: string }>> {
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("marketplace_product_publish", { p_product_id: productId });
@@ -124,6 +117,35 @@ export async function requestImageUploadAction(
     p_product_id: productId,
     p_content_type: contentType,
     p_variant_id: variantId ?? undefined,
+  });
+  if (error || !data) return { ok: false, ...fail(error) };
+  const r = data as { image_id: string; object_key: string };
+  if (!isMarketplaceImageKey(r.object_key)) return { ok: false, code: "unexpected" };
+  try {
+    return { ok: true, imageId: r.image_id, objectKey: r.object_key,
+      grant: await authorizeMediaUpload(supabase, "marketplace", r.object_key, expectedBytes) };
+  } catch {
+    await runImageRemoval(supabase, r.image_id);
+    return { ok: false, code: "upload_failed" };
+  }
+}
+
+/**
+ * Replacement upload ticket: like `requestImageUploadAction`, but the new pending image points at the approved image it
+ * will replace. The old image stays live until a moderator approves the new one; then the old one is deleted from R2.
+ */
+export async function requestImageReplacementAction(
+  imageId: string,
+  contentType: string,
+  expectedBytes: number,
+): Promise<SellerResult<{ imageId: string; objectKey: string; grant: UploadGrant }>> {
+  if (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > (await imageMaxBytes("marketplace"))) {
+    return { ok: false, code: "file_too_large" };
+  }
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_seller_image_replace_request_upload", {
+    p_image_id: imageId,
+    p_content_type: contentType,
   });
   if (error || !data) return { ok: false, ...fail(error) };
   const r = data as { image_id: string; object_key: string };
@@ -301,6 +323,65 @@ export async function setSellerPickupAction(
   if (error || !data) return { ok: false, ...fail(error) };
   revalidatePath(DELIVERY_PATH);
   return { ok: true, pickupAvailable: Boolean((data as { pickup_available?: boolean }).pickup_available) };
+}
+
+/* ---------- delivery terms, free shipping and readiness (PR 8) ---------- */
+
+/**
+ * Saves the showroom-wide delivery settings and the terms of every covered place in one transaction:
+ * preparation days, free-shipping minimum, pickup instructions, and per place the fee,
+ * delivery duration, next-day option and free-shipping minimum. Returns what is still missing for publishing.
+ */
+export async function saveSellerDeliveryTermsAction(
+  organizationId: string,
+  settings: Record<string, unknown>,
+  places: Record<string, unknown>[],
+): Promise<SellerResult<{ missing: string[] }>> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_seller_delivery_terms_save", {
+    p_organization_id: organizationId,
+    p_settings: settings as unknown as Json,
+    p_areas: places as unknown as Json,
+  });
+  if (error || !data) return { ok: false, ...fail(error) };
+  revalidatePath(AREAS_PATH);
+  revalidatePath(DELIVERY_PATH);
+  return { ok: true, missing: ((data as { missing?: string[] }).missing ?? []) as string[] };
+}
+
+export type FreeShippingProduct = { id: string; name_ar: string; name_en: string; status: string; free_shipping: boolean };
+
+/** The showroom's products with their free-shipping flag (flagged first), optionally filtered by name. */
+export async function listFreeShippingProductsAction(
+  organizationId: string,
+  search: string,
+): Promise<SellerResult<{ items: FreeShippingProduct[]; flaggedCount: number }>> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_seller_free_shipping_products_get", {
+    p_organization_id: organizationId,
+    p_search: search.trim() === "" ? undefined : search.trim(),
+    p_limit: 50,
+  });
+  if (error || !data) return { ok: false, ...fail(error) };
+  const d = data as { items?: FreeShippingProduct[]; flagged_count?: number };
+  return { ok: true, items: d.items ?? [], flaggedCount: Number(d.flagged_count ?? 0) };
+}
+
+/** Flags a product as always shipping free, or clears the flag. */
+export async function setProductFreeShippingAction(
+  organizationId: string,
+  productId: string,
+  enabled: boolean,
+): Promise<SellerResult<{ freeShipping: boolean }>> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_seller_product_free_shipping_set", {
+    p_organization_id: organizationId,
+    p_product_id: productId,
+    p_enabled: enabled,
+  });
+  if (error || !data) return { ok: false, ...fail(error) };
+  revalidatePath(DELIVERY_PATH);
+  return { ok: true, freeShipping: Boolean((data as { free_shipping?: boolean }).free_shipping) };
 }
 
 /**

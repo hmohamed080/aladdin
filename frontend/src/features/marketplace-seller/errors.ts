@@ -6,6 +6,7 @@ export type SellerActionError = { code: string; detail?: string };
  * `unexpected`, so no raw database text ever reaches the screen.
  */
 export function parseSellerError(message: string | null | undefined): SellerActionError {
+  if (/^publication blocked:.*\bseller_no_(payment_method|delivery)\b/.test((message ?? "").trim())) return { code: "store_setup_missing" };
   const m = /^mp:([a-z_]+)(?::(.*))?$/.exec((message ?? "").trim());
   if (!m || !m[1]) return { code: "unexpected" };
   return m[2] ? { code: m[1], detail: m[2] } : { code: m[1] };
@@ -20,6 +21,7 @@ export const KNOWN_ERROR_CODES = new Set([
   "archived",
   "product_type_invalid",
   "product_type_immutable",
+  "low_stock_invalid",
   "name_ar_invalid",
   "name_en_invalid",
   "description_too_long",
@@ -50,6 +52,8 @@ export const KNOWN_ERROR_CODES = new Set([
   "upload_rate_limited",
   "image_content_invalid",
   "image_removed",
+  "image_not_replaceable",
+  "replacement_pending",
   "delete_incomplete",
   "object_still_present",
   "image_not_marked_for_removal",
@@ -69,18 +73,16 @@ export const KNOWN_ERROR_CODES = new Set([
   "delivery_duplicate",
   "delivery_area_unknown",
   "pickup_invalid",
+  "store_setup_missing",
+  "preparation_days_invalid",
+  "free_shipping_invalid",
+  "pickup_instructions_invalid",
+  "duration_invalid",
+  "next_day_invalid",
+  "next_day_fee_invalid",
+  "search_invalid",
 ]);
 
 export function errorKey(code: string): string {
   return `marketplaceSeller.error.${KNOWN_ERROR_CODES.has(code) ? code : "unexpected"}`;
-}
-
-/**
- * A publication blocker code from the database (`missing_product_attribute:color`,
- * `missing_variant_attribute:SKU:color`, `no_available_stock`, …) split into the
- * catalogue key and the detail to show beside it.
- */
-export function blockerParts(code: string): { key: string; detail?: string } {
-  const [head, ...rest] = code.split(":");
-  return { key: `marketplaceSeller.blocker.${head}`, detail: rest.length ? rest.join(" · ") : undefined };
 }

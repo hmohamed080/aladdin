@@ -37,9 +37,10 @@ end;
 $$;
 
 -- A. SEED -------------------------------------------------------------------
-select is((select count(*)::int from public.notification_templates), 6, 'A1 six Phase 1 templates are seeded');
+-- later features add templates of their own (the Marketplace stock notices, plan PR 7): this file counts the Phase 1 six
+select is((select count(*)::int from public.notification_templates where key not like 'marketplace.stock.%'), 6, 'A1 six Phase 1 templates are seeded');
 select is((select count(*)::int from public.notification_templates
-            where char_length(default_title_ar) > 0 and char_length(default_title_en) > 0
+            where key not like 'marketplace.stock.%' and char_length(default_title_ar) > 0 and char_length(default_title_en) > 0
               and char_length(default_body_ar) > 0 and char_length(default_body_en) > 0), 6,
           'A2 every template has Arabic and English defaults');
 select is((select count(*)::int from public.notification_templates t
@@ -52,7 +53,7 @@ select pg_temp.act_as(:'nobody');
 select throws_ok($$select * from public.admin_notification_templates()$$, '42501', null, 'B1 a plain user cannot list templates');
 select pg_temp.back();
 select pg_temp.act_as(:'adm');
-select is((select count(*)::int from public.admin_notification_templates()), 6, 'B2 an Administrator can list the templates');
+select is((select count(*)::int from public.admin_notification_templates() where key not like 'marketplace.stock.%'), 6, 'B2 an Administrator can list the templates');
 select throws_ok($$select public.admin_notification_template_set('marketplace.seller.approved', 'ع', 'ع {message}', 'T', 'T {message}', 'سبب صحيح')$$,
                  '42501', null, 'B3 an Administrator cannot edit (view only)');
 select pg_temp.back();
