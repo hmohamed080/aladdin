@@ -8982,6 +8982,72 @@
           "grantable": false
         }
       ],
+      "definer": true,
+      "effective": {
+        "anon": false,
+        "service_role": false,
+        "authenticated": false,
+        "authenticator": false,
+        "dashboard_user": false,
+        "supabase_auth_admin": false,
+        "supabase_storage_admin": false
+      },
+      "signature": "app.marketplace_review_approve_image(uuid,uuid)",
+      "schemaUsage": {
+        "anon": true,
+        "service_role": false,
+        "authenticated": true,
+        "authenticator": false,
+        "dashboard_user": false,
+        "supabase_auth_admin": false,
+        "supabase_storage_admin": false
+      }
+    },
+    {
+      "kind": "f",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "grants": [
+        {
+          "role": "postgres",
+          "grantable": false
+        }
+      ],
+      "definer": true,
+      "effective": {
+        "anon": false,
+        "service_role": false,
+        "authenticated": false,
+        "authenticator": false,
+        "dashboard_user": false,
+        "supabase_auth_admin": false,
+        "supabase_storage_admin": false
+      },
+      "signature": "app.marketplace_review_products(text)",
+      "schemaUsage": {
+        "anon": true,
+        "service_role": false,
+        "authenticated": true,
+        "authenticator": false,
+        "dashboard_user": false,
+        "supabase_auth_admin": false,
+        "supabase_storage_admin": false
+      }
+    },
+    {
+      "kind": "f",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "grants": [
+        {
+          "role": "postgres",
+          "grantable": false
+        }
+      ],
       "definer": false,
       "effective": {
         "anon": false,
@@ -15804,6 +15870,154 @@
         "supabase_storage_admin": false
       },
       "signature": "public.admin_marketplace_platform_status()",
+      "schemaUsage": {
+        "anon": true,
+        "service_role": true,
+        "authenticated": true,
+        "authenticator": true,
+        "dashboard_user": true,
+        "supabase_auth_admin": true,
+        "supabase_storage_admin": true
+      }
+    },
+    {
+      "kind": "f",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "grants": [
+        {
+          "role": "authenticated",
+          "grantable": false
+        },
+        {
+          "role": "postgres",
+          "grantable": false
+        }
+      ],
+      "definer": true,
+      "effective": {
+        "anon": false,
+        "service_role": false,
+        "authenticated": true,
+        "authenticator": false,
+        "dashboard_user": false,
+        "supabase_auth_admin": false,
+        "supabase_storage_admin": false
+      },
+      "signature": "public.admin_marketplace_product_review_approve(uuid)",
+      "schemaUsage": {
+        "anon": true,
+        "service_role": true,
+        "authenticated": true,
+        "authenticator": true,
+        "dashboard_user": true,
+        "supabase_auth_admin": true,
+        "supabase_storage_admin": true
+      }
+    },
+    {
+      "kind": "f",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "grants": [
+        {
+          "role": "authenticated",
+          "grantable": false
+        },
+        {
+          "role": "postgres",
+          "grantable": false
+        }
+      ],
+      "definer": true,
+      "effective": {
+        "anon": false,
+        "service_role": false,
+        "authenticated": true,
+        "authenticator": false,
+        "dashboard_user": false,
+        "supabase_auth_admin": false,
+        "supabase_storage_admin": false
+      },
+      "signature": "public.admin_marketplace_product_review_queue(text,integer,integer)",
+      "schemaUsage": {
+        "anon": true,
+        "service_role": true,
+        "authenticated": true,
+        "authenticator": true,
+        "dashboard_user": true,
+        "supabase_auth_admin": true,
+        "supabase_storage_admin": true
+      }
+    },
+    {
+      "kind": "f",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "grants": [
+        {
+          "role": "authenticated",
+          "grantable": false
+        },
+        {
+          "role": "postgres",
+          "grantable": false
+        }
+      ],
+      "definer": true,
+      "effective": {
+        "anon": false,
+        "service_role": false,
+        "authenticated": true,
+        "authenticator": false,
+        "dashboard_user": false,
+        "supabase_auth_admin": false,
+        "supabase_storage_admin": false
+      },
+      "signature": "public.admin_marketplace_product_review_reject(uuid,uuid[],text,uuid,text,text)",
+      "schemaUsage": {
+        "anon": true,
+        "service_role": true,
+        "authenticated": true,
+        "authenticator": true,
+        "dashboard_user": true,
+        "supabase_auth_admin": true,
+        "supabase_storage_admin": true
+      }
+    },
+    {
+      "kind": "f",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "grants": [
+        {
+          "role": "authenticated",
+          "grantable": false
+        },
+        {
+          "role": "postgres",
+          "grantable": false
+        }
+      ],
+      "definer": true,
+      "effective": {
+        "anon": false,
+        "service_role": false,
+        "authenticated": true,
+        "authenticator": false,
+        "dashboard_user": false,
+        "supabase_auth_admin": false,
+        "supabase_storage_admin": false
+      },
+      "signature": "public.admin_marketplace_product_review_summary()",
       "schemaUsage": {
         "anon": true,
         "service_role": true,
@@ -23913,6 +24127,43 @@
         "supabase_storage_admin": false
       },
       "signature": "public.marketplace_seller_image_remove_finalize(uuid)",
+      "schemaUsage": {
+        "anon": true,
+        "service_role": true,
+        "authenticated": true,
+        "authenticator": true,
+        "dashboard_user": true,
+        "supabase_auth_admin": true,
+        "supabase_storage_admin": true
+      }
+    },
+    {
+      "kind": "f",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "grants": [
+        {
+          "role": "authenticated",
+          "grantable": false
+        },
+        {
+          "role": "postgres",
+          "grantable": false
+        }
+      ],
+      "definer": true,
+      "effective": {
+        "anon": false,
+        "service_role": false,
+        "authenticated": true,
+        "authenticator": false,
+        "dashboard_user": false,
+        "supabase_auth_admin": false,
+        "supabase_storage_admin": false
+      },
+      "signature": "public.marketplace_seller_image_replace_request_upload(uuid,text)",
       "schemaUsage": {
         "anon": true,
         "service_role": true,

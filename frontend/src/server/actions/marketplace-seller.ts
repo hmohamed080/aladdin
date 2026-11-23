@@ -130,6 +130,35 @@ export async function requestImageUploadAction(
   }
 }
 
+/**
+ * Replacement upload ticket: like `requestImageUploadAction`, but the new pending image points at the approved image it
+ * will replace. The old image stays live until a moderator approves the new one; then the old one is deleted from R2.
+ */
+export async function requestImageReplacementAction(
+  imageId: string,
+  contentType: string,
+  expectedBytes: number,
+): Promise<SellerResult<{ imageId: string; objectKey: string; grant: UploadGrant }>> {
+  if (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > (await imageMaxBytes("marketplace"))) {
+    return { ok: false, code: "file_too_large" };
+  }
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_seller_image_replace_request_upload", {
+    p_image_id: imageId,
+    p_content_type: contentType,
+  });
+  if (error || !data) return { ok: false, ...fail(error) };
+  const r = data as { image_id: string; object_key: string };
+  if (!isMarketplaceImageKey(r.object_key)) return { ok: false, code: "unexpected" };
+  try {
+    return { ok: true, imageId: r.image_id, objectKey: r.object_key,
+      grant: await authorizeMediaUpload(supabase, "marketplace", r.object_key, expectedBytes) };
+  } catch {
+    await runImageRemoval(supabase, r.image_id);
+    return { ok: false, code: "upload_failed" };
+  }
+}
+
 type Supabase = Awaited<ReturnType<typeof getServerSupabase>>;
 
 /** Phase 1 -> 2 -> 3 of the image removal (Migration 07), on the central media system. */
