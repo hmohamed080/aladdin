@@ -74,6 +74,9 @@ export function QueuedImages({ files, onChange, disabled }: { files: File[]; onC
         </p>
         <p className="text-label text-fg-muted">{t("marketplaceSeller.image.hint")}</p>
         <p className="text-label text-fg-muted">{t("marketplaceSeller.image.queuedHint")}</p>
+        <p className="text-label text-fg-muted" data-testid="queued-slots">
+          {t("marketplaceSeller.image.slots", { used: files.length, max: MAX_IMAGES_PER_BATCH })}
+        </p>
         <input
           ref={inputRef}
           type="file"
@@ -94,7 +97,7 @@ export function QueuedImages({ files, onChange, disabled }: { files: File[]; onC
       ) : null}
 
       {previews.length ? (
-        <ul className="grid grid-cols-2 gap-sm tablet:grid-cols-4 desktop:grid-cols-5">
+        <ul className="grid grid-cols-2 gap-sm tablet:grid-cols-3 desktop:grid-cols-5">
           {previews.map((p, i) => (
             <li key={`${p.file.name}-${p.file.size}`} className="relative overflow-hidden rounded-md border bg-surface">
               {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview, never uploaded yet */}
@@ -116,6 +119,16 @@ export function QueuedImages({ files, onChange, disabled }: { files: File[]; onC
               <p className="truncate px-2 py-1 text-label text-fg-muted" dir="ltr">
                 {p.file.name}
               </p>
+              {i > 0 ? (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  className="w-full border-t px-2 py-1 text-label text-accent hover:bg-surface-2 disabled:opacity-50"
+                  onClick={() => onChange([p.file, ...files.filter((f) => f !== p.file)])}
+                >
+                  {t("marketplaceSeller.image.makePrimary")}
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>

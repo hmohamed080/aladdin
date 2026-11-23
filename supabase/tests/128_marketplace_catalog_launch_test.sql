@@ -162,8 +162,11 @@ select throws_like($$ select public.admin_marketplace_set_media_verification_rea
 set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
 select throws_like($$ select public.admin_marketplace_set_media_verification_ready(true, '') $$, 'mp:media_verification_mandatory%',
   'D2. even a moderator cannot use the retired media switch');
--- before the switch: publication is still blocked by the flag alone
+-- publication is not blocked by anything once the seller also has payment and delivery set up (PR 7)
 reset role;
+insert into public.marketplace_seller_payment_settings (seller_organization_id, cod_enabled) values (current_setting('t.a')::uuid, true);
+insert into public.marketplace_delivery_rates (seller_organization_id, governorate_key, fee_egp, duration_min_days, duration_max_days) values (current_setting('t.a')::uuid, 'cairo', 50, 1, 2);
+insert into public.marketplace_seller_delivery_settings (seller_organization_id, preparation_days) values (current_setting('t.a')::uuid, 1);
 select is(app.marketplace_publication_blockers(current_setting('t.p')::uuid), array[]::text[],
   'D3. with a verified image and stock, nothing blocks publication (no media switch)');
 set local role authenticated;
@@ -226,8 +229,13 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
 select public.admin_marketplace_seller_reinstate('9c000000-cccc-4ccc-8ccc-000000000001', 'delivery test over');
 reset role;
+-- PR 7: suspension unpublished the product and reinstatement does not republish; the seller republishes manually
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
+select public.marketplace_product_publish(current_setting('t.p')::uuid);
+reset role;
 set local role service_role;
-select is((select count(*)::int from public.marketplace_public_image_ref(current_setting('t.img')::uuid)), 1, 'F5. reinstating restores it');
+select is((select count(*)::int from public.marketplace_public_image_ref(current_setting('t.img')::uuid)), 1, 'F5. reinstating and republishing restores it');
 reset role;
 
 select set_config('t.aname', (select name from public.organizations where id = current_setting('t.a')::uuid), true);

@@ -9811,6 +9811,11 @@ export type Database = {
           product_id: string
         }[]
       }
+      admin_marketplace_platform_status: { Args: never; Returns: Json }
+      admin_marketplace_set_open: {
+        Args: { p_open: boolean; p_reason: string }
+        Returns: boolean
+      }
       admin_marketplace_product_review_approve: {
         Args: { p_product_id: string }
         Returns: Json
@@ -11452,6 +11457,10 @@ export type Database = {
       marketplace_seller_product_readiness: {
         Args: { p_product_id: string }
         Returns: string[]
+      }
+      marketplace_seller_product_publication_state: {
+        Args: { p_product_id: string }
+        Returns: Json
       }
       marketplace_seller_product_save: {
         Args: { p_payload: Json }
