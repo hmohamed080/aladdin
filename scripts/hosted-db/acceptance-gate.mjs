@@ -236,7 +236,7 @@ export const PLANS = {
   // prod-catchup (PRODUCTION, target "production"): ONE plan for docs/operations/PRODUCTION_CATCHUP_PLAN_20261123.md. Production is at 210 / 20261112090001 (read live 2026-11-23);
   // supabase db push pushes every unapplied local migration, so main's 27 pending cannot be split into batches. 210 -> 237 (+ PC_LATER). Creates tables (Marketplace 30, media limits,
   // notification templates) and changes rows (permissions, three storage bucket limits), so freshBackup: a restore-verified PRODUCTION snapshot is mandatory and none is pinned
-  // (PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS is EMPTY), so the plan is refused until the owner takes one. "changed" was MEASURED, not written by hand: replay of the 27 on a scratch
+  // (PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS pins only aladdin-production-20261123T142725Z, restore PASS), so the plan is refused for any other label. "changed" was MEASURED, not written by hand: replay of the 27 on a scratch
   // database with scripts/hosted-db/catalog-fingerprint.sql before/after and catalog-diff.mjs (170 functions, the touched constraints/trigger, and prefixes for the new tables).
   // Run only through production-preflight.sh / production-apply.sh; the Acceptance scripts refuse it.
   "prod-catchup": { target: "production", fixes: ["media-notify", "marketplace", "prod-catchup"], recovery: "forward-fix", freshBackup: true, applied: 210, latest: PROD_210, pending: PC_PENDING, preContract: PROD_210, postContract: PC_PENDING.at(-1),
@@ -456,8 +456,13 @@ export const RESTORE_VERIFIED_SNAPSHOTS = {
   // 2026-11-22: taken and restore-tested (CLI 3.2.0) with Acceptance at 232 migrations (latest 20261116100014); the fresh snapshot the media-notify plan needs.
   "aladdin-acceptance-20261122T100424Z": { backupRun: "45010533680", restoreRun: "45019578075", tables: 202, rows: 3815, migrations: 232 },
 };
-/** Restore-verified PRODUCTION snapshots (label must start with aladdin-production-). EMPTY: none has been taken, so every Production plan is refused until one is pinned here after its restore test PASSED. */
-export const PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS = {};
+/** Restore-verified PRODUCTION snapshots (label must start with aladdin-production-). A label is pinned here only after its restore test reported RESULT: PASS; every other Production label is refused. */
+export const PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS = {
+  // 2026-11-23: taken (backup run 45194259216, complete coverage verified, ledger succeeded) and restore-tested (restore run 45199513364: RESULT PASS,
+  // sha256 e030c87a32873a200dd55066d039a5fd0dfb1c746e7d033b5eaf9aebbaa354ff, schema fingerprint exact, 172 tables / 32355 rows exact, R2 media inventory exact: 1313 files,
+  // 21 of 21 sampled restored with the recorded sha256) with Production at 210 migrations (latest 20261112090001). The snapshot the prod-catchup plan needs.
+  "aladdin-production-20261123T142725Z": { backupRun: "45194259216", restoreRun: "45199513364", tables: 172, rows: 32355, migrations: 210 },
+};
 export const FORWARD_FIX = {
   // marketplace: refuses (RAISE) while any seller/product/order/import/stock row or marketplace media object exists; never deletes user data.
   // It is the only recovery of the "marketplace" plan. It restores exactly the media functions and constraint the 14 Marketplace migrations
