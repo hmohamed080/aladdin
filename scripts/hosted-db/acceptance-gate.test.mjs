@@ -382,9 +382,11 @@ test("prod-catchup: a push of only part of the pending list or one with an extra
   has(checkAcceptance({ target: "production", plan: "prod-catchup", list: list("prod-catchup"), dry: dry(P.pending.slice(0, 2)), localVersions: P.pending }), /dry run would push/);
   has(checkAcceptance({ target: "production", plan: "prod-catchup", list: list("prod-catchup", [{ local: "20261123090001", remote: null }]), dry: dry([...P.pending, "20261123090001"]), localVersions: P.pending }), /pending is|dry run would push/);
 });
-test("prod-catchup: needs a restore-verified PRODUCTION snapshot; the registry is EMPTY (fail closed) and an Acceptance snapshot never counts", () => {
+test("prod-catchup: needs a restore-verified PRODUCTION snapshot; only the pinned one counts (fail closed) and an Acceptance snapshot never counts", () => {
   assert.equal(PC().freshBackup, true);
-  assert.deepEqual(PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS, {});
+  assert.deepEqual(PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS, { "aladdin-production-20261123T142725Z": { backupRun: "45194259216", restoreRun: "45199513364", tables: 172, rows: 32355, migrations: 210 } });
+  assert.ok(Object.keys(PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS).every((k) => k.startsWith("aladdin-production-")));
+  assert.deepEqual(checkRecovery({ plan: "prod-catchup", label: "aladdin-production-20261123T142725Z", forwardFixSha256: allShas() }), []);
   const shas = allShas();
   has(checkRecovery({ plan: "prod-catchup", label: "", forwardFixSha256: shas }), /needs --backup-label/);
   has(checkRecovery({ plan: "prod-catchup", label: Object.keys(RESTORE_VERIFIED_SNAPSHOTS).at(-1), forwardFixSha256: shas }), /not a pinned restore-verified PRODUCTION snapshot/);
