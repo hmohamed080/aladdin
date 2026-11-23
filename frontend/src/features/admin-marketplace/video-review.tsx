@@ -65,14 +65,14 @@ export function VideoReviewCard({ video }: { video: ReviewVideo }) {
       {ready ? (
         rejecting ? (
           <div className="flex flex-col gap-sm">
-            <LabeledField label={t("adminMarketplace.videos.reason")}>
-              <Textarea value={reason} maxLength={1000} onChange={(e) => setReason(e.target.value)} />
+            <LabeledField label={t("adminMarketplace.videos.reason")} htmlFor={`${video.id}-reason`}>
+              <Textarea id={`${video.id}-reason`} value={reason} maxLength={1000} onChange={(e) => setReason(e.target.value)} />
             </LabeledField>
-            <LabeledField label={t("adminMarketplace.videos.messageAr")}>
-              <Textarea dir="rtl" value={messageAr} maxLength={1000} onChange={(e) => setMessageAr(e.target.value)} />
+            <LabeledField label={t("adminMarketplace.videos.messageAr")} htmlFor={`${video.id}-ar`}>
+              <Textarea id={`${video.id}-ar`} dir="rtl" value={messageAr} maxLength={1000} onChange={(e) => setMessageAr(e.target.value)} />
             </LabeledField>
-            <LabeledField label={t("adminMarketplace.videos.messageEn")}>
-              <Textarea dir="ltr" value={messageEn} maxLength={1000} onChange={(e) => setMessageEn(e.target.value)} />
+            <LabeledField label={t("adminMarketplace.videos.messageEn")} htmlFor={`${video.id}-en`}>
+              <Textarea id={`${video.id}-en`} dir="ltr" value={messageEn} maxLength={1000} onChange={(e) => setMessageEn(e.target.value)} />
             </LabeledField>
             <div className="flex gap-sm">
               <Button size="sm" variant="danger" disabled={pending} onClick={() => decide("reject")}>{t("adminMarketplace.videos.confirmReject")}</Button>

@@ -24,7 +24,7 @@ beforeEach(() => {
 
 describe("VideoReviewCard", () => {
   it("plays the video and approves it", async () => {
-    renderWithI18n(<VideoReviewCard video={video()} />);
+    renderWithI18n(<VideoReviewCard video={video()} />, "en");
     expect(screen.getByTestId("player")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
     await waitFor(() => expect(review).toHaveBeenCalledWith("v1", "approve", expect.anything()));
@@ -33,7 +33,7 @@ describe("VideoReviewCard", () => {
 
   it("rejects only with the reason and both messages, and shows the refusal otherwise", async () => {
     review.mockResolvedValueOnce({ ok: false, code: "reason_required" });
-    renderWithI18n(<VideoReviewCard video={video()} />);
+    renderWithI18n(<VideoReviewCard video={video()} />, "en");
     fireEvent.click(screen.getByRole("button", { name: "Reject" }));
     fireEvent.click(screen.getByRole("button", { name: "Reject video" }));
     expect(await screen.findByText("Write the internal reason.")).toBeTruthy();
@@ -47,13 +47,13 @@ describe("VideoReviewCard", () => {
   });
 
   it("offers no decision while the video is still processing", () => {
-    renderWithI18n(<VideoReviewCard video={video({ state: "processing", playback: null })} />);
+    renderWithI18n(<VideoReviewCard video={video({ state: "processing", playback: null })} />, "en");
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Reject" })).toBeNull();
   });
 
   it("lets a rejected video be approved and shows the internal reason to reviewers", () => {
-    renderWithI18n(<VideoReviewCard video={video({ reviewStatus: "rejected", reviewReason: "blurry footage" })} />);
+    renderWithI18n(<VideoReviewCard video={video({ reviewStatus: "rejected", reviewReason: "blurry footage" })} />, "en");
     expect(screen.getByRole("button", { name: "Approve" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Reject" })).toBeNull();
     expect(screen.getByText(/blurry footage/)).toBeTruthy();
