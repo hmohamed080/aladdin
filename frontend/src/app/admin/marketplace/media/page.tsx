@@ -5,8 +5,7 @@ import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { AdminHeader } from "@/features/admin/parts";
 import { StatePanel } from "@/components/ui/primitives";
 import { marketplacePrivateImageUrls } from "@/server/media/marketplace-public-images";
-import { ProductReview, type ReviewCounts, type ReviewProduct, type ReviewTab } from "@/features/admin-marketplace/product-review";
-import type { ReviewPreset } from "@/features/admin-marketplace/review-preset-manager";
+import { ProductReview, type ReviewCounts, type ReviewPreset, type ReviewProduct, type ReviewTab } from "@/features/admin-marketplace/product-review";
 import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +41,7 @@ export default async function AdminProductReviewPage({
   const [summaryRes, queueRes, presetsRes] = await Promise.all([
     supabase.rpc("admin_marketplace_product_review_summary"),
     supabase.rpc("admin_marketplace_product_review_queue", { p_tab: tab, p_limit: PAGE_SIZE, p_offset: (page - 1) * PAGE_SIZE }),
-    supabase.rpc("admin_marketplace_review_presets"),
+    supabase.rpc("admin_marketplace_seller_presets"),
   ]);
   if (summaryRes.error || queueRes.error || presetsRes.error) {
     const denied = [summaryRes.error, queueRes.error, presetsRes.error].some((e) => e?.code === "42501");
@@ -56,7 +55,8 @@ export default async function AdminProductReviewPage({
 
   const counts = summaryRes.data as unknown as ReviewCounts;
   const queue = queueRes.data as unknown as { total: number; items: QueuedProduct[] };
-  const presets = presetsRes.data as unknown as { can_manage: boolean; items: ReviewPreset[] };
+  // PR 5's one preset system: the image rejection reasons are the presets whose action is image_reject
+  const presets = ((presetsRes.data ?? []) as unknown as (ReviewPreset & { action: string })[]).filter((p) => p.action === "image_reject");
   // Card-size previews through the media Worker (or /api/media), re-checking the moderator permission on every read.
   const keys = queue.items.flatMap((p) => p.images.map((i) => i.object_key));
   const previews = await marketplacePrivateImageUrls(supabase, keys, "card");
@@ -74,8 +74,7 @@ export default async function AdminProductReviewPage({
         pages={Math.max(1, Math.ceil(Number(queue.total) / PAGE_SIZE))}
         counts={counts}
         products={products}
-        presets={presets.items}
-        canManagePresets={presets.can_manage}
+        presets={presets}
       />
     </div>
   );

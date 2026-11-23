@@ -10,7 +10,16 @@ import { Badge, Card, InlineError, InlineSuccess } from "@/components/ui/primiti
 import { Button, ButtonLink, Input, Select, Textarea } from "@/components/ui/controls";
 import { CheckIcon, XIcon } from "@/components/ui/icons";
 import { approveImagesAction, approveProductAction, rejectProductAction } from "@/server/actions/admin-marketplace";
-import { PresetManager, type ReviewPreset } from "./review-preset-manager";
+
+/** A rejection-reason preset (PR 5's marketplace_seller_message_presets, action image_reject). */
+export type ReviewPreset = {
+  id: string;
+  label_ar: string;
+  label_en: string;
+  text_ar: string;
+  text_en: string;
+  is_active: boolean;
+};
 
 export type ReviewImage = {
   id: string;
@@ -51,8 +60,8 @@ const KNOWN_ERRORS = new Set([
   "images_invalid",
   "no_pending_images",
   "owner_message_required",
+  "owner_message_conflict",
   "preset_not_found",
-  "preset_invalid",
 ]);
 const STATUS_TONE = { pending: "warning", verified: "success", rejected: "danger" } as const;
 const REVIEW_PATH = "/admin/marketplace/media";
@@ -64,7 +73,6 @@ export function ProductReview({
   counts,
   products,
   presets,
-  canManagePresets,
 }: {
   tab: ReviewTab;
   page: number;
@@ -72,7 +80,6 @@ export function ProductReview({
   counts: ReviewCounts;
   products: ReviewProduct[];
   presets: ReviewPreset[];
-  canManagePresets: boolean;
 }) {
   const { t, locale } = useI18n();
   const activePresets = presets.filter((p) => p.is_active);
@@ -123,8 +130,6 @@ export function ProductReview({
           ) : null}
         </div>
       ) : null}
-
-      {canManagePresets ? <PresetManager presets={presets} /> : null}
     </div>
   );
 }
@@ -322,13 +327,14 @@ function RejectPanel({
   presets: ReviewPreset[];
   busy: boolean;
   onCancel: () => void;
-  onSubmit: (input: { reason: string; ownerMessage: string; presetId: string | null }) => void;
+  onSubmit: (input: { reason: string; presetId: string | null; messageAr: string; messageEn: string }) => void;
 }) {
   const { t, locale } = useI18n();
   const [reason, setReason] = useState("");
   const [presetId, setPresetId] = useState("");
-  const [custom, setCustom] = useState("");
-  const ready = reason.trim().length >= 3 && (presetId !== "" || custom.trim().length >= 3);
+  const [customAr, setCustomAr] = useState("");
+  const [customEn, setCustomEn] = useState("");
+  const ready = reason.trim().length >= 3 && (presetId !== "" || (customAr.trim().length >= 3 && customEn.trim().length >= 3));
   const label = (p: ReviewPreset) => (locale === "ar" ? p.label_ar : p.label_en);
   const preview = presets.find((p) => p.id === presetId);
 
@@ -338,7 +344,7 @@ function RejectPanel({
       aria-label={t("adminMarketplace.media.reject.title", { count, name })}
       onSubmit={(e) => {
         e.preventDefault();
-        if (ready) onSubmit({ reason, ownerMessage: custom, presetId: presetId || null });
+        if (ready) onSubmit({ reason, presetId: presetId || null, messageAr: customAr, messageEn: customEn });
       }}
     >
       <p className="text-body font-medium text-fg">{t("adminMarketplace.media.reject.title", { count, name })}</p>
@@ -363,18 +369,21 @@ function RejectPanel({
         </Select>
       </label>
       {preview ? (
-        <p className="text-label text-fg-secondary">{locale === "ar" ? preview.message_ar : preview.message_en}</p>
+        <div className="flex flex-col gap-1 text-label text-fg-secondary">
+          <p dir="rtl" lang="ar">{preview.text_ar}</p>
+          <p dir="ltr" lang="en">{preview.text_en}</p>
+        </div>
       ) : (
-        <label className="flex flex-col gap-1 text-label text-fg-secondary">
-          {t("adminMarketplace.media.reject.message")}
-          <Textarea
-            rows={3}
-            maxLength={300}
-            value={custom}
-            placeholder={t("adminMarketplace.media.reject.customPlaceholder")}
-            onChange={(e) => setCustom(e.target.value)}
-          />
-        </label>
+        <>
+          <label className="flex flex-col gap-1 text-label text-fg-secondary">
+            {t("adminMarketplace.media.reject.messageAr")}
+            <Textarea rows={3} maxLength={300} dir="rtl" lang="ar" value={customAr} onChange={(e) => setCustomAr(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1 text-label text-fg-secondary">
+            {t("adminMarketplace.media.reject.messageEn")}
+            <Textarea rows={3} maxLength={300} dir="ltr" lang="en" value={customEn} onChange={(e) => setCustomEn(e.target.value)} />
+          </label>
+        </>
       )}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" size="sm" variant="danger" disabled={busy || !ready}>

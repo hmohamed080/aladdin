@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
-import { loadMarketplaceSellerStatus } from "@/server/queries/marketplace-seller";
+import { loadMarketplaceSellerStanding } from "@/server/queries/marketplace-seller";
+import { SellerStandingPanel } from "@/features/marketplace-seller/standing-panel";
 import { PageHeader } from "@/components/ui/workspace-layout";
 import { StatePanel } from "@/components/ui/primitives";
 import { StatTiles } from "@/components/ui/stat-tiles";
@@ -86,8 +87,8 @@ export default async function MarketplaceProductsPage({
   const t = m.marketplaceSeller;
   const ar = locale === "ar";
 
-  const status = await loadMarketplaceSellerStatus(supabase, org.organizationId);
-  const access = sellerPageAccess(status);
+  const standing = await loadMarketplaceSellerStanding(supabase, org.organizationId);
+  const access = sellerPageAccess(standing?.status ?? null);
   // Never enabled (or the preview is closed), or permanently removed: no such page.
   if (access === "not-found") notFound();
 
@@ -95,11 +96,12 @@ export default async function MarketplaceProductsPage({
     return (
       <div className="flex flex-col gap-lg">
         <PageHeader locale={locale} Icon={StorefrontIcon} title={t.title} subtitle={t.subtitle} />
-        <StatePanel
-          icon={<StorefrontIcon size={20} />}
-          tone={status === "suspended" ? "warning" : "neutral"}
-          title={status === "suspended" ? t.suspendedTitle : t.pendingTitle}
-          body={status === "suspended" ? t.suspendedBody : t.pendingBody}
+        <SellerStandingPanel
+          standing={standing}
+          copy={m.marketplaceSeller.approval}
+          locale={locale}
+          organizationId={org.organizationId}
+          canRequest={org.capabilities.includes("org.manage")}
         />
       </div>
     );
