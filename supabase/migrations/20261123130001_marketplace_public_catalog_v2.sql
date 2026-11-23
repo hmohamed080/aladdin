@@ -333,6 +333,8 @@ stable
 security definer
 set search_path = ''
 as $$
+  -- Delegates to browse, which already applies app.marketplace_product_is_listed(p.id) (products with nothing to sell are withdrawn)
+  -- and app.marketplace_seller_is_public(...) (open switch + approved seller).
   select public.marketplace_public_browse(p_category, p_type, p_query, p_sort, p_limit, p_offset, p_price_min, p_price_max,
                                           p_attrs, false, null, null, null, null);
 $$;
