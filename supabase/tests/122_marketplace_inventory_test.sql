@@ -410,8 +410,8 @@ update public.marketplace_stock_locations set is_active = false where organizati
 select ok('no_available_stock' = any(app.marketplace_publication_blockers('b1000000-0000-4000-8000-0000000000b1')),
   'J3. a product whose stock sits only at inactive locations reports no_available_stock');
 select ok(not ('seller_not_approved' = any(app.marketplace_publication_blockers('a1000000-0000-4000-8000-0000000000a1')))
-      and 'media_verification_not_available' = any(app.marketplace_publication_blockers('a1000000-0000-4000-8000-0000000000a1')),
-  'J4. with the seller approved, publication is STILL closed by the media-verification flag (Migration 04)');
+      and not ('media_verification_not_available' = any(app.marketplace_publication_blockers('a1000000-0000-4000-8000-0000000000a1'))),
+  'J4. with the seller approved, no media-verification flag blocks publication any more (always mandatory since 20261123100001)');
 select throws_ok($$ update public.marketplace_products set status = 'published' where id = 'a1000000-0000-4000-8000-0000000000a1' $$,
   '23514', null, 'J5. publication is still refused');
 

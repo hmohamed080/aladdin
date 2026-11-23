@@ -6,7 +6,7 @@ import { saveSellerPresetAction } from "@/server/actions/notification-templates"
 import { useKeptFormAction } from "./use-kept-form-action";
 
 const FIELDS = ["action", "label_ar", "label_en", "text_ar", "text_en", "sort_order", "reason"] as const;
-const ACTIONS = ["approve", "reject", "suspend", "reinstate", "revoke"] as const;
+const ACTIONS = ["approve", "reject", "suspend", "reinstate", "revoke", "image_reject"] as const;
 
 export type SellerPresetValue = {
   id: string | null;
