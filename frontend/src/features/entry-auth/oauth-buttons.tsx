@@ -58,11 +58,11 @@ export function EntryOAuthButtons({
       </form>
       <p className="text-center text-label text-fg-muted">
         {t("entryAuth.oauthConsentPrefix")}{" "}
-        <Link href="/legal/terms" target="_blank" className="underline underline-offset-4">
+        <Link href="/legal/terms" prefetch={false} target="_blank" className="underline underline-offset-4">
           {t("entryAuth.terms")}
         </Link>{" "}
         {t("entryAuth.and")}{" "}
-        <Link href="/legal/privacy" target="_blank" className="underline underline-offset-4">
+        <Link href="/legal/privacy" prefetch={false} target="_blank" className="underline underline-offset-4">
           {t("entryAuth.privacy")}
         </Link>
       </p>
