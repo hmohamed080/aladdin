@@ -8,7 +8,7 @@ import { InlineError, InlineSuccess } from "@/components/ui/primitives";
 import { TrashIcon, UploadIcon } from "@/components/ui/icons";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { BV_ALLOWED_TYPES, BV_DOC_TYPES, BV_MAX_DRAFTS, BV_NOTE_MAX, validateBvFile, type BvDocType } from "@/lib/business-verification/contract";
-import { confirmBvUploadAction, removeBvDocumentAction, requestBvUploadAction, submitBvAction } from "@/server/actions/business-verification";
+import { abandonBvUploadAction, confirmBvUploadAction, removeBvDocumentAction, requestBvUploadAction, submitBvAction } from "@/server/actions/business-verification";
 import type { FormState } from "@/server/actions/sales-forms";
 import type { BvDocument } from "@/server/queries/business-verification";
 import { BvDocumentRow } from "./parts";
@@ -57,18 +57,23 @@ export function BvOwnerPanel({
     const valid = validateBvFile(file);
     if (!valid.ok) return setError(t(valid.code));
     setBusy(true);
+    let reservedKey: string | null = null;
     try {
       const ticket = await requestBvUploadAction({ orgId, docType, contentType: file.type, sizeBytes: file.size, fileName: file.name });
       if (!ticket.ok) throw new Error(ticket.code);
+      reservedKey = ticket.key;
       try { await uploadWithGrant(ticket.grant, file); }
       catch { throw new Error("businessVerification.errors.upload"); }
       const confirmed = await confirmBvUploadAction(ticket.key);
       if (!confirmed.ok) throw new Error(confirmed.code);
+      reservedKey = null;
       setNotice(t("businessVerification.owner.uploaded"));
       router.refresh();
     } catch (err) {
       const code = err instanceof Error && err.message.includes(".") ? err.message : "businessVerification.errors.upload";
       setError(t(code));
+      // A reservation was made but the document never became ready: free its slot now instead of after an hour.
+      if (reservedKey) { try { await abandonBvUploadAction(reservedKey); router.refresh(); } catch { /* it expires on its own */ } }
     } finally {
       setBusy(false);
     }

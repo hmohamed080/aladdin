@@ -6,7 +6,7 @@ vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({ rpc:
 const media = vi.hoisted(() => ({ authorize: vi.fn(), verify: vi.fn(), remove: vi.fn() }));
 vi.mock("@/server/storage/media", () => ({ authorizeMediaUpload: media.authorize, verifyPendingMedia: media.verify, removeMedia: media.remove }));
 vi.mock("@/server/media/limits", async () => { const { DEFAULT_IMAGE_LIMITS: d } = await import("@/lib/media/limits"); return { imageMaxBytes: async (p: keyof typeof d) => d[p], invalidateMediaLimitCache: () => undefined }; });
-import { confirmBvUploadAction, removeBvDocumentAction, requestBvUploadAction } from "./business-verification";
+import { abandonBvUploadAction, confirmBvUploadAction, removeBvDocumentAction, requestBvUploadAction } from "./business-verification";
 
 const ORG = "9c000000-cccc-4ccc-8ccc-000000000001";
 const DOC = "5bc41c1a-0000-4000-8000-0000000000aa";
@@ -59,3 +59,30 @@ describe("verification document storage", () => {
     expect((await removeBvDocumentAction(DOC)).ok).toBe(false);
   });
 });
+
+describe("abandoning an upload that failed", () => {
+  it("retires the caller's own pending draft at once and then deletes any partial object", async () => {
+    state.rpc.mockResolvedValue({ data: KEY, error: null });
+    expect(await abandonBvUploadAction(KEY)).toEqual({ ok: true });
+    expect(state.rpc).toHaveBeenCalledWith("business_verification_document_abandon", { p_object_key: KEY });
+    expect(media.remove).toHaveBeenCalledWith(expect.anything(), "verification", KEY);
+  });
+
+  it("refuses a key of the wrong shape without calling the database", async () => {
+    expect((await abandonBvUploadAction("not-a-key")).ok).toBe(false);
+    expect(state.rpc).not.toHaveBeenCalled();
+  });
+
+  it("reports the database refusal (not the caller's draft, or already confirmed) and deletes nothing", async () => {
+    state.rpc.mockResolvedValue({ data: null, error: { message: "document not found" } });
+    expect((await abandonBvUploadAction(KEY)).ok).toBe(false);
+    expect(media.remove).not.toHaveBeenCalled();
+  });
+
+  it("still succeeds when the partial object cannot be deleted (the pending prefix expires on its own)", async () => {
+    state.rpc.mockResolvedValue({ data: KEY, error: null });
+    media.remove.mockRejectedValue(new Error("r2 down"));
+    expect(await abandonBvUploadAction(KEY)).toEqual({ ok: true });
+  });
+});
+

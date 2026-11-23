@@ -7365,7 +7365,7 @@ export const en = {
       inReview: "This request is already being reviewed.",
       alreadyVerified: "This business is already verified.",
       notApproved: "Documents can be sent once your business application is approved.",
-      tooMany: "You can add up to 10 documents per request. Remove one first.",
+      tooMany: "You can add up to 10 documents per request. This count includes uploads that did not finish; those expire on their own after one hour. Remove a document or try again in a little while.",
       fileSize: "Each document must be smaller than 10 MB.",
       fileType: "Use a PDF, JPG, PNG or WebP file.",
       submittedDocument: "A sent document is kept as evidence and cannot be removed.",

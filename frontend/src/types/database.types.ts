@@ -10273,6 +10273,10 @@ export type Database = {
         Args: { p_verification_id: string }
         Returns: Json
       }
+      business_verification_document_abandon: {
+        Args: { p_object_key: string }
+        Returns: string
+      }
       business_verification_document_confirm: {
         Args: { p_object_key: string }
         Returns: string

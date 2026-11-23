@@ -126,6 +126,13 @@ insert into _ids select 'd2', id::text from public.business_verification_documen
 set local role authenticated;
 set local request.jwt.claims = :'own';
 select is(public.business_verification_document_remove((select v::uuid from _ids where k = 'd2')), (select v from _ids where k = 'k2'), 'B12: a draft document can be removed');
+-- B13-B15: a failed upload releases its slot at once (20261123090001)
+insert into _ids select 'k3', public.business_verification_document_request_upload((select v::uuid from _ids where k = 'o1'), 'tax_card', 'image/png', 1024, 'abandon.png');
+set local request.jwt.claims = :'out';
+select throws_ok(format('select public.business_verification_document_abandon(%L)', (select v from _ids where k = 'k3')), 'P0002', null, 'B13: another user cannot abandon the owner''s pending draft');
+set local request.jwt.claims = :'own';
+select is(public.business_verification_document_abandon((select v from _ids where k = 'k3')), (select v from _ids where k = 'k3'), 'B14: the creator abandons an unconfirmed draft at once');
+select throws_ok(format('select public.business_verification_document_abandon(%L)', (select v from _ids where k = 'k1')), 'P0002', null, 'B15: a confirmed (ready) document cannot be abandoned');
 
 set local request.jwt.claims = :'out';
 select is((select count(*)::int from storage.objects where bucket_id = 'business-verification-documents'), 0, 'C4: an outsider sees no document object');
