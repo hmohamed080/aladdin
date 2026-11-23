@@ -24,7 +24,7 @@ export default async function AdminMarketplaceSellersPage() {
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const m = getMessages(locale).adminMarketplace;
   const [{ data, error }, presetResult] = await Promise.all([
-    supabase.rpc("admin_marketplace_seller_overview"),
+    supabase.rpc("admin_marketplace_seller_overview_v2"),
     supabase.rpc("admin_marketplace_seller_presets"),
   ]);
 

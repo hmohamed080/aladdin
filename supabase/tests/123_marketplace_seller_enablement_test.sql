@@ -123,8 +123,8 @@ select throws_ok($$ select public.admin_marketplace_seller_approve('aaaaaaaa-aaa
   '23514', null, 'B1. a non-showroom organization (supplier) cannot be approved');
 select throws_ok($$ select public.admin_marketplace_seller_approve('00000000-0000-4000-8000-0000000000ff', 'unknown organization') $$,
   '23503', null, 'B2. an unknown organization cannot be approved');
-select throws_ok($$ select public.admin_marketplace_seller_suspend('9c000000-cccc-4ccc-8ccc-000000000001', '') $$,
-  '22023', null, 'B3. a reason is mandatory for suspend (optional for approve since seller approval v2)');
+select throws_ok($$ select public.admin_marketplace_seller_approve('9c000000-cccc-4ccc-8ccc-000000000001', '') $$,
+  '22023', null, 'B3. a reason is mandatory');
 select is((select count(*)::int from public.admin_marketplace_sellers()), 0,
   'B4. refused approvals left no account behind');
 
@@ -192,9 +192,9 @@ select is(public.admin_marketplace_seller_reinstate('9c000000-cccc-4ccc-8ccc-000
 select is(public.admin_marketplace_seller_revoke('9c000000-cccc-4ccc-8ccc-000000000001', 'policy violation'),
   'revoked', 'C8. an approved seller can be revoked');
 select throws_ok($$ select public.admin_marketplace_seller_reinstate('9c000000-cccc-4ccc-8ccc-000000000001', 'try to undo') $$,
-  '23514', null, 'C9. a revoked seller cannot be reinstated (only a suspended one can)');
-select throws_ok($$ select public.admin_marketplace_seller_reject('9c000000-cccc-4ccc-8ccc-000000000001', 'try to reject') $$,
-  '23514', null, 'C10. ...nor rejected (re-approval after revoke is covered by test 144)');
+  '23514', null, 'C9. a revoked seller cannot be reinstated (terminal in V1)');
+select throws_ok($$ select public.admin_marketplace_seller_approve('9c000000-cccc-4ccc-8ccc-000000000001', 'try to re-approve') $$,
+  '23514', null, 'C10. ...nor re-approved');
 select throws_ok($$ select public.admin_marketplace_seller_revoke('9c000000-cccc-4ccc-8ccc-000000000001', 'already revoked') $$,
   '23514', null, 'C11. ...nor revoked twice');
 select is((select array_agg(action order by sequence) from public.admin_marketplace_seller_history('9c000000-cccc-4ccc-8ccc-000000000001')),

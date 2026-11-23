@@ -2,19 +2,28 @@
 --
 -- WHAT CHANGES
 --   1. A new status `rejected` (with a reason). An admin can approve a rejected seller later.
---   2. `revoked` is no longer terminal: an admin can approve a revoked seller again. This reverses the V1 design of
---      app.marketplace_seller_transition ("revoked is terminal in V1").
---   3. The showroom owner can ask for approval himself (public.marketplace_seller_request_approval), also after a
---      rejection. The `pending` status and the `requested` event finally have a writer.
+--   2. `revoked` is no longer terminal: an admin can approve a revoked seller again, and the owner can ask again
+--      himself. This reverses the V1 design of app.marketplace_seller_transition ("revoked is terminal in V1").
+--   3. The showroom owner can ask for approval himself (public.marketplace_seller_request_approval), the first time or
+--      again after a rejection or a revocation. Approval itself stays admin-only. The `pending` status and the
+--      `requested` event finally have a writer. There is no withdraw from pending: an admin rejects instead.
 --   4. Reason rules: required for reject, suspend, revoke and reinstate; optional for approve (and for a request).
 --   5. Two texts per transition: the internal admin REASON (admins only, never readable by the seller) and an
 --      owner-facing MESSAGE, chosen from an admin-managed preset list (each preset carries Arabic and English text)
---      or written as custom free text ("other"). Both are stored on the account and on the append-only event.
+--      or written as custom text ("other") in TWO separate fields, Arabic and English (never one text for both languages).
+--      Both languages are stored on the account and on the append-only event.
 --   6. Every transition except a request notifies the OWNER (members holding org.manage, not every manager) through
 --      the notification-template system (20261121090003): one base template per transition. The owner message fills
---      {message} in each language. app.notify_from_template gains optional per-language variables for that.
+--      {message} in each language. app.notify_from_template gets a second signature with per-language variables for that.
 --   7. The sellers overview reports why an organization is not eligible (type / status / deleted) so the admin can
 --      explain "Eligible = No" on hover, and lists deleted organizations that still hold a seller account.
+--
+-- EXPAND / CONTRACT (scripts/migration-policy.mjs): nothing is dropped. Every changed function is ADDED as a new signature
+-- next to the old one, which stays untouched for the still-promoted application: app.notify_from_template (9 args),
+-- app.marketplace_seller_transition (7 args), public.admin_marketplace_seller_approve/suspend/revoke/reinstate (5 args),
+-- public.admin_marketplace_seller_overview_v2() and admin_marketplace_seller_history_v2(uuid) (new return shapes need new
+-- names). None of the new signatures has a default argument, so a call with the OLD argument list can never become
+-- ambiguous. Release N+1 drops the old signatures once nothing promoted calls them.
 --
 -- PERMISSIONS: no new permission is needed. Transitions stay under marketplace_sellers.manage. The preset list is
 -- readable by the seller admins and the template viewers, and edited under notification_templates.manage (Super
@@ -126,6 +135,10 @@ insert into public.marketplace_seller_message_presets (action, label_ar, label_e
    'بيانات نشاطك غير مكتملة. يرجى استكمالها ثم طلب الاعتماد من جديد.', 'Your business details are incomplete. Please complete them and request approval again.', 10),
   ('reject',    'لا يستوفي الشروط',      'Does not meet requirements',
    'نشاطك لا يستوفي حاليًا شروط البيع في المتجر.', 'Your business does not currently meet the Marketplace selling requirements.', 20),
+  ('reject',    'مستندات ناقصة',          'Documents missing',
+   'المستندات المطلوبة غير مكتملة. يرجى رفعها ثم طلب الاعتماد من جديد.', 'The required documents are missing. Please upload them and request approval again.', 30),
+  ('reject',    'نشاط غير مدعوم',         'Business type not supported',
+   'نوع نشاطك غير مدعوم في المتجر حاليًا.', 'Your type of business is not currently supported on the Marketplace.', 40),
   ('suspend',   'مراجعة شكاوى العملاء',  'Reviewing customer complaints',
    'تم إيقاف البيع مؤقتًا لمراجعة شكاوى العملاء.', 'Selling is paused while we review customer complaints.', 10),
   ('suspend',   'مراجعة بيانات المعرض',  'Reviewing showroom details',
@@ -141,18 +154,18 @@ insert into public.marketplace_seller_message_presets (action, label_ar, label_e
 -- 3. Notification writer: optional per-language variables
 -- ---------------------------------------------------------------------------
 -- The owner message exists in both languages, so the writer must be able to render {message} differently per language.
--- p_vars_ar / p_vars_en are merged over p_vars for that language only. Callers with seven arguments are unaffected.
-drop function app.notify_from_template(uuid, uuid, text, text, uuid, text, jsonb);
-create or replace function app.notify_from_template(
+-- p_vars_ar / p_vars_en are merged over p_vars for that language only. The seven-argument function stays as it is; this is
+-- a second signature (no defaults, so a seven-argument call keeps resolving to the old one).
+create function app.notify_from_template(
   p_recipient_user_id uuid,
   p_organization_id   uuid,
   p_template_key      text,
   p_subject_type      text,
   p_subject_id        uuid,
   p_deep_link         text,
-  p_vars              jsonb default '{}'::jsonb,
-  p_vars_ar           jsonb default null,
-  p_vars_en           jsonb default null
+  p_vars              jsonb,
+  p_vars_ar           jsonb,
+  p_vars_en           jsonb
 )
 returns uuid
 language plpgsql
@@ -205,17 +218,16 @@ comment on function app.notify_from_template(uuid, uuid, text, text, uuid, text,
   'Internal-only. Renders both languages of a template with the given variables (p_vars_ar / p_vars_en override p_vars per language), writes one notification through app.notify (self-notification still suppressed) and stores the rendered snapshot in notifications.content. Unknown template raises; a missing variable renders empty.';
 
 -- ---------------------------------------------------------------------------
--- 4. The single seller-state transition (internal; replaces the V1 four-argument function)
+-- 4. The single seller-state transition (internal; a new 7-argument signature next to the V1 four-argument function)
 -- ---------------------------------------------------------------------------
-drop function app.marketplace_seller_transition(uuid, text, text, uuid);
-
-create or replace function app.marketplace_seller_transition(
+create function app.marketplace_seller_transition(
   p_organization_id uuid,
   p_action          text,        -- request | approve | reject | suspend | reinstate | revoke
   p_reason          text,        -- internal admin reason (optional for request and approve)
   p_actor           uuid,
-  p_preset_id       uuid default null,
-  p_message         text default null   -- custom owner-facing message ("other")
+  p_preset_id       uuid,        -- owner message from an admin-managed preset, or null
+  p_message_ar      text,        -- custom owner-facing message, Arabic ("other"); both custom fields or neither
+  p_message_en      text         -- custom owner-facing message, English
 )
 returns text
 language plpgsql
@@ -228,7 +240,8 @@ declare
   v_event   text;
   v_org     record;
   v_reason  text := nullif(btrim(coalesce(p_reason, '')), '');
-  v_custom  text := nullif(btrim(coalesce(p_message, '')), '');
+  v_cust_ar text := nullif(btrim(coalesce(p_message_ar, '')), '');
+  v_cust_en text := nullif(btrim(coalesce(p_message_en, '')), '');
   v_msg_ar  text;
   v_msg_en  text;
   v_preset  public.marketplace_seller_message_presets;
@@ -247,18 +260,22 @@ begin
   end if;
 
   -- owner-facing message: a preset of THIS action, or custom text, never both; a request carries none
-  if p_action = 'request' and (p_preset_id is not null or v_custom is not null) then
+  if p_action = 'request' and (p_preset_id is not null or v_cust_ar is not null or v_cust_en is not null) then
     raise exception 'a request carries no owner message' using errcode = '22023';
   end if;
-  if p_preset_id is not null and v_custom is not null then
+  if p_preset_id is not null and (v_cust_ar is not null or v_cust_en is not null) then
     raise exception 'choose a preset or write a custom message, not both' using errcode = '22023';
   end if;
-  if v_custom is not null then
-    if char_length(v_custom) > 300 then
-      raise exception 'the owner message is limited to 300 characters' using errcode = '22023';
+  -- a custom message is two separate texts; one language alone would leave the other owner notification empty
+  if (v_cust_ar is null) <> (v_cust_en is null) then
+    raise exception 'a custom owner message needs both the Arabic and the English text' using errcode = '22023';
+  end if;
+  if v_cust_ar is not null then
+    if char_length(v_cust_ar) > 300 or char_length(v_cust_en) > 300 then
+      raise exception 'the owner message is limited to 300 characters per language' using errcode = '22023';
     end if;
-    v_msg_ar := v_custom;
-    v_msg_en := v_custom;
+    v_msg_ar := v_cust_ar;
+    v_msg_en := v_cust_en;
   elsif p_preset_id is not null then
     select * into v_preset from public.marketplace_seller_message_presets
      where id = p_preset_id and is_active and action = p_action;
@@ -282,7 +299,8 @@ begin
   -- transition table
   case p_action
     when 'request' then
-      if v_from is not null and v_from <> 'rejected' then
+      -- first request, or again after a rejection or a revocation (the owner may ask again; only an admin approves)
+      if v_from is not null and v_from not in ('rejected', 'revoked') then
         raise exception 'cannot request approval while the seller is %', v_from using errcode = '23514';
       end if;
       v_to := 'pending'; v_event := 'requested';
@@ -372,54 +390,50 @@ begin
   return v_to;
 end;
 $$;
-revoke all on function app.marketplace_seller_transition(uuid, text, text, uuid, uuid, text)
+revoke all on function app.marketplace_seller_transition(uuid, text, text, uuid, uuid, text, text)
   from public, anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- 5. Admin RPCs (permission-checked, audited)
 -- ---------------------------------------------------------------------------
-drop function public.admin_marketplace_seller_approve(uuid, text);
-drop function public.admin_marketplace_seller_suspend(uuid, text);
-drop function public.admin_marketplace_seller_revoke(uuid, text);
-drop function public.admin_marketplace_seller_reinstate(uuid, text);
-
+-- New signatures (reason, preset, Arabic message, English message), no defaults: the old (uuid, text) functions stay.
 create or replace function public.admin_marketplace_seller_approve(
-  p_organization_id uuid, p_reason text default null, p_preset_id uuid default null, p_message text default null)
+  p_organization_id uuid, p_reason text, p_preset_id uuid, p_message_ar text, p_message_en text)
 returns text language plpgsql security definer set search_path = '' as $$
 begin
-  return app.marketplace_seller_transition(p_organization_id, 'approve', p_reason, app.marketplace_assert_seller_admin(true), p_preset_id, p_message);
+  return app.marketplace_seller_transition(p_organization_id, 'approve', p_reason, app.marketplace_assert_seller_admin(true), p_preset_id, p_message_ar, p_message_en);
 end;
 $$;
 create or replace function public.admin_marketplace_seller_reject(
-  p_organization_id uuid, p_reason text, p_preset_id uuid default null, p_message text default null)
+  p_organization_id uuid, p_reason text, p_preset_id uuid, p_message_ar text, p_message_en text)
 returns text language plpgsql security definer set search_path = '' as $$
 begin
-  return app.marketplace_seller_transition(p_organization_id, 'reject', p_reason, app.marketplace_assert_seller_admin(true), p_preset_id, p_message);
+  return app.marketplace_seller_transition(p_organization_id, 'reject', p_reason, app.marketplace_assert_seller_admin(true), p_preset_id, p_message_ar, p_message_en);
 end;
 $$;
 create or replace function public.admin_marketplace_seller_suspend(
-  p_organization_id uuid, p_reason text, p_preset_id uuid default null, p_message text default null)
+  p_organization_id uuid, p_reason text, p_preset_id uuid, p_message_ar text, p_message_en text)
 returns text language plpgsql security definer set search_path = '' as $$
 begin
-  return app.marketplace_seller_transition(p_organization_id, 'suspend', p_reason, app.marketplace_assert_seller_admin(true), p_preset_id, p_message);
+  return app.marketplace_seller_transition(p_organization_id, 'suspend', p_reason, app.marketplace_assert_seller_admin(true), p_preset_id, p_message_ar, p_message_en);
 end;
 $$;
 create or replace function public.admin_marketplace_seller_revoke(
-  p_organization_id uuid, p_reason text, p_preset_id uuid default null, p_message text default null)
+  p_organization_id uuid, p_reason text, p_preset_id uuid, p_message_ar text, p_message_en text)
 returns text language plpgsql security definer set search_path = '' as $$
 begin
-  return app.marketplace_seller_transition(p_organization_id, 'revoke', p_reason, app.marketplace_assert_seller_admin(true), p_preset_id, p_message);
+  return app.marketplace_seller_transition(p_organization_id, 'revoke', p_reason, app.marketplace_assert_seller_admin(true), p_preset_id, p_message_ar, p_message_en);
 end;
 $$;
 create or replace function public.admin_marketplace_seller_reinstate(
-  p_organization_id uuid, p_reason text, p_preset_id uuid default null, p_message text default null)
+  p_organization_id uuid, p_reason text, p_preset_id uuid, p_message_ar text, p_message_en text)
 returns text language plpgsql security definer set search_path = '' as $$
 begin
-  return app.marketplace_seller_transition(p_organization_id, 'reinstate', p_reason, app.marketplace_assert_seller_admin(true), p_preset_id, p_message);
+  return app.marketplace_seller_transition(p_organization_id, 'reinstate', p_reason, app.marketplace_assert_seller_admin(true), p_preset_id, p_message_ar, p_message_en);
 end;
 $$;
 
--- The showroom owner asks for approval (first time, or again after a rejection). Authority: org.manage on THIS
+-- The showroom owner asks for approval (first time, or again after a rejection or a revocation). Authority: org.manage on THIS
 -- organization, nothing else; the database re-validates that the organization is an eligible, active showroom.
 create or replace function public.marketplace_seller_request_approval(p_organization_id uuid)
 returns text language plpgsql security definer set search_path = '' as $$
@@ -433,7 +447,7 @@ begin
   if p_organization_id is null or not app.has_capability(p_organization_id, 'org.manage') then
     raise exception 'organization not found or not permitted' using errcode = '42501';
   end if;
-  return app.marketplace_seller_transition(p_organization_id, 'request', null, v_uid);
+  return app.marketplace_seller_transition(p_organization_id, 'request', null, v_uid, null, null, null);
 end;
 $$;
 
@@ -513,10 +527,9 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 6. Overview and history (return shape changes, so they are recreated)
+-- 6. Overview and history (the return shape changes, so they are new functions; the V1 ones stay)
 -- ---------------------------------------------------------------------------
-drop function public.admin_marketplace_seller_overview();
-create or replace function public.admin_marketplace_seller_overview()
+create function public.admin_marketplace_seller_overview_v2()
 returns table (
   organization_id uuid, organization_name text, org_status text, org_type text, org_deleted boolean, eligible boolean,
   seller_status text, status_reason text, owner_message_ar text, owner_message_en text,
@@ -549,8 +562,7 @@ begin
 end;
 $$;
 
-drop function public.admin_marketplace_seller_history(uuid);
-create or replace function public.admin_marketplace_seller_history(p_organization_id uuid)
+create function public.admin_marketplace_seller_history_v2(p_organization_id uuid)
 returns table (sequence bigint, action text, from_status text, to_status text, reason text, owner_message_ar text,
                owner_message_en text, preset_id uuid, actor_user_id uuid, org_type_at_event text,
                org_status_at_event text, created_at timestamptz)
@@ -568,25 +580,25 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 7. Grants
 -- ---------------------------------------------------------------------------
-revoke all on function public.admin_marketplace_seller_approve(uuid, text, uuid, text)   from public, anon, authenticated, service_role;
-revoke all on function public.admin_marketplace_seller_reject(uuid, text, uuid, text)    from public, anon, authenticated, service_role;
-revoke all on function public.admin_marketplace_seller_suspend(uuid, text, uuid, text)   from public, anon, authenticated, service_role;
-revoke all on function public.admin_marketplace_seller_revoke(uuid, text, uuid, text)    from public, anon, authenticated, service_role;
-revoke all on function public.admin_marketplace_seller_reinstate(uuid, text, uuid, text) from public, anon, authenticated, service_role;
+revoke all on function public.admin_marketplace_seller_approve(uuid, text, uuid, text, text)   from public, anon, authenticated, service_role;
+revoke all on function public.admin_marketplace_seller_reject(uuid, text, uuid, text, text)    from public, anon, authenticated, service_role;
+revoke all on function public.admin_marketplace_seller_suspend(uuid, text, uuid, text, text)   from public, anon, authenticated, service_role;
+revoke all on function public.admin_marketplace_seller_revoke(uuid, text, uuid, text, text)    from public, anon, authenticated, service_role;
+revoke all on function public.admin_marketplace_seller_reinstate(uuid, text, uuid, text, text) from public, anon, authenticated, service_role;
 revoke all on function public.marketplace_seller_request_approval(uuid)                  from public, anon, authenticated, service_role;
 revoke all on function public.admin_marketplace_seller_presets()                         from public, anon, authenticated, service_role;
 revoke all on function public.admin_marketplace_seller_preset_save(uuid, text, text, text, text, text, boolean, integer, text)
   from public, anon, authenticated, service_role;
-revoke all on function public.admin_marketplace_seller_overview()                        from public, anon, authenticated, service_role;
-revoke all on function public.admin_marketplace_seller_history(uuid)                     from public, anon, authenticated, service_role;
-grant execute on function public.admin_marketplace_seller_approve(uuid, text, uuid, text)   to authenticated;
-grant execute on function public.admin_marketplace_seller_reject(uuid, text, uuid, text)    to authenticated;
-grant execute on function public.admin_marketplace_seller_suspend(uuid, text, uuid, text)   to authenticated;
-grant execute on function public.admin_marketplace_seller_revoke(uuid, text, uuid, text)    to authenticated;
-grant execute on function public.admin_marketplace_seller_reinstate(uuid, text, uuid, text) to authenticated;
+revoke all on function public.admin_marketplace_seller_overview_v2()                     from public, anon, authenticated, service_role;
+revoke all on function public.admin_marketplace_seller_history_v2(uuid)                  from public, anon, authenticated, service_role;
+grant execute on function public.admin_marketplace_seller_approve(uuid, text, uuid, text, text)   to authenticated;
+grant execute on function public.admin_marketplace_seller_reject(uuid, text, uuid, text, text)    to authenticated;
+grant execute on function public.admin_marketplace_seller_suspend(uuid, text, uuid, text, text)   to authenticated;
+grant execute on function public.admin_marketplace_seller_revoke(uuid, text, uuid, text, text)    to authenticated;
+grant execute on function public.admin_marketplace_seller_reinstate(uuid, text, uuid, text, text) to authenticated;
 grant execute on function public.marketplace_seller_request_approval(uuid)                  to authenticated;
 grant execute on function public.admin_marketplace_seller_presets()                         to authenticated;
 grant execute on function public.admin_marketplace_seller_preset_save(uuid, text, text, text, text, text, boolean, integer, text)
   to authenticated;
-grant execute on function public.admin_marketplace_seller_overview()                        to authenticated;
-grant execute on function public.admin_marketplace_seller_history(uuid)                     to authenticated;
+grant execute on function public.admin_marketplace_seller_overview_v2()                     to authenticated;
+grant execute on function public.admin_marketplace_seller_history_v2(uuid)                  to authenticated;

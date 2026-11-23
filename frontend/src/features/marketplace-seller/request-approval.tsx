@@ -10,7 +10,7 @@ import { requestSellerApprovalAction } from "@/server/actions/marketplace-seller
 const KNOWN = new Set(["not_permitted", "transition_refused"]);
 
 /**
- * "Request approval" for the showroom owner (first time, or again after a rejection). Presentation only: the database decides
+ * "Request approval" for the showroom owner (first time, or again after a rejection or a revocation). Presentation only: the database decides
  * whether the caller owns the organization and whether it is an eligible, active showroom.
  */
 export function RequestApprovalButton({ organizationId, again }: { organizationId: string; again: boolean }) {

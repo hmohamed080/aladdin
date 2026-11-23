@@ -53,21 +53,23 @@ export function SellersTable({ rows, presets }: { rows: SellerRow[]; presets: Pr
   const [open, setOpen] = useState<{ org: string; action: SellerTransition } | null>(null);
   const [reason, setReason] = useState("");
   const [choice, setChoice] = useState("");
-  const [custom, setCustom] = useState("");
+  const [customAr, setCustomAr] = useState("");
+  const [customEn, setCustomEn] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pending, start] = useTransition();
 
   const needsReason = open ? reasonRequired(open.action) : false;
   const reasonOk = !needsReason || reason.trim().length >= 3;
-  const customOk = choice !== OTHER || custom.trim().length > 0;
+  const customOk = choice !== OTHER || (customAr.trim().length > 0 && customEn.trim().length > 0);
   const options = open ? presets.filter((p) => p.isActive && p.action === open.action) : [];
 
   function begin(org: string, action: SellerTransition) {
     setOpen({ org, action });
     setReason("");
     setChoice("");
-    setCustom("");
+    setCustomAr("");
+    setCustomEn("");
     setError(null);
     setDone(false);
   }
@@ -79,7 +81,8 @@ export function SellersTable({ rows, presets }: { rows: SellerRow[]; presets: Pr
       const r = await sellerTransitionAction(open.org, open.action, {
         reason,
         presetId: choice && choice !== OTHER ? choice : null,
-        message: choice === OTHER ? custom : null,
+        messageAr: choice === OTHER ? customAr : null,
+        messageEn: choice === OTHER ? customEn : null,
       });
       if (!r.ok) {
         setError(t(`adminMarketplace.errors.${ERR.has(r.code) ? r.code : "unexpected"}`));
@@ -197,14 +200,26 @@ export function SellersTable({ rows, presets }: { rows: SellerRow[]; presets: Pr
                         </p>
                       ) : null}
                       {choice === OTHER ? (
-                        <Textarea
-                          rows={2}
-                          maxLength={OWNER_MESSAGE_MAX}
-                          value={custom}
-                          aria-label={t("adminMarketplace.sellers.messageLabel")}
-                          placeholder={t("adminMarketplace.sellers.messageCustomPlaceholder")}
-                          onChange={(e) => setCustom(e.target.value)}
-                        />
+                        <>
+                          <Textarea
+                            rows={2}
+                            dir="rtl"
+                            maxLength={OWNER_MESSAGE_MAX}
+                            value={customAr}
+                            aria-label={t("adminMarketplace.sellers.messageCustomArLabel")}
+                            placeholder={t("adminMarketplace.sellers.messageCustomArPlaceholder")}
+                            onChange={(e) => setCustomAr(e.target.value)}
+                          />
+                          <Textarea
+                            rows={2}
+                            dir="ltr"
+                            maxLength={OWNER_MESSAGE_MAX}
+                            value={customEn}
+                            aria-label={t("adminMarketplace.sellers.messageCustomEnLabel")}
+                            placeholder={t("adminMarketplace.sellers.messageCustomEnPlaceholder")}
+                            onChange={(e) => setCustomEn(e.target.value)}
+                          />
+                        </>
                       ) : null}
                       {error ? <InlineError>{error}</InlineError> : null}
                       <div className="flex gap-2">

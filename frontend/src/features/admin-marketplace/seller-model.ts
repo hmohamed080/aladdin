@@ -59,7 +59,7 @@ export type PresetRow = {
   sortOrder: number;
 };
 
-/** The owner-message choice sent with a transition: a preset, custom text, or nothing. */
-export type OwnerMessage = { presetId: string | null; message: string | null };
+/** The owner-message choice sent with a transition: a preset, custom text in BOTH languages, or nothing. */
+export type OwnerMessage = { presetId: string | null; messageAr: string | null; messageEn: string | null };
 
 export const OWNER_MESSAGE_MAX = 300;

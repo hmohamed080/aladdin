@@ -7,7 +7,7 @@ import type { MarketplaceSellerStatus } from "@/server/queries/marketplace-selle
  *   notice     — pending, suspended, rejected or revoked: the business was put
  *                through enablement, so it is told where it stands rather than
  *                shown a 404 (rejected and revoked are reversible: the owner can
- *                ask again after a rejection, an admin can approve again).
+ *                ask again after either, an admin approves again).
  *   not-found  — never enabled, or the Marketplace preview is closed: the route
  *                does not exist for this organization.
  *

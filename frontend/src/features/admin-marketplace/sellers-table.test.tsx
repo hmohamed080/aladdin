@@ -72,7 +72,7 @@ describe("SellersTable", () => {
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
     expect(screen.getByText("Internal reason (optional)")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Approve · Confirm/ }));
-    await waitFor(() => expect(transition).toHaveBeenCalledWith("org-1", "approve", { reason: "", presetId: null, message: null }));
+    await waitFor(() => expect(transition).toHaveBeenCalledWith("org-1", "approve", { reason: "", presetId: null, messageAr: null, messageEn: null }));
     expect(refresh).toHaveBeenCalled();
   });
 
@@ -96,20 +96,29 @@ describe("SellersTable", () => {
     fireEvent.change(select, { target: { value: "p-reject" } });
     expect(screen.getByTestId("preset-preview").textContent).toBe("Please complete your details.");
     fireEvent.click(screen.getByRole("button", { name: /Reject · Confirm/ }));
-    await waitFor(() => expect(transition).toHaveBeenCalledWith("org-1", "reject", { reason: "papers missing", presetId: "p-reject", message: null }));
+    await waitFor(() => expect(transition).toHaveBeenCalledWith("org-1", "reject", { reason: "papers missing", presetId: "p-reject", messageAr: null, messageEn: null }));
   });
 
-  it("sends custom free text ('Other') and needs some text before Confirm", async () => {
+  it("sends custom text ('Other') as two separate fields and needs both languages before Confirm", async () => {
     renderWithI18n(<SellersTable rows={[row({ status: "approved" })]} presets={presets} />, "en");
     fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
     fireEvent.change(screen.getByLabelText("Internal reason (required)"), { target: { value: "breach" } });
     fireEvent.change(screen.getByLabelText("Message to the owner", { selector: "select" }), { target: { value: "__other__" } });
     const confirm = screen.getByRole("button", { name: /Revoke · Confirm/ }) as HTMLButtonElement;
     expect(confirm.disabled).toBe(true);
-    fireEvent.change(screen.getByPlaceholderText("Write the message the owner will read"), { target: { value: "Please call us" } });
+    fireEvent.change(screen.getByPlaceholderText("Write the message in English"), { target: { value: "Please call us" } });
+    expect(confirm.disabled).toBe(true); // Arabic still empty
+    fireEvent.change(screen.getByPlaceholderText("Write the message in Arabic"), { target: { value: "يرجى الاتصال بنا" } });
     expect(confirm.disabled).toBe(false);
     fireEvent.click(confirm);
-    await waitFor(() => expect(transition).toHaveBeenCalledWith("org-1", "revoke", { reason: "breach", presetId: null, message: "Please call us" }));
+    await waitFor(() =>
+      expect(transition).toHaveBeenCalledWith("org-1", "revoke", {
+        reason: "breach",
+        presetId: null,
+        messageAr: "يرجى الاتصال بنا",
+        messageEn: "Please call us",
+      }),
+    );
   });
 
   it("shows the refusal and keeps the form open when the server refuses", async () => {

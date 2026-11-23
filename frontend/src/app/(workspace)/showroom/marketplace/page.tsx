@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * /showroom/marketplace — where the showroom stands with the Marketplace and, for its owner, the place to ask for approval
- * (first time, or again after a rejection). It exists only while the Marketplace preview is open and only for a showroom;
+ * (first time, or again after a rejection or a revocation). It exists only while the Marketplace preview is open and only for a showroom;
  * every other organization gets the ordinary not-found. Approval itself is an admin decision: this page never grants it.
  */
 export default async function MarketplaceApprovalPage() {

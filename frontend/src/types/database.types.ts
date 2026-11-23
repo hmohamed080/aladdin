@@ -9724,10 +9724,10 @@ export type Database = {
       }
       admin_marketplace_media_settings: { Args: never; Returns: Json }
       admin_marketplace_seller_approve: {
-        Args: { p_message?: string; p_organization_id: string; p_preset_id?: string; p_reason?: string }
+        Args: { p_message_ar: string | null; p_message_en: string | null; p_organization_id: string; p_preset_id: string | null; p_reason: string | null }
         Returns: string
       }
-      admin_marketplace_seller_history: {
+      admin_marketplace_seller_history_v2: {
         Args: { p_organization_id: string }
         Returns: {
           action: string
@@ -9744,7 +9744,7 @@ export type Database = {
           to_status: string
         }[]
       }
-      admin_marketplace_seller_overview: {
+      admin_marketplace_seller_overview_v2: {
         Args: never
         Returns: {
           approved_at: string
@@ -9794,19 +9794,19 @@ export type Database = {
         }[]
       }
       admin_marketplace_seller_reinstate: {
-        Args: { p_message?: string; p_organization_id: string; p_preset_id?: string; p_reason: string }
+        Args: { p_message_ar: string | null; p_message_en: string | null; p_organization_id: string; p_preset_id: string | null; p_reason: string }
         Returns: string
       }
       admin_marketplace_seller_reject: {
-        Args: { p_message?: string; p_organization_id: string; p_preset_id?: string; p_reason: string }
+        Args: { p_message_ar: string | null; p_message_en: string | null; p_organization_id: string; p_preset_id: string | null; p_reason: string }
         Returns: string
       }
       admin_marketplace_seller_revoke: {
-        Args: { p_message?: string; p_organization_id: string; p_preset_id?: string; p_reason: string }
+        Args: { p_message_ar: string | null; p_message_en: string | null; p_organization_id: string; p_preset_id: string | null; p_reason: string }
         Returns: string
       }
       admin_marketplace_seller_suspend: {
-        Args: { p_message?: string; p_organization_id: string; p_preset_id?: string; p_reason: string }
+        Args: { p_message_ar: string | null; p_message_en: string | null; p_organization_id: string; p_preset_id: string | null; p_reason: string }
         Returns: string
       }
       admin_marketplace_sellers: {

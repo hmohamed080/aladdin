@@ -29,9 +29,10 @@ export type SellerTransition = keyof typeof SELLER_RPC;
 export type SellerTransitionInput = {
   /** Internal admin reason. Required for everything except approve. */
   reason: string;
-  /** The owner-facing message: a preset id, or custom text ("other"), never both. */
+  /** The owner-facing message: a preset id, or custom text ("other") in Arabic AND English, never both. */
   presetId?: string | null;
-  message?: string | null;
+  messageAr?: string | null;
+  messageEn?: string | null;
 };
 
 /** Maps a refusal of the seller RPCs (plain messages, Postgres codes) to a stable code. */
@@ -55,15 +56,20 @@ export async function sellerTransitionAction(
   if (!(action in SELLER_RPC)) return { ok: false, code: "invalid_action" };
   const reason = input.reason.trim();
   if (action !== "approve" && reason.length < 3) return { ok: false, code: "reason_required" };
-  const message = input.message?.trim() || null;
+  const messageAr = input.messageAr?.trim() || null;
+  const messageEn = input.messageEn?.trim() || null;
   const presetId = input.presetId || null;
-  if (presetId && message) return { ok: false, code: "message_invalid" };
+  // one preset, or two custom texts (both languages), never a mix and never one language alone
+  if (presetId && (messageAr || messageEn)) return { ok: false, code: "message_invalid" };
+  if (Boolean(messageAr) !== Boolean(messageEn)) return { ok: false, code: "message_invalid" };
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc(SELLER_RPC[action], {
     p_organization_id: organizationId,
-    p_reason: reason || undefined,
-    p_preset_id: presetId ?? undefined,
-    p_message: message ?? undefined,
+    // explicit nulls: the five-argument signature has no defaults, and an omitted key would fall back to the old (uuid, text) function
+    p_reason: reason || null,
+    p_preset_id: presetId,
+    p_message_ar: messageAr,
+    p_message_en: messageEn,
   });
   if (error) return { ok: false, code: sellerErrorCode(error) };
   revalidatePath(SELLERS);

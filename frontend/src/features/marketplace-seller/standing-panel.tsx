@@ -17,7 +17,7 @@ type Copy = {
 
 /**
  * Where the showroom stands with the Marketplace, in its owner's words: the status, the message the platform team wrote to the
- * owner (never the internal reason), and, for a showroom that has not asked yet or was rejected, the request button. The
+ * owner (never the internal reason), and, for a showroom that has not asked yet, was rejected or had its approval revoked, the request button. The
  * request is only offered to the owner; the database re-checks that and the showroom's eligibility.
  */
 export function SellerStandingPanel({
@@ -39,7 +39,7 @@ export function SellerStandingPanel({
   const text = copy[status];
   const message = standing ? (locale === "ar" ? standing.messageAr : standing.messageEn) : null;
   const tone = status === "approved" || status === "pending" || status === "none" ? "neutral" : "warning";
-  const askable = canRequest && (status === "none" || status === "rejected");
+  const askable = canRequest && (status === "none" || status === "rejected" || status === "revoked");
   return (
     <div className="flex flex-col gap-md" data-testid="seller-standing" data-status={status}>
       <StatePanel
@@ -47,7 +47,7 @@ export function SellerStandingPanel({
         tone={tone}
         title={text.title}
         body={text.body}
-        action={askable ? <RequestApprovalButton organizationId={organizationId} again={status === "rejected"} /> : undefined}
+        action={askable ? <RequestApprovalButton organizationId={organizationId} again={status === "rejected" || status === "revoked"} /> : undefined}
       />
       {message ? (
         <div className="rounded-md border bg-surface px-md py-sm" data-testid="seller-owner-message">

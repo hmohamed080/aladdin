@@ -48,16 +48,19 @@ describe("SellerStandingPanel", () => {
       "en",
     );
 
-  it("lets the owner ask when nothing was requested yet, and again after a rejection", () => {
+  it("lets the owner ask when nothing was requested yet, and again after a rejection or a revocation", () => {
     const first = panel(null, true);
     expect(screen.getByRole("button", { name: "Request approval" })).toBeTruthy();
     first.unmount();
-    panel("rejected", true);
-    expect(screen.getByRole("button", { name: "Request approval again" })).toBeTruthy();
+    for (const status of ["rejected", "revoked"]) {
+      const view = panel(status, true);
+      expect(screen.getByRole("button", { name: "Request approval again" })).toBeTruthy();
+      view.unmount();
+    }
   });
 
-  it("offers no request while pending, suspended, revoked or approved, or to a non-owner", () => {
-    for (const status of ["pending", "suspended", "revoked", "approved"]) {
+  it("offers no request while pending, suspended or approved, or to a non-owner", () => {
+    for (const status of ["pending", "suspended", "approved"]) {
       const view = panel(status, true);
       expect(screen.queryByRole("button")).toBeNull();
       view.unmount();
