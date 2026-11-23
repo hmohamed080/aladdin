@@ -146,7 +146,7 @@ export default async function AdminBackupsPage() {
         )}
       </Card>
 
-      <BackupScheduleForm environment={environment} settings={status.settings} canManage={canSchedule} />
+      <BackupScheduleForm key={status.settings.version} environment={environment} settings={status.settings} canManage={canSchedule} />
 
       <Card>
         <SectionTitle>{t("backups.overview.coverage")}</SectionTitle>
