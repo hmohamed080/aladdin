@@ -1,6 +1,6 @@
 {
- "version": "20261123130002",
- "source": "Exact function permission contract after 20261123130002_marketplace_product_video.sql: main contract 20261123120001 plus seven new functions (seller video list RPC, three admin video review RPCs, three internal helpers). video_upload_begin, video_update, video_delete, media_edge_video, video_writable and the cap trigger function are re-declared with unchanged signatures and grants.",
+ "version": "20261123140002",
+ "source": "Exact function permission contract after 20261123140002_marketplace_product_video.sql: main contract 20261123120001 plus seven new functions (seller video list RPC, three admin video review RPCs, three internal helpers). video_upload_begin, video_update, video_delete, media_edge_video, video_writable and the cap trigger function are re-declared with unchanged signatures and grants.",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.marketplace_public_cart(jsonb,text,text)",
