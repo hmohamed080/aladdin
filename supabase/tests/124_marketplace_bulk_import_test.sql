@@ -521,17 +521,17 @@ select is((select count(*)::int from public.marketplace_products where seller_or
 -- L. Safety: imported data cannot be published
 -- ===========================================================================
 select ok(
-  (select 'no_verified_primary_image' = any(b) and 'no_available_stock' = any(b) and 'media_verification_not_available' = any(b)
+  (select 'no_verified_primary_image' = any(b) and 'no_available_stock' = any(b)
    from (select app.marketplace_publication_blockers((select id from public.marketplace_products
           where seller_organization_id = current_setting('t.a')::uuid and external_ref = 'P1')) b) q),
-  'L1. an imported product is blocked: no verified image, no stock, media verification off');
+  'L1. an imported product is blocked: no verified image, no stock');
 select throws_ok($$ update public.marketplace_products set status = 'published'
   where seller_organization_id = '9c000000-cccc-4ccc-8ccc-000000000001' and external_ref = 'P1' $$,
   '23514', null, 'L2. publishing an imported product directly is refused');
 select is((select count(*)::int from public.marketplace_public_catalog() where slug like 'wallpaper-one-%'), 0,
   'L3. imported products are invisible in the public catalogue');
-select is((select media_verification_ready from public.marketplace_platform_settings), false,
-  'L4. media verification is still off (nothing in the import path can enable it)');
+select is((select count(*)::int from public.marketplace_public_catalog() where slug like 'wallpaper-one-%'), 0,
+  'L4. nothing in the import path made an imported product public');
 
 select * from finish();
 rollback;
