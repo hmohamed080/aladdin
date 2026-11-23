@@ -45,13 +45,6 @@ export async function saveSellerProductAction(
   return { ok: true, ...r };
 }
 
-export async function productReadinessAction(productId: string): Promise<SellerResult<{ blockers: string[] }>> {
-  const supabase = await getServerSupabase();
-  const { data, error } = await supabase.rpc("marketplace_seller_product_readiness", { p_product_id: productId });
-  if (error) return { ok: false, ...fail(error) };
-  return { ok: true, blockers: (data ?? []) as string[] };
-}
-
 export async function publishProductAction(productId: string): Promise<SellerResult<{ status: string }>> {
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("marketplace_product_publish", { p_product_id: productId });

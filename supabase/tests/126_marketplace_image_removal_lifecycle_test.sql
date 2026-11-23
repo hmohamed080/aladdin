@@ -302,10 +302,10 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
 select is(public.media_storage_resolve('marketplace', (select object_key from public.marketplace_product_images where id = current_setting('t.fresh1')::uuid), 'upload') ->> 'state', 'pending',
   'H3. a fresh key is usable by the catalogue manager');
--- fill to the pending cap of 10 (fresh1 is #1)
-select public.marketplace_seller_image_request_upload(current_setting('t.p')::uuid, 'image/png') from generate_series(1, 9);
+-- PR 7: a product holds at most 5 live images, un-uploaded keys included (fresh1 is #1)
+select public.marketplace_seller_image_request_upload(current_setting('t.p')::uuid, 'image/png') from generate_series(1, 4);
 select throws_like($$ select public.marketplace_seller_image_request_upload(current_setting('t.p')::uuid, 'image/png') $$,
-  'mp:too_many_pending_uploads%', 'H4. at most 10 un-uploaded keys per product at once');
+  'mp:too_many_images%', 'H4. at most 5 live image slots per product at once');
 reset role;
 -- hourly cap per organization: 200 withdrawn rows created in the last hour
 insert into public.marketplace_product_images (product_id, object_key, sort_order, is_primary, status, upload_state)

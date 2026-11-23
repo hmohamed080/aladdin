@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockerParts, errorKey, parseSellerError } from "./errors";
+import { errorKey, parseSellerError } from "./errors";
 
 describe("parseSellerError", () => {
   it("reads the code and detail of a seller refusal", () => {
@@ -18,12 +18,9 @@ describe("parseSellerError", () => {
   });
 });
 
-describe("blockerParts", () => {
-  it("splits a blocker into its message key and detail", () => {
-    expect(blockerParts("no_available_stock")).toEqual({ key: "marketplaceSeller.blocker.no_available_stock" });
-    expect(blockerParts("missing_variant_attribute:WP-1:color")).toEqual({
-      key: "marketplaceSeller.blocker.missing_variant_attribute",
-      detail: "WP-1 · color",
-    });
+describe("PR 7 codes", () => {
+  it("knows the low-stock refusal and no longer exposes publication blockers", () => {
+    expect(errorKey("low_stock_invalid")).toBe("marketplaceSeller.error.low_stock_invalid");
+    expect(parseSellerError("mp:low_stock_invalid")).toEqual({ code: "low_stock_invalid" });
   });
 });

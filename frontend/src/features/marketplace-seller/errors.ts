@@ -20,6 +20,7 @@ export const KNOWN_ERROR_CODES = new Set([
   "archived",
   "product_type_invalid",
   "product_type_immutable",
+  "low_stock_invalid",
   "name_ar_invalid",
   "name_en_invalid",
   "description_too_long",
@@ -73,14 +74,4 @@ export const KNOWN_ERROR_CODES = new Set([
 
 export function errorKey(code: string): string {
   return `marketplaceSeller.error.${KNOWN_ERROR_CODES.has(code) ? code : "unexpected"}`;
-}
-
-/**
- * A publication blocker code from the database (`missing_product_attribute:color`,
- * `missing_variant_attribute:SKU:color`, `no_available_stock`, …) split into the
- * catalogue key and the detail to show beside it.
- */
-export function blockerParts(code: string): { key: string; detail?: string } {
-  const [head, ...rest] = code.split(":");
-  return { key: `marketplaceSeller.blocker.${head}`, detail: rest.length ? rest.join(" · ") : undefined };
 }

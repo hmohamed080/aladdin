@@ -94,6 +94,18 @@ export type SellerProductImage = {
   url: string | null;
 };
 
+export type ReviewState = "approved" | "pending_review" | "rejected" | "no_image";
+
+export type PublicationState = {
+  status: string;
+  lowStockThreshold: number;
+  reviewState: ReviewState;
+  paymentReady: boolean;
+  deliveryReady: boolean;
+  listed: boolean;
+  canPublish: boolean;
+};
+
 export type SellerProductDetail = {
   id: string;
   organizationId: string;
@@ -118,6 +130,8 @@ export type SellerProductDetail = {
   }[];
   images: SellerProductImage[];
   blockers: string[];
+  /** Facts that drive the required fields and the Publish button (no blocker list is ever shown). */
+  publication: PublicationState | null;
   /** Images the seller removed whose bytes are not confirmed deleted yet (retryable). */
   pendingRemovals: { imageId: string; variantId: string | null }[];
 };
@@ -164,6 +178,7 @@ export async function loadSellerProduct(supabase: Client, productId: string): Pr
       url: urls.get(i.object_key) ?? null,
     })),
     blockers: (p.blockers ?? []) as string[],
+    publication: await loadPublicationState(supabase, productId),
     pendingRemovals: await loadPendingRemovals(supabase, productId),
   };
 }
@@ -182,4 +197,33 @@ export async function loadStockLocations(supabase: Client, organizationId: strin
 async function loadPendingRemovals(supabase: Client, productId: string): Promise<SellerProductDetail["pendingRemovals"]> {
   const { data } = await supabase.rpc("marketplace_seller_images_pending_removal", { p_product_id: productId });
   return ((data ?? []) as { image_id: string; variant_id: string | null }[]).map((r) => ({ imageId: r.image_id, variantId: r.variant_id }));
+}
+
+async function loadPublicationState(supabase: Client, productId: string): Promise<PublicationState | null> {
+  const { data, error } = await supabase.rpc("marketplace_seller_product_publication_state", { p_product_id: productId });
+  if (error || !data) return null;
+  const d = data as Record<string, unknown>;
+  return {
+    status: String(d.status),
+    lowStockThreshold: Number(d.low_stock_threshold ?? 5),
+    reviewState: (d.review_state as ReviewState) ?? "no_image",
+    paymentReady: Boolean(d.payment_ready),
+    deliveryReady: Boolean(d.delivery_ready),
+    listed: Boolean(d.listed),
+    canPublish: Boolean(d.can_publish),
+  };
+}
+
+/** Store-level setup for a product that does not exist yet (the same facts, read from the seller's settings). */
+export async function loadStoreSetup(supabase: Client, organizationId: string): Promise<{ paymentReady: boolean; deliveryReady: boolean }> {
+  const [pay, delivery] = await Promise.all([
+    supabase.rpc("marketplace_seller_payment_settings_get", { p_organization_id: organizationId }),
+    supabase.rpc("marketplace_seller_delivery_get", { p_organization_id: organizationId }),
+  ]);
+  const p = (pay.data ?? {}) as { cod_enabled?: boolean; instapay_enabled?: boolean };
+  const d = (delivery.data ?? {}) as { rates?: { fee_egp: number | null }[]; pickup_available?: boolean };
+  return {
+    paymentReady: Boolean(p.cod_enabled || p.instapay_enabled),
+    deliveryReady: Boolean(d.pickup_available || (d.rates ?? []).some((r) => r.fee_egp !== null)),
+  };
 }

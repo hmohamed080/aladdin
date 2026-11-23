@@ -1,4 +1,7 @@
 - Acceptance (`nxossqhdfltcqdwvbewi`) is at 235 migrations, latest `20261121090003` (media caps, admin upload limits, notification templates applied 2026-11-22). The matching frontend is NOT deployed there yet. Production is untouched (last recorded 207).
+## Marketplace publication gate v2 and product form (draft PR, not deployed) - 2026-11-23
+- Branch `feat/mkt-publication-gate-20261123` (Marketplace PR 7): migration `20261123110001` is NOT applied to Acceptance or Production (local isolated stack only). Adds the Marketplace open/close switch (`marketplace_open`, Super Admin permission `marketplace_platform.manage`, audited), per-product low-stock threshold with in-app owner notifications, stock-out withdrawal from the storefront, auto-unpublish on seller suspension, payment and delivery as publish conditions, changeable product type, 5 media slots. The Marketplace video upload path is still OFF. Existing published products of a seller without a payment method or delivery are unpublished on their next save.
+
 ## Marketplace notification templates (draft PR, not deployed) - 2026-11-21
 - Branch `feat/mkt-notification-templates-20261121`: migration `20261121090003` (templates, history, `notifications.content`, six `marketplace.*` event types) is NOT applied to Acceptance or Production (local isolated stack only). Admin page `/admin/notification-templates`. No emitter calls it yet (PR 5 and PR 6).
 

@@ -39,10 +39,18 @@ import {
   parseFilters,
   type DisplayState,
   type PagedProducts,
+  type ReviewState,
 } from "@/features/marketplace-seller/products-model";
 
 export const dynamic = "force-dynamic";
 
+/** The review record shown beside the price: approved / pending review / not approved / no image yet. */
+const REVIEW_CHIP: Record<ReviewState, string> = {
+  approved: "bg-success/15 text-success",
+  pending_review: "bg-warning/15 text-warning",
+  rejected: "bg-danger/15 text-danger",
+  no_image: "bg-surface-2 text-fg-secondary",
+};
 
 const PILL: Record<DisplayState, { dot: string; chip: string }> = {
   published: { dot: "bg-success", chip: "bg-success/15 text-success" },
@@ -298,7 +306,15 @@ export default async function MarketplaceProductsPage({
                           ) : null}
                         </td>
                         <td className="whitespace-nowrap px-md py-sm text-fg">
-                          {p.fromPrice === null ? "—" : t.price.replace("{amount}", formatEgp(p.fromPrice, locale))}
+                          <div className="flex flex-col items-start gap-1">
+                            <span>{p.fromPrice === null ? "—" : t.price.replace("{amount}", formatEgp(p.fromPrice, locale))}</span>
+                            <span
+                              data-testid="review-record"
+                              className={cn("inline-flex rounded-pill px-2.5 py-0.5 text-label font-medium", REVIEW_CHIP[p.reviewState])}
+                            >
+                              {t.review[p.reviewState]}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-md py-sm text-center">
                           {p.inlineStock && p.inlineStock.locationId ? (
@@ -363,7 +379,7 @@ export default async function MarketplaceProductsPage({
                                 <EyeIcon size={16} />
                               </IconSlot>
                             )}
-                            <RowPublishToggle productId={p.id} status={p.status} />
+                            <RowPublishToggle productId={p.id} status={p.status} reviewState={p.reviewState} />
                           </div>
                         </td>
                       </tr>

@@ -181,8 +181,8 @@ select is((select status from public.marketplace_product_variants where sku = 'W
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
 select throws_like($$ select public.marketplace_seller_product_save(
-  public.marketplace_seller_product_get(current_setting('t.p1')::uuid) || '{"product_type_key":"cornice"}'::jsonb) $$,
-  'mp:product_type_immutable%', 'D5. the product type cannot be changed');
+  public.marketplace_seller_product_get(current_setting('t.p1')::uuid) || '{"product_type_key":"no-such-type"}'::jsonb) $$,
+  'mp:product_type_invalid%', 'D5. an unknown product type is refused (the type itself is changeable since PR 7, see test 183)');
 select lives_ok($$ select public.marketplace_seller_product_save(jsonb_build_object(
   'id', current_setting('t.p1'), 'organization_id', '91000005-1111-4111-8111-000000000005',
   'name_ar', 'س', 'name_en', 'Org field ignored')) $$,
