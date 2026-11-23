@@ -8,6 +8,7 @@ import { requireAdminRoute } from "@/server/authorization/admin";
 import { AdminHeader } from "@/features/admin/parts";
 import { Card, SectionTitle, StatePanel } from "@/components/ui/primitives";
 import { NotificationTemplateEditor } from "@/features/admin-ops/notification-template-editor";
+import { SellerPresetEditor } from "@/features/admin-ops/seller-preset-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +25,10 @@ export default async function NotificationTemplatesPage() {
   const t = createTranslator(locale);
   const supabase = await getServerSupabase();
 
-  const [templates, history] = await Promise.all([
+  const [templates, history, presetResult] = await Promise.all([
     supabase.rpc("admin_notification_templates"),
     supabase.rpc("admin_notification_template_events", { p_limit: 30 }),
+    supabase.rpc("admin_marketplace_seller_presets"),
   ]);
   const header = <AdminHeader locale={locale} title={t("notificationTemplates.title")} subtitle={t("notificationTemplates.subtitle")} />;
   if (templates.error?.code === "42501" || history.error?.code === "42501") {
@@ -39,6 +41,7 @@ export default async function NotificationTemplatesPage() {
   const rows = templates.data ?? [];
   const events = (history.data ?? []) as EventRow[];
   const canManage = can(access, "notification_templates.manage");
+  const presets = presetResult.data ?? [];
 
   const actorIds = [...new Set(events.map((e) => e.actor_id))];
   const names = new Map<string, string>();
@@ -79,6 +82,32 @@ export default async function NotificationTemplatesPage() {
               </div>
             );
           })}
+        </div>
+      </Card>
+      <Card>
+        <SectionTitle>{t("notificationTemplates.presets.title")}</SectionTitle>
+        <p className="mt-sm text-label text-fg-muted">{t("notificationTemplates.presets.hint")}</p>
+        <div className="mt-md" data-testid="seller-presets">
+          {presets.map((p) =>
+            canManage ? (
+              <SellerPresetEditor
+                key={p.id}
+                preset={{ id: p.id, action: p.action, labelAr: p.label_ar, labelEn: p.label_en, textAr: p.text_ar, textEn: p.text_en, isActive: p.is_active, sortOrder: p.sort_order }}
+              />
+            ) : (
+              <div key={p.id} className="flex flex-col gap-sm border-b border-strong py-md">
+                <p className="text-body font-medium text-fg">
+                  {t(`adminMarketplace.sellers.action.${p.action}`)} · {locale === "ar" ? p.label_ar : p.label_en}
+                  {p.is_active ? "" : ` (${t("notificationTemplates.presets.inactive")})`}
+                </p>
+                <p className="text-body text-fg" dir="rtl" lang="ar">{p.text_ar}</p>
+                <p className="text-body text-fg" dir="ltr" lang="en">{p.text_en}</p>
+              </div>
+            ),
+          )}
+          {canManage ? (
+            <SellerPresetEditor preset={{ id: null, action: "reject", labelAr: "", labelEn: "", textAr: "", textEn: "", isActive: true, sortOrder: 50 }} />
+          ) : null}
         </div>
       </Card>
       <ul className="list-disc ps-lg text-label text-fg-muted">

@@ -3580,7 +3580,10 @@ export type Database = {
           org_status_at_event: string | null
           org_type_at_event: string | null
           organization_id: string
-          reason: string
+          owner_message_ar: string | null
+          owner_message_en: string | null
+          preset_id: string | null
+          reason: string | null
           sequence: number
           to_status: string
         }
@@ -3593,7 +3596,10 @@ export type Database = {
           org_status_at_event?: string | null
           org_type_at_event?: string | null
           organization_id: string
-          reason: string
+          owner_message_ar?: string | null
+          owner_message_en?: string | null
+          preset_id?: string | null
+          reason?: string | null
           sequence?: never
           to_status: string
         }
@@ -3606,7 +3612,10 @@ export type Database = {
           org_status_at_event?: string | null
           org_type_at_event?: string | null
           organization_id?: string
-          reason?: string
+          owner_message_ar?: string | null
+          owner_message_en?: string | null
+          preset_id?: string | null
+          reason?: string | null
           sequence?: never
           to_status?: string
         }
@@ -3626,6 +3635,10 @@ export type Database = {
           approved_by: string | null
           created_at: string
           organization_id: string
+          owner_message_ar: string | null
+          owner_message_en: string | null
+          rejected_at: string | null
+          rejected_by: string | null
           requested_at: string
           revoked_at: string | null
           revoked_by: string | null
@@ -3641,6 +3654,10 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           organization_id: string
+          owner_message_ar?: string | null
+          owner_message_en?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
           requested_at?: string
           revoked_at?: string | null
           revoked_by?: string | null
@@ -3656,6 +3673,10 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           organization_id?: string
+          owner_message_ar?: string | null
+          owner_message_en?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
           requested_at?: string
           revoked_at?: string | null
           revoked_by?: string | null
@@ -9738,7 +9759,7 @@ export type Database = {
       }
       admin_marketplace_review_presets: { Args: never; Returns: Json }
       admin_marketplace_seller_approve: {
-        Args: { p_organization_id: string; p_reason: string }
+        Args: { p_message?: string; p_organization_id: string; p_preset_id?: string; p_reason?: string }
         Returns: string
       }
       admin_marketplace_seller_history: {
@@ -9750,6 +9771,9 @@ export type Database = {
           from_status: string
           org_status_at_event: string
           org_type_at_event: string
+          owner_message_ar: string
+          owner_message_en: string
+          preset_id: string
           reason: string
           sequence: number
           to_status: string
@@ -9761,27 +9785,63 @@ export type Database = {
           approved_at: string
           approved_by_name: string
           eligible: boolean
+          org_deleted: boolean
           org_status: string
+          org_type: string
           organization_id: string
           organization_name: string
+          owner_message_ar: string
+          owner_message_en: string
           products_draft: number
           products_published: number
           products_total: number
+          requested_at: string
           seller_status: string
           status_changed_at: string
           status_reason: string
         }[]
       }
+      admin_marketplace_seller_preset_save: {
+        Args: {
+          p_action: string
+          p_id: string
+          p_is_active: boolean
+          p_label_ar: string
+          p_label_en: string
+          p_reason: string
+          p_sort_order: number
+          p_text_ar: string
+          p_text_en: string
+        }
+        Returns: string
+      }
+      admin_marketplace_seller_presets: {
+        Args: never
+        Returns: {
+          action: string
+          id: string
+          is_active: boolean
+          label_ar: string
+          label_en: string
+          sort_order: number
+          text_ar: string
+          text_en: string
+        }[]
+      }
       admin_marketplace_seller_reinstate: {
-        Args: { p_organization_id: string; p_reason: string }
+        Args: { p_message?: string; p_organization_id: string; p_preset_id?: string; p_reason: string }
+        Returns: string
+      }
+      admin_marketplace_seller_reject: {
+        Args: { p_message?: string; p_organization_id: string; p_preset_id?: string; p_reason: string }
         Returns: string
       }
       admin_marketplace_seller_revoke: {
-        Args: { p_organization_id: string; p_reason: string }
+        Args: { p_message?: string; p_organization_id: string; p_preset_id?: string; p_reason: string }
         Returns: string
       }
       admin_marketplace_seller_suspend: {
-        Args: { p_organization_id: string; p_reason: string }
+        Args: { p_message?: string; p_organization_id: string; p_preset_id?: string; p_reason: string }
         Returns: string
       }
       admin_marketplace_sellers: {
@@ -11170,6 +11230,10 @@ export type Database = {
         }[]
       }
       marketplace_public_product: { Args: { p_slug: string }; Returns: Json }
+      marketplace_seller_request_approval: {
+        Args: { p_organization_id: string }
+        Returns: string
+      }
       marketplace_seller_default_location: {
         Args: { p_organization_id: string }
         Returns: string
