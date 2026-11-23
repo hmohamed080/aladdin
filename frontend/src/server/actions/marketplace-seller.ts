@@ -332,6 +332,65 @@ export async function setSellerPickupAction(
   return { ok: true, pickupAvailable: Boolean((data as { pickup_available?: boolean }).pickup_available) };
 }
 
+/* ---------- delivery terms, free shipping and readiness (PR 8) ---------- */
+
+/**
+ * Saves the showroom-wide delivery settings and the terms of every covered place in one transaction:
+ * preparation days, free-shipping minimum, pickup instructions, and per place the fee,
+ * delivery duration, next-day option and free-shipping minimum. Returns what is still missing for publishing.
+ */
+export async function saveSellerDeliveryTermsAction(
+  organizationId: string,
+  settings: Record<string, unknown>,
+  places: Record<string, unknown>[],
+): Promise<SellerResult<{ missing: string[] }>> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_seller_delivery_terms_save", {
+    p_organization_id: organizationId,
+    p_settings: settings as unknown as Json,
+    p_areas: places as unknown as Json,
+  });
+  if (error || !data) return { ok: false, ...fail(error) };
+  revalidatePath(AREAS_PATH);
+  revalidatePath(DELIVERY_PATH);
+  return { ok: true, missing: ((data as { missing?: string[] }).missing ?? []) as string[] };
+}
+
+export type FreeShippingProduct = { id: string; name_ar: string; name_en: string; status: string; free_shipping: boolean };
+
+/** The showroom's products with their free-shipping flag (flagged first), optionally filtered by name. */
+export async function listFreeShippingProductsAction(
+  organizationId: string,
+  search: string,
+): Promise<SellerResult<{ items: FreeShippingProduct[]; flaggedCount: number }>> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_seller_free_shipping_products_get", {
+    p_organization_id: organizationId,
+    p_search: search.trim() === "" ? undefined : search.trim(),
+    p_limit: 50,
+  });
+  if (error || !data) return { ok: false, ...fail(error) };
+  const d = data as { items?: FreeShippingProduct[]; flagged_count?: number };
+  return { ok: true, items: d.items ?? [], flaggedCount: Number(d.flagged_count ?? 0) };
+}
+
+/** Flags a product as always shipping free, or clears the flag. */
+export async function setProductFreeShippingAction(
+  organizationId: string,
+  productId: string,
+  enabled: boolean,
+): Promise<SellerResult<{ freeShipping: boolean }>> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_seller_product_free_shipping_set", {
+    p_organization_id: organizationId,
+    p_product_id: productId,
+    p_enabled: enabled,
+  });
+  if (error || !data) return { ok: false, ...fail(error) };
+  revalidatePath(DELIVERY_PATH);
+  return { ok: true, freeShipping: Boolean((data as { free_shipping?: boolean }).free_shipping) };
+}
+
 /**
  * The showroom owner asks for Marketplace approval (first time, or again after a rejection). Authority (org.manage on the
  * organization) and eligibility are decided by the database; this only reports the outcome as a stable code.

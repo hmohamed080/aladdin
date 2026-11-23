@@ -158,6 +158,7 @@ export async function savePaymentSettingsAction(
     p_settings: {
       cod_enabled: Boolean(settings.cod_enabled),
       instapay_enabled: Boolean(settings.instapay_enabled),
+      instapay_full_enabled: Boolean(settings.instapay_full_enabled),
       instapay_address: settings.instapay_address?.trim() || null,
       instapay_account_name: settings.instapay_account_name?.trim() || null,
       instapay_deposit_percent: settings.instapay_deposit_percent === null ? null : String(settings.instapay_deposit_percent),
