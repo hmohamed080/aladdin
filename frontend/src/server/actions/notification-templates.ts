@@ -59,7 +59,7 @@ export async function saveNotificationTemplateAction(_previous: FormState, fd: F
   return { ok: true, code: (data as { changed?: boolean } | null)?.changed === false ? "notificationTemplates.unchanged" : "notificationTemplates.saved" };
 }
 
-const PRESET_ACTIONS = ["approve", "reject", "suspend", "reinstate", "revoke"];
+const PRESET_ACTIONS = ["approve", "reject", "suspend", "reinstate", "revoke", "image_reject"];
 
 /**
  * Super Admin: create or edit one owner-message preset of the Marketplace seller transitions (admin_marketplace_seller_preset_save,
@@ -98,5 +98,6 @@ export async function saveSellerPresetAction(_previous: FormState, fd: FormData)
   }
   revalidatePath("/admin/notification-templates");
   revalidatePath("/admin/marketplace");
+  revalidatePath("/admin/marketplace/media");
   return { ok: true, code: "notificationTemplates.presets.saved" };
 }

@@ -50,6 +50,8 @@ export const KNOWN_ERROR_CODES = new Set([
   "upload_rate_limited",
   "image_content_invalid",
   "image_removed",
+  "image_not_replaceable",
+  "replacement_pending",
   "delete_incomplete",
   "object_still_present",
   "image_not_marked_for_removal",

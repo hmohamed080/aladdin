@@ -40,14 +40,14 @@ select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname like 'marketplace\_seller\_%'
      and p.prosecdef and exists (select 1 from unnest(p.proconfig) c where c = 'search_path=""')),
-  25, 'A1. the twenty-five seller RPCs (nine from Migration 06, two from 07, three from 09, four from 12, six from 14, one from seller approval v2) are SECURITY DEFINER with an empty search_path');
+  26, 'A1. the twenty-six seller RPCs (nine from Migration 06, two from 07, three from 09, four from 12, six from 14, one from seller approval v2, one from PR 6) are SECURITY DEFINER with an empty search_path');
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname like 'marketplace\_seller\_%'
      and has_function_privilege('authenticated', p.oid, 'execute')
      and not has_function_privilege('anon', p.oid, 'execute')
      and not has_function_privilege('service_role', p.oid, 'execute')),
-  25, 'A2. ...executable by authenticated only (never anon, never a service credential)');
+  26, 'A2. ...executable by authenticated only (never anon, never a service credential)');
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'app' and p.proname like 'marketplace\_%' and has_function_privilege('authenticated', p.oid, 'execute')),
@@ -368,9 +368,9 @@ reset role;
 -- ===========================================================================
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
-select ok('media_verification_not_available' = any(public.marketplace_seller_product_readiness(current_setting('t.p1')::uuid))
+select ok(not ('media_verification_not_available' = any(public.marketplace_seller_product_readiness(current_setting('t.p1')::uuid)))
       and 'no_verified_primary_image' = any(public.marketplace_seller_product_readiness(current_setting('t.p1')::uuid)),
-  'I1. readiness reports the real blockers (unverified image, media verification off)');
+  'I1. readiness reports the real blockers (unverified image; no media switch any more)');
 select throws_ok($$ select public.marketplace_product_publish(current_setting('t.p1')::uuid) $$, '23514', null,
   'I2. the product cannot be published');
 select is((select count(*)::int from public.marketplace_public_catalog() where slug like 'modern-wallpaper-%'), 0,
