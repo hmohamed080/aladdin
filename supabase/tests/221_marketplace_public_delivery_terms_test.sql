@@ -1,5 +1,5 @@
 -- pgTAP: Marketplace PR 9 — delivery estimate (no cut-off), next day and free-shipping rules
--- (app.marketplace_delivery_terms / public.marketplace_public_delivery, 20261123130001).
+-- (app.marketplace_delivery_terms / public.marketplace_public_delivery, 20261123150001).
 --
 -- The rules come from PR 8 (delivery + payment settings, 20261123120001). Without PR 8's tables the migration degrades to
 -- "configured = false" (asserted in G); every rich assertion is skipped then. Dates are asserted relative to today in

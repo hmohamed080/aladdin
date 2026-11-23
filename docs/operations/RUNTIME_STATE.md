@@ -14,7 +14,7 @@
 - Checked after activation (from a single machine, anonymous): 20 of 20 requests to `/` returned `HIT`; `/auth/sign-in`, `/legal/terms`, `/legal/privacy` and `/market` returned 200; requests with a Cookie, a query string or an `RSC` header were never cached. NOT measured: the effect on `_rsc` requests, on `Network connection lost` errors, on Worker CPU, and logged-in pages. That needs 24 hours of traffic compared with the 24 hours before (about 30% `_rsc`, 63 errors, median CPU about 240 ms).
 
 ## Marketplace public catalog v2 (draft PR, not deployed) - 2026-11-23
-- Branch `feat/mkt-public-catalog-20261123`: migration `20261123130001` (browse / delivery / seller / status public reads) is NOT applied to Acceptance or Production (local isolated stack only). Requires PR 7 #241 and PR 8 #240 merged first for the full feature (it degrades without them). Nothing deployed.
+- Branch `feat/mkt-public-catalog-20261123`: migration `20261123150001` (browse / delivery / seller / status public reads) is NOT applied to Acceptance or Production (local isolated stack only). Requires PR 7 #241 and PR 8 #240 merged first for the full feature (it degrades without them). Nothing deployed.
 
 ## Marketplace seller approval v2 (draft PR, not deployed) - 2026-11-23
 - Branch `feat/mkt-seller-approval-v2-20261123`: migration `20261123090001` (status `rejected`, reversible revoke, owner request RPC, owner-message presets, owner-only notifications through the templates) is NOT applied to Acceptance or Production (local isolated stack only, rolled-back transactions). Pages: `/admin/marketplace`, `/admin/notification-templates` (preset editor), `/showroom/marketplace`.

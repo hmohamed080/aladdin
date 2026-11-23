@@ -1,4 +1,4 @@
--- pgTAP: Marketplace PR 9 — public catalog v2 (20261123130001_marketplace_public_catalog_v2.sql)
+-- pgTAP: Marketplace PR 9 — public catalog v2 (20261123150001_marketplace_public_catalog_v2.sql)
 --
 --   A. SHAPE      — grants: the public reads are anon-callable, the internal helpers are not.
 --   B. VISIBILITY — published + enabled + in stock only; stock-out withdraws the product everywhere; suspended seller; privacy.
