@@ -45,6 +45,7 @@ const items: Item[] = [
   // applies to the link; each page's RPCs re-check marketplace_sellers.* and refuse without the permission.
   { href: "/admin/marketplace", key: "admin.nav.marketplace", exact: true, Icon: StorefrontIcon },
   { href: "/admin/marketplace/media", key: "admin.nav.marketplaceMedia", exact: false, Icon: CameraIcon },
+  { href: "/admin/marketplace/videos", key: "admin.nav.marketplaceVideos", exact: false, Icon: CameraIcon },
   { href: "/admin/audit", key: "admin.preview.nav.audit", exact: false, Icon: ScrollIcon },
   { href: "/admin/backups", key: "backups.title", exact: false, Icon: PackageIcon },
   { href: "/admin/media-limits", key: "mediaLimits.title", exact: false, Icon: CameraIcon },

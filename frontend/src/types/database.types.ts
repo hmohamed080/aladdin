@@ -3947,6 +3947,42 @@ export type Database = {
           },
         ]
       }
+      marketplace_video_events: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          detail: Json
+          id: string
+          organization_id: string
+          product_id: string
+          sequence: number
+          video_id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          organization_id: string
+          product_id: string
+          sequence?: number
+          video_id: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          organization_id?: string
+          product_id?: string
+          sequence?: number
+          video_id?: string
+        }
+        Relationships: []
+      }
       measurement_units: {
         Row: {
           code: Database["public"]["Enums"]["product_unit"]
@@ -4175,6 +4211,7 @@ export type Database = {
           height: number | null
           id: string
           lease_until: string | null
+          marketplace_product_id: string | null
           owner_user_id: string
           product_id: string | null
           project_id: string | null
@@ -4184,8 +4221,15 @@ export type Database = {
           purged_at: string | null
           ready_at: string | null
           renditions: string[]
+          review_message_ar: string | null
+          review_message_en: string | null
+          review_reason: string | null
+          review_status: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           revision: string | null
           scope: Database["public"]["Enums"]["media_video_scope"]
+          seller_organization_id: string | null
           size_bytes: number | null
           slot: number | null
           sort_order: number | null
@@ -4210,6 +4254,7 @@ export type Database = {
           height?: number | null
           id?: string
           lease_until?: string | null
+          marketplace_product_id?: string | null
           owner_user_id: string
           product_id?: string | null
           project_id?: string | null
@@ -4219,8 +4264,15 @@ export type Database = {
           purged_at?: string | null
           ready_at?: string | null
           renditions?: string[]
+          review_message_ar?: string | null
+          review_message_en?: string | null
+          review_reason?: string | null
+          review_status?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           revision?: string | null
           scope: Database["public"]["Enums"]["media_video_scope"]
+          seller_organization_id?: string | null
           size_bytes?: number | null
           slot?: number | null
           sort_order?: number | null
@@ -4245,6 +4297,7 @@ export type Database = {
           height?: number | null
           id?: string
           lease_until?: string | null
+          marketplace_product_id?: string | null
           owner_user_id?: string
           product_id?: string | null
           project_id?: string | null
@@ -4254,8 +4307,15 @@ export type Database = {
           purged_at?: string | null
           ready_at?: string | null
           renditions?: string[]
+          review_message_ar?: string | null
+          review_message_en?: string | null
+          review_reason?: string | null
+          review_status?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           revision?: string | null
           scope?: Database["public"]["Enums"]["media_video_scope"]
+          seller_organization_id?: string | null
           size_bytes?: number | null
           slot?: number | null
           sort_order?: number | null
@@ -4269,6 +4329,20 @@ export type Database = {
           width?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "media_videos_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_videos_seller_organization_id_fkey"
+            columns: ["seller_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "media_videos_owner_user_id_fkey"
             columns: ["owner_user_id"]
@@ -9726,6 +9800,17 @@ export type Database = {
         Returns: Json
       }
       admin_marketplace_media_settings: { Args: never; Returns: Json }
+      admin_marketplace_pending_videos: {
+        Args: { p_limit?: number }
+        Returns: {
+          name_ar: string
+          name_en: string
+          oldest_uploaded_at: string
+          organization_id: string
+          pending_count: number
+          product_id: string
+        }[]
+      }
       admin_marketplace_platform_status: { Args: never; Returns: Json }
       admin_marketplace_set_open: {
         Args: { p_open: boolean; p_reason: string }
@@ -9751,6 +9836,25 @@ export type Database = {
         Returns: Json
       }
       admin_marketplace_product_review_summary: { Args: never; Returns: Json }
+      admin_marketplace_product_videos: {
+        Args: { p_product_id: string }
+        Returns: {
+          created_at: string
+          duration_seconds: number
+          has_poster: boolean
+          height: number
+          id: string
+          review_message_ar: string
+          review_message_en: string
+          review_reason: string
+          review_status: string
+          reviewed_at: string
+          slot: number
+          state: Database["public"]["Enums"]["media_video_state"]
+          title: string
+          width: number
+        }[]
+      }
       admin_marketplace_seller_approve: {
         Args: { p_message_ar: string | null; p_message_en: string | null; p_organization_id: string; p_preset_id: string | null; p_reason: string | null }
         Returns: string
@@ -9860,6 +9964,10 @@ export type Database = {
       admin_marketplace_set_media_verification_ready: {
         Args: { p_ready: boolean; p_reason: string }
         Returns: boolean
+      }
+      admin_marketplace_video_review: {
+        Args: { p_decision: string; p_message_ar: string | null; p_message_en: string | null; p_reason: string | null; p_video_id: string }
+        Returns: undefined
       }
       admin_media_limit_events: {
         Args: { p_limit?: number }
@@ -10018,6 +10126,24 @@ export type Database = {
       }
       admin_whatsapp_otp_delivery_reconcile: { Args: { p_applied: Json; p_drift?: Json }; Returns: Json }
       admin_whatsapp_otp_delivery_authorized: { Args: never; Returns: Json }
+      marketplace_product_video_list: {
+        Args: { p_product_id: string }
+        Returns: {
+          created_at: string
+          duration_seconds: number
+          failure_code: string
+          has_poster: boolean
+          height: number
+          id: string
+          review_message_ar: string
+          review_message_en: string
+          review_status: string
+          slot: number
+          state: Database["public"]["Enums"]["media_video_state"]
+          title: string
+          width: number
+        }[]
+      }
       whatsapp_otp_notification_record: {
         Args: { p_event_key: string; p_kind: string; p_source_env: string; p_occurred_at: number; p_stats: Json }
         Returns: Json
@@ -12912,7 +13038,7 @@ export type Database = {
         | "proposal_pending"
         | "decision_pending"
       lead_status: "active" | "won" | "lost" | "archived"
-      media_video_scope: "portfolio" | "product"
+      media_video_scope: "portfolio" | "product" | "marketplace"
       media_video_state:
         | "uploading"
         | "processing"
@@ -13234,7 +13360,7 @@ export const Constants = {
         "decision_pending",
       ],
       lead_status: ["active", "won", "lost", "archived"],
-      media_video_scope: ["portfolio", "product"],
+      media_video_scope: ["portfolio", "product", "marketplace"],
       media_video_state: [
         "uploading",
         "processing",
