@@ -60,8 +60,8 @@ select ok(has_function_privilege('service_role', 'public.marketplace_public_imag
 select ok(has_function_privilege('anon', 'public.marketplace_public_catalog_page(text,text,text,text,integer,integer,numeric,numeric,boolean,jsonb)', 'execute')
       and has_function_privilege('anon', 'public.marketplace_public_facets(text)', 'execute'),
   'A3. the paged public catalogue and facets are readable anonymously');
-select is((select media_verification_ready from public.marketplace_platform_settings), false,
-  'A4. the migration leaves public media OFF');
+select is(app.marketplace_media_verification_ready(), true,
+  'A4. image verification is always mandatory (no media switch since 20261123100001)');
 select is((select count(*)::int from information_schema.role_table_grants
            where table_name in ('marketplace_image_moderation_events', 'marketplace_platform_events')
              and grantee in ('anon', 'authenticated', 'service_role')), 0,
@@ -160,20 +160,21 @@ set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","r
 select throws_like($$ select public.admin_marketplace_set_media_verification_ready(true, 'seller tries') $$, 'mp:not_permitted%',
   'D1. a seller cannot switch public media on');
 set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
-select throws_like($$ select public.admin_marketplace_set_media_verification_ready(true, '') $$, 'mp:reason_required%',
-  'D2. switching needs a reason');
--- before the switch: publication is still blocked by the flag alone (PR 7: the seller also has payment and delivery set up)
+select throws_like($$ select public.admin_marketplace_set_media_verification_ready(true, '') $$, 'mp:media_verification_mandatory%',
+  'D2. even a moderator cannot use the retired media switch');
+-- before PR 7's rules: the seller also has payment and delivery set up (inserted below)
 reset role;
 insert into public.marketplace_seller_payment_settings (seller_organization_id, cod_enabled) values (current_setting('t.a')::uuid, true);
 insert into public.marketplace_delivery_rates (seller_organization_id, governorate_key, fee_egp) values (current_setting('t.a')::uuid, 'cairo', 50);
-select is(app.marketplace_publication_blockers(current_setting('t.p')::uuid), array['media_verification_not_available'],
-  'D3. with a verified image and stock, only the media switch still blocks');
+select is(app.marketplace_publication_blockers(current_setting('t.p')::uuid), array[]::text[],
+  'D3. with a verified image and stock, nothing blocks publication (no media switch)');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
-select is(public.admin_marketplace_set_media_verification_ready(true, 'acceptance passed'), true, 'D4. a moderator switches media on');
+select throws_like($$ select public.admin_marketplace_set_media_verification_ready(false, 'acceptance passed') $$, 'mp:media_verification_mandatory%',
+  'D4. switching verification off is refused');
 reset role;
-select is((select action from public.marketplace_platform_events order by sequence desc limit 1), 'media_verification_enabled',
-  'D5. ...and it is recorded');
+select is((select count(*)::int from public.marketplace_platform_events where created_at >= now()), 0,
+  'D5. ...and nothing is written to the platform trail');
 
 -- ===========================================================================
 -- E. Publish ready
@@ -207,14 +208,14 @@ select ok(public.media_edge_public('marketplace', current_setting('t.img')::uuid
   'F2b. the Worker receives the R2 object of a deliverable image (organization products/ folder)');
 select is(public.media_edge_public('marketplace', current_setting('t.img2')::uuid, 'original'), null,
   'F2c. ...and nothing for a rejected image');
-update public.marketplace_platform_settings set media_verification_ready = false;
+update public.marketplace_product_images set status = 'pending' where id = current_setting('t.img')::uuid;
 set local role service_role;
 select is((select count(*)::int from public.marketplace_public_image_ref(current_setting('t.img')::uuid)), 0,
-  'F3. with the media switch off nothing is deliverable');
+  'F3. an image that is not verified is not deliverable');
 reset role;
 select is(public.media_edge_public('marketplace', current_setting('t.img')::uuid, 'original'), null,
   'F3b. ...not through the Worker either');
-update public.marketplace_platform_settings set media_verification_ready = true;
+update public.marketplace_product_images set status = 'verified' where id = current_setting('t.img')::uuid;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
 select public.admin_marketplace_seller_suspend('9c000000-cccc-4ccc-8ccc-000000000001', 'delivery test');

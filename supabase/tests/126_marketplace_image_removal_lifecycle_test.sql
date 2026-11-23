@@ -80,8 +80,8 @@ select ok((select pg_get_constraintdef(oid) from pg_constraint where conname = '
 select is((select count(*)::int from information_schema.role_table_grants
            where table_schema = 'public' and grantee in ('anon', 'authenticated') and privilege_type <> 'SELECT'
              and table_name like 'marketplace\_%'), 0, 'A5. still no client write grant on any marketplace table');
-select is((select media_verification_ready from public.marketplace_platform_settings where singleton), false,
-  'A6. media_verification_ready is still false');
+select is(app.marketplace_media_verification_ready(), true,
+  'A6. image verification is always mandatory (no media switch since 20261123100001)');
 select ok(pg_get_constraintdef((select oid from pg_constraint where conname = 'ck_marketplace_images_upload_state')) like '%deleting%',
   'A7. upload_state admits the deleting state');
 
@@ -352,8 +352,8 @@ select is((select count(*)::int from public.marketplace_product_status_events
   'I2. ...with an audit event naming the actor');
 select is((select count(*)::int from public.marketplace_public_catalog() where slug like 'removal-lifecycle-product-%'), 0,
   'I3. and it is not in the public catalogue');
-select is((select media_verification_ready from public.marketplace_platform_settings where singleton), false,
-  'I4. media_verification_ready is still false at the end');
+select is(app.marketplace_media_verification_ready(), true,
+  'I4. image verification is still mandatory at the end');
 
 -- ===========================================================================
 -- J. Central cleanup
