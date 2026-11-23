@@ -11,6 +11,9 @@
  *      `localPatterns`), never revocable media, so caching them is safe.
  *   3. `Strict-Transport-Security` (`max-age=63072000`) on every HTTPS response
  *      (the app sets no HSTS of its own).
+ *   4. The anonymous Landing page (`/`, no cookies, no query) may be served from the data-centre cache for a few
+ *      minutes (LANDING_EDGE_CACHE_SECONDS; off when unset). One URL only, never a zone-wide rule:
+ *      see src/lib/cloudflare/landing-cache.ts.
  *
  * Everything else is the unchanged Next.js app. This file is excluded from the
  * app's tsconfig because it imports build output; wrangler bundles it.
@@ -19,12 +22,15 @@
 import openNext from "../.open-next/worker.js";
 import { isBackendPath, proxyToBackend } from "../src/lib/cloudflare/backend-proxy";
 import { withPlatformForwardedHeaders } from "../src/lib/cloudflare/forwarded-headers";
+import { landingCacheSeconds, serveLanding } from "../src/lib/cloudflare/landing-cache";
 
 type Env = {
   BACKEND?: { fetch(request: Request): Promise<Response> };
   BACKEND_ORIGIN?: string;
   NEXT_PUBLIC_APP_ENV?: string;
   CF_VERSION_METADATA?: { id: string };
+  /** Seconds the edge may reuse the anonymous Landing page. Absent or 0 = off (landing-cache.ts). */
+  LANDING_EDGE_CACHE_SECONDS?: string;
 } & Record<string, unknown>;
 
 const HSTS = "max-age=63072000";
@@ -80,7 +86,16 @@ export default {
     } else if (pathname === "/_next/image" && request.method === "GET") {
       response = await optimizedImage(request, env, ctx);
     } else {
-      response = await openNext.fetch(request, env, ctx);
+      // The anonymous Landing page may come from the edge copy; every other request (and `/` when the switch is off)
+      // is rendered by the app exactly as before.
+      response = await serveLanding({
+        request,
+        cache: caches.default,
+        version: env.CF_VERSION_METADATA?.id,
+        seconds: landingCacheSeconds(env.LANDING_EDGE_CACHE_SECONDS),
+        render: () => openNext.fetch(request, env, ctx),
+        defer: (work) => ctx.waitUntil(work),
+      });
     }
     return withHsts(response, request);
   },
