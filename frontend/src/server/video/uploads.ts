@@ -4,12 +4,14 @@ import { z } from "zod";
 import { readPublicEnv } from "@/lib/env";
 import { readStorageEnv } from "@/lib/env/storage";
 import {
-  VIDEO_PARTS_PER_REQUEST, VIDEO_STORAGE_MAX_BYTES, VIDEO_TITLE_MAX, VIDEO_TYPES,
+  VIDEO_PARTS_PER_REQUEST, VIDEO_TITLE_MAX, VIDEO_TYPES,
   isVideoType, videoPartBytes, videoPartCount, videoPartLength, videoSignatureMatches,
 } from "@/lib/media/video-policy";
 import { readSessionIdentity } from "@/server/auth/session";
 import { cacheKey, withRedis } from "@/server/cache/redis";
 import { consumeRateLimit } from "@/server/cache/rate-limit";
+import { MEDIA_LIMIT_CEILING } from "@/lib/media/limits";
+import { videoMaxBytes } from "@/server/media/limits";
 import { privilegedStorageClient } from "@/server/storage/media";
 import { videoUploadStore, type UploadTransport, type VideoUploadStore } from "./provider";
 import { videoEnabled } from "./playback";
@@ -22,7 +24,7 @@ import { videoEnabled } from "./playback";
  * (RLS-scoped RPCs); only the bookkeeping writes use the service role, after
  * the caller's own check has passed.
  */
-export type VideoErrorCode = "not_allowed" | "invalid" | "limit" | "rate_limited" | "not_found" | "incomplete" | "unavailable";
+export type VideoErrorCode = "not_allowed" | "invalid" | "too_large" | "limit" | "rate_limited" | "not_found" | "incomplete" | "unavailable";
 export class VideoUploadError extends Error {
   constructor(readonly code: VideoErrorCode) { super(code); }
 }
@@ -35,8 +37,9 @@ export const beginSchema = z.object({
   projectId: UUID.optional(),
   title: z.string().trim().min(1).max(VIDEO_TITLE_MAX),
   contentType: z.enum(VIDEO_TYPES),
-  // No product cap: only R2's own object limit.
-  bytes: z.number().int().positive().max(VIDEO_STORAGE_MAX_BYTES),
+  // Site-wide per-file cap (100 MB).
+  // Shape only: the platform ceiling. The limit of the place (stored, admin-configurable) is checked in beginVideoUpload.
+  bytes: z.number().int().positive().max(MEDIA_LIMIT_CEILING.video),
 }).refine((v) => (v.scope === "product") === (v.productId !== undefined), { message: "productId belongs to product scope" })
   .refine((v) => v.projectId === undefined || v.scope === "portfolio", { message: "projectId belongs to portfolio scope" });
 export const partsSchema = z.object({ parts: z.array(z.number().int().min(1)).min(1).max(VIDEO_PARTS_PER_REQUEST) });
@@ -72,6 +75,7 @@ export type UploadPlan = { id: string; transport: UploadTransport; partBytes: nu
 
 export async function beginVideoUpload(client: SupabaseClient, input: z.infer<typeof beginSchema>, uploads: VideoUploadStore = videoUploadStore()): Promise<UploadPlan> {
   requireVideo();
+  if (input.bytes > await videoMaxBytes(input.scope)) throw new VideoUploadError("too_large");
   // p_product_id is always sent: it has no SQL default, and PostgREST matches functions by argument names.
   const { data: id, error } = await client.rpc("video_upload_begin", { p_scope: input.scope, p_product_id: input.productId ?? null,
     p_title: input.title, p_content_type: input.contentType, p_bytes: input.bytes });

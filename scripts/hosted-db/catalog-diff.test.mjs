@@ -31,3 +31,10 @@ test("load accepts raw, row-array, rows and string shapes and rejects other JSON
   assert.ok(load(JSON.stringify({ rows: [{ fingerprint: JSON.stringify(fp()) }] })).functions_def);
   assert.throws(() => load("[]")); assert.throws(() => load("nope")); assert.throws(() => load('{"a":1}'));
 });
+
+test("an expected entry ending with * covers every key with that prefix, and an unused wildcard is reported missing", () => {
+  const touched = new Map([["public.marketplace_a", ["relations:added"]], ["public.marketplace_a.id", ["columns:added"]], ["public.ux_marketplace_x", ["indexes:added"]]]);
+  assert.deepEqual(checkExpected(touched, ["public.marketplace_*", "public.ux_marketplace_*"]), []);
+  assert.deepEqual(checkExpected(touched, ["public.marketplace_*"]), ["unexpected change: public.ux_marketplace_x (indexes:added)"]);
+  assert.deepEqual(checkExpected(touched, ["public.marketplace_*", "public.ux_marketplace_*", "public.ix_marketplace_*"]), ["expected change missing: public.ix_marketplace_*"]);
+});

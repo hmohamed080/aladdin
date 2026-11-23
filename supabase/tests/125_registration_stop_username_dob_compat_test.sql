@@ -210,7 +210,7 @@ select is(pg_temp.q(:'padmin', $$ public.admin_users_directory(p_search => 'quas
 select is(pg_temp.q(:'padmin', $$ (public.admin_users_directory(p_search => 'Quasar Zed') -> 'rows' -> 0) ? 'username' $$), 'false',
   'rows no longer carry a username key (P1 M3a)');
 select is(pg_temp.q(:'padmin', $$ (select array_agg(k order by k) from jsonb_object_keys(public.admin_users_directory(p_search => 'Quasar Zed') -> 'rows' -> 0) k) $$),
-  '{account_type,city,completion,created_at,display_name,display_name_ar,display_name_en,email,flags,governorate,id,is_verified,latest_verification_status,organization,organization_count,phone,profile_id,public_profile_available,registered_account,status,verification_state}',
+  '{account_type,city,completion,created_at,display_name,display_name_ar,display_name_en,email,flags,governorate,id,is_verified,latest_verification_status,organization,organization_count,phone,profile_id,public_profile_available,registered_account,registration_state,status,verification_state}',
   'the row shape is unchanged except for the removed username key (P1 M3a)');
 select is(pg_temp.q('91250000-0000-4000-8000-0000000000d1', $$ public.admin_users_directory() $$), 'ERR:42501',
   'a non-admin is still refused by the permission check');

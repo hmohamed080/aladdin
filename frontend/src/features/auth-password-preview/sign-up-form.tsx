@@ -192,7 +192,7 @@ export function PasswordSignUpForm({
   const footer = (
     <p>
       {t("authPasswordPreview.signUp.haveAccount")}{" "}
-      <Link href="/auth/sign-in" className="font-semibold text-accent hover:underline">
+      <Link prefetch={false} href="/auth/sign-in" className="font-semibold text-accent hover:underline">
         {t("authPasswordPreview.signUp.signInLink")}
       </Link>
     </p>
@@ -381,11 +381,11 @@ export function PasswordSignUpForm({
         ))}
         <p className="mt-xs text-center text-label text-fg-muted" data-sign-up-agreement>
           {t("authPasswordPreview.signUp.agreementPrefix")}{" "}
-          <Link href="/legal/terms" target="_blank" className="font-semibold text-fg-secondary hover:underline">
+          <Link href="/legal/terms" prefetch={false} target="_blank" className="font-semibold text-fg-secondary hover:underline">
             {t("entryAuth.terms")}
           </Link>{" "}
           {t("entryAuth.and")}{" "}
-          <Link href="/legal/privacy" target="_blank" className="font-semibold text-fg-secondary hover:underline">
+          <Link href="/legal/privacy" prefetch={false} target="_blank" className="font-semibold text-fg-secondary hover:underline">
             {t("entryAuth.privacy")}
           </Link>
           . {t("authPasswordPreview.signUp.agreementSuffix")}

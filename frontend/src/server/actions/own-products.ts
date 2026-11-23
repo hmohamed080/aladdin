@@ -8,7 +8,6 @@ import { isLifecycleAction, parseOwnProductForm } from "@/features/showroom-shel
 import { parseAudienceCodes } from "@/features/showroom-shell/products/product-audiences";
 import { mapOwnProductError } from "@/features/showroom-shell/products/error-map";
 import {
-  PRODUCT_IMAGE_MAX_BYTES,
   isProductImageContentType,
   isProductImageKey,
   type ProductImageErrorCode,
@@ -16,6 +15,7 @@ import {
 import type { Database } from "@/types/database.types";
 import { authorizeMediaUpload, verifyPendingMedia, removeMedia } from "@/server/storage/media";
 import type { UploadGrant } from "@/lib/storage/provider-types";
+import { imageMaxBytes } from "@/server/media/limits";
 
 /**
  * Server Actions for "منتجاتي". Every one forwards the CALLER's JWT to a
@@ -191,7 +191,7 @@ export type ImageResult = { ok: true } | { ok: false; code: string };
 export type ImageConfirmResult = { ok: true; id: string } | { ok: false; code: string };
 
 export async function requestProductImageUploadAction(productId: string, contentType: string, expectedBytes?: number): Promise<ImageTicket> {
-  if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > PRODUCT_IMAGE_MAX_BYTES)) {
+  if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > (await imageMaxBytes("product")))) {
     return { ok: false, code: "showroomProducts.images.errorSize" };
   }
   if (!UUID.test(productId) || !isProductImageContentType(contentType)) {

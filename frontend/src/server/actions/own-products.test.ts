@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   authorize: vi.fn(), verify: vi.fn(), cleanup: vi.fn(),
 }));
 vi.mock("@/server/storage/media", () => ({ authorizeMediaUpload: state.authorize, verifyPendingMedia: state.verify, removeMedia: state.cleanup }));
+vi.mock("@/server/media/limits", async () => { const { DEFAULT_IMAGE_LIMITS: d } = await import("@/lib/media/limits"); return { imageMaxBytes: async (p: keyof typeof d) => d[p], invalidateMediaLimitCache: () => undefined }; });
 vi.mock("next/cache", () => ({ revalidatePath: state.revalidate }));
 vi.mock("next/navigation", () => ({ redirect: state.redirect }));
 vi.mock("@/lib/supabase/server", () => ({

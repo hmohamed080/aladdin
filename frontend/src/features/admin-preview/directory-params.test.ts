@@ -85,11 +85,13 @@ describe("parseUsersDirectoryParams", () => {
 
 describe("parseOrgsDirectoryParams", () => {
   it("accepts only the organization status tabs, types and sorts", () => {
-    expect(parseOrgsDirectoryParams({ status: "rejected", type: "importer", sort: "completeness:desc" })).toMatchObject({
+    expect(parseOrgsDirectoryParams({ status: "attention", type: "importer", sort: "completeness:desc" })).toMatchObject({
       status: null,
       orgType: "importer",
       sort: "registered:desc",
     });
+    // Rejected is a real organization tab (approval decision); "attention" belongs to Users only.
+    expect(parseOrgsDirectoryParams({ status: "rejected" }).status).toBe("rejected");
     expect(parseOrgsDirectoryParams({ status: "pending", sort: "registered:asc", page: "4" })).toMatchObject({
       status: "pending",
       sort: "registered:asc",

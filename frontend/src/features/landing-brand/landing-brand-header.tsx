@@ -6,11 +6,12 @@ import { MenuIcon, XIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
 import { brandContent } from "./landing-brand-content";
+import { LandingBrandCart } from "./landing-brand-cart";
 import { BrandIcon } from "./landing-brand-icons";
 import styles from "./landing-brand.module.css";
 
 /** Brand header: logo, anchor navigation, sign in, and the account-type dropdown (opens under its button). */
-export function LandingBrandHeader() {
+export function LandingBrandHeader({ showCart = false }: { showCart?: boolean } = {}) {
   const { dir, t: tr } = useI18n();
   const t = brandContent.nav;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -49,6 +50,7 @@ export function LandingBrandHeader() {
         ))}
       </nav>
       <div className={styles.actions}>
+        {showCart ? <LandingBrandCart /> : null}
         <div className={styles.registerWrap} ref={wrap}>
           <button ref={trigger} type="button" className={styles.register} aria-haspopup="true" aria-expanded={signupOpen} aria-controls="brand-register" onClick={() => setSignupOpen(!signupOpen)}>
             <BrandIcon name="user-plus" size={18} /><span>{t.register}</span>

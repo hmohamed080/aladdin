@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({
-  enabled: vi.fn(() => true), identity: vi.fn(), limit: vi.fn(), admin: vi.fn(), redis: vi.fn(),
+  videoMax: vi.fn(async () => 100 * 1024 * 1024), enabled: vi.fn(() => true), identity: vi.fn(), limit: vi.fn(), admin: vi.fn(), redis: vi.fn(),
   publicEnv: vi.fn(() => ({ NEXT_PUBLIC_APP_ENV: "local" })), storageEnv: vi.fn(() => ({ R2_PRODUCTION_WRITES_APPROVED: false })),
 }));
 vi.mock("./playback", () => ({ videoEnabled: mocks.enabled }));
+vi.mock("@/server/media/limits", () => ({ videoMaxBytes: mocks.videoMax }));
 vi.mock("@/server/auth/session", () => ({ readSessionIdentity: mocks.identity }));
 vi.mock("@/server/cache/rate-limit", () => ({ consumeRateLimit: mocks.limit }));
 vi.mock("@/server/cache/redis", () => ({ withRedis: mocks.redis, cacheKey: (...p: unknown[]) => JSON.stringify(p) }));
@@ -54,16 +55,27 @@ describe("beginSchema", () => {
     expect(beginSchema.safeParse({ ...base, scope: "product" }).success).toBe(false);
     expect(beginSchema.safeParse({ ...base, scope: "product", productId: ID }).success).toBe(true);
   });
-  it("refuses other types, and sizes only beyond R2's own object limit", () => {
+  it("refuses other types, and sizes beyond the platform ceiling (the limit of the place is checked when the upload begins)", () => {
     expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/x-msvideo", bytes: 10 }).success).toBe(false);
-    expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 600 * 1024 * 1024 }).success).toBe(true);
-    expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 200 * 1024 ** 3 }).success).toBe(true);
+    expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 100 * 1024 * 1024 }).success).toBe(true);
+    expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 1024 * 1024 * 1024 }).success).toBe(true);
+    expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 1024 * 1024 * 1024 + 1 }).success).toBe(false);
     expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 5 * 1024 ** 4 + 1 }).success).toBe(false);
   });
 });
 
 describe("beginVideoUpload", () => {
+  it("refuses a video over the STORED limit of its place before touching the database, and admits it once the limit is raised", async () => {
+    const c = client({ video_upload_begin: { data: ID, error: null } });
+    await expect(beginVideoUpload(c, { scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 60 * 1024 * 1024 }, uploads()).then(() => "ok")).resolves.toBe("ok");
+    mocks.videoMax.mockResolvedValueOnce(50 * 1024 * 1024);
+    const refused = client({ video_upload_begin: { data: ID, error: null } });
+    await expect(beginVideoUpload(refused, { scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 60 * 1024 * 1024 }, uploads())).rejects.toMatchObject({ code: "too_large" });
+    expect(refused.rpc).not.toHaveBeenCalled();
+  });
+
   it("plans larger parts for a file that would need more than 10,000", async () => {
+    mocks.videoMax.mockResolvedValueOnce(Number.MAX_SAFE_INTEGER); // part planning does not depend on the place limit
     const c = client({ video_upload_begin: { data: ID, error: null } });
     const bytes = 2048 * 1024 ** 3;
     const plan = await beginVideoUpload(c, { scope: "portfolio", title: "t", contentType: "video/mp4", bytes }, uploads());
@@ -72,6 +84,7 @@ describe("beginVideoUpload", () => {
   });
 
   it("asks the database as the caller first, then opens and attaches the multipart upload", async () => {
+    mocks.videoMax.mockResolvedValueOnce(Number.MAX_SAFE_INTEGER);
     const c = client({ video_upload_begin: { data: ID, error: null } });
     const u = uploads();
     const plan = await beginVideoUpload(c, { scope: "portfolio", title: "t", contentType: "video/mp4", bytes: VIDEO_PART_BYTES * 2 + 1 }, u);

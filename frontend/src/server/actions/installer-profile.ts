@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getIndividualOnboardingData } from "@/server/queries/onboarding";
 import { AVAILABILITIES } from "@/lib/onboarding/persona-fields";
+import { submitCraftsmanVerificationIfComplete, type CraftsmanVerificationOutcome } from "@/server/profile/craftsman-verification";
 
 /**
  * Saves the approved Installer profile page (`/home/profile`, design `/preview/installer-account`) in one go, through
@@ -38,7 +39,7 @@ const schema = z.object({
 });
 
 export type InstallerProfileInput = z.input<typeof schema>;
-export type InstallerProfileResult = { ok: true } | { ok: false; code: "invalid" | "phoneInBio" | "name" | "trades" | "profile" | "areas" };
+export type InstallerProfileResult = { ok: true; verification: CraftsmanVerificationOutcome | null } | { ok: false; code: "invalid" | "phoneInBio" | "name" | "trades" | "profile" | "areas" };
 
 export async function saveInstallerProfileAction(input: InstallerProfileInput): Promise<InstallerProfileResult> {
   const parsed = schema.safeParse(input);
@@ -85,6 +86,8 @@ export async function saveInstallerProfileAction(input: InstallerProfileInput): 
     if (saved.error) return { ok: false, code: "areas" };
   }
 
+  // The saved profile may have just reached 100%: the database decides, and files at most one request.
+  const verification = await submitCraftsmanVerificationIfComplete();
   revalidatePath("/home", "layout");
-  return { ok: true };
+  return { ok: true, verification };
 }

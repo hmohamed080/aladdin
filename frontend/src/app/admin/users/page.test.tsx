@@ -12,6 +12,7 @@ import type { AdminDirectoryUser } from "@/features/admin-preview/directory-mapp
  * links the PROFILE id, never the user id.
  */
 const loadUsersDirectory = vi.fn();
+const loadPendingUserVerifications = vi.fn();
 const loadStaffRanks = vi.fn();
 const requireAdminRoute = vi.fn();
 const CALLER_ID = "55555555-5555-4555-8555-555555555555";
@@ -27,7 +28,11 @@ vi.mock("@/lib/supabase/server", () => ({
   getServerSupabase: vi.fn(async () => ({ auth: { getUser: async () => ({ data: { user: { id: CALLER_ID } } }) } })),
 }));
 vi.mock("next/headers", () => ({ cookies: vi.fn(async () => ({ get: () => ({ value: "en" }) })) }));
-vi.mock("@/server/queries/admin-directory", () => ({ loadUsersDirectory: (...a: unknown[]) => loadUsersDirectory(...a) }));
+vi.mock("@/server/queries/admin-directory", () => ({
+  loadUsersDirectory: (...a: unknown[]) => loadUsersDirectory(...a),
+  loadPendingUserVerifications: (...a: unknown[]) => loadPendingUserVerifications(...a),
+}));
+vi.mock("@/server/actions/admin-forms", () => ({ approveVerificationAction: vi.fn(), rejectVerificationAction: vi.fn(), adminInitiateVerificationAction: vi.fn() }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }),
   usePathname: () => "/admin/users",
@@ -80,6 +85,8 @@ beforeEach(() => {
   loadUsersDirectory.mockReset();
   loadStaffRanks.mockReset();
   loadStaffRanks.mockResolvedValue(new Map());
+  loadPendingUserVerifications.mockReset();
+  loadPendingUserVerifications.mockResolvedValue(new Map());
   requireAdminRoute.mockReset();
   requireAdminRoute.mockResolvedValue(administrator);
 });
@@ -210,5 +217,101 @@ describe("Users directory page - rank-aware Suspend", () => {
     loadUsersDirectory.mockResolvedValue(okPage([user({ id: USER_ID })]));
     const { container } = await renderPage({});
     expect(suspendButtons(rowOf(container, USER_ID))).toHaveLength(0);
+  });
+});
+
+describe("Users directory page - real Verify / Reject", () => {
+  const PENDING = { id: "99999999-9999-4999-8999-999999999999", status: "submitted", verificationType: "professional" };
+
+  it("offers Approve and Reject on a row with an open request, and reads pending requests once for the page's ids only", async () => {
+    loadUsersDirectory.mockResolvedValue(okPage([user({ status: "pending_verification" })]));
+    loadPendingUserVerifications.mockResolvedValue(new Map([[USER_ID, PENDING]]));
+    await renderPage({});
+    expect(loadPendingUserVerifications).toHaveBeenCalledTimes(1);
+    expect(loadPendingUserVerifications.mock.calls[0]?.[1]).toEqual([USER_ID]);
+    // The table renders each row in more than one layout; every copy must be live.
+    for (const name of ["Approve", "Reject"]) {
+      const buttons = screen.getAllByRole("button", { name });
+      expect(buttons.length).toBeGreaterThan(0);
+      for (const b of buttons) expect(b.getAttribute("aria-disabled")).toBeNull();
+    }
+  });
+
+  it("labels a legacy pending_verification account by its derived registration state (ADR-0031)", async () => {
+    loadUsersDirectory.mockResolvedValue(
+      okPage([
+        user({ id: "70000001-0000-4000-8000-0000000000a1", status: "pending_verification", registrationState: "consent_pending" }),
+        user({ id: "70000001-0000-4000-8000-0000000000a2", status: "pending_verification", registrationState: "access_ready" }),
+      ]),
+    );
+    await renderPage({});
+    // Rows may render in more than one layout; one unfinished account must produce exactly as many "unfinished" labels
+    // as "Terms not accepted" labels, so the finished account contributes none.
+    const unfinished = screen.getAllByText("Did not finish registration").length;
+    expect(unfinished).toBeGreaterThan(0);
+    expect(unfinished).toBe(screen.getAllByText("Terms not accepted").length);
+    expect(screen.getAllByText("Registered").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the buttons but disabled, with the reason, when the account has no pending request", async () => {
+    loadUsersDirectory.mockResolvedValue(okPage([user({ status: "pending_verification" })]));
+    await renderPage({});
+    const buttons = screen.getAllByRole("button", { name: /Approve/ });
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const b of buttons) {
+      expect(b.getAttribute("aria-disabled")).toBe("true");
+      expect(b.getAttribute("title")).toBe("No pending verification request for this account.");
+    }
+  });
+
+  it("offers a LIVE Approve / Reject (no separate Start step) for an active professional with no request", async () => {
+    loadUsersDirectory.mockResolvedValue(okPage([user({ status: "active", accountType: "installer_technician" })]));
+    await renderPage({});
+    expect(screen.queryByRole("button", { name: /Start verification/ })).toBeNull();
+    const approve = screen.getAllByRole("button", { name: /^Approve/ });
+    expect(approve.length).toBeGreaterThan(0);
+    expect(approve[0]?.getAttribute("aria-disabled")).toBeNull();
+  });
+
+  it("shows a derived 'Profile incomplete' warning with the real percentage on a VERIFIED account below 100%, and nowhere else", async () => {
+    loadUsersDirectory.mockResolvedValue(
+      okPage([
+        user({ id: "70000001-0000-4000-8000-0000000000a1", verificationState: "verified", isVerified: true, completion: 60 }),
+        user({ id: "70000001-0000-4000-8000-0000000000a2", verificationState: "verified", isVerified: true, completion: 100 }),
+        user({ id: "70000001-0000-4000-8000-0000000000a3", verificationState: "unverified", completion: 60 }),
+      ]),
+    );
+    await renderPage({});
+    const warnings = screen.getAllByTestId("profile-incomplete-warning");
+    expect(warnings.length).toBeGreaterThan(0);
+    for (const w of warnings) expect(w.textContent).toBe("Profile incomplete (60%)");
+    // exactly one account is flagged (each row may render in more than one layout)
+    expect(new Set(warnings.map((w) => w.textContent)).size).toBe(1);
+  });
+
+  it("has a Needs attention tab (count shown only when it is open) and forwards the derived status filter", async () => {
+    loadUsersDirectory.mockResolvedValue({
+      ok: true,
+      data: { rows: [], total: 0, page: 1, pageSize: 10, counts: { all: 9, pending: 0, verified: 5, suspended: 0, rejected: 0, attention: 0 } },
+    });
+    await renderPage({ status: "attention" });
+    expect(loadUsersDirectory.mock.calls[0]?.[1]).toMatchObject({ status: "attention" });
+    expect(screen.getAllByText("Needs attention").length).toBeGreaterThan(0);
+  });
+
+  it("draws nothing for an account that is not pending and has no request", async () => {
+    loadUsersDirectory.mockResolvedValue(okPage([user({ status: "active" })]));
+    await renderPage({});
+    expect(screen.queryByRole("button", { name: /Approve/ })).toBeNull();
+  });
+
+  it("draws nothing, and reads nothing, without the users.verify permission", async () => {
+    requireAdminRoute.mockResolvedValue(acc(50, ALL.filter((p) => p !== "users.verify")));
+    loadUsersDirectory.mockResolvedValue(okPage([user({ status: "pending_verification" })]));
+    loadPendingUserVerifications.mockResolvedValue(new Map([[USER_ID, PENDING]]));
+    await renderPage({});
+    expect(loadPendingUserVerifications).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /Approve/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Reject/ })).toBeNull();
   });
 });

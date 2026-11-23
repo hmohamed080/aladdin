@@ -161,7 +161,7 @@ Two caveats:
 
 **The new ceiling, with its arithmetic:**
 - **Disk:** none in size. Usable disk is 20 GB − ≈ 0.5 GB image = 19.5 GB. A local read needs `size + 1 GiB ≤ 19.5 GB`, so originals up to **≈ 18.4 GB** are read from disk. That is 2.5× the old 7.5 GB, because the outputs no longer accumulate. Anything larger is streamed and needs only the 1 GiB headroom.
-- **Object:** R2's 5 TiB object limit (ADR-0020) is the only byte ceiling left.
+- **Object:** uploads are capped at 100 MB per file (ADR-0030, which supersedes ADR-0020's "no cap"); R2's 5 TiB object limit is far above it. The arithmetic below remains the worker's technical headroom.
 - **Wall time:** a single transcode must finish within the URL's 7-day maximum: 604,800 s. At the measured 1.0–2.2 × real time for 1080p, that is about **76–168 h of source in one job**, roughly 3–7 days of video. ffmpeg's own budget (`8 s × duration + 600 s`) reaches 7 days at about 21 h of source. For a longer video, ffmpeg's timeout, not the URL, would still allow the run. The run then depends on no reconnect being needed after day 7. 4K decode is slower than the 1080p measurement, so for 4K use the low end.
 - **Restarts:** platform restarts still cost an attempt each (see the caveats above). For multi-day jobs that is the more likely limit.
 

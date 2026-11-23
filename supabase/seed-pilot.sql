@@ -4,7 +4,6 @@
 -- caller has ALTER TABLE rights or a way to expand the private rollout ledger.
 begin;
 alter table public.organizations disable trigger showroom_activation_complete;
-alter table public.verifications disable trigger showroom_review_complete;
 alter table public.products disable trigger showroom_product_publish_complete;
 alter table public.quotations disable trigger showroom_quotation_sell_complete;
 alter table public.orders disable trigger trg_zz_showroom_order_sell_complete;
@@ -1233,7 +1232,6 @@ insert into app.showroom_legacy_seller_exceptions(organization_id,closed_at,reas
 insert into app.showroom_legacy_published_products(product_id,organization_id) select p.id,p.organization_id from public.products p join app.showroom_legacy_seller_exceptions e on e.organization_id=p.organization_id where e.closed_at is null and p.status='published' and p.deleted_at is null on conflict do nothing;
 insert into app.showroom_legacy_orders(order_id,organization_id) select o.id,o.supplier_org_id from public.orders o join app.showroom_legacy_seller_exceptions e on e.organization_id=o.supplier_org_id where e.closed_at is null on conflict do nothing;
 alter table public.organizations enable trigger showroom_activation_complete;
-alter table public.verifications enable trigger showroom_review_complete;
 alter table public.products enable trigger showroom_product_publish_complete;
 alter table public.quotations enable trigger showroom_quotation_sell_complete;
 alter table public.orders enable trigger trg_zz_showroom_order_sell_complete;

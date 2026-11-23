@@ -57,7 +57,7 @@ it("denies same and fresh sessions after revocation despite cached upstream", as
 it("fails closed on upstream errors and oversized streams", async () => {
   fetcher.mockResolvedValueOnce(new Response(null, { status: 404 }));
   expect((await deliverMedia(client, "portfolio", "image.png")).status).toBe(404);
-  fetcher.mockResolvedValueOnce(new Response(new Uint8Array(5 * 1024 * 1024 + 1)));
+  fetcher.mockResolvedValueOnce(new Response(new Uint8Array(20 * 1024 * 1024 + 1)) /* platform image ceiling + 1: stored files are served up to the ceiling */);
   const response = await deliverMedia(client, "portfolio", "image.png");
   await expect(response.arrayBuffer()).rejects.toThrow("media stream limit");
 });

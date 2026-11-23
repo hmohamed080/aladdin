@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
-import { sanitizeNext } from "@/server/auth/next";
+import { sanitizeNext, postAuthDestination } from "@/server/auth/next";
 import { resolveActiveLanding } from "@/server/queries/landing";
 import { hasAppAccess, type RegistrationState } from "@/server/queries/registration";
 import { captchaTokenFrom, isCaptchaFailure } from "@/server/auth/captcha";
@@ -142,7 +142,7 @@ export async function verifyEmailOtp(_prev: AuthState, formData: FormData): Prom
   // This is the real post-OTP landing path. Resolve the caller's canonical
   // surface, then retain a safe deep link only when it belongs to that surface.
   const landing = await resolveActiveLanding(supabase);
-  const destination = next === landing || next.startsWith(`${landing}/`) ? next : landing;
+  const destination = postAuthDestination(next, landing);
   redirect(destination);
 }
 
