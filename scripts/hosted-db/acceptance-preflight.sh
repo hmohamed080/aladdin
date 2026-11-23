@@ -6,7 +6,7 @@
 set -euo pipefail
 export LC_ALL=C
 ACC="nxossqhdfltcqdwvbewi"; PROD="kkpkgjrweysgvhvkhzun"
-PLAN="${1:-}"; [[ "$PLAN" =~ ^(media|m1|m3a|media\+m1|marketplace|media-notify)$ ]] || { echo "usage: $0 media|m1|m3a|media+m1|marketplace|media-notify"; exit 2; }
+PLAN="${1:-}"; [[ "$PLAN" =~ ^(media|m1|m3a|media\+m1|marketplace|media-notify|registration-gate)$ ]] || { echo "usage: $0 media|m1|m3a|media+m1|marketplace|media-notify|registration-gate"; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"; cd "$HERE/../.."
 sb() { pnpm exec supabase "$@"; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP" supabase/.temp' EXIT
