@@ -69,6 +69,24 @@ export async function confirmBvUploadAction(key: string): Promise<BvResult> {
 }
 
 /**
+ * After a failed browser upload: retire the caller's own never-confirmed draft at once so it stops counting toward the
+ * 10-document limit (otherwise it holds the slot until the next request more than one hour later), then delete any partial
+ * object. The database refuses anything that is not the caller's own pending, unsubmitted draft.
+ */
+export async function abandonBvUploadAction(key: string): Promise<BvResult> {
+  if (!isBvKey(key)) return { ok: false, code: "states.genericRetry" };
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("business_verification_document_abandon", { p_object_key: key });
+  if (error) return { ok: false, code: mapBvError(error.message) };
+  if (typeof data === "string" && isBvKey(data)) {
+    // Best effort: the pending/ prefix of the bucket expires on its own.
+    try { await removeMedia(supabase, "verification", data); } catch { /* nothing more to do */ }
+  }
+  revalidatePath(SHOWROOM_PATH);
+  return { ok: true };
+}
+
+/**
  * Only an UNSUBMITTED draft can be removed (the RPC refuses submitted evidence, which is retained).
  * The record is retired first; the bytes are then deleted and cleanup completion recorded.
  */

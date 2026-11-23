@@ -8,6 +8,7 @@ vi.mock("@/server/actions/business-verification", () => ({
   requestBvUploadAction: vi.fn(),
   confirmBvUploadAction: vi.fn(),
   removeBvDocumentAction: vi.fn(),
+  abandonBvUploadAction: vi.fn(),
   submitBvAction: vi.fn(),
   startBvReviewAction: vi.fn(),
   requestBvInfoAction: vi.fn(),
