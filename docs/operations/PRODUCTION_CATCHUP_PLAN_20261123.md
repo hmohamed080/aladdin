@@ -8,7 +8,17 @@ Production (`kkpkgjrweysgvhvkhzun`) is behind Acceptance (`nxossqhdfltcqdwvbewi`
 ## Current decision
 - Acceptance first, Production only after: no workflow applies a hosted migration or deploys Production on a push to `main`.
 - Production LIVE state (read-only, 2026-11-23): 210 migrations, latest `20261112090001`, no gaps after 207. The three beyond the 2026-11-11 record (`20261110090001`, `20261110090002`, `20261112090001`) are already applied, so the remaining gap is 27 migrations, not 30, and batch 1 is down to its last two migrations. `RUNTIME_STATE.md` still shows the older "last recorded 207".
-- Production has 1,093 users; 54 have `users.status = 'active'` and 1,039 do not. Their registration state has not been classified yet (see the gate batch).
+- Production has 1,093 users; 54 have `users.status = 'active'` and 1,039 do not. Registration state classified read-only on 2026-11-23 with the exact branch order of `app.admin_user_registration_state` (aggregate counts only):
+
+| Derived state | Users | Signed in within 30 days | Never signed in |
+|---|---|---|---|
+| access_ready | 941 | 408 | 0 |
+| active_personal | 83 | 22 | 10 |
+| unverified | 60 | 0 | 60 |
+| account_type_pending | 5 | 2 | 0 |
+| consent_pending | 4 | 1 | 3 |
+
+  The registration gate would refuse writes for `unverified`, `consent_pending` and `account_type_pending`: 69 accounts, of which 60 never signed in (they cannot, their email is unconfirmed) and only 3 signed in during the last 30 days. The other 1,024 are unaffected. The UI already sends those 3 to finish registration, so the gate adds no new restriction in practice for real use.
 - Acceptance state: 237 migrations, latest `20261122090002` (2026-11-23).
 - The classification below is an estimate from file names and the notes in `scripts/hosted-db/acceptance-gate.mjs`; each batch is re-checked against its SQL when its gate plan is written.
 
@@ -26,7 +36,7 @@ Production (`kkpkgjrweysgvhvkhzun`) is behind Acceptance (`nxossqhdfltcqdwvbewi`
 ## Proposed order
 1 then 3, then 2, then 6, then 4 and 5 last.
 
-Why the gate (6) is not first: Production has 1,039 users whose `users.status` is not `active`. Their derived registration state must be classified first (read-only), because the gate refuses state-changing requests of every account in `unverified`, `consent_pending` or `account_type_pending`. It refuses state-changing requests of accounts whose registration is unfinished. Before applying it to Production, count Production accounts in those states (the helper `app.admin_user_registration_state` is created by batch 6 itself, so compute the same branch order from consents, onboarding progress and email confirmation), and decide what happens to them (the gate would stop their writes until they finish registering). On Acceptance the five `consent_pending` accounts are test accounts.
+Why the gate (6) is not first: Production has 1,039 users whose `users.status` is not `active`. Their derived registration state must be classified first (read-only), because the gate refuses state-changing requests of every account in `unverified`, `consent_pending` or `account_type_pending`. It refuses state-changing requests of accounts whose registration is unfinished. Before applying it to Production, the count of Production accounts in those states was taken (see Current decision: 69, 3 recently active); repeat it right before the apply (the helper `app.admin_user_registration_state` is created by batch 6 itself, so compute the same branch order from consents, onboarding progress and email confirmation), and decide what happens to them (the gate would stop their writes until they finish registering). On Acceptance the five `consent_pending` accounts are test accounts.
 
 ## Prerequisites before ANY Production apply
 1. Live read-only history of Production (done 2026-11-23: 210, latest `20261112090001`; repeat immediately before each batch) and a catalog fingerprint against the expected pre-state.
