@@ -37,6 +37,8 @@ const ACC_218 = "20261116090001"; // latest on Acceptance: #192/#200 (2026111509
 const ACC_232 = "20261116100014"; // latest on Acceptance after the Marketplace plan (read 2026-11-22: 232 migrations)
 const ACC_235 = "20261121090003"; // latest on Acceptance after the media-notify plan (read 2026-11-22: 235 migrations)
 const RG_PENDING = ["20261122090001", "20261122090002"];
+const PROD_210 = "20261112090001"; // latest on PRODUCTION (read-only, 2026-11-23: 210 migrations)
+const PB1_PENDING = ["20261114090001", "20261115090001"];
 const MN_PENDING = ["20261121090001", "20261121090002", "20261121090003"];
 const MKT_PENDING = Array.from({ length: 14 }, (_, i) => `202611161000${String(i + 1).padStart(2, "0")}`);
 /** changed = function names (schema.name, every overload) the plan is allowed to touch; nothing else may change in the catalog. */
@@ -213,6 +215,12 @@ export const PLANS = {
   // copy: exactly these 5 function differences, nothing else). Recovery: the pinned forward-fix, proven to restore the exact live definitions of the 3 functions.
   "registration-gate": { fixes: ["registration-gate"], recovery: "forward-fix", applied: 235, latest: ACC_235, pending: RG_PENDING, preContract: ACC_235, postContract: "20261122090002",
     changed: ["app.api_pre_request", "app.admin_user_status_tab", "public.admin_users_directory", "app.admin_user_registration_state", "app.registration_gate_allows"] },
+  // prod-batch1 (PRODUCTION, target "production"): batch 1 of docs/operations/PRODUCTION_CATCHUP_PLAN_20261123.md. 210 -> 212. Replaces 3 functions and adds 3 functions
+  // and 1 trigger (no table, row, policy or grant change). freshBackup: any Production step needs a restore-verified PRODUCTION snapshot (none is pinned yet, so this
+  // plan is refused until the owner takes one). Run only through production-preflight.sh / production-apply.sh; the Acceptance scripts refuse it.
+  "prod-batch1": { target: "production", fixes: ["prod-batch1"], recovery: "forward-fix", freshBackup: true, applied: 210, latest: PROD_210, pending: PB1_PENDING, preContract: PROD_210, postContract: "20261115090001",
+    changed: ["public.apply_account_upgrade", "public.apply_organization_verification", "public.review_approve", "app.assert_assigned_reviewer",
+      "public.craftsman_profile_verification_submit", "app.craftsman_review_guard", "public.verifications.craftsman_review_complete"] },
   "media+m1": { fixes: ["media", "m1"], recovery: "forward-fix", applied: 207, latest: BASE, pending: [MEDIA, M1], preContract: BASE, postContract: M1,
     changed: ["app.media_storage_key_assign", "public.media_migration_target_key", "public.media_migration_switch", "public.media_migration_rollback",
       "public.my_registration_state", "app.profile_completion", "public.admin_users_directory"] },
@@ -242,6 +250,8 @@ export const RESTORE_VERIFIED_SNAPSHOTS = {
   // 2026-11-22: taken and restore-tested (CLI 3.2.0) with Acceptance at 232 migrations (latest 20261116100014); the fresh snapshot the media-notify plan needs.
   "aladdin-acceptance-20261122T100424Z": { backupRun: "45010533680", restoreRun: "45019578075", tables: 202, rows: 3815, migrations: 232 },
 };
+/** Restore-verified PRODUCTION snapshots (label must start with aladdin-production-). EMPTY: none has been taken, so every Production plan is refused until one is pinned here after its restore test PASSED. */
+export const PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS = {};
 export const FORWARD_FIX = {
   // marketplace: refuses (RAISE) while any seller/product/order/import/stock row or marketplace media object exists; never deletes user data.
   // It is the only recovery of the "marketplace" plan. It restores exactly the media functions and constraint the 14 Marketplace migrations
@@ -254,6 +264,9 @@ export const FORWARD_FIX = {
   // registration-gate: function-only. Restores app.api_pre_request, app.admin_user_status_tab and public.admin_users_directory to their exact pre-plan definitions (md5 of
   // pg_get_functiondef and of the comment equal the live Acceptance values read before the plan) and drops the two added functions. Touches no data.
   "registration-gate": { file: "forward-fix/registration-gate-restore-previous.sql", sha256: "39f99de6d09a5a7d1b5e0250091ec2eadaa37c56c55b3e382857fe43daf22d18" },
+  // prod-batch1: restores the exact PRODUCTION definitions of public.apply_account_upgrade / apply_organization_verification / review_approve (md5 read live on Production
+  // 2026-11-23) and drops what the batch added (trigger craftsman_review_complete and 3 functions). Proven on a scratch database: md5 of definition, comment and ACL equal Production's.
+  "prod-batch1": { file: "forward-fix/prod-batch1-restore-previous.sql", sha256: "d41f791e9547f4a15468ee2a26e652070a8660c82deae8b24f4b0af96b90990d" },
   verification: { file: "forward-fix/verification-restore-previous.sql", sha256: "a50cd460c243b3580927c1f8b8e84ec1cc1109048c9b08b055a06b470570fcac" },
   m1: { file: "forward-fix/m1-restore-previous.sql", sha256: "5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045" },
   m3a: { file: "forward-fix/m3a-restore-previous.sql", sha256: "d4161977e7664e3345d000ee87503fd3a5983935c81257dd082c0a5ef0b43ec3" },
@@ -262,15 +275,17 @@ export const FORWARD_FIX = {
 /** forwardFixSha256: { <fix name>: <sha256 of the file in this checkout, or undefined> } for every fix the plan needs. */
 export function checkRecovery({ plan: name, label, forwardFixSha256 = {} }) {
   const P = plan(name), p = [];
+  const prod = P.target === "production";
+  const REG = prod ? PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS : RESTORE_VERIFIED_SNAPSHOTS;
   // A plan that creates tables is not recoverable by function-only forward-fixes alone (they never restore rows), so it needs a pinned,
   // restore-verified snapshot taken AFTER Acceptance reached the plan's starting history (its migrations count must be >= plan.applied).
   if (P.freshBackup) {
-    const snap = label ? RESTORE_VERIFIED_SNAPSHOTS[label] : undefined;
+    const snap = label ? REG[label] : undefined;
     if (!label) p.push(`plan ${name} needs --backup-label of a fresh restore-verified snapshot (migrations >= ${P.applied})`);
     else if (snap && snap.migrations < P.applied) p.push(`snapshot ${label} has ${snap.migrations} migrations; plan ${name} needs one taken at ${P.applied} or later`);
   }
-  if (label && !Object.prototype.hasOwnProperty.call(RESTORE_VERIFIED_SNAPSHOTS, label)) {
-    p.push(`backup label ${label} is not a pinned restore-verified snapshot (${Object.keys(RESTORE_VERIFIED_SNAPSHOTS).join(", ")}); add it to RESTORE_VERIFIED_SNAPSHOTS only after its restore test reports RESULT: PASS`);
+  if (label && !Object.prototype.hasOwnProperty.call(REG, label)) {
+    p.push(`backup label ${label} is not a pinned restore-verified ${prod ? "PRODUCTION " : ""}snapshot (${Object.keys(REG).join(", ") || "none pinned"}); add it to RESTORE_VERIFIED_SNAPSHOTS only after its restore test reports RESULT: PASS`);
   }
   for (const fx of P.fixes) {
     const F = FORWARD_FIX[fx];
@@ -287,8 +302,9 @@ export const plan = (name) => {
 };
 const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 
-export function checkAcceptance({ plan: name, list, dry, localVersions }) {
+export function checkAcceptance({ plan: name, list, dry, localVersions, target = "acceptance" }) {
   const P = plan(name), p = [];
+  if ((P.target ?? "acceptance") !== target) p.push(`plan ${name} targets ${P.target ?? "acceptance"}, but this gate was run for ${target}`);
   const rows = list?.migrations ?? [];
   const remote = rows.filter((r) => r.remote).map((r) => String(r.remote)).sort();
   const pending = rows.filter((r) => r.local && !r.remote).map((r) => String(r.local)).sort();
@@ -308,8 +324,9 @@ export function checkAcceptance({ plan: name, list, dry, localVersions }) {
 }
 
 /** After the real push: applied + pending.length applied, latest = last pending, none pending, no remote-only. */
-export function checkAcceptancePost({ plan: name, list }) {
+export function checkAcceptancePost({ plan: name, list, target = "acceptance" }) {
   const P = plan(name), p = [];
+  if ((P.target ?? "acceptance") !== target) p.push(`plan ${name} targets ${P.target ?? "acceptance"}, but this gate was run for ${target}`);
   const rows = list?.migrations ?? [];
   const remote = rows.filter((r) => r.remote).map((r) => String(r.remote)).sort();
   const want = P.applied + P.pending.length;
@@ -325,6 +342,7 @@ export function checkAcceptancePost({ plan: name, list }) {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   const j = (f) => JSON.parse(readFileSync(f, "utf8").replace(/^[^{]*/, ""));
+  const target = process.env.GATE_TARGET === "production" ? "production" : "acceptance"; // set only by production-preflight.sh / production-apply.sh
   try {
     const [a, b, c, d] = process.argv.slice(2);
     if (a === "describe") {
@@ -342,19 +360,20 @@ PENDING_VERSIONS="${P.pending.join(" ")}"\nEXPECT_CHANGED='${P.changed.join(";")
         try { shas[fx] = createHash("sha256").update(readFileSync(resolve(d, F.file))).digest("hex"); } catch { shas[fx] = undefined; }
       }
       const problems = checkRecovery({ plan: b, label: c === "none" ? "" : c, forwardFixSha256: shas });
+      if ((plan(b).target ?? "acceptance") !== target) problems.unshift(`plan ${b} targets ${plan(b).target ?? "acceptance"}, but this gate was run for ${target}`);
       if (problems.length) { console.error("Acceptance recovery gate: REFUSED\n" + problems.map((x) => `  - ${x}`).join("\n")); process.exit(1); }
       const snap = c !== "none" ? RESTORE_VERIFIED_SNAPSHOTS[c] : null;
       console.log(`Acceptance recovery gate: ok (plan ${b}: forward-fix ${plan(b).fixes.map((x) => `${x} sha256 ${FORWARD_FIX[x].sha256.slice(0, 12)}`).join(", ")} verified${snap ? `; snapshot ${c} is a HISTORICAL reference (restore PASS run ${snap.restoreRun}, ${snap.migrations} migrations), not a current recovery point` : ""})`);
       process.exit(0);
     }
     if (a === "post") {
-      const problems = checkAcceptancePost({ plan: b, list: j(c) });
+      const problems = checkAcceptancePost({ plan: b, list: j(c), target });
       if (problems.length) { console.error("Acceptance post-push gate: FAILED\n" + problems.map((x) => `  - ${x}`).join("\n")); process.exit(1); }
       const P = plan(b);
       console.log(`Acceptance post-push gate: ok (${P.applied + P.pending.length} applied, latest ${P.pending.at(-1)}, none pending)`);
       process.exit(0);
     }
-    const problems = checkAcceptance({ plan: a, list: j(b), dry: j(c), localVersions: readdirSync(d).filter((f) => f.endsWith(".sql")).map((f) => f.slice(0, 14)) });
+    const problems = checkAcceptance({ plan: a, list: j(b), dry: j(c), localVersions: readdirSync(d).filter((f) => f.endsWith(".sql")).map((f) => f.slice(0, 14)), target });
     if (problems.length) { console.error("Acceptance gate: REFUSED\n" + problems.map((x) => `  - ${x}`).join("\n")); process.exit(1); }
     const P = plan(a);
     console.log(`Acceptance gate: ok (plan ${a}: ${P.applied} applied, latest ${P.latest}, exactly [${P.pending.join(", ")}] pending, plain push, no drift)`);

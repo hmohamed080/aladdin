@@ -19,26 +19,26 @@ const has = (p, re) => assert.ok(p.some((x) => re.test(x)), JSON.stringify(p));
 
 for (const name of Object.keys(PLANS)) {
   const P = PLANS[name], local = [...P.pending];
-  test(`${name}: the expected state passes`, () => assert.deepEqual(checkAcceptance({ plan: name, list: list(name), dry: dry(P.pending), localVersions: local }), []));
-  test(`${name}: an extra pending file is refused`, () => has(checkAcceptance({ plan: name, list: list(name, [{ local: "20261201090001", remote: null }]), dry: dry([...P.pending, "20261201090001"]), localVersions: local }), /pending is/));
-  test(`${name}: remote-only drift is refused`, () => has(checkAcceptance({ plan: name, list: list(name, [{ local: null, remote: "20261201000000" }]), dry: dry(P.pending), localVersions: local }), /drift/));
+  test(`${name}: the expected state passes`, () => assert.deepEqual(checkAcceptance({ target: PLANS[name].target, plan: name, list: list(name), dry: dry(P.pending), localVersions: local }), []));
+  test(`${name}: an extra pending file is refused`, () => has(checkAcceptance({ target: PLANS[name].target, plan: name, list: list(name, [{ local: "20261201090001", remote: null }]), dry: dry([...P.pending, "20261201090001"]), localVersions: local }), /pending is/));
+  test(`${name}: remote-only drift is refused`, () => has(checkAcceptance({ target: PLANS[name].target, plan: name, list: list(name, [{ local: null, remote: "20261201000000" }]), dry: dry(P.pending), localVersions: local }), /drift/));
   test(`${name}: an out-of-order pending migration (needs --include-all) is refused`, () => {
     const l = list(name); l.migrations.push({ local: "20250101000000", remote: null });
-    has(checkAcceptance({ plan: name, list: l, dry: dry(P.pending), localVersions: local }), /out-of-order|pending is/);
+    has(checkAcceptance({ target: PLANS[name].target, plan: name, list: l, dry: dry(P.pending), localVersions: local }), /out-of-order|pending is/);
   });
   test(`${name}: a wrong dry run or non-dry run is refused`, () => {
-    has(checkAcceptance({ plan: name, list: list(name), dry: dry([...P.pending, "20261201090001"]), localVersions: local }), /dry run would push/);
-    has(checkAcceptance({ plan: name, list: list(name), dry: { ...dry(P.pending), dryRun: false }, localVersions: local }), /dryRun:true/);
+    has(checkAcceptance({ target: PLANS[name].target, plan: name, list: list(name), dry: dry([...P.pending, "20261201090001"]), localVersions: local }), /dry run would push/);
+    has(checkAcceptance({ target: PLANS[name].target, plan: name, list: list(name), dry: { ...dry(P.pending), dryRun: false }, localVersions: local }), /dryRun:true/);
   });
-  test(`${name}: a missing migration file in the checkout is refused`, () => has(checkAcceptance({ plan: name, list: list(name), dry: dry(P.pending), localVersions: [] }), /not in this checkout/));
+  test(`${name}: a missing migration file in the checkout is refused`, () => has(checkAcceptance({ target: PLANS[name].target, plan: name, list: list(name), dry: dry(P.pending), localVersions: [] }), /not in this checkout/));
   const after = () => ({ migrations: [...appliedFor(P), ...P.pending.map((v) => ({ local: v, remote: v }))] });
-  test(`${name}: post-push passes when everything is applied`, () => assert.deepEqual(checkAcceptancePost({ plan: name, list: after() }), []));
-  test(`${name}: post-push refuses the pre-push state`, () => has(checkAcceptancePost({ plan: name, list: list(name) }), /applied after the push|still pending/));
+  test(`${name}: post-push passes when everything is applied`, () => assert.deepEqual(checkAcceptancePost({ target: PLANS[name].target, plan: name, list: after() }), []));
+  test(`${name}: post-push refuses the pre-push state`, () => has(checkAcceptancePost({ target: PLANS[name].target, plan: name, list: list(name) }), /applied after the push|still pending/));
 }
 
 test("the old 203-migration / 090003..090006 baseline is refused by every plan", () => {
   const old = { migrations: [...hist(202), { local: "20261107090002", remote: "20261107090002" }, ...["20261107090003", "20261107090004", "20261107090005", "20261107090006"].map((v) => ({ local: v, remote: null }))] };
-  for (const name of Object.keys(PLANS)) has(checkAcceptance({ plan: name, list: old, dry: dry(PLANS[name].pending), localVersions: PLANS[name].pending }), /applied migrations|latest applied|pending is/);
+  for (const name of Object.keys(PLANS)) has(checkAcceptance({ target: PLANS[name].target, plan: name, list: old, dry: dry(PLANS[name].pending), localVersions: PLANS[name].pending }), /applied migrations|latest applied|pending is/);
 });
 test("the media plan refuses a history where media is already applied", () => {
   has(checkAcceptance({ plan: "media", list: list("m1"), dry: dry(["20261110090002"]), localVersions: ["20261110090001"] }), /applied migrations|latest applied|pending is/);
@@ -312,4 +312,63 @@ test("registration-gate forward-fix: one transaction, function-only, replaces th
   const hook = code.slice(at("create or replace function app.api_pre_request()"), at("comment on function app.api_pre_request()"));
   assert.ok(!/registration_gate_allows|admin_user_registration_state/.test(hook));
   assert.ok(!/registration_gate_allows|admin_user_registration_state/.test(code.slice(at("CREATE OR REPLACE FUNCTION public.admin_users_directory("), at("DROP FUNCTION IF EXISTS app.registration_gate_allows"))));
+});
+
+// plan "prod-batch1": PRODUCTION, 20261114090001 + 20261115090001 on top of Production at 210 / 20261112090001 (read-only 2026-11-23).
+test("prod-batch1: targets production, 210 -> 212, 2 pending, newer than the latest applied", () => {
+  const P = PLANS["prod-batch1"];
+  assert.equal(P.target, "production");
+  assert.equal(P.applied, 210); assert.equal(P.latest, "20261112090001");
+  assert.deepEqual(P.pending, ["20261114090001", "20261115090001"]);
+  assert.ok(P.pending.every((v) => v > P.latest));
+  const files = readdirSync(here("../../supabase/migrations")).map((f) => f.slice(0, 14));
+  assert.deepEqual(files.filter((v) => v > P.latest && v <= P.postContract), P.pending);
+});
+test("prod-batch1: both permission contracts exist in this checkout", () => {
+  for (const v of [PLANS["prod-batch1"].preContract, PLANS["prod-batch1"].postContract]) assert.ok(readFileSync(here(`../../supabase/permissions/${v}.json`)).length > 0, v);
+});
+test("prod-batch1: expected-change list = 3 replaced functions, 3 added functions and 1 added trigger", () => {
+  assert.deepEqual([...PLANS["prod-batch1"].changed].sort(), [
+    "app.assert_assigned_reviewer", "app.craftsman_review_guard", "public.apply_account_upgrade", "public.apply_organization_verification",
+    "public.craftsman_profile_verification_submit", "public.review_approve", "public.verifications.craftsman_review_complete"]);
+});
+test("prod-batch1: the Acceptance gate refuses it and the Production gate refuses every Acceptance plan", () => {
+  const P = PLANS["prod-batch1"];
+  has(checkAcceptance({ plan: "prod-batch1", list: list("prod-batch1"), dry: dry(P.pending), localVersions: [...P.pending] }), /targets production, but this gate was run for acceptance/);
+  has(checkAcceptancePost({ plan: "prod-batch1", list: { migrations: [...appliedFor(P), ...P.pending.map((v) => ({ local: v, remote: v }))] } }), /targets production/);
+  for (const name of Object.keys(PLANS).filter((n) => n !== "prod-batch1")) {
+    const A = PLANS[name];
+    has(checkAcceptance({ target: "production", plan: name, list: list(name), dry: dry(A.pending), localVersions: [...A.pending] }), /targets acceptance, but this gate was run for production/);
+  }
+});
+test("prod-batch1: any Production step needs a restore-verified PRODUCTION snapshot; none is pinned, and an Acceptance snapshot never counts", () => {
+  assert.equal(PLANS["prod-batch1"].freshBackup, true);
+  const sha = { "prod-batch1": createHash("sha256").update(readFileSync(here(`./${FORWARD_FIX["prod-batch1"].file}`))).digest("hex") };
+  has(checkRecovery({ plan: "prod-batch1", label: "", forwardFixSha256: sha }), /needs --backup-label/);
+  has(checkRecovery({ plan: "prod-batch1", label: Object.keys(RESTORE_VERIFIED_SNAPSHOTS).at(-1), forwardFixSha256: sha }), /not a pinned restore-verified PRODUCTION snapshot/);
+  has(checkRecovery({ plan: "prod-batch1", label: "aladdin-production-20261123T000000Z", forwardFixSha256: sha }), /not a pinned restore-verified PRODUCTION snapshot/);
+});
+test("prod-batch1: the forward-fix restores the 3 old functions before dropping the guard, is idempotent (IF EXISTS) and one transaction", () => {
+  const sql = readFileSync(here(`./${FORWARD_FIX["prod-batch1"].file}`), "utf8").toLowerCase();
+  const at = (s) => { const i = sql.indexOf(s); assert.ok(i >= 0, s); return i; };
+  const lastRestore = Math.max(at("function public.apply_account_upgrade("), at("function public.apply_organization_verification("), at("function public.review_approve("));
+  assert.ok(lastRestore < at("drop function if exists app.assert_assigned_reviewer("), "restore before drop");
+  assert.ok(at("drop trigger if exists craftsman_review_complete") < at("drop function if exists app.craftsman_review_guard()"));
+  assert.ok(!/drop function (?!if exists)/i.test(sql), "every drop is IF EXISTS");
+  assert.ok(sql.includes("begin;") && sql.trimEnd().endsWith("commit;"));
+  assert.ok(!/\b(delete|truncate|insert into|update public)\b/i.test(sql.replace(/--.*$/gm, "").replace(/\$function\$[\s\S]*?\$function\$/g, "")), "no data change outside function bodies");
+});
+test("production scripts: Production only, plan prod-batch1 only, hidden password, typed confirmation, backup label mandatory, never include-all", () => {
+  for (const f of ["production-apply.sh", "production-preflight.sh"]) {
+    const sh = readFileSync(here(`./${f}`), "utf8");
+    assert.ok(sh.includes("export GATE_TARGET=production"), f);
+    assert.ok(sh.includes('sb link --project-ref "$PROD"') && !sh.includes('sb link --project-ref "$ACC"'), f);
+    assert.ok(sh.includes('REFUSED: linked to Acceptance'), f);
+    assert.ok(sh.includes("read -r -s -p"), f);
+    assert.ok(!/(sb|supabase)[^\n"]*--include-all|migration repair|db reset/.test(sh.replace(/^#.*$/gm, "")), f);
+  }
+  const apply = readFileSync(here("./production-apply.sh"), "utf8");
+  assert.ok(apply.includes("APPLY $PLAN TO PRODUCTION") && apply.includes("aladdin-production-"));
+  assert.ok(apply.includes('[ -e .git ]'), "works from a git worktree too");
+  for (const f of ["acceptance-apply.sh", "acceptance-preflight.sh"]) assert.ok(!readFileSync(here(`./${f}`), "utf8").includes("prod-batch1"), `${f} must not accept the Production plan`);
 });
