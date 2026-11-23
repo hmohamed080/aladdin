@@ -1,6 +1,6 @@
 {
  "version": "20261123150001",
- "source": "Exact function permission contract after 20261123150001_marketplace_public_catalog_v2.sql (Marketplace PR 9). Built as main's latest contract (20261123120001: #238 and #240 merged) plus the delta of #241 (publication gate) plus this migration's own functions (four internal helpers with no client grant; public reads marketplace_public_status, _browse, _delivery and _seller; marketplace_public_catalog_page, _facets and _product keep their signatures and grants). Not generated from a fresh local database. Re-derive if #240/#241 change before they land.",
+ "source": "Exact function permission contract after 20261123150001_marketplace_public_catalog_v2.sql (Marketplace PR 9). Built as the contract 20261123130001 (origin/feat/mkt-publication-gate-20261123) plus this migration's own functions only: four internal helpers with no client grant (marketplace_public_stock_left, marketplace_product_ships_free, marketplace_delivery_terms, marketplace_free_shipping) and the public reads marketplace_public_status, _browse, _delivery and _seller; marketplace_public_catalog_page, _facets and _product keep their signatures and grants. Not generated from a fresh local database.",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.marketplace_public_browse(text,text,text,text,integer,integer,numeric,numeric,jsonb,boolean,integer,text,text,text)",
