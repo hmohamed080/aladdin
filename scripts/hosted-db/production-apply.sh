@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # APPLIES the pending migrations of ONE named plan to PRODUCTION (kkpkgjrweysgvhvkhzun) ONLY, with every gate before and after.
-# Plan: prod-batch1 = 20261114090001, 20261115090001 (verification apply reviewer gate, craftsman profile verification submit), 210 -> 212.
+# Plan: prod-catchup = ALL 27 pending migrations 20261114090001 .. 20261122090002 (plus PC_LATER in acceptance-gate.mjs), 210 -> 237, in ONE plain push (a push always sends every unapplied local migration).
 # See docs/operations/PRODUCTION_CATCHUP_PLAN_20261123.md and acceptance-gate.mjs (the plan is marked target "production").
 # NOT to be run without the owner's separate explicit GO for Production. Acceptance is refused. Never uses --include-all, repair or reset.
-#   bash scripts/hosted-db/production-apply.sh --plan prod-batch1 --sha <full 40-char origin/main sha> --backup-label <aladdin-production-YYYYMMDDTHHMMSSZ>
+#   bash scripts/hosted-db/production-apply.sh --plan prod-catchup --sha <full 40-char origin/main sha> --backup-label <aladdin-production-YYYYMMDDTHHMMSSZ>
 # Any Production step needs a restore-verified PRODUCTION snapshot taken at 210 migrations or later, pinned in
 # PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS (acceptance-gate.mjs) after its restore test passed. None is pinned yet, so this script REFUSES to reach the
-# password prompt today. Recovery of the batch is the pinned forward-fix (forward-fix/prod-batch1-restore-previous.sql, sha256-checked).
+# password prompt today. Recovery = three pinned forward-fixes, run in this order: media-notify-remove.sql, marketplace-remove.sql, prod-catchup-restore-previous.sql (sha256-checked; they restore functions, constraints and
+# tables only: rows written after the push are recoverable ONLY from the backup).
 # Order: checkout gates -> recovery gate -> password (hidden) -> link -> PRE checks (history, dry run, permissions vs the pre contract, table counts,
 #        structure, catalog fingerprint) -> typed confirmation -> `supabase db push --linked` -> POST checks (history, permissions vs the post contract,
 #        counts, structure, catalog diff: exactly the plan's objects changed). PASS only when every check succeeded.
@@ -19,8 +20,8 @@ ACC="nxossqhdfltcqdwvbewi"; PROD="kkpkgjrweysgvhvkhzun"
 export GATE_TARGET=production
 PLAN=""; SHA=""; LABEL=""
 while [ $# -gt 0 ]; do case "$1" in --plan) PLAN="${2:-}"; shift 2;; --sha) SHA="${2:-}"; shift 2;; --backup-label) LABEL="${2:-}"; shift 2;; *) echo "unknown argument $1"; exit 2;; esac; done
-[[ "$PLAN" =~ ^(prod-batch1)$ ]] || { echo "usage: --plan prod-batch1 --sha <40-char sha> --backup-label <aladdin-production-YYYYMMDDTHHMMSSZ>"; exit 2; }
-[[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: --plan prod-batch1 --sha <40-char sha> --backup-label <label>"; exit 2; }
+[[ "$PLAN" =~ ^(prod-catchup)$ ]] || { echo "usage: --plan prod-catchup --sha <40-char sha> --backup-label <aladdin-production-YYYYMMDDTHHMMSSZ>"; exit 2; }
+[[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: --plan prod-catchup --sha <40-char sha> --backup-label <label>"; exit 2; }
 [[ "$LABEL" =~ ^aladdin-production-[0-9]{8}T[0-9]{6}Z$ ]] || { echo "--backup-label (required) must look like aladdin-production-YYYYMMDDTHHMMSSZ"; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # Plan facts come from acceptance-gate.mjs (single source): PRE_CONTRACT POST_CONTRACT N_PENDING POST_APPLIED LATEST EXPECT_CHANGED PENDING_VERSIONS
@@ -48,6 +49,7 @@ git fetch -q origin main
 for f in $PENDING_VERSIONS; do ls supabase/migrations/${f}_*.sql >/dev/null; done
 [ -f "supabase/permissions/${POST_CONTRACT}.json" ] || { echo "REFUSED: permission contract ${POST_CONTRACT} is not in this checkout"; exit 1; }
 echo "checkout OK: exact $SHA = origin/main, clean tree; plan $PLAN ($PENDING_VERSIONS)"
+node "$HERE/acceptance-gate.mjs" drift "$PLAN" supabase/migrations   # every migration on this checkout newer than 210 must be in the plan (PC_LATER), else REFUSED
 STEP="recovery gate"
 node "$HERE/acceptance-gate.mjs" recovery "$PLAN" "${LABEL:-none}" "$HERE"
 OUT="$(mktemp -d)"

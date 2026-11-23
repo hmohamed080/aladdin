@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkAcceptance, checkAcceptancePost, checkRecovery, FORWARD_FIX, RESTORE_VERIFIED_SNAPSHOTS, PLANS, plan } from "./acceptance-gate.mjs";
+import { checkAcceptance, checkAcceptancePost, checkRecovery, pendingDrift, FORWARD_FIX, RESTORE_VERIFIED_SNAPSHOTS, PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS, PC_LATER, PC_LATER_CHANGED, PLANS, plan } from "./acceptance-gate.mjs";
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -314,61 +314,152 @@ test("registration-gate forward-fix: one transaction, function-only, replaces th
   assert.ok(!/registration_gate_allows|admin_user_registration_state/.test(code.slice(at("CREATE OR REPLACE FUNCTION public.admin_users_directory("), at("DROP FUNCTION IF EXISTS app.registration_gate_allows"))));
 });
 
-// plan "prod-batch1": PRODUCTION, 20261114090001 + 20261115090001 on top of Production at 210 / 20261112090001 (read-only 2026-11-23).
-test("prod-batch1: targets production, 210 -> 212, 2 pending, newer than the latest applied", () => {
-  const P = PLANS["prod-batch1"];
+
+// plan "prod-catchup": PRODUCTION, the single plan 210 -> 237 (27 migrations 20261114090001 .. 20261122090002) on top of Production at 210 / 20261112090001 (read live 2026-11-23).
+const PC = () => PLANS["prod-catchup"];
+const PC_FIRST_27 = ["20261114090001", "20261115090001", "20261115090002", "20261115090003", "20261115090004", "20261115090005", "20261115090006", "20261116090001",
+  ...Array.from({ length: 14 }, (_, i) => `202611161000${String(i + 1).padStart(2, "0")}`), "20261121090001", "20261121090002", "20261121090003", "20261122090001", "20261122090002"];
+test("prod-catchup: targets production, 210 -> 237, exactly the 27 pending versions in order, all newer than the latest applied", () => {
+  const P = PC();
   assert.equal(P.target, "production");
-  assert.equal(P.applied, 210); assert.equal(P.latest, "20261112090001");
-  assert.deepEqual(P.pending, ["20261114090001", "20261115090001"]);
-  assert.ok(P.pending.every((v) => v > P.latest));
+  assert.equal(P.applied, 210); assert.equal(P.latest, "20261112090001"); assert.equal(P.preContract, "20261112090001");
+  assert.deepEqual(P.pending.slice(0, 27), PC_FIRST_27);
+  assert.deepEqual(P.pending, [...PC_FIRST_27, ...PC_LATER]);
+  assert.equal(P.postContract, P.pending.at(-1));
+  assert.ok(P.pending.every((v, i, a) => v > P.latest && (i === 0 || v > a[i - 1])), "ascending, plain push");
+  assert.equal(P.applied + P.pending.length, 237 + PC_LATER.length);
+  assert.throws(() => plan("prod-batch1"), /unknown plan/, "the unusable batch plan is gone");
+});
+test("prod-catchup: every migration on this checkout between the latest applied and the plan's last version is in the plan; both permission contracts exist", () => {
+  const P = PC();
   const files = readdirSync(here("../../supabase/migrations")).map((f) => f.slice(0, 14));
-  assert.deepEqual(files.filter((v) => v > P.latest && v <= P.postContract), P.pending);
+  assert.deepEqual(files.filter((v) => v > P.latest && v <= P.pending.at(-1)), P.pending);
+  for (const v of [P.preContract, P.postContract]) assert.ok(readFileSync(here(`../../supabase/permissions/${v}.json`)).length > 0, v);
 });
-test("prod-batch1: both permission contracts exist in this checkout", () => {
-  for (const v of [PLANS["prod-batch1"].preContract, PLANS["prod-batch1"].postContract]) assert.ok(readFileSync(here(`../../supabase/permissions/${v}.json`)).length > 0, v);
+test("prod-catchup: pendingDrift names every newer migration the plan does not list and every plan version missing from the checkout", () => {
+  const P = PC();
+  assert.deepEqual(pendingDrift({ plan: "prod-catchup", localVersions: [...P.pending, "20261112090001"] }), { unplanned: [], missing: [] });
+  assert.deepEqual(pendingDrift({ plan: "prod-catchup", localVersions: [...P.pending, "20261123090001", "20261124090002"] }).unplanned, ["20261123090001", "20261124090002"]);
+  assert.deepEqual(pendingDrift({ plan: "prod-catchup", localVersions: P.pending.slice(1) }).missing, [P.pending[0]]);
 });
-test("prod-batch1: expected-change list = 3 replaced functions, 3 added functions and 1 added trigger", () => {
-  assert.deepEqual([...PLANS["prod-batch1"].changed].sort(), [
-    "app.assert_assigned_reviewer", "app.craftsman_review_guard", "public.apply_account_upgrade", "public.apply_organization_verification",
-    "public.craftsman_profile_verification_submit", "public.review_approve", "public.verifications.craftsman_review_complete"]);
+test("prod-catchup: PC_LATER is how later migrations (Marketplace PR 5 / PR 6) join the plan, and it is empty or strictly newer than 20261122090002", () => {
+  assert.ok(PC_LATER.every((v) => /^\d{14}$/.test(v) && v > "20261122090002"));
+  assert.ok(Array.isArray(PC_LATER_CHANGED));
+  assert.ok(PC().changed.length >= 184);
 });
-test("prod-batch1: the Acceptance gate refuses it and the Production gate refuses every Acceptance plan", () => {
-  const P = PLANS["prod-batch1"];
-  has(checkAcceptance({ plan: "prod-batch1", list: list("prod-batch1"), dry: dry(P.pending), localVersions: [...P.pending] }), /targets production, but this gate was run for acceptance/);
-  has(checkAcceptancePost({ plan: "prod-batch1", list: { migrations: [...appliedFor(P), ...P.pending.map((v) => ({ local: v, remote: v }))] } }), /targets production/);
-  for (const name of Object.keys(PLANS).filter((n) => n !== "prod-batch1")) {
+test("prod-catchup: expected-change list was measured; it names the replaced constraints, the dropped trigger, the 5 non-table added functions and the table prefixes", () => {
+  const c = PC().changed;
+  for (const k of ["public.audit_log.ck_audit_action_known", "public.verifications.ck_verifications_reason_required", "public.notifications.ck_notifications_event_type_known",
+    "public.media_storage_locations.media_storage_locations_namespace_check", "public.verifications.showroom_review_complete", "public.media_videos.media_videos_cap_on_insert",
+    "app.registration_gate_allows", "app.admin_user_registration_state", "app.assert_assigned_reviewer", "public.craftsman_profile_verification_submit", "public.admin_initiate_verification",
+    "public.marketplace_*", "public.media_limit*", "public.notification_template*", "public.notifications.content*"]) assert.ok(c.includes(k), k);
+  assert.equal(new Set(c).size, c.length, "no duplicates");
+});
+test("prod-catchup: every function the 27 migrations create is covered by the expected-change list (derived from the SQL, not written by hand)", () => {
+  const P = PC(), dir = here("../../supabase/migrations");
+  const hit = (k) => P.changed.some((e) => (e.endsWith("*") ? k.startsWith(e.slice(0, -1)) : k === e || k.startsWith(e + "(")));
+  const miss = [], dropped = new Set(), created = [];
+  for (const f of readdirSync(dir).filter((f) => PC_FIRST_27.includes(f.slice(0, 14)))) {
+    const sql = readFileSync(`${dir}/${f}`, "utf8").replace(/--.*$/gm, "");
+    for (const m of sql.matchAll(/create\s+(?:or\s+replace\s+)?function\s+((?:public|app)\.[a-z_0-9]+)\s*\(/gi)) created.push([f, m[1].toLowerCase()]);
+    for (const m of sql.matchAll(/drop\s+function\s+(?:if\s+exists\s+)?((?:public|app)\.[a-z_0-9]+)\s*\(/gi)) dropped.add(m[1].toLowerCase());
+  }
+  // a function created and dropped again inside the sequence leaves no trace (the catalog diff is net)
+  for (const [f, n] of created) if (!dropped.has(n) && !hit(n)) miss.push(`${f}: ${n}`);
+  assert.deepEqual(miss, []);
+});
+test("prod-catchup: the Acceptance gate refuses it and the Production gate refuses every Acceptance plan", () => {
+  const P = PC();
+  has(checkAcceptance({ plan: "prod-catchup", list: list("prod-catchup"), dry: dry(P.pending), localVersions: [...P.pending] }), /targets production, but this gate was run for acceptance/);
+  has(checkAcceptancePost({ plan: "prod-catchup", list: { migrations: [...appliedFor(P), ...P.pending.map((v) => ({ local: v, remote: v }))] } }), /targets production/);
+  for (const name of Object.keys(PLANS).filter((n) => n !== "prod-catchup")) {
     const A = PLANS[name];
     has(checkAcceptance({ target: "production", plan: name, list: list(name), dry: dry(A.pending), localVersions: [...A.pending] }), /targets acceptance, but this gate was run for production/);
   }
 });
-test("prod-batch1: any Production step needs a restore-verified PRODUCTION snapshot; none is pinned, and an Acceptance snapshot never counts", () => {
-  assert.equal(PLANS["prod-batch1"].freshBackup, true);
-  const sha = { "prod-batch1": createHash("sha256").update(readFileSync(here(`./${FORWARD_FIX["prod-batch1"].file}`))).digest("hex") };
-  has(checkRecovery({ plan: "prod-batch1", label: "", forwardFixSha256: sha }), /needs --backup-label/);
-  has(checkRecovery({ plan: "prod-batch1", label: Object.keys(RESTORE_VERIFIED_SNAPSHOTS).at(-1), forwardFixSha256: sha }), /not a pinned restore-verified PRODUCTION snapshot/);
-  has(checkRecovery({ plan: "prod-batch1", label: "aladdin-production-20261123T000000Z", forwardFixSha256: sha }), /not a pinned restore-verified PRODUCTION snapshot/);
+test("prod-catchup: a push of only part of the pending list or one with an extra migration is refused (a push always sends everything)", () => {
+  const P = PC();
+  has(checkAcceptance({ target: "production", plan: "prod-catchup", list: list("prod-catchup"), dry: dry(P.pending.slice(0, 2)), localVersions: P.pending }), /dry run would push/);
+  has(checkAcceptance({ target: "production", plan: "prod-catchup", list: list("prod-catchup", [{ local: "20261123090001", remote: null }]), dry: dry([...P.pending, "20261123090001"]), localVersions: P.pending }), /pending is|dry run would push/);
 });
-test("prod-batch1: the forward-fix restores the 3 old functions before dropping the guard, is idempotent (IF EXISTS) and one transaction", () => {
-  const sql = readFileSync(here(`./${FORWARD_FIX["prod-batch1"].file}`), "utf8").toLowerCase();
-  const at = (s) => { const i = sql.indexOf(s); assert.ok(i >= 0, s); return i; };
-  const lastRestore = Math.max(at("function public.apply_account_upgrade("), at("function public.apply_organization_verification("), at("function public.review_approve("));
-  assert.ok(lastRestore < at("drop function if exists app.assert_assigned_reviewer("), "restore before drop");
-  assert.ok(at("drop trigger if exists craftsman_review_complete") < at("drop function if exists app.craftsman_review_guard()"));
-  assert.ok(!/drop function (?!if exists)/i.test(sql), "every drop is IF EXISTS");
-  assert.ok(sql.includes("begin;") && sql.trimEnd().endsWith("commit;"));
-  assert.ok(!/\b(delete|truncate|insert into|update public)\b/i.test(sql.replace(/--.*$/gm, "").replace(/\$function\$[\s\S]*?\$function\$/g, "")), "no data change outside function bodies");
+test("prod-catchup: needs a restore-verified PRODUCTION snapshot; the registry is EMPTY (fail closed) and an Acceptance snapshot never counts", () => {
+  assert.equal(PC().freshBackup, true);
+  assert.deepEqual(PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS, {});
+  const shas = allShas();
+  has(checkRecovery({ plan: "prod-catchup", label: "", forwardFixSha256: shas }), /needs --backup-label/);
+  has(checkRecovery({ plan: "prod-catchup", label: Object.keys(RESTORE_VERIFIED_SNAPSHOTS).at(-1), forwardFixSha256: shas }), /not a pinned restore-verified PRODUCTION snapshot/);
+  has(checkRecovery({ plan: "prod-catchup", label: "aladdin-production-20261123T000000Z", forwardFixSha256: shas }), /not a pinned restore-verified PRODUCTION snapshot/);
 });
-test("production scripts: Production only, plan prod-batch1 only, hidden password, typed confirmation, backup label mandatory, never include-all", () => {
+test("prod-catchup: recovery is three pinned forward-fixes in undo order (media-notify, marketplace, prod-catchup); a missing or altered one is refused", () => {
+  assert.deepEqual(PC().fixes, ["media-notify", "marketplace", "prod-catchup"]);
+  for (const fx of PC().fixes) assert.ok(FORWARD_FIX[fx]?.sha256, fx);
+  const shas = allShas();
+  has(checkRecovery({ plan: "prod-catchup", label: "aladdin-production-x", forwardFixSha256: { ...shas, "prod-catchup": "0".repeat(64) } }), /forward-fix .*prod-catchup-restore-previous.sql/);
+  has(checkRecovery({ plan: "prod-catchup", label: "aladdin-production-x", forwardFixSha256: { ...shas, marketplace: undefined } }), /marketplace-remove.sql/);
+});
+// md5 of pg_get_functiondef read LIVE on Production (kkpkgjrweysgvhvkhzun) on 2026-11-23, read-only SELECT. The forward-fix text, with the trailing newline pg_get_functiondef emits, must hash to these.
+const PRODUCTION_DEF_MD5 = {
+  "app.showroom_review_guard": "26cc7fa6f659689a06c2afd39055e9c3", "app.showroom_activation_guard": "b2a81ce4db1a2166986043c30e1f9b91",
+  "app.admin_user_status_tab": "a4015c3cf935c40dd867bda43b203636", "app.bv_decide": "e2ebf60f07446b71be626f13e99e4fc7", "app.api_pre_request": "b6d0688d65ac8c8c950bd220eb7dfb3a",
+  "public.admin_organization_detail": "2fed3ec9bbd63cb10afc39cf0d3f02b5", "public.admin_organizations_list": "61d36eed4c0e27c80abad1b046f405c8",
+  "public.admin_user_detail": "cc64ccf105d69630c9753bee678fd846", "public.admin_users_directory": "57f096f2b9ffdb246f0461ab5819b615",
+  "public.apply_account_upgrade": "7ac34c470b0bba6b6815df8347bc3dad", "public.apply_organization_verification": "2b5b185a2f447654ce1f501cffacd48a",
+  "public.business_verification_request_info": "2efcbb735500279f70d98872c4e67804", "public.review_approve": "a8929887cca8956dec0d2ee986ba0e68", "public.review_reject": "b2adb8e881cd59eac75d7f5ea81dcbc5"
+};
+test("prod-catchup forward-fix: the 14 restored function definitions hash to the md5 read live on Production (exact restore, not an approximation)", () => {
+  const sql = readFileSync(here(`./${FORWARD_FIX["prod-catchup"].file}`), "utf8");
+  const got = {};
+  for (const m of sql.matchAll(/CREATE OR REPLACE FUNCTION ([a-z_.]+)\([\s\S]*?\$function\$;/g)) got[m[1]] = createHash("md5").update(m[0].slice(0, -1) + "\n").digest("hex");
+  assert.deepEqual(got, PRODUCTION_DEF_MD5);
+});
+test("prod-catchup forward-fix: one transaction, restores before it drops, every drop IF EXISTS, constraints NOT VALID first, owner-only ACL on the guard, no data deleted", () => {
+  const sql = readFileSync(here(`./${FORWARD_FIX["prod-catchup"].file}`), "utf8");
+  const code = sql.split("\n").filter((l) => !l.startsWith("--")).join("\n");
+  const low = code.toLowerCase();
+  const at = (s) => { const i = low.indexOf(s.toLowerCase()); assert.ok(i >= 0, s); return i; };
+  assert.equal((code.match(/^begin;$/gm) ?? []).length, 1); assert.ok(code.trimEnd().endsWith("commit;"));
+  const lastRestore = Math.max(...Object.keys(PRODUCTION_DEF_MD5).map((n) => low.lastIndexOf(`create or replace function ${n}(`)));
+  for (const d of ["drop function if exists app.craftsman_review_guard()", "drop function if exists public.craftsman_profile_verification_submit(boolean)", "drop function if exists public.admin_initiate_verification(text, uuid, text)",
+    "drop function if exists app.admin_user_registration_state(uuid)", "drop function if exists app.registration_gate_allows(text, text)", "drop function if exists app.assert_assigned_reviewer(public.verifications)"]) assert.ok(lastRestore < at(d), `restore before ${d}`);
+  assert.ok(!/drop function (?!if exists)/i.test(code), "every function drop is IF EXISTS");
+  assert.ok(at("revoke all on function app.showroom_review_guard() from public, anon, authenticated, service_role") < at("create trigger showroom_review_complete"));
+  assert.ok(/add constraint ck_verifications_reason_required[\s\S]*?not valid;/i.test(code) && /add constraint ck_audit_action_known[\s\S]*?not valid;/i.test(code));
+  assert.ok(!/\b(delete|truncate|insert into)\b/i.test(code.replace(/\$function\$[\s\S]*?\$function\$/g, "")), "no row deleted or inserted outside function bodies");
+  assert.ok(!/drop table|drop column/i.test(code), "function/constraint/trigger only");
+  // comments are restored for the 7 functions that carry one on Production
+  assert.equal((code.match(/^COMMENT ON FUNCTION /gm) ?? []).length, 7);
+});
+test("prod-catchup forward-fix: the audit_log vocabulary has the same members as Production (220, md5 of the byte-ordered list read live) and drops only verification.admin_initiated", () => {
+  const sql = readFileSync(here(`./${FORWARD_FIX["prod-catchup"].file}`), "utf8");
+  const def = sql.split("\n").find((l) => l.includes("ADD CONSTRAINT ck_audit_action_known"));
+  const members = [...def.matchAll(/'([a-z_.]*)'::text/g)].map((m) => m[1]).sort();
+  assert.equal(members.length, 220);
+  assert.equal(createHash("md5").update(members.join(",")).digest("hex"), "7a5e10f77d98c87f392db57872a12b29");
+  assert.ok(!members.includes("verification.admin_initiated"));
+});
+test("prod-catchup: the table parts reuse the marketplace and media-notify forward-fixes unchanged (pinned hashes), guard first, never delete user rows", () => {
+  assert.equal(FORWARD_FIX.marketplace.sha256, "72bdfd9b68ef88f85338321d4eb79c711e2d0be3bbf1e708a96b001dee58b734");
+  assert.equal(FORWARD_FIX["media-notify"].sha256, "807149eb92e650ae6e3ffccea420fca110ba3a6bf3eed44f9a1be8f799ace6a5");
+  for (const fx of ["marketplace", "media-notify"]) {
+    const sql = readFileSync(here(FORWARD_FIX[fx].file), "utf8");
+    assert.ok(sql.indexOf("$guard$") < sql.search(/\bDROP (TABLE|FUNCTION)\b/), `${fx}: guard before the first drop`);
+  }
+  // the three bucket limits media-notify restores are the live Production values (5 MiB, read 2026-11-23)
+  assert.ok(readFileSync(here(FORWARD_FIX["media-notify"].file), "utf8").includes("SET file_size_limit = 5242880"));
+});
+test("production scripts: Production only, plan prod-catchup only, hidden password, typed confirmation, backup label mandatory, drift refusal, never include-all", () => {
   for (const f of ["production-apply.sh", "production-preflight.sh"]) {
     const sh = readFileSync(here(`./${f}`), "utf8");
     assert.ok(sh.includes("export GATE_TARGET=production"), f);
     assert.ok(sh.includes('sb link --project-ref "$PROD"') && !sh.includes('sb link --project-ref "$ACC"'), f);
     assert.ok(sh.includes('REFUSED: linked to Acceptance'), f);
     assert.ok(sh.includes("read -r -s -p"), f);
+    assert.ok(sh.includes('acceptance-gate.mjs" drift "$PLAN"'), `${f} refuses a plan that does not match main`);
+    assert.ok(sh.includes("(prod-catchup)") && !sh.includes("prod-batch1"), f);
     assert.ok(!/(sb|supabase)[^\n"]*--include-all|migration repair|db reset/.test(sh.replace(/^#.*$/gm, "")), f);
   }
   const apply = readFileSync(here("./production-apply.sh"), "utf8");
   assert.ok(apply.includes("APPLY $PLAN TO PRODUCTION") && apply.includes("aladdin-production-"));
   assert.ok(apply.includes('[ -e .git ]'), "works from a git worktree too");
-  for (const f of ["acceptance-apply.sh", "acceptance-preflight.sh"]) assert.ok(!readFileSync(here(`./${f}`), "utf8").includes("prod-batch1"), `${f} must not accept the Production plan`);
+  for (const f of ["acceptance-apply.sh", "acceptance-preflight.sh"]) assert.ok(!/prod-(batch1|catchup)/.test(readFileSync(here(`./${f}`), "utf8")), `${f} must not accept the Production plan`);
 });
