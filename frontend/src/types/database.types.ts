@@ -11125,7 +11125,32 @@ export type Database = {
         }
         Returns: Json
       }
+      marketplace_public_browse: {
+        Args: {
+          p_area?: string
+          p_attrs?: Json
+          p_category?: string
+          p_free_shipping?: boolean
+          p_governorate?: string
+          p_limit?: number
+          p_max_days?: number
+          p_offset?: number
+          p_price_max?: number
+          p_price_min?: number
+          p_query?: string
+          p_seller?: string
+          p_sort?: string
+          p_type?: string
+        }
+        Returns: Json
+      }
+      marketplace_public_delivery: {
+        Args: { p_area?: string; p_governorate?: string; p_sku?: string; p_slug: string }
+        Returns: Json
+      }
       marketplace_public_facets: { Args: { p_type?: string }; Returns: Json }
+      marketplace_public_seller: { Args: { p_slug: string }; Returns: Json }
+      marketplace_public_status: { Args: never; Returns: Json }
       marketplace_public_image_ref: {
         Args: { p_image_id: string }
         Returns: {

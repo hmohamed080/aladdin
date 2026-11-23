@@ -2,20 +2,27 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ChevronLeftIcon, ChevronRightIcon, PackageIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
+import { DeliveryBlock } from "./delivery-block";
+import { deliveryCopy } from "./live-delivery-copy";
+import { OfficialBadge } from "./product-card";
 import { liveCartCopy } from "./live-cart-copy";
 import { useLiveCart } from "./live-cart-store";
 import { useMarketplaceImageSrc } from "./image-urls";
-import type { PublicProduct } from "./public-contract";
-import { fmtEgp, liveCopy } from "./live-copy";
+import type { BuyerPlace, DeliveryTerms, PublicProduct } from "./public-contract";
+import { fmtEgp, fmtNum, liveCopy } from "./live-copy";
 import { attributeText as valueText, labelOf as label } from "./live-format";
 import styles from "../marketplace.module.css";
+import v2 from "../marketplace-v2.module.css";
 
 /** Live product page: real gallery (approved images only), variant choice, honest non-purchasable state. */
-export function LiveProduct({ product }: { product: PublicProduct }) {
+export function LiveProduct({ product, terms = null, place = null }: { product: PublicProduct; terms?: DeliveryTerms | null; place?: BuyerPlace | null }) {
   const imageSrc = useMarketplaceImageSrc();
   const { locale, t: tr } = useI18n();
   const t = liveCopy[locale];
+  const d = deliveryCopy[locale];
+  const Sep = locale === "ar" ? ChevronLeftIcon : ChevronRightIcon;
   const c = liveCartCopy[locale];
   const cart = useLiveCart();
   const [added, setAdded] = useState<"added" | "cart_full" | null>(null);
@@ -39,56 +46,53 @@ export function LiveProduct({ product }: { product: PublicProduct }) {
   const title = label(product, locale);
   const description = (locale === "ar" ? product.description_ar : product.description_en) || product.description_ar || product.description_en;
   const typeName = locale === "ar" ? product.product_type_name_ar : product.product_type_name_en;
-  const crumbSep = locale === "ar" ? "‹" : "›";
   const categoryName = locale === "ar" ? product.category_name_ar : product.category_name_en;
 
   return (
     <div className={styles.detail}>
       <nav className={styles.crumbs} aria-label={t.back}>
         <Link href="/market">{t.back}</Link>
-        <span aria-hidden="true">{crumbSep}</span>
+        <Sep size={14} className={v2.crumbIcon} aria-hidden="true" />
         <Link href={`/market?category=${product.category_key}`}>{categoryName}</Link>
-        <span aria-hidden="true">{crumbSep}</span>
+        <Sep size={14} className={v2.crumbIcon} aria-hidden="true" />
         <Link href={`/market?category=${product.category_key}&type=${product.product_type_key}`}>{typeName}</Link>
       </nav>
 
       <div className={styles.detailGrid}>
         <div className={styles.gallery}>
-          <div className={styles.galleryMain}>
-            {current ? (
-              // eslint-disable-next-line @next/next/no-img-element -- no-store proxy
-              <img
-                src={imageSrc(current.image_id, "full")}
-                fetchPriority="high"
-                decoding="async"
-                alt={(locale === "ar" ? current.alt_text_ar : current.alt_text_en) || title}
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
-              />
-            ) : (
-              <span className="grid h-full place-items-center text-[var(--stone)]">{t.noImage}</span>
-            )}
+          <div className={v2.galleryRow}>
+            {images.length > 1 ? (
+              <ul className={v2.thumbCol} aria-label={t.back}>
+                {images.map((img, i) => (
+                  <li key={img.image_id}>
+                    <button type="button" className={i === index ? v2.thumbOn : undefined} aria-label={`${i + 1} / ${images.length}`} aria-pressed={i === index} onClick={() => setIndex(i)}>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- no-store proxy */}
+                      <img src={imageSrc(img.image_id, "thumb")} alt="" loading="lazy" decoding="async" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className={v2.mainFrame}>
+              {current ? (
+                // eslint-disable-next-line @next/next/no-img-element -- no-store proxy
+                <img src={imageSrc(current.image_id, "full")} fetchPriority="high" decoding="async" alt={(locale === "ar" ? current.alt_text_ar : current.alt_text_en) || title} />
+              ) : (
+                <span className={v2.placeholder} aria-hidden="true">
+                  <PackageIcon size={56} />
+                </span>
+              )}
+            </div>
           </div>
-          {images.length > 1 ? (
-            <ul className={styles.thumbs}>
-              {images.map((img, i) => (
-                <li key={img.image_id}>
-                  <button
-                    type="button"
-                    className={i === index ? styles.thumbActive : undefined}
-                    aria-label={`${i + 1} / ${images.length}`}
-                    aria-pressed={i === index}
-                    onClick={() => setIndex(i)}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- no-store proxy */}
-                    <img src={imageSrc(img.image_id, "thumb")} alt="" loading="lazy" decoding="async" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
         </div>
 
         <div className={styles.buy}>
+          {product.seller_slug ? (
+            <p className={v2.sellerBar}>
+              <Link href={`/market/sellers/${product.seller_slug}`} className={v2.sellerLink}>{product.seller_name}</Link>
+              {product.seller_official ? <OfficialBadge locale={locale} href={`/market/sellers/${product.seller_slug}`} /> : null}
+            </p>
+          ) : null}
           <h1 className={styles.detailTitle}>{title}</h1>
           {description ? <p className={styles.detailDesc}>{description}</p> : null}
 
@@ -126,9 +130,7 @@ export function LiveProduct({ product }: { product: PublicProduct }) {
               <p className={styles.sku}>
                 {t.sku}: <bdi dir="ltr">{variant.sku}</bdi>
               </p>
-              <p className={`${styles.stock} ${variant.purchasable ? styles.stockIn : styles.stockOut}`}>
-                {variant.purchasable ? t.inStock : t.outOfStock}
-              </p>
+              {variant.stock_left ? <p className={v2.lowStockPage}>{d.onlyLeft(fmtNum(variant.stock_left, locale))}</p> : null}
               <button
                 type="button"
                 className={styles.addToCart}
@@ -145,6 +147,8 @@ export function LiveProduct({ product }: { product: PublicProduct }) {
               ) : null}
             </div>
           ) : null}
+
+          <DeliveryBlock locale={locale} terms={terms} place={place} unitPrice={variant ? Number(variant.price_egp) : null} />
 
           {product.attributes.length || variant?.attributes.length || product.brand ? (
             <section className={styles.specs}>

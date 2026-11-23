@@ -17,8 +17,18 @@ export type PublicCard = {
   category_name_ar: string;
   category_name_en: string;
   seller_name: string;
+  /** public slug of the showroom (its storefront); null when the organization has none */
+  seller_slug?: string | null;
+  /** business-verified showroom: the blue «Official Store» badge */
+  seller_official?: boolean;
   from_price_egp: number | null;
   in_stock: boolean;
+  /** units left when 3 or fewer (a card says "Only N left"); null otherwise, the exact stock is never published */
+  stock_left?: number | null;
+  /** one unit of the product ships free (flagged product, free delivery to the chosen place, or the free-shipping threshold) */
+  free_shipping?: boolean;
+  /** the delivery estimate, counted from today; absent in answers from before Marketplace PR 9 */
+  delivery?: CardDelivery;
   variant_count: number;
   /** the SKU of the only active variant (one-click add to cart from a card); null when there are several */
   cart_sku?: string | null;
@@ -27,7 +37,50 @@ export type PublicCard = {
   colors: string[];
 };
 
-export type PublicPage = { total: number; limit: number; offset: number; items: PublicCard[] };
+export type CardDelivery = {
+  status: DeliveryStatus;
+  configured: boolean;
+  min_days: number | null;
+  max_days: number | null;
+  fee_egp: number | null;
+  pickup_available: boolean;
+};
+
+export type PublicPage = { total: number; limit: number; offset: number; items: PublicCard[]; open?: boolean };
+
+export type DeliveryStatus = "available" | "not_available" | "needs_area" | "pickup_only" | "none";
+
+/**
+ * The delivery-details block of the product page (`marketplace_public_delivery`): what the showroom offers one buyer
+ * place, or, with no place, the range over all the places it covers. Dates are Africa/Cairo calendar days (YYYY-MM-DD).
+ */
+export type DeliveryTerms = {
+  configured: boolean;
+  status: DeliveryStatus;
+  fee_egp: number | null;
+  fee_min_egp: number | null;
+  fee_max_egp: number | null;
+  prep_days: number | null;
+  min_days: number | null;
+  max_days: number | null;
+  earliest: string | null;
+  latest: string | null;
+  cutoff_time: string | null;
+  after_cutoff: boolean;
+  seconds_to_cutoff: number | null;
+  free_min_egp: number | null;
+  next_day: { fee_egp: number; arrival: string } | null;
+  pickup_available: boolean;
+  pickup_instructions: string | null;
+  free_shipping: boolean;
+  free_reason: "product" | "free_delivery" | "threshold" | null;
+  product_free: boolean;
+};
+
+export type PublicSeller = { slug: string; name: string; official: boolean; product_count: number };
+
+/** The buyer's place: governorate key and optional area key (both from the platform's place list). */
+export type BuyerPlace = { gov: string; area: string };
 
 export type FacetType = { key: string; name_ar: string; name_en: string; count: number };
 export type FacetCategory = FacetType & { types: FacetType[] };
@@ -58,6 +111,8 @@ export type PublicVariant = {
   selling_unit: string;
   price_egp: number;
   purchasable: boolean;
+  /** units left when 3 or fewer */
+  stock_left?: number | null;
   attributes: PublicAttribute[];
 };
 
@@ -75,6 +130,10 @@ export type PublicProduct = {
   category_name_ar: string;
   category_name_en: string;
   seller_name: string;
+  seller_slug?: string | null;
+  seller_official?: boolean;
+  stock_left?: number | null;
+  ships_free?: boolean;
   cover_image_id: string | null;
   attributes: PublicAttribute[];
   variants: PublicVariant[];
