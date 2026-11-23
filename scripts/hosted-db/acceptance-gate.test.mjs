@@ -304,12 +304,12 @@ test("registration-gate forward-fix: one transaction, function-only, replaces th
   assert.equal((code.match(/^commit;/gim) ?? []).length, 1);
   const at = (needle) => { const i = code.indexOf(needle); assert.ok(i > -1, needle); return i; };
   const lastReplace = Math.max(at("create or replace function app.api_pre_request()"), at("create or replace function app.admin_user_status_tab("), at("CREATE OR REPLACE FUNCTION public.admin_users_directory("));
-  assert.ok(lastReplace < at("DROP FUNCTION app.registration_gate_allows(text, text);"), "replace before drop");
-  assert.ok(lastReplace < at("DROP FUNCTION app.admin_user_registration_state(uuid);"), "replace before drop");
+  assert.ok(lastReplace < at("DROP FUNCTION IF EXISTS app.registration_gate_allows(text, text);"), "replace before drop");
+  assert.ok(lastReplace < at("DROP FUNCTION IF EXISTS app.admin_user_registration_state(uuid);"), "replace before drop");
   for (const forbidden of [/\binsert\s+into\b/i, /\bupdate\s+public\./i, /\bdelete\s+from\b/i, /\btruncate\b/i, /\bdrop\s+table\b/i, /\balter\s+table\b/i, /\bgrant\b/i, /\brevoke\b/i, /\bcascade\b/i])
     assert.ok(!forbidden.test(code), String(forbidden));
   // the restored hook no longer references the gate functions it is about to drop
   const hook = code.slice(at("create or replace function app.api_pre_request()"), at("comment on function app.api_pre_request()"));
   assert.ok(!/registration_gate_allows|admin_user_registration_state/.test(hook));
-  assert.ok(!/registration_gate_allows|admin_user_registration_state/.test(code.slice(at("CREATE OR REPLACE FUNCTION public.admin_users_directory("), at("DROP FUNCTION app.registration_gate_allows"))));
+  assert.ok(!/registration_gate_allows|admin_user_registration_state/.test(code.slice(at("CREATE OR REPLACE FUNCTION public.admin_users_directory("), at("DROP FUNCTION IF EXISTS app.registration_gate_allows"))));
 });

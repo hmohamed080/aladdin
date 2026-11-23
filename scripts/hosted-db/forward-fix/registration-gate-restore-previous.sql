@@ -242,7 +242,8 @@ begin
 end;
 $function$;
 
-DROP FUNCTION app.registration_gate_allows(text, text);
-DROP FUNCTION app.admin_user_registration_state(uuid);
+-- IF EXISTS: if only 20261122090001 was applied, the gate helper was never created and the recovery must still succeed.
+DROP FUNCTION IF EXISTS app.registration_gate_allows(text, text);
+DROP FUNCTION IF EXISTS app.admin_user_registration_state(uuid);
 
 commit;

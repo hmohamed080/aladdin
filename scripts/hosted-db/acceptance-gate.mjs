@@ -253,7 +253,7 @@ export const FORWARD_FIX = {
   "media-notify": { file: "forward-fix/media-notify-remove.sql", sha256: "807149eb92e650ae6e3ffccea420fca110ba3a6bf3eed44f9a1be8f799ace6a5" },
   // registration-gate: function-only. Restores app.api_pre_request, app.admin_user_status_tab and public.admin_users_directory to their exact pre-plan definitions (md5 of
   // pg_get_functiondef and of the comment equal the live Acceptance values read before the plan) and drops the two added functions. Touches no data.
-  "registration-gate": { file: "forward-fix/registration-gate-restore-previous.sql", sha256: "6b1a11f20b456f64f048b215c1bf510394a39e0df84786ed5569ef9eac697dd5" },
+  "registration-gate": { file: "forward-fix/registration-gate-restore-previous.sql", sha256: "39f99de6d09a5a7d1b5e0250091ec2eadaa37c56c55b3e382857fe43daf22d18" },
   verification: { file: "forward-fix/verification-restore-previous.sql", sha256: "a50cd460c243b3580927c1f8b8e84ec1cc1109048c9b08b055a06b470570fcac" },
   m1: { file: "forward-fix/m1-restore-previous.sql", sha256: "5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045" },
   m3a: { file: "forward-fix/m3a-restore-previous.sql", sha256: "d4161977e7664e3345d000ee87503fd3a5983935c81257dd082c0a5ef0b43ec3" },

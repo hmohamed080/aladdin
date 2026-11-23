@@ -65,3 +65,12 @@ test("every write probe targets a row that cannot exist or fails on its own inpu
   const writes = calls.filter((c) => !c.startsWith("GET") && !c.includes("/token") && !c.includes("my_registration_state") && !c.includes("my_account_status"));
   assert.deepEqual(writes.sort(), ["DELETE /rest/v1/user_availability_windows", "PATCH /rest/v1/profiles", "POST /rest/v1/organizations", "POST /rest/v1/rpc/graphql", "POST /rest/v1/rpc/job_save"]);
 });
+
+test("with CAPTCHA protection ON the smoke runs from existing access tokens and never calls the password grant", async () => {
+  const { impl, calls } = fake();
+  const base = env({ SMOKE_EMAIL: "", SMOKE_PASSWORD: "", SMOKE_ACCESS_TOKEN: "tok-open", SMOKE_DONE_ACCESS_TOKEN: "tok-done" });
+  const r = await runSmoke({ fetchImpl: impl, env: base });
+  assert.equal(r.ok, true, r.lines.join("\n"));
+  assert.equal(calls.some((c) => c.includes("/token")), false);
+  assert.ok(r.lines.some((l) => /second account is registered/.test(l)));
+});

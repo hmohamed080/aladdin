@@ -13,6 +13,10 @@
  *   $env:SMOKE_PUBLISHABLE_KEY = "<the Acceptance publishable key>"
  *   $env:SMOKE_EMAIL = "<an account that has NOT finished registration>"; $env:SMOKE_PASSWORD = "<its password>"
  *   # optional, a finished account:  $env:SMOKE_DONE_EMAIL / $env:SMOKE_DONE_PASSWORD
+ * Acceptance has hosted CAPTCHA protection ON, so a token-less password grant is refused (captcha_failed). In that case do NOT turn the
+ * protection off: sign in through the app's own page instead, copy that session's access token (browser dev tools, Application, the
+ * sb-...-auth-token cookie/storage, field access_token) and pass it as SMOKE_ACCESS_TOKEN (and SMOKE_DONE_ACCESS_TOKEN for the optional
+ * finished account) in place of the email and password. Access tokens expire after about an hour.
  *   node scripts/hosted-db/registration-gate-smoke.mjs
  * Only the Acceptance project is accepted; Production is refused. Needs no database password and no service key.
  */
@@ -51,16 +55,16 @@ export async function runSmoke({ fetchImpl = fetch, env = process.env } = {}) {
   const lines = []; let ok = true;
   const out = (pass, text) => { lines.push(`${pass ? "PASS" : "FAIL"}  ${text}`); if (!pass) ok = false; };
   const url = (env.SMOKE_URL ?? "").replace(/\/+$/, ""), key = env.SMOKE_PUBLISHABLE_KEY ?? "";
-  if (!url || !key || !env.SMOKE_EMAIL || !env.SMOKE_PASSWORD) return { ok: false, lines: ["FAIL  set SMOKE_URL, SMOKE_PUBLISHABLE_KEY, SMOKE_EMAIL and SMOKE_PASSWORD (see the header of this file)"] };
+  if (!url || !key || !(env.SMOKE_ACCESS_TOKEN || (env.SMOKE_EMAIL && env.SMOKE_PASSWORD))) return { ok: false, lines: ["FAIL  set SMOKE_URL, SMOKE_PUBLISHABLE_KEY and either SMOKE_ACCESS_TOKEN or SMOKE_EMAIL + SMOKE_PASSWORD (see the header of this file)"] };
   if (projectRef(url) !== ACCEPTANCE_REF) return { ok: false, lines: [`FAIL  refused: ${url} is not the Acceptance project (${ACCEPTANCE_REF}); this script never runs against Production or any other project`] };
   if (key.startsWith("sb_secret_") || key.includes("service_role")) return { ok: false, lines: ["FAIL  refused: pass the PUBLISHABLE key, never a secret/service key"] };
 
   // ---- unfinished account: writes refused, reads allowed
-  const token = await signIn(fetchImpl, url, key, env.SMOKE_EMAIL, env.SMOKE_PASSWORD);
+  const token = env.SMOKE_ACCESS_TOKEN || await signIn(fetchImpl, url, key, env.SMOKE_EMAIL, env.SMOKE_PASSWORD);
   const state = await call(fetchImpl, url, key, token, "POST", "/rpc/my_registration_state", {});
   const s = typeof state.json === "string" ? state.json : "";
   if (state.status !== 200 || !UNFINISHED.has(s)) {
-    return { ok: false, lines: [`FAIL  the SMOKE_EMAIL account must be mid-registration (consent_pending or account_type_pending); it reports "${s || state.status}". Use an account that has signed up but not finished.`] };
+    return { ok: false, lines: [`FAIL  the SMOKE_EMAIL/SMOKE_ACCESS_TOKEN account must be mid-registration (consent_pending or account_type_pending); it reports "${s || state.status}". Use an account that has signed up but not finished.`] };
   }
   out(true, `account is mid-registration (${s})`);
   const nobody = randomUUID();
@@ -83,11 +87,11 @@ export async function runSmoke({ fetchImpl = fetch, env = process.env } = {}) {
   }
 
   // ---- optional finished account: not affected
-  if (env.SMOKE_DONE_EMAIL && env.SMOKE_DONE_PASSWORD) {
-    const t2 = await signIn(fetchImpl, url, key, env.SMOKE_DONE_EMAIL, env.SMOKE_DONE_PASSWORD);
+  if (env.SMOKE_DONE_ACCESS_TOKEN || (env.SMOKE_DONE_EMAIL && env.SMOKE_DONE_PASSWORD)) {
+    const t2 = env.SMOKE_DONE_ACCESS_TOKEN || await signIn(fetchImpl, url, key, env.SMOKE_DONE_EMAIL, env.SMOKE_DONE_PASSWORD);
     const st2 = await call(fetchImpl, url, key, t2, "POST", "/rpc/my_registration_state", {});
     const s2 = typeof st2.json === "string" ? st2.json : "";
-    if (!FINISHED.has(s2)) out(false, `the SMOKE_DONE_EMAIL account must have finished registration; it reports "${s2 || st2.status}"`);
+    if (!FINISHED.has(s2)) out(false, `the SMOKE_DONE_EMAIL/SMOKE_DONE_ACCESS_TOKEN account must have finished registration; it reports "${s2 || st2.status}"`);
     else {
       out(true, `second account is registered (${s2})`);
       const w = await call(fetchImpl, url, key, t2, "PATCH", `/profiles?user_id=eq.${nobody}`, { headline: "gate-smoke" }, { prefer: "return=minimal" });
