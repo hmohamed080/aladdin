@@ -13,7 +13,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(41);
+select plan(44);
 
 update auth.users set email_confirmed_at = now()
   where id in ('71000005-0000-4000-8000-000000000005', '55555555-5555-4555-8555-555555555555', '11111111-1111-4111-8111-111111111111');
@@ -115,6 +115,24 @@ select applied from public.marketplace_stock_apply(current_setting('t.b')::uuid,
 set local role anon;
 select is((select count(*)::int from public.marketplace_public_catalog() where slug = 'gate-v2-wallpaper'), 1, 'B4. restocking brings it back with no manual step');
 reset role;
+
+-- recipients are active members holding org.manage ONLY: a former creator with no membership is not notified
+update public.organizations set created_by = '70000009-0000-4000-8000-000000000009' where id = current_setting('t.b')::uuid;
+select applied from public.marketplace_stock_apply(current_setting('t.b')::uuid, current_setting('t.v')::uuid, current_setting('t.l')::uuid,
+  'replenish', 20, 'gv2-again-0000001', 'restock', 'manual');
+select applied from public.marketplace_stock_apply(current_setting('t.b')::uuid, current_setting('t.v')::uuid, current_setting('t.l')::uuid,
+  'correction', -30, 'gv2-again-0000002', 'sold', 'manual');
+select is((select count(*)::int from public.notifications where recipient_user_id = '70000009-0000-4000-8000-000000000009'
+           and event_type like 'marketplace.stock.%'), 0, 'C5. a former creator without an active membership is not notified');
+select is((select count(*)::int from public.notifications n where n.event_type like 'marketplace.stock.%' and n.subject_id = current_setting('t.p')::uuid
+           and not exists (select 1 from public.memberships m join public.membership_capabilities c on c.membership_id = m.id and c.capability_key = 'org.manage'
+                           where m.user_id = n.recipient_user_id and m.organization_id = current_setting('t.b')::uuid and m.status = 'active')), 0,
+  'C6. every stock notification went to an active member holding org.manage');
+set local role anon;
+select is((select count(*)::int from public.marketplace_public_catalog() where slug = 'gate-v2-wallpaper'), 0, 'B5. out of stock again: withdrawn');
+reset role;
+select applied from public.marketplace_stock_apply(current_setting('t.b')::uuid, current_setting('t.v')::uuid, current_setting('t.l')::uuid,
+  'replenish', 10, 'gv2-again-0000003', 'restock', 'manual');
 
 -- ===========================================================================
 -- D. Suspension

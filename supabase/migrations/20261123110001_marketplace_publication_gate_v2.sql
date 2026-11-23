@@ -741,8 +741,6 @@ begin
     select m.user_id from public.memberships m
       join public.membership_capabilities c on c.membership_id = m.id and c.capability_key = 'org.manage'
      where m.organization_id = v_org and m.status = 'active'
-    union
-    select o.created_by from public.organizations o where o.id = v_org
   loop
     perform app.notify_from_template(v_owner, v_org, v_tpl, 'marketplace_product', v_product,
       '/showroom/marketplace/products/' || v_product::text || '/edit',
