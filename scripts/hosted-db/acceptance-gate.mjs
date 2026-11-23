@@ -19,11 +19,13 @@
  *   registration-gate  20261122090001..002 (Admin registration-state column, the Pending-tab rule, and the central registration gate in the Data API
  *             pre-request hook, ADR-0031) on top of Acceptance at 235 / 20261121090003. 235 -> 237. FUNCTION-ONLY (3 functions replaced, 2 added;
  *             no table, row, policy or grant), so like media+m1 no backup is required: the recovery is the pinned "registration-gate" forward-fix.
+ *   prod-catchup  PRODUCTION: the single plan 210 -> 237 (27 migrations, 20261114090001 .. 20261122090002, plus PC_LATER). Needs a restore-verified PRODUCTION snapshot (none pinned).
  *   m3a       after `m1` is applied (Acceptance and Production are both at 209 today): only 20261112090001 (P1 M3a) is pending. 209 -> 210.
  *
  *   node acceptance-gate.mjs <plan> <migration-list.json> <dry-run.json> <migrations dir>
  *   node acceptance-gate.mjs post <plan> <migration-list.json>
  *   node acceptance-gate.mjs recovery <plan> <snapshot label|none> <scripts/hosted-db dir>   (forward-fix sha256 / pinned snapshot)
+ *   node acceptance-gate.mjs drift <plan> <migrations dir>   (is every newer migration on this checkout in the plan?)
  *   node acceptance-gate.mjs describe <plan>      (prints shell-safe KEY=VALUE lines for acceptance-apply.sh)
  */
 import { readFileSync, readdirSync } from "node:fs";
@@ -38,7 +40,23 @@ const ACC_232 = "20261116100014"; // latest on Acceptance after the Marketplace 
 const ACC_235 = "20261121090003"; // latest on Acceptance after the media-notify plan (read 2026-11-22: 235 migrations)
 const RG_PENDING = ["20261122090001", "20261122090002"];
 const PROD_210 = "20261112090001"; // latest on PRODUCTION (read-only, 2026-11-23: 210 migrations)
-const PB1_PENDING = ["20261114090001", "20261115090001"];
+/**
+ * prod-catchup: ONE Production plan from 210 / 20261112090001 to current main. PC_PENDING is the single list to edit at execution time: when Marketplace PR 5 / PR 6 (or any
+ * other work) add migrations to main, append their versions to PC_LATER, add the objects they change to PC_LATER_CHANGED, extend the forward-fix coverage (see
+ * docs/operations/PRODUCTION_CATCHUP_PLAN_20261123.md "Updating the plan at execution time") and re-run the tests: pendingDrift() and the drift test name every version that is
+ * on main but not in the plan.
+ */
+const PC_BASE = [
+  "20261114090001",
+  "20261115090001", "20261115090002", "20261115090003", "20261115090004", "20261115090005", "20261115090006",
+  "20261116090001",
+  ...Array.from({ length: 14 }, (_, i) => `202611161000${String(i + 1).padStart(2, "0")}`),
+  "20261121090001", "20261121090002", "20261121090003",
+  "20261122090001", "20261122090002"
+];
+export const PC_LATER = []; // versions newer than 20261122090002 that this plan must also push (empty today)
+export const PC_LATER_CHANGED = []; // objects those later migrations add or change (function schema.name, or a key prefix ending in *)
+export const PC_PENDING = [...PC_BASE, ...PC_LATER];
 const MN_PENDING = ["20261121090001", "20261121090002", "20261121090003"];
 const MKT_PENDING = Array.from({ length: 14 }, (_, i) => `202611161000${String(i + 1).padStart(2, "0")}`);
 /** changed = function names (schema.name, every overload) the plan is allowed to touch; nothing else may change in the catalog. */
@@ -215,12 +233,200 @@ export const PLANS = {
   // copy: exactly these 5 function differences, nothing else). Recovery: the pinned forward-fix, proven to restore the exact live definitions of the 3 functions.
   "registration-gate": { fixes: ["registration-gate"], recovery: "forward-fix", applied: 235, latest: ACC_235, pending: RG_PENDING, preContract: ACC_235, postContract: "20261122090002",
     changed: ["app.api_pre_request", "app.admin_user_status_tab", "public.admin_users_directory", "app.admin_user_registration_state", "app.registration_gate_allows"] },
-  // prod-batch1 (PRODUCTION, target "production"): batch 1 of docs/operations/PRODUCTION_CATCHUP_PLAN_20261123.md. 210 -> 212. Replaces 3 functions and adds 3 functions
-  // and 1 trigger (no table, row, policy or grant change). freshBackup: any Production step needs a restore-verified PRODUCTION snapshot (none is pinned yet, so this
-  // plan is refused until the owner takes one). Run only through production-preflight.sh / production-apply.sh; the Acceptance scripts refuse it.
-  "prod-batch1": { target: "production", fixes: ["prod-batch1"], recovery: "forward-fix", freshBackup: true, applied: 210, latest: PROD_210, pending: PB1_PENDING, preContract: PROD_210, postContract: "20261115090001",
-    changed: ["public.apply_account_upgrade", "public.apply_organization_verification", "public.review_approve", "app.assert_assigned_reviewer",
-      "public.craftsman_profile_verification_submit", "app.craftsman_review_guard", "public.verifications.craftsman_review_complete"] },
+  // prod-catchup (PRODUCTION, target "production"): ONE plan for docs/operations/PRODUCTION_CATCHUP_PLAN_20261123.md. Production is at 210 / 20261112090001 (read live 2026-11-23);
+  // supabase db push pushes every unapplied local migration, so main's 27 pending cannot be split into batches. 210 -> 237 (+ PC_LATER). Creates tables (Marketplace 30, media limits,
+  // notification templates) and changes rows (permissions, three storage bucket limits), so freshBackup: a restore-verified PRODUCTION snapshot is mandatory and none is pinned
+  // (PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS is EMPTY), so the plan is refused until the owner takes one. "changed" was MEASURED, not written by hand: replay of the 27 on a scratch
+  // database with scripts/hosted-db/catalog-fingerprint.sql before/after and catalog-diff.mjs (170 functions, the touched constraints/trigger, and prefixes for the new tables).
+  // Run only through production-preflight.sh / production-apply.sh; the Acceptance scripts refuse it.
+  "prod-catchup": { target: "production", fixes: ["media-notify", "marketplace", "prod-catchup"], recovery: "forward-fix", freshBackup: true, applied: 210, latest: PROD_210, pending: PC_PENDING, preContract: PROD_210, postContract: PC_PENDING.at(-1),
+    changed: [
+      "app.admin_user_registration_state",
+      "app.admin_user_status_tab",
+      "app.api_pre_request",
+      "app.assert_assigned_reviewer",
+      "app.bv_decide",
+      "app.marketplace_append_only",
+      "app.marketplace_assert_admin_permission",
+      "app.marketplace_assert_seller_admin",
+      "app.marketplace_assert_seller_reader",
+      "app.marketplace_assert_seller_writer",
+      "app.marketplace_attribute_definition_guard",
+      "app.marketplace_attribute_json",
+      "app.marketplace_attribute_option_guard",
+      "app.marketplace_attribute_value_guard",
+      "app.marketplace_attribute_value_ok",
+      "app.marketplace_can_manage_catalog",
+      "app.marketplace_can_manage_orders",
+      "app.marketplace_import_apply_attribute",
+      "app.marketplace_import_apply_row",
+      "app.marketplace_import_assert_lease",
+      "app.marketplace_import_cancel_impl",
+      "app.marketplace_import_create_impl",
+      "app.marketplace_import_flag",
+      "app.marketplace_import_job_guard",
+      "app.marketplace_import_parse_asset_name",
+      "app.marketplace_import_record_finding",
+      "app.marketplace_import_row_findings",
+      "app.marketplace_import_set_status",
+      "app.marketplace_import_slug",
+      "app.marketplace_import_write_guard",
+      "app.marketplace_inventory_level_guard",
+      "app.marketplace_media_can_delete",
+      "app.marketplace_media_can_read",
+      "app.marketplace_media_can_upload",
+      "app.marketplace_media_cleanup_rows",
+      "app.marketplace_media_metadata",
+      "app.marketplace_media_retire",
+      "app.marketplace_media_storage_key",
+      "app.marketplace_media_verification_ready",
+      "app.marketplace_movement_seller_guard",
+      "app.marketplace_order_document",
+      "app.marketplace_order_event",
+      "app.marketplace_order_stock",
+      "app.marketplace_product_cover_image",
+      "app.marketplace_product_guard",
+      "app.marketplace_product_has_publishable_image",
+      "app.marketplace_proof_require_verified_media",
+      "app.marketplace_pta_guard",
+      "app.marketplace_public_image_key",
+      "app.marketplace_publication_blockers",
+      "app.marketplace_refresh_variant_signature",
+      "app.marketplace_require_verified_media",
+      "app.marketplace_seller_account_guard",
+      "app.marketplace_seller_apply_attributes",
+      "app.marketplace_seller_is_eligible",
+      "app.marketplace_seller_is_enabled",
+      "app.marketplace_seller_stage_import_assets",
+      "app.marketplace_seller_transition",
+      "app.marketplace_stock_location_guard",
+      "app.marketplace_stock_movement_append_only",
+      "app.marketplace_type_attribute_in_use_guard",
+      "app.marketplace_variant_available",
+      "app.marketplace_variant_guard",
+      "app.marketplace_variant_signature",
+      "app.media_limit_bytes",
+      "app.media_limit_events_append_only",
+      "app.media_metadata",
+      "app.media_storage_key_for",
+      "app.media_videos_enforce_cap",
+      "app.notification_template_events_append_only",
+      "app.notify_from_template",
+      "app.registration_gate_allows",
+      "app.render_template",
+      "app.showroom_activation_guard",
+      "app.showroom_review_guard",
+      "app.template_variables",
+      "public.admin_initiate_verification",
+      "public.admin_marketplace_media_approve",
+      "public.admin_marketplace_media_queue",
+      "public.admin_marketplace_media_record_validation",
+      "public.admin_marketplace_media_reject",
+      "public.admin_marketplace_media_settings",
+      "public.admin_marketplace_seller_approve",
+      "public.admin_marketplace_seller_history",
+      "public.admin_marketplace_seller_overview",
+      "public.admin_marketplace_seller_reinstate",
+      "public.admin_marketplace_seller_revoke",
+      "public.admin_marketplace_seller_suspend",
+      "public.admin_marketplace_sellers",
+      "public.admin_marketplace_set_media_verification_ready",
+      "public.admin_media_limit_events",
+      "public.admin_media_limit_set",
+      "public.admin_notification_template_events",
+      "public.admin_notification_template_reset",
+      "public.admin_notification_template_set",
+      "public.admin_notification_templates",
+      "public.admin_organization_detail",
+      "public.admin_organizations_list",
+      "public.admin_user_detail",
+      "public.admin_users_directory",
+      "public.apply_account_upgrade",
+      "public.apply_organization_verification",
+      "public.business_verification_request_info",
+      "public.craftsman_profile_verification_submit",
+      "public.marketplace_buyer_order_cancel",
+      "public.marketplace_buyer_order_get",
+      "public.marketplace_buyer_orders",
+      "public.marketplace_buyer_proof_confirm",
+      "public.marketplace_buyer_proof_request_upload",
+      "public.marketplace_checkout_place",
+      "public.marketplace_import_apply_next",
+      "public.marketplace_import_cancel",
+      "public.marketplace_import_claim",
+      "public.marketplace_import_complete_dry_run",
+      "public.marketplace_import_create",
+      "public.marketplace_import_job_cancel",
+      "public.marketplace_import_job_create",
+      "public.marketplace_import_job_report",
+      "public.marketplace_import_purge_staging",
+      "public.marketplace_import_release",
+      "public.marketplace_import_retry_failed",
+      "public.marketplace_import_seal",
+      "public.marketplace_import_stage_assets",
+      "public.marketplace_import_stage_rows",
+      "public.marketplace_import_validate_next",
+      "public.marketplace_product_publish",
+      "public.marketplace_product_unpublish",
+      "public.marketplace_public_cart",
+      "public.marketplace_public_catalog",
+      "public.marketplace_public_catalog_page",
+      "public.marketplace_public_facets",
+      "public.marketplace_public_image_ref",
+      "public.marketplace_public_product",
+      "public.marketplace_rejected_images_purge",
+      "public.marketplace_seller_default_location",
+      "public.marketplace_seller_delivery_areas_save",
+      "public.marketplace_seller_delivery_get",
+      "public.marketplace_seller_delivery_prices_save",
+      "public.marketplace_seller_image_confirm_upload",
+      "public.marketplace_seller_image_remove",
+      "public.marketplace_seller_image_remove_finalize",
+      "public.marketplace_seller_image_request_upload",
+      "public.marketplace_seller_images_pending_removal",
+      "public.marketplace_seller_images_update",
+      "public.marketplace_seller_import_step",
+      "public.marketplace_seller_order_get",
+      "public.marketplace_seller_order_transition",
+      "public.marketplace_seller_orders_page",
+      "public.marketplace_seller_payment_settings_get",
+      "public.marketplace_seller_payment_settings_save",
+      "public.marketplace_seller_pickup_set",
+      "public.marketplace_seller_product_get",
+      "public.marketplace_seller_product_readiness",
+      "public.marketplace_seller_product_save",
+      "public.marketplace_seller_products_page",
+      "public.marketplace_seller_proof_review",
+      "public.marketplace_seller_publish_ready",
+      "public.marketplace_seller_stock_adjust",
+      "public.marketplace_stock_apply",
+      "public.media_cleanup_candidates",
+      "public.media_cleanup_retire",
+      "public.media_edge_authorize",
+      "public.media_edge_public",
+      "public.media_limits_get",
+      "public.media_storage_attest",
+      "public.media_storage_reserve",
+      "public.media_storage_resolve",
+      "public.organization_media_resolve",
+      "public.review_approve",
+      "public.review_reject",
+      "public.audit_log.ck_audit_action_known",
+      "public.media_storage_locations.media_storage_locations_namespace_check",
+      "public.media_videos.media_videos_cap_on_insert",
+      "public.notifications.ck_notifications_content_shape",
+      "public.notifications.ck_notifications_event_type_known",
+      "public.verifications.ck_verifications_reason_required",
+      "public.verifications.showroom_review_complete",
+      "public.marketplace_*",
+      "public.ux_marketplace_*",
+      "public.ix_marketplace_*",
+      "public.uq_marketplace_*",
+      "public.media_limit*",
+      "public.notification_template*",
+      "public.notifications.content*",
+      ...PC_LATER_CHANGED
+    ] },
   "media+m1": { fixes: ["media", "m1"], recovery: "forward-fix", applied: 207, latest: BASE, pending: [MEDIA, M1], preContract: BASE, postContract: M1,
     changed: ["app.media_storage_key_assign", "public.media_migration_target_key", "public.media_migration_switch", "public.media_migration_rollback",
       "public.my_registration_state", "app.profile_completion", "public.admin_users_directory"] },
@@ -264,14 +470,24 @@ export const FORWARD_FIX = {
   // registration-gate: function-only. Restores app.api_pre_request, app.admin_user_status_tab and public.admin_users_directory to their exact pre-plan definitions (md5 of
   // pg_get_functiondef and of the comment equal the live Acceptance values read before the plan) and drops the two added functions. Touches no data.
   "registration-gate": { file: "forward-fix/registration-gate-restore-previous.sql", sha256: "39f99de6d09a5a7d1b5e0250091ec2eadaa37c56c55b3e382857fe43daf22d18" },
-  // prod-batch1: restores the exact PRODUCTION definitions of public.apply_account_upgrade / apply_organization_verification / review_approve (md5 read live on Production
-  // 2026-11-23) and drops what the batch added (trigger craftsman_review_complete and 3 functions). Proven on a scratch database: md5 of definition, comment and ACL equal Production's.
-  "prod-batch1": { file: "forward-fix/prod-batch1-restore-previous.sql", sha256: "d41f791e9547f4a15468ee2a26e652070a8660c82deae8b24f4b0af96b90990d" },
+  // prod-catchup: the NON-table part of the Production catch-up. Restores 14 functions to their exact PRODUCTION definitions (md5 of pg_get_functiondef and of the comment read live on
+  // Production 2026-11-23), the showroom review trigger + guard (with the owner-only ACL), the two constraints and drops the 5 functions the catch-up adds. The table parts are the
+  // "media-notify" and "marketplace" forward-fixes (re-proved against Production's pre-state: Production pre-state + 27 migrations + the three files = identical catalog fingerprint).
+  // Undo order: media-notify, marketplace, prod-catchup.
+  "prod-catchup": { file: "forward-fix/prod-catchup-restore-previous.sql", sha256: "1137c10d511193a4cee599a1105b5a3bbb6ae714fdd5f04b753a932c3740ce7a" },
   verification: { file: "forward-fix/verification-restore-previous.sql", sha256: "a50cd460c243b3580927c1f8b8e84ec1cc1109048c9b08b055a06b470570fcac" },
   m1: { file: "forward-fix/m1-restore-previous.sql", sha256: "5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045" },
   m3a: { file: "forward-fix/m3a-restore-previous.sql", sha256: "d4161977e7664e3345d000ee87503fd3a5983935c81257dd082c0a5ef0b43ec3" },
   media: { file: "forward-fix/media-restore-previous.sql", sha256: "4f0f4ce33ed49ca85555756ff7186a33da6d3b6cca17f391da9bc4daf735f270" },
 };
+/** Versions on this checkout newer than the plan's latest applied that the plan does not list, and plan versions missing from the checkout (empty = the plan matches main). */
+export function pendingDrift({ plan: name, localVersions }) {
+  const P = plan(name);
+  return {
+    unplanned: localVersions.filter((v) => v > P.latest && !P.pending.includes(v)).sort(),
+    missing: P.pending.filter((v) => !localVersions.includes(v))
+  };
+}
 /** forwardFixSha256: { <fix name>: <sha256 of the file in this checkout, or undefined> } for every fix the plan needs. */
 export function checkRecovery({ plan: name, label, forwardFixSha256 = {} }) {
   const P = plan(name), p = [];
@@ -350,6 +566,13 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
       console.log(`PRE_CONTRACT=${P.preContract}\nPOST_CONTRACT=${P.postContract}\nRECOVERY=${P.recovery}
 N_PENDING=${P.pending.length}\nPOST_APPLIED=${P.applied + P.pending.length}\nLATEST=${P.pending.at(-1)}
 PENDING_VERSIONS="${P.pending.join(" ")}"\nEXPECT_CHANGED='${P.changed.join(";")}'`);
+      process.exit(0);
+    }
+    if (a === "drift") {
+      // node acceptance-gate.mjs drift <plan> <migrations dir>
+      const d = pendingDrift({ plan: b, localVersions: readdirSync(c).filter((f) => f.endsWith(".sql")).map((f) => f.slice(0, 14)) });
+      if (d.unplanned.length || d.missing.length) { console.error(`plan ${b} does not match this checkout\n  - not in the plan: ${d.unplanned.join(", ") || "none"}\n  - in the plan but missing here: ${d.missing.join(", ") || "none"}\nUpdate PC_LATER / PC_LATER_CHANGED and the forward-fix coverage first (docs/operations/PRODUCTION_CATCHUP_PLAN_20261123.md).`); process.exit(1); }
+      console.log(`plan ${b}: matches this checkout (${plan(b).pending.length} pending, none unplanned)`);
       process.exit(0);
     }
     if (a === "recovery") {
