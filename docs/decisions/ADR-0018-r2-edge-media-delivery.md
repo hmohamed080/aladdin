@@ -1,5 +1,7 @@
 # ADR-0018 — Media delivery: R2 primary store, ticketed edge Worker for private and conditional-public media
 
+> **Amended by [ADR-0029](ADR-0029-business-verification-documents-on-r2.md) (accepted by the owner, 2026-11-23):** business-verification documents and `purchase-request-images` also live in R2 only; there is no Supabase Storage exception. The bullet below that keeps them in Supabase is the part amended and is historical; this ADR is otherwise unchanged.
+
 **Status:** Proposed · 2026-10-18, revised 2026-10-19 ([Revision 2](#revision-2--2026-10-19-full-media-architecture)) · **Needs owner approval.** Nothing in this ADR has been deployed, and no hosted resource exists for it. The code is on the unmerged draft PR #89 and the branch stacked on it, with edge delivery and R2 writes switched off (`MEDIA_EDGE_DELIVERY_ENABLED=false`, `R2_STORAGE_ENABLED=false`).
 
 **Refines:** [ADR-0017](ADR-0017-rc2-private-media-integration.md) (RC2 private-media provider integration). ADR-0017 stays in force. This ADR adds a second delivery path for R2-provider rows and records which media may be served without a session.
@@ -115,7 +117,7 @@ Evidence: `/mnt/project-files/showroom-admin/supabase-usage-audit.md` and `/mnt/
 
 - **Cloudflare R2 is the primary store** for the five revocable namespaces: `avatar`, `portfolio`, `certificate`, `product`, `organization`. The bucket is **private**: no public access and no `r2.dev`. A lifecycle rule expires `pending/` uploads after 2 days.
 - Supabase remains the authority for identity, tenancy, lifecycle and media metadata (ADR-0017, unchanged). `media_storage_locations.provider` records `supabase` or `r2` per object. Legacy `supabase` rows keep working through the application proxy until they are migrated by `scripts/media-storage.mjs` (see [media-monitoring.md](../operations/media-monitoring.md)).
-- **Business-verification documents stay in Supabase Storage, unchanged.** This is the PR #88 contract: the private `business-verification-documents` bucket, the `bv_documents_*` policies, the caller-signed 30 s URL and the `/business-verification/file/<org>/<file>` route. They are not in `media_storage_locations`, the migration tooling or the edge Worker. `purchase-request-images` also stays on Supabase, as ADR-0017 already decided.
+- **(Superseded by ADR-0029, 2026-11-23) Business-verification documents stay in Supabase Storage, unchanged.** This is the PR #88 contract: the private `business-verification-documents` bucket, the `bv_documents_*` policies, the caller-signed 30 s URL and the `/business-verification/file/<org>/<file>` route. They are not in `media_storage_locations`, the migration tooling or the edge Worker. `purchase-request-images` also stays on Supabase, as ADR-0017 already decided.
 - **No media is unconditionally public.** There is no public bucket, no public CDN URL and no long-lived browser cache for any namespace. Each byte served is authorized by Postgres at the time of the request.
 
 ### 2. Delivery: the `media-edge` Cloudflare Worker (`edge/media-worker/`)
