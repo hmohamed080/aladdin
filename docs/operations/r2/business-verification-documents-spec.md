@@ -1,12 +1,12 @@
 # Business-verification documents on R2: specification
 
-**Status:** Proposed with [ADR-0029](../../decisions/ADR-0029-business-verification-documents-on-r2.md). Nothing here is built or applied.
+**Status:** Accepted with [ADR-0029](../../decisions/ADR-0029-business-verification-documents-on-r2.md) (owner decision, 2026-11-23). This text was written on 2026-11-17 as a proposal and describes the work as if nothing existed; **much of it is already built and applied** (migration `20261107090005`, the `verification` namespace in `/api/media`, the upload action and the file route; verified on Production and Acceptance on 2026-11-23). Read ADR-0029 "Implementation status" first; where this spec and the ADR differ, the ADR wins.
 
 ## Purpose
 
 Say exactly what changes, in what order and with which gates, so the files of business-verification documents live only in R2 and Supabase Storage holds none.
 
-## Today (verified 2026-11-16/17)
+## Today (as first written, 2026-11-16/17; superseded by the implementation status in ADR-0029)
 
 | Item | Fact |
 |---|---|
@@ -14,7 +14,7 @@ Say exactly what changes, in what order and with which gates, so the files of bu
 | Storage | private Supabase bucket `business-verification-documents`, key `{organization_id}/{file}` |
 | Authorization | `app.can_read_bv_object` (organization managers, or reviewers for `ready` documents), policies `bv_documents_*` |
 | Read path | route `/business-verification/file/[orgId]/[fileName]`, a caller-signed 30 s URL streamed by the app |
-| Registry | not in `media_storage_locations` (`20261107090005` allows `avatar, portfolio, certificate, product, organization, request, verification`) |
+| Registry | `20261107090005` allows the namespace `verification` in `media_storage_locations`; new documents are recorded there with `provider = r2` (verified 2026-11-23). Only legacy rows have no record |
 | Backup | counted as "Supabase Storage objects" (`storage_objects` in the snapshot manifest). With the legacy media backup off, any such file makes `Verify complete coverage` fail. Acceptance, 2026-11-16: one test document, removed by the owner |
 
 ## Target layout (R2, private bucket per environment)
@@ -25,7 +25,7 @@ u/{user_id}/verification/{document_id}/original.{ext}             personal docum
 pending/{upload_id}/                                              reserved upload, expires after 2 days
 ```
 
-Names carry ids only (no file name, no document type), as for all media. The original file name stays in `business_verification_documents.file_name`.
+Names carry ids only (no file name, no document type), as for all media. The original file name stays in `business_verification_documents.file_name`. These are PHYSICAL keys (`media_storage_locations.storage_key`); `business_verification_documents.object_key` stays the logical key `<organization_id>/<uuid>.<ext>` that the file route and the resolver use.
 
 ## Work items
 
