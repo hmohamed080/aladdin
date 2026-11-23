@@ -1,6 +1,6 @@
 # ADR-0029 — Business-verification documents move to R2 (Supabase Storage holds no files)
 
-**Status:** Proposed · 2026-11-17 · needs owner approval. Nothing in this ADR is built, migrated or deployed.
+**Status:** Accepted by the owner on 2026-11-23 (no exception: every file, including business-verification documents and `purchase-request-images`, lives in R2 only) · first written 2026-11-17. See "Implementation status" for what already exists and what is still open.
 
 **Amends:** [ADR-0018](ADR-0018-r2-edge-media-delivery.md), the bullet "Business-verification documents stay in Supabase Storage, unchanged" (and §7 item 1 of [r2-delivery-architecture.md](../operations/showroom-admin-handoff/r2-delivery-architecture.md)). ADR-0018 stays unchanged as history. Linked both ways.
 
@@ -8,7 +8,11 @@
 
 Decide where the files of business-verification documents live, so that **R2 is the only place that stores files** and Supabase keeps only identity, tenancy, permissions and metadata (the target state of the media architecture v3).
 
-## Current decision (proposed)
+## Owner decision (2026-11-23)
+
+Production and Acceptance hold **all** media in R2 with the same architecture and the same security. No file is kept in Supabase Storage and no new write may enter it. This removes the `business-verification-documents` exception of ADR-0018 and the `purchase-request-images` exception of ADR-0017 / the "deferred" item below.
+
+## Current decision
 
 1. **Every verification document is stored in the private R2 bucket of its environment**, under the owner-scoped layout of the media architecture:
    - organization documents: `o/{organization_id}/verification/{document_id}/original.{ext}`;
@@ -35,7 +39,7 @@ Decide where the files of business-verification documents live, so that **R2 is 
 
 ## What is deferred
 
-- `purchase-request-images` (ADR-0017 excludes it; a separate decision).
+- ~~`purchase-request-images`~~: no longer deferred; covered by the owner decision of 2026-11-23 (the `request` namespace is already part of the central media system, migration `20261107090005`).
 - Identity-document types, if the product adds them later (they would use the personal layout above and need their own retention rule).
 - Any change to who may read a document: this ADR moves bytes, not permissions.
 
@@ -45,6 +49,14 @@ Decide where the files of business-verification documents live, so that **R2 is 
 - Until the migration of the existing files is finished, the old path keeps working for rows with `provider` absent or `supabase`; the two paths coexist.
 - ADR-0018's statement that these documents are not in `media_storage_locations` and the edge Worker is superseded by this ADR once it is accepted.
 - Production release needs the owner's approval for each stage (code, migration, copy, switch, retirement).
+
+## Implementation status (verified read-only, 2026-11-23)
+
+- **Already in the code and applied.** Migration `20261107090005_request_and_verification_media.sql` (on Production since the 210-migration state) extends `media_storage_locations` and the central media functions to the namespaces `request` and `verification`; `/api/media/[namespace]` accepts `verification`; `/business-verification/file/<org>/<file>` serves through `deliverMedia(..., "verification", key)`; the upload action asks `authorizeMediaUpload(..., "verification", ...)` for the provider. No front-end file uploads to the bucket directly.
+- **Exercised on Acceptance.** One verification document (PDF, 2026-11-08) is recorded with `provider = r2`, verified. Another Acceptance document row (2026-11-04, PNG) is `ready` but has no `media_storage_locations` row and no object in Supabase Storage (which is empty there): a dangling reference to decide on.
+- **Production data.** 0 documents, 0 submissions, 0 objects in the bucket. There is nothing to migrate on Production.
+- **Supabase side closed (Production, 2026-11-23).** `storage.objects` holds 0 files; the held activation `r2-only-storage-write-closure.sql` was applied, so no INSERT/UPDATE policy remains on the seven application buckets (including `bv_documents_insert_authorized`). Reads and deletes stay until the buckets are retired. Acceptance is not closed yet.
+- **Still open.** (1) A real upload/read/refusal run of verification and request documents on Acceptance with an owner session (the checklist is in `docs/operations/BV_DOCUMENTS_R2_ONLY_PLAN_20261123.md`); (2) the security review of that plan; (3) the closure on Acceptance; (4) retiring the empty buckets; (5) switching off `LEGACY_MEDIA_BACKUP` everywhere (done for Production's three environments).
 
 ## Related files
 
