@@ -4,7 +4,7 @@ import { ButtonLink } from "@/components/ui/controls";
 import { ChevronLeftIcon, ChevronRightIcon, TruckIcon } from "@/components/ui/icons";
 import { requireApprovedSeller } from "@/features/marketplace-seller/seller-gate";
 import { DeliveryEditor } from "@/features/marketplace-seller/delivery-editor";
-import type { StoredRate } from "@/features/marketplace-seller/delivery-model";
+import { EMPTY_SETTINGS, type StoredRate, type StoredSettings } from "@/features/marketplace-seller/delivery-model";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,13 @@ export default async function MarketplaceDeliveryPage() {
   const { supabase, org, locale } = await requireApprovedSeller();
   const t = getMessages(locale).marketplaceSeller;
   const { data } = await supabase.rpc("marketplace_seller_delivery_get", { p_organization_id: org.organizationId });
-  const settings = (data ?? { rates: [], pickup_available: false }) as unknown as { rates?: StoredRate[]; pickup_available?: boolean };
+  const settings = (data ?? { rates: [], pickup_available: false }) as unknown as {
+    rates?: StoredRate[];
+    pickup_available?: boolean;
+    settings?: StoredSettings;
+    missing?: string[];
+    free_shipping_product_count?: number;
+  };
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
@@ -33,7 +39,14 @@ export default async function MarketplaceDeliveryPage() {
           </ButtonLink>
         }
       />
-      <DeliveryEditor organizationId={org.organizationId} initialRates={settings.rates ?? []} initialPickup={Boolean(settings.pickup_available)} />
+      <DeliveryEditor
+        organizationId={org.organizationId}
+        initialRates={settings.rates ?? []}
+        initialPickup={Boolean(settings.pickup_available)}
+        initialSettings={settings.settings ?? EMPTY_SETTINGS}
+        initialMissing={settings.missing ?? []}
+        freeShippingCount={Number(settings.free_shipping_product_count ?? 0)}
+      />
     </div>
   );
 }
