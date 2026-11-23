@@ -5,18 +5,13 @@
 -- block, the seller storefront and the closed state. Owner decisions, Part 4A of
 -- docs/product/marketplace-requirements-walkthrough-20261119.md.
 --
--- ORDER OF MERGE (documented on purpose; this migration is written to degrade, not to fail):
---   * PR 7 (20261123110001, publication gate / marketplace open-close switch) and PR 8 (20261123120001,
---     delivery + payment settings) should be applied BEFORE this one. Their versions sort before this one.
---   * Without PR 7  : app.marketplace_is_open() does not exist, so the Marketplace is treated as open. The
---                     stock withdrawal is implemented here directly, so it does not depend on PR 7.
---   * Without PR 8  : the delivery columns/tables do not exist; the delivery terms say configured = false
---                     (fee and pickup only, no estimate, no free-shipping rule, no next-day option).
---   * PR 5 / PR 6   : not read here. Seller visibility keeps going through app.marketplace_seller_is_enabled
---                     (PR 5 owns what "approved" means); media verification keeps going through
---                     app.marketplace_media_verification_ready() (PR 6 makes it unconditional).
---   Detection is run-time (to_regclass / pg_attribute inside plpgsql), so the order of applying never breaks the
---   functions; it only decides how much they can say.
+-- ORDER OF MERGE. PR 7 (#241, 20261123110001: open/close switch, seller visibility and on-shelf rule) MUST be applied
+--   before this one; this migration calls its app.marketplace_is_open / marketplace_seller_is_public /
+--   marketplace_product_is_listed directly. PR 8 (#240, 20261123120001, delivery + payment settings) should be
+--   applied before too; without it the delivery columns/tables do not exist and the delivery terms say
+--   configured = false (fee and pickup only), detected at run time (to_regclass / pg_attribute).
+--   PR 5 / PR 6 : not read here (seller approval is behind marketplace_seller_is_public; media verification is
+--   app.marketplace_media_verification_ready(), unconditional since PR 6).
 --
 -- COMPATIBILITY. Nothing is dropped. marketplace_public_facets(text), marketplace_public_product(text) and
 -- marketplace_public_catalog_page(...10 args) keep their signatures, grants and old result keys (new keys added),
@@ -38,36 +33,9 @@
 -- ===========================================================================
 
 -- ---------------------------------------------------------------------------
--- 1. Internal helpers (no client grant)
+-- 1. Internal helpers (no client grant). The open switch, seller visibility and the on-shelf rule are PR 7's
+--    app.marketplace_is_open / marketplace_seller_is_public / marketplace_product_is_listed (hard dependency: #241 first).
 -- ---------------------------------------------------------------------------
--- Is the public Marketplace open? PR 7 owns the switch; before it exists the answer is "open".
-create or replace function app.marketplace_public_open()
-returns boolean
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-begin
-  if to_regprocedure('app.marketplace_is_open()') is null then
-    return true;
-  end if;
-  return app.marketplace_is_open();
-end;
-$$;
-
--- At least one active variant has units to sell: a product with none is withdrawn from every public surface.
-create or replace function app.marketplace_public_listed(p_product_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select exists (select 1 from public.marketplace_product_variants v
-                 where v.product_id = p_product_id and v.status = 'active' and app.marketplace_variant_available(v.id) > 0);
-$$;
-
 -- Units left across the active variants, only when 3 or fewer (a card says "Only N left"; larger stock is never published).
 create or replace function app.marketplace_public_stock_left(p_product_id uuid)
 returns integer
@@ -207,7 +175,7 @@ as $$
 $$;
 
 revoke all on function
-  app.marketplace_public_open(), app.marketplace_public_listed(uuid), app.marketplace_public_stock_left(uuid),
+  app.marketplace_is_open(), app.marketplace_public_stock_left(uuid),
   app.marketplace_product_ships_free(uuid), app.marketplace_delivery_terms(uuid, text, text),
   app.marketplace_free_shipping(uuid, jsonb, numeric)
   from public, anon, authenticated, service_role;
@@ -222,7 +190,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select jsonb_build_object('open', app.marketplace_public_open());
+  select jsonb_build_object('open', app.marketplace_is_open());
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -249,7 +217,7 @@ as $$
            greatest(coalesce(p_offset, 0), 0) as off,
            nullif(lower(btrim(coalesce(p_query, ''))), '') as q,
            app.marketplace_media_verification_ready() as media,
-           app.marketplace_public_open() as is_open,
+           app.marketplace_is_open() as is_open,
            case when jsonb_typeof(p_attrs) = 'object' then p_attrs else '{}'::jsonb end as attrs,
            nullif(lower(btrim(p_governorate)), '') as gov,
            nullif(lower(btrim(p_area)), '') as area,
@@ -270,8 +238,8 @@ as $$
     cross join lateral (select app.marketplace_delivery_terms(p.seller_organization_id, pr.gov, pr.area) as terms) d
     where pr.is_open
       and p.status = 'published'
-      and app.marketplace_seller_is_enabled(p.seller_organization_id)
-      and app.marketplace_public_listed(p.id)
+      and app.marketplace_seller_is_public(p.seller_organization_id)
+      and app.marketplace_product_is_listed(p.id)
       and (pr.seller is null or o.slug = pr.seller)
       and (coalesce(p_category, '') = '' or c.key = p_category)
       and (coalesce(p_type, '') = '' or t.key = p_type)
@@ -384,10 +352,10 @@ as $$
     from public.marketplace_products p
     join public.marketplace_product_types t on t.id = p.product_type_id and t.is_active
     join public.marketplace_categories c on c.id = t.category_id and c.is_active
-    where app.marketplace_public_open()
+    where app.marketplace_is_open()
       and p.status = 'published'
-      and app.marketplace_seller_is_enabled(p.seller_organization_id)
-      and app.marketplace_public_listed(p.id)
+      and app.marketplace_seller_is_public(p.seller_organization_id)
+      and app.marketplace_product_is_listed(p.id)
   ),
   scoped as (
     select * from visible where coalesce(p_type, '') = '' or type_key = p_type
@@ -417,7 +385,7 @@ as $$
     where coalesce(p_type, '') = '' and d.key = 'color' and d.is_active
   )
   select jsonb_build_object(
-    'open', app.marketplace_public_open(),
+    'open', app.marketplace_is_open(),
     'categories', coalesce((
       select jsonb_agg(jsonb_build_object(
                'key', c.key, 'name_ar', c.name_ar, 'name_en', c.name_en,
@@ -463,7 +431,7 @@ declare
   v_media  boolean := app.marketplace_media_verification_ready();
   v_result jsonb;
 begin
-  if not app.marketplace_public_open() then
+  if not app.marketplace_is_open() then
     return null;
   end if;
   select p.* into v_p
@@ -471,8 +439,8 @@ begin
   join public.marketplace_product_types tt on tt.id = p.product_type_id and tt.is_active
   join public.marketplace_categories cc on cc.id = tt.category_id and cc.is_active
   where p.slug = p_slug and p.status = 'published'
-    and app.marketplace_seller_is_enabled(p.seller_organization_id)
-    and app.marketplace_public_listed(p.id);
+    and app.marketplace_seller_is_public(p.seller_organization_id)
+    and app.marketplace_product_is_listed(p.id);
   if not found then
     return null;
   end if;
@@ -568,7 +536,7 @@ declare
   v_flag  boolean;
   v_free  boolean;
 begin
-  if p_slug is null or p_slug !~ '^[a-z0-9-]{1,120}$' or not app.marketplace_public_open() then
+  if p_slug is null or p_slug !~ '^[a-z0-9-]{1,120}$' or not app.marketplace_is_open() then
     return null;
   end if;
   select p.* into v_p
@@ -576,8 +544,8 @@ begin
   join public.marketplace_product_types tt on tt.id = p.product_type_id and tt.is_active
   join public.marketplace_categories cc on cc.id = tt.category_id and cc.is_active
   where p.slug = p_slug and p.status = 'published'
-    and app.marketplace_seller_is_enabled(p.seller_organization_id)
-    and app.marketplace_public_listed(p.id);
+    and app.marketplace_seller_is_public(p.seller_organization_id)
+    and app.marketplace_product_is_listed(p.id);
   if not found then
     return null;
   end if;
@@ -613,17 +581,17 @@ as $$
 declare
   o public.organizations;
 begin
-  if p_slug is null or p_slug !~ '^[a-z0-9]+(-[a-z0-9]+)*$' or char_length(p_slug) > 120 or not app.marketplace_public_open() then
+  if p_slug is null or p_slug !~ '^[a-z0-9]+(-[a-z0-9]+)*$' or char_length(p_slug) > 120 or not app.marketplace_is_open() then
     return null;
   end if;
   select * into o from public.organizations where slug = p_slug and deleted_at is null;
-  if not found or not app.marketplace_seller_is_enabled(o.id) then
+  if not found or not app.marketplace_seller_is_public(o.id) then
     return null;
   end if;
   return jsonb_build_object(
     'slug', o.slug, 'name', o.name, 'official', o.business_verified_at is not null,
     'product_count', (select count(*) from public.marketplace_products p
-                      where p.seller_organization_id = o.id and p.status = 'published' and app.marketplace_public_listed(p.id)));
+                      where p.seller_organization_id = o.id and p.status = 'published' and app.marketplace_product_is_listed(p.id)));
 end;
 $$;
 

@@ -1,6 +1,6 @@
 {
  "version": "20261123130001",
- "source": "Exact function permission contract after 20261123130001_marketplace_public_catalog_v2.sql (Marketplace PR 9). Built as main's latest contract (20261123100001, #238) plus the deltas of #241 (publication gate) and #240 (delivery/payment settings) plus this migration's own functions (six internal helpers with no client grant; public reads marketplace_public_status, _browse, _delivery and _seller; marketplace_public_catalog_page, _facets and _product keep their signatures and grants). Not generated from a fresh local database. Re-derive if #240/#241 change before they land.",
+ "source": "Exact function permission contract after 20261123130001_marketplace_public_catalog_v2.sql (Marketplace PR 9). Built as main's latest contract (20261123100001, #238) plus the deltas of #241 (publication gate) and #240 (delivery/payment settings) plus this migration's own functions (four internal helpers with no client grant; public reads marketplace_public_status, _browse, _delivery and _seller; marketplace_public_catalog_page, _facets and _product keep their signatures and grants). Not generated from a fresh local database. Re-derive if #240/#241 change before they land.",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.marketplace_public_browse(text,text,text,text,integer,integer,numeric,numeric,jsonb,boolean,integer,text,text,text)",
@@ -8964,72 +8964,6 @@
     "supabase_storage_admin": false
    },
    "signature": "app.marketplace_public_image_key(uuid)",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": false,
-    "authenticated": true,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
-     "role": "postgres",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": false,
-    "authenticated": false,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
-   "signature": "app.marketplace_public_listed(uuid)",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": false,
-    "authenticated": true,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
-     "role": "postgres",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": false,
-    "authenticated": false,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
-   "signature": "app.marketplace_public_open()",
    "schemaUsage": {
     "anon": true,
     "service_role": false,

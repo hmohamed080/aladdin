@@ -36,11 +36,11 @@ select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.
              and not has_function_privilege('service_role', p.oid, 'execute')), 7,
   'A1. the seven public reads are SECURITY DEFINER, empty search_path, granted to anon + authenticated only');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'app' and p.proname in ('marketplace_public_open', 'marketplace_public_listed', 'marketplace_public_stock_left',
+           where n.nspname = 'app' and p.proname in ('marketplace_public_stock_left',
                                                      'marketplace_product_ships_free', 'marketplace_delivery_terms', 'marketplace_free_shipping')
              and not has_function_privilege('anon', p.oid, 'execute') and not has_function_privilege('authenticated', p.oid, 'execute')
-             and not has_function_privilege('service_role', p.oid, 'execute')), 6,
-  'A2. the six internal helpers have no client grant');
+             and not has_function_privilege('service_role', p.oid, 'execute')), 4,
+  'A2. the four internal helpers have no client grant');
 
 -- ===========================================================================
 -- Fixtures: A has an in-stock product (CART-like), a zero-stock one and a draft; B has an in-stock one
@@ -106,7 +106,7 @@ select public.marketplace_seller_stock_adjust((select id from public.marketplace
 reset role;
 select is((select sum((t ->> 'count')::int)::int from jsonb_array_elements(public.marketplace_public_facets() -> 'categories') c, jsonb_array_elements(c -> 'types') t
            where t ->> 'key' = 'wallpaper'), (select count(*)::int from public.marketplace_products p where p.product_type_id = (select id from public.marketplace_product_types where key = 'wallpaper')
-           and p.status = 'published' and app.marketplace_public_listed(p.id) and app.marketplace_seller_is_enabled(p.seller_organization_id)),
+           and p.status = 'published' and app.marketplace_product_is_listed(p.id) and app.marketplace_seller_is_public(p.seller_organization_id)),
   'B10. facet counts skip the withdrawn product');
 -- suspended seller
 set local role authenticated;
