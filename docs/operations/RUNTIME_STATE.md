@@ -20,6 +20,8 @@
 
 ## Marketplace seller approval v2 (draft PR, not deployed) - 2026-11-23
 - Branch `feat/mkt-seller-approval-v2-20261123`: migration `20261123090001` (status `rejected`, reversible revoke, owner request RPC, owner-message presets, owner-only notifications through the templates) is NOT applied to Acceptance or Production (local isolated stack only, rolled-back transactions). Pages: `/admin/marketplace`, `/admin/notification-templates` (preset editor), `/showroom/marketplace`.
+## Marketplace seller delivery and payment settings (draft PR 8, not deployed) - 2026-11-23
+- Branch `feat/mkt-delivery-payment-settings-20261123`: migration `20261123120001` (preparation days, per-area duration / next-day / free-shipping minimum, per-product free shipping, InstaPay full payment, append-only settings audit, `app.marketplace_seller_commerce_missing` readiness contract) is NOT applied to Acceptance or Production (local isolated stack only, tested in rolled-back transactions). The publication gate is untouched (PR 7 consumes the readiness function). Seller pages: `/showroom/marketplace/delivery` and `/showroom/marketplace/payments`.
 
 ## Marketplace notification templates (draft PR, not deployed) - 2026-11-21
 - Branch `feat/mkt-notification-templates-20261121`: migration `20261121090003` (templates, history, `notifications.content`, six `marketplace.*` event types) is NOT applied to Acceptance or Production (local isolated stack only). Admin page `/admin/notification-templates`. No emitter calls it yet (PR 5 and PR 6).

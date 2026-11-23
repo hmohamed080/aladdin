@@ -116,6 +116,8 @@ export type SellerOrdersPage = {
 export type PaymentSettings = {
   cod_enabled: boolean;
   instapay_enabled: boolean;
+  /** InstaPay full payment (instapay_enabled stays the InstaPay deposit). Absent on older databases. */
+  instapay_full_enabled?: boolean;
   instapay_address: string | null;
   instapay_account_name: string | null;
   instapay_deposit_percent: number | null;
