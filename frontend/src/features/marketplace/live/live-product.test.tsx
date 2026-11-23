@@ -61,6 +61,24 @@ describe("LiveProduct v2 header", () => {
     expect(screen.queryByText(/call|whatsapp|contact/i)).toBeNull();
   });
 
+  it("is browse-only: no add-to-cart button unless the ordering flag is on", () => {
+    const { unmount } = render(
+      <I18nProvider locale="en" dir="ltr">
+        <LiveProduct product={official} />
+      </I18nProvider>,
+    );
+    expect(screen.queryByRole("button", { name: /add to cart/i })).toBeNull();
+    unmount();
+    vi.stubEnv("NEXT_PUBLIC_MARKETPLACE_ORDERING", "true");
+    render(
+      <I18nProvider locale="en" dir="ltr">
+        <LiveProduct product={official} />
+      </I18nProvider>,
+    );
+    expect(screen.getByRole("button", { name: /add to cart/i })).toBeInTheDocument();
+    vi.unstubAllEnvs();
+  });
+
   it("shows a thumbnail strip beside the large image when there are several images", () => {
     render(
       <I18nProvider locale="en" dir="ltr">

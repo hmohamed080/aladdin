@@ -1,4 +1,5 @@
 import { FOOTER_LINKS, SOCIAL_LINKS } from "./landing-brand-links";
+import { isMarketplaceOrderingEnabled } from "@/lib/env";
 import Image from "next/image";
 import { brandContent, PARTNER_NAMES } from "./landing-brand-content";
 import { bukra, hurme, HERO_SIZES } from "./landing-brand-fonts";
@@ -37,7 +38,7 @@ export function LandingBrand({ stats, market = { open: false, live: [], images: 
             <Image src="/landing-brand/hero.jpg" alt="" fill priority fetchPriority="high" quality={65} sizes={HERO_SIZES} className={styles.heroImg} />
             <div className={styles.heroShade} />
           </div>
-          <LandingBrandHeader showCart={market.open} />
+          <LandingBrandHeader showCart={market.open && isMarketplaceOrderingEnabled()} />
           <div className={styles.heroBody}>
             <div className={styles.heroCopy}>
               <h1>{c.hero.title} <span>{c.hero.accent}</span> {c.hero.titleTail}</h1>
@@ -62,7 +63,7 @@ export function LandingBrand({ stats, market = { open: false, live: [], images: 
         </div>
       </section>
       </div>
-      <div className={styles.onlyMobile}><MobileHero stats={stats} showCart={market.open} /></div>
+      <div className={styles.onlyMobile}><MobileHero stats={stats} showCart={market.open && isMarketplaceOrderingEnabled()} /></div>
 
       <div className={styles.onlyDesktop}>
       <section id="roles" className={styles.section}>
