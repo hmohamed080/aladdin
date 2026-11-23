@@ -1,3 +1,5 @@
+## Marketplace product review, PR 6 (draft PR, not deployed) - 2026-11-23
+- Branch `feat/mkt-product-review-20261123`: migration `20261123100001` (product-level review RPCs, owner message presets, image replacement, image verification always mandatory) is NOT applied to Acceptance or Production (local isolated stack only). Admin page `/admin/marketplace/media` is now "Product review" (one card per product, images in a scrollable strip); the media on/off card is gone. First emitter of `app.notify_from_template` (`marketplace.product.rejected`, owner only, on rejection only). Nothing deployed.
 - Acceptance (`nxossqhdfltcqdwvbewi`) is at 237 migrations, latest `20261122090002` (registration gate applied 2026-11-23, see the section below). The frontend matching `main` `b7de7c6b` is deployed to the preview Worker (version `41b77bf4-53b4-408d-9891-b527c540b0c6`). Production is untouched (last recorded 207).
 
 ## Registration gate on Acceptance (ADR-0031 PR 1 + security fix) - 2026-11-23
