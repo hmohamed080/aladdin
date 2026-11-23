@@ -6,11 +6,6 @@ import { readBoundedBody } from "@/server/storage/validation";
 import { mediaProvider, privilegedStorageClient, requireR2ForRead, resolveMedia } from "@/server/storage/media";
 
 /**
- * The bytes of one Marketplace image, read through the central media system (R2).
- * `client` must be allowed to READ the key by the marketplace media resolver (a member of
- * the seller organization, or a media moderator); anything else throws "media unavailable".
- */
-/**
  * The STORED (verified, re-encoded) original, not the upload. `readObject` returns the pending upload, which
  * confirmation re-encodes (sRGB, bounded edge, no personal metadata) before it is stored, so its size and hash
  * never equal the recorded ones. Moderation validates what the shop would serve: the stored object.
@@ -20,6 +15,11 @@ async function readStoredBytes(provider: Awaited<ReturnType<typeof mediaProvider
   return readBoundedBody(await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(30_000) }), storedObjectCeiling("image"));
 }
 
+/**
+ * The bytes of one Marketplace image, read through the central media system (R2).
+ * `client` must be allowed to READ the key by the marketplace media resolver (a member of
+ * the seller organization, or a media moderator); anything else throws "media unavailable".
+ */
 export async function readMarketplaceImageBytes(client: SupabaseClient, key: string): Promise<Uint8Array> {
   const media = await resolveMedia(client, "marketplace", key, "read");
   requireR2ForRead("marketplace", media.provider);
