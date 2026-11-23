@@ -35,6 +35,16 @@ expected_bucket() {
   esac
 }
 
+# The dynamic site-media bucket of each project (Admin-managed banners and hero media). The backup reads ONLY its own
+# label's bucket, so a token or variable of the other project fails closed instead of filing the wrong data.
+expected_site_bucket() {
+  case "$BACKUP_LABEL" in
+    production) echo aladdin-site-media;;
+    acceptance) echo aladdin-acceptance-site-media;;
+    *) echo "";;
+  esac
+}
+
 # Retention windows, in days. r2/*-lifecycle.json must say the same (retention-test.sh fails if they drift).
 #   DB_MONTHLY_RETENTION_DAYS    the longest a database snapshot lives (monthly: locked 365, expires at 366)
 #   R2_MEDIA_RETENTION_DAYS      an R2 media copy expires this long after it was WRITTEN
@@ -206,7 +216,7 @@ media_findings() {
     rm -f "$tmp"; echo "P no readable $kind record for $name in $prefix (its $kind step did not finish)"; return 0
   fi
   len="$(s3 s3api head-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.$kind.tsv.age" --query ContentLength --output text 2>/dev/null || true)"
-  case "$len" in ''|*[!0-9]*) echo "P no $kind inventory for $name in $prefix";; 0) [ "$kind" = r2media ] || echo "P no $kind inventory for $name in $prefix";; esac
+  case "$len" in ''|*[!0-9]*) echo "P no $kind inventory for $name in $prefix";; 0) { [ "$kind" = r2media ] || [ "$kind" = sitemedia ]; } || echo "P no $kind inventory for $name in $prefix";; esac
   if out="$(python3 "$LIB_DIR/media-record.py" "$tmp" "$BACKUP_LABEL" "$name" "$BACKUP_LABEL" $expected)"; then
     [ -z "$out" ] || echo "$out"
   else
@@ -244,6 +254,15 @@ media_coverage() {
       echo "$level the snapshot requires $n $desc and no independent copy of them is being made ($sw is off)"
     fi
   done <<< "$counts"
+  # The site-media bucket has no database rows to count, so what a snapshot requires of it is fixed by the project:
+  # Production always requires its site copy (a snapshot without one is an alarm, retries cannot fix it); any other
+  # project is checked only when its switch is on. CHECK_SITE_MEDIA overrides the switch for tests.
+  on="${CHECK_SITE_MEDIA:-${R2_SITE_BACKUP:-0}}"
+  if [ "$on" != 0 ]; then
+    media_findings "$prefix" "$name" sitemedia
+  elif [ "$BACKUP_LABEL" = production ]; then
+    echo "A the snapshot requires the site-media bucket and no independent copy of it is being made (R2_SITE_BACKUP is off)"
+  fi
 }
 
 # 0 when snapshot $1 is stored in every given prefix and the media it requires is backed up there (see

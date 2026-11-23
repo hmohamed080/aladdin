@@ -1,5 +1,7 @@
 # Migration dry-run, preflight and rollback runbook (2026-11-08)
 
+> **Superseded for Acceptance (2026-11-11):** the four 2026-11-07 migrations are already applied (Acceptance 207 / `20261107090006`). The current Acceptance procedure for the pending migrations is [account-identity/P1-ACCEPTANCE-RUNBOOK.md](account-identity/P1-ACCEPTANCE-RUNBOOK.md); the scripts are re-pinned in PR #179. The 203-based text below is history.
+
 Preparation only. Nothing here was run against a hosted database except read-only history listings. Every hosted step below needs its own owner approval. Rule: migrations only through `supabase db push`; no SQL Editor, no history repair.
 
 Live history, read 2026-11-08 07:50Z (Supabase tool, read-only):
@@ -22,7 +24,7 @@ Preflight (read-only, owner machine):
 4. `supabase db push --linked --dry-run --output-format json > dry.json`, then `node scripts/migration-history-guard.mjs list.json --dry-run dry.json`. Must list exactly 090003, 090004, 090005, 090006 in that order. Any other row, any include-all hint: STOP.
 5. Permission contract: `scripts/migration-permission-gate.mjs` only runs against a local RC2 test container (`node scripts/migration-permission-gate.mjs supabase_db_aladdin_r2_rc2_upgrade postgres upgrade`, needs the local Docker stack built by `supabase-rls.yml`). It cannot read a hosted database. Gate on a green `supabase-rls` run on the exact main SHA instead. Baseline `select count(*) from storage.objects` = 1 and `media_storage_locations` = 11, recorded.
 
-Backup gate (before the push, separately approved): snapshot `aladdin-acceptance-20261108T060819Z` exists. Its restore test must report RESULT: PASS with schema, row counts and media inventory exact (track 1 owns this). The push waits for that PASS. If the snapshot is older than the push by more than a few hours or any migration or user-visible write happened since, take a new one.
+Backup gate (before the push, separately approved): snapshot `aladdin-acceptance-20261108T094450Z` exists (newest restore-verified; the earlier `20261108T060819Z` is superseded). Its restore test must report RESULT: PASS with schema, row counts and media inventory exact (track 1 owns this). The push waits for that PASS. If the snapshot is older than the push by more than a few hours or any migration or user-visible write happened since, take a new one.
 
 Push (approval): `supabase db push --linked`. Then:
 - `migration list --linked` shows 207 applied, none pending; guard `--expect up-to-date` passes.
@@ -71,7 +73,7 @@ Independent read-only cross-checks from the cloud session (Supabase tool, 09:37Z
 |---|---|
 | Fresh read-only history and dry-run | DONE (section F) |
 | Permissions baseline (pre) | DONE, 731/731 |
-| Pre-migration backup with restore PASS | DONE: snapshot `aladdin-acceptance-20261108T060819Z`, restore run 42461215127 PASS |
+| Pre-migration backup with restore PASS | DONE (historical): newest restore-verified snapshot is `aladdin-acceptance-20261108T094450Z`, restore run 42469078723 PASS (the earlier `20261108T060819Z`, run 42461215127, is superseded) |
 | Backup freshness | **Owner decision.** Snapshot is 06:08Z; since then 4 `auth.users` rows were created/updated/signed in and 1 session was created (test activity; `storage.objects` and `media_storage_locations` unchanged). The 4 pending migrations are additive and change no existing user row. A restore of that snapshot would lose those 4 touches. Either accept that, or run the aladdin-backups daily backup (label acceptance) plus its restore test again immediately before the push. |
 | Script and gate tests | DONE: `acceptance-gate`, `acceptance-postcheck`, `verify-permissions-readonly` unit tests; apply script exercised against a stubbed CLI (pass, push failure, wrong project, wrong SHA, bad confirmation, post-permission mismatch). Not yet run against the real CLI. |
 | #153 merged to main | **Needed first.** `acceptance-apply.sh` refuses unless HEAD equals the pinned SHA and `origin/main`. It lives only in PR #153. |
@@ -79,7 +81,7 @@ Independent read-only cross-checks from the cloud session (Supabase tool, 09:37Z
 
 ## H. Exact Acceptance-only apply and verify plan (do not run without a separate owner GO)
 1. Owner merges PR #153 (decision). Record the resulting `origin/main` SHA `<MAIN_SHA>`.
-2. Backup gate: confirm or refresh the snapshot (section G). Keep its label, e.g. `aladdin-acceptance-20261108T060819Z`.
+2. Backup gate: confirm or refresh the snapshot (section G). Keep its label, e.g. `aladdin-acceptance-20261108T094450Z`.
 3. In a clean checkout on the owner machine (Git Bash): `git fetch origin main && git checkout --detach <MAIN_SHA> && git status --porcelain` (empty).
 4. `bash scripts/hosted-db/acceptance-apply.sh --sha <MAIN_SHA> --backup-label <label>`. It: re-checks the commit and tree; asks for the Acceptance database password (hidden); links and refuses any project other than Acceptance; re-runs the pre-checks (history 203 and exactly 4 pending, dry run, permissions vs `20261107090002`, table counts, structure); asks you to type `APPLY 4 MIGRATIONS TO ACCEPTANCE`; runs `supabase db push --linked` (no `--include-all`, no repair); then runs the post-checks.
 5. Post-checks it enforces: history 207, none pending; permissions equal the `20261107090006` contract (753 functions); `storage_key` column present; 4 backup tables present; `app.whatsapp_otp_delivery_requests` present and empty; `app.backup_settings` has 1 row, `backup_environment`, `backup_runs`, `backup_run_events` empty (backup control is NOT initialized and nothing is scheduled); `storage.objects` still 1 and `media_storage_locations` still 11. Other row-count differences are listed for review, not failed.

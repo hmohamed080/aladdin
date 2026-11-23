@@ -12,8 +12,10 @@ describe("classifySignInIdentifier", () => {
     }
   });
 
-  it("reads a letter-first handle as a username", () => {
-    expect(classifySignInIdentifier("Ahmed.Showroom_1")).toEqual({ kind: "username", value: "ahmed.showroom_1" });
+  it("does not read a letter-first handle as anything: there is no username sign-in", () => {
+    for (const raw of ["Ahmed.Showroom_1", "mona_adel", "validuser123", "ab"]) {
+      expect(classifySignInIdentifier(raw)).toBeNull();
+    }
   });
 
   it("rejects empty, malformed or impossible values", () => {

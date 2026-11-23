@@ -1,6 +1,6 @@
 # Installer/technician phone + password authentication
 
-> **Superseded 2026-10-28 (ADR-0025).** The `/installer/sign-in` and `/installer/sign-up` pages are retired and permanently redirect to `/auth/sign-in` and `/auth/sign-up?type=installer_technician`. Every account type now signs up with a mobile number (WhatsApp code) or email on `/auth/sign-up`, and signs in with one "Mobile number, username or email" field. See [ADR-0025](../decisions/ADR-0025-one-field-sign-in-whatsapp-sign-up.md). The text below is kept as history; the phone login alias it describes is still used.
+> **Superseded 2026-10-28 (ADR-0025).** The `/installer/sign-in` and `/installer/sign-up` pages are retired. They redirected to `/auth/sign-in` and `/auth/sign-up?type=installer_technician` until 2026-11-15; the redirects are removed, the URLs answer 404 in the app, and Cloudflare blocks them (403) at the edge. Every account type now signs up with a mobile number (WhatsApp code) or email on `/auth/sign-up`, and signs in with one "Mobile number, username or email" field. See [ADR-0025](../decisions/ADR-0025-one-field-sign-in-whatsapp-sign-up.md). The text below is kept as history; the phone login alias it describes is still used.
 
 **Status:** the approved, permanent, role-specific authentication entry point for
 installer/technician (الصنايعية) accounts. The current authentication model is

@@ -26,6 +26,8 @@ remain unchanged. No deletion UI is provided.
 
 ## Validation and deferred activation
 
+> Superseded 2026-11-10: migration counts and activation steps below are historical. Current state and the owner GO list: [BACKUPS_ADMIN_ACTIVATION.md](BACKUPS_ADMIN_ACTIVATION.md).
+
 Hosted Acceptance currently has 203 migrations through 20261107090002; Production
 has 193 through 20261027090001 (read-only inspection on November 7). Proposed R2
 migrations use 20261107090004/4; backup control uses 20261107090006, none applied.

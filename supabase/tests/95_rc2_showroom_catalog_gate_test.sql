@@ -7,7 +7,6 @@ select no_plan();
 
 alter table public.products disable trigger showroom_product_publish_complete;
 alter table public.organizations disable trigger showroom_activation_complete;
-alter table public.verifications disable trigger showroom_review_complete;
 
 insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data, email_confirmed_at, created_at, updated_at)
 select ('95' || lpad(n::text, 6, '0') || '-0000-4000-8000-000000000095')::uuid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',

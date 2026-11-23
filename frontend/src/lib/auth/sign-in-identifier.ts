@@ -3,7 +3,7 @@ import { parsePhone } from "@/features/installer-phone-auth/validation";
 import type { CanonicalPhone } from "@/lib/contact/phone";
 
 /**
- * The one sign-in field ("Mobile number, username or email"). Pure and
+ * The one sign-in field ("Mobile number or email"). Pure and
  * client-safe; the server action re-classifies from scratch.
  *
  *   * anything with "@"                        → email
@@ -16,11 +16,9 @@ import type { CanonicalPhone } from "@/lib/contact/phone";
  */
 export type SignInIdentifier =
   | { kind: "email"; value: string }
-  | { kind: "phone"; value: CanonicalPhone }
-  | { kind: "username"; value: string };
+  | { kind: "phone"; value: CanonicalPhone };
 
 const PHONE_SHAPE = /^\+?[0-9][0-9\s\-().]{5,}$/;
-const USERNAME_SHAPE = /^[A-Za-z][A-Za-z0-9._]{1,63}$/;
 
 export function classifySignInIdentifier(input: unknown): SignInIdentifier | null {
   if (typeof input !== "string") return null;
@@ -31,6 +29,5 @@ export function classifySignInIdentifier(input: unknown): SignInIdentifier | nul
     const phone = parsePhone(raw);
     return phone.ok ? { kind: "phone", value: phone.value } : null;
   }
-  if (USERNAME_SHAPE.test(raw)) return { kind: "username", value: raw.toLowerCase() };
   return null;
 }

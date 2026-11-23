@@ -27,3 +27,11 @@
 
 ## Amendment (R2, 2026-10-31): one verification authority
 The WhatsApp code for mobile sign-up is no longer generated, stored or checked by the sign-up server. It belongs to the phone verification authority (`supabase/migrations/20261030090001/2`, `frontend/src/server/phone-verification`): the account is created only with that authority's single-use grant, and `profiles.phone_verified_at` is set only after the usual initialisation. The sign-up server holds no code, no hash and no table of its own, and no longer calls Meta; delivery goes through one interface (`PHONE_OTP_DELIVERY`, default off). The first step no longer says whether a number is registered (a registered number simply receives no code). The legacy table `public.phone_verification_challenges` is dropped by the forward-only migration `20261031090001`. Everything ships OFF; see `docs/security/PHONE_SIGNUP_R2_INTEGRATION.md`.
+
+## Revision 2026-11-15 — retired entry URLs no longer redirect
+
+The permanent redirects from the retired entry pages to `/auth/*` are removed from `frontend/next.config.ts`: `/installer/sign-in|sign-up`, `/showroom/sign-in|sign-up` and `/temporary/craftsman/sign-in|sign-up`. They are old, unused and the owner asked for them to go. The app answers 404 for them like for any unknown path. The only redirects left in `next.config.ts` are `/preview/showroom-suite-v2` and `/admin/preview`.
+
+On the public production domain Cloudflare also blocks them at the edge (custom WAF rule "Block legacy website paths", 403), so they never reach the Worker. Consequence: a link to one of these URLs that was shared earlier (a message, an invitation) no longer lands on the sign-in page. The tests that asserted the 308s now assert 404 (`e2e/one-field-auth.spec.ts`, `e2e-acceptance/hosted-acceptance.spec.ts`, `showroom-shell/persistent-shell.test.ts`).
+
+> **Amended 2026-11-15 by [ADR-0028](ADR-0028-retired-entry-urls-answer-404.md):** the statement above that the retired URLs "answer 404 like for any unknown path" was not true for `/showroom/sign-in|sign-up` (a catch-all route redirected a logged-out visitor to sign-in). ADR-0028 records the fix. The text above is kept unchanged as history.

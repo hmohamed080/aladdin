@@ -14,7 +14,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(34);
+select plan(36);
 
 -- ===========================================================================
 -- A. Structure
@@ -108,7 +108,13 @@ reset role;
 -- a token for a subject that is not a user row, and a malformed subject
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000000aa","role":"authenticated"}', true);
 set local role authenticated;
-select lives_ok('select pgrst_hooks.pre_request()', 'unknown subject: passes (the data layer decides)');
+select set_config('request.method', 'GET', true);
+select lives_ok('select pgrst_hooks.pre_request()', 'unknown subject: a read passes (the data layer decides)');
+-- ADR-0031: a write, or a request whose method is unknown, from a subject the registration check cannot verify is refused.
+select set_config('request.method', 'POST', true);
+select throws_ok('select pgrst_hooks.pre_request()', '42501', 'registration incomplete', 'unknown subject: a write is refused (fails closed)');
+select set_config('request.method', '', true);
+select throws_ok('select pgrst_hooks.pre_request()', '42501', 'registration incomplete', 'unknown subject: an unknown method is refused (fails closed)');
 reset role;
 select set_config('request.jwt.claims', '{"sub":"not-a-uuid","role":"authenticated"}', true);
 set local role authenticated;

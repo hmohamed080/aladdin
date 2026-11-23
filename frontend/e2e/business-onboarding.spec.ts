@@ -40,7 +40,6 @@ async function register(
   const email = `biz-${tag}-${uniq()}@example.test`;
   await registerWithPassword(page, request, {
     email,
-    username: `biz${tag}${uniq()}`.slice(0, 24),
     displayName: `E2E ${tag}`,
     accountType,
     landing,

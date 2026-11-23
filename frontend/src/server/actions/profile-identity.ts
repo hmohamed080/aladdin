@@ -1,13 +1,14 @@
 "use server";
 
 import { authorizeMediaUpload, verifyPendingMedia, removeMedia } from "@/server/storage/media";
+import { imageMaxBytes } from "@/server/media/limits";
 import type { UploadGrant } from "@/lib/storage/provider-types";
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { submitCraftsmanVerificationIfComplete } from "@/server/profile/craftsman-verification";
 import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 import { SECURITY_CODES, defaultSecurityDeps, performPhoneChange } from "@/server/auth/installer-security";
 import { resolveSecuritySession } from "@/server/auth/security-session";
-import { changeUsername, type UsernameResult } from "@/server/identity/username-change";
 
 /**
  * The identity fields every audience shares — display name, phone, avatar —
@@ -43,17 +44,6 @@ export async function setDisplayNameAction(
   return { ok: true };
 }
 
-/** The caller's own username, through `profile_set_username` (see `server/identity/username-change.ts`). Returns the stored value. */
-export type UsernameFieldState = { ok: boolean; code?: string; username?: string };
-
-export async function setUsernameAction(_prev: UsernameFieldState, fd: FormData): Promise<UsernameFieldState> {
-  const supabase = await getServerSupabase();
-  const result: UsernameResult = await changeUsername(supabase, fd.get("username"));
-  if (!result.ok) return { ok: false, code: result.code };
-  revalidateIdentity();
-  return { ok: true, username: result.username };
-}
-
 export async function setPhoneAction(
   _prev: IdentityFieldState,
   fd: FormData,
@@ -84,6 +74,8 @@ export async function setPhoneAction(
       code: error.code === "23505" ? "profileIdentity.phone.unavailable" : "profileIdentity.phone.error",
     };
   }
+  // A saved phone can complete a Craftsman's profile; the database decides whether to file the request.
+  await submitCraftsmanVerificationIfComplete();
   revalidateIdentity();
   return { ok: true };
 }
@@ -146,8 +138,11 @@ export type AvatarUploadTicket =
 
 /** Step 1 — creates the pending metadata row and returns the server-generated key the client must upload to. */
 export async function requestAvatarUploadAction(contentType: string, expectedBytes?: number): Promise<AvatarUploadTicket> {
-  if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > 3 * 1024 * 1024)) {
-    return { ok: false, code: "profileIdentity.avatar.errorUpload" };
+  if (expectedBytes !== undefined) {
+    if (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0) return { ok: false, code: "profileIdentity.avatar.errorUpload" };
+    // The limit in force today (the one an administrator sets on Upload limits), checked BEFORE the pending row and
+    // before any byte is uploaded, on every storage provider. The database still refuses the same size on the receipt.
+    if (expectedBytes > (await imageMaxBytes("avatar"))) return { ok: false, code: "profileIdentity.avatar.errorTooLarge" };
   }
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("avatar_request_upload", { p_content_type: contentType });
@@ -184,6 +179,8 @@ export async function confirmAvatarUploadAction(objectKey: string): Promise<Avat
     try { await removeMedia(supabase, "avatar", previousKey); } catch { /* Metadata already revoked access. */ }
   }
 
+  // A first photo can complete a Craftsman's profile; the database decides whether to file the request.
+  await submitCraftsmanVerificationIfComplete();
   revalidateIdentity();
   return { ok: true };
 }

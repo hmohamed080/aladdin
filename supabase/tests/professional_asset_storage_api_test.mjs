@@ -316,8 +316,8 @@ async function main() {
   check("bucket: certificates is private, 10 MiB, pdf + three image types",
     buckets[0] === `${CERTIFICATES}|false|10485760|application/pdf,image/jpeg,image/png,image/webp`,
     buckets[0]);
-  check("bucket: portfolio is private, 5 MiB, three image types and no pdf",
-    buckets[1] === `${PORTFOLIO}|false|5242880|image/jpeg,image/png,image/webp`, buckets[1]);
+  check("bucket: portfolio is private, 10 MiB, three image types and no pdf",
+    buckets[1] === `${PORTFOLIO}|false|10485760|image/jpeg,image/png,image/webp`, buckets[1]);
   check("bucket: BOTH stay private even though one is publicly readable — publication is a metadata fact, never a bucket setting (S1)",
     buckets.every((b) => b.includes("|false|")));
 

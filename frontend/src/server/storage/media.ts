@@ -3,16 +3,19 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { readPublicEnv } from "@/lib/env";
 import { legacyStorageWritesOpen, readStorageEnv } from "@/lib/env/storage";
-import { mediaPolicy, isOrganizationMedia } from "@/lib/storage/media-policy";
+import { createHash } from "node:crypto";
+import { mediaPolicy, isOrganizationMedia, isR2OnlyMedia, reencodesOriginal } from "@/lib/storage/media-policy";
 import type { MediaNamespace, StorageProviderName } from "@/lib/storage/provider-types";
 import { SupabaseStorageProvider } from "./supabase-provider";
 import { CloudflareR2StorageProvider } from "./r2-provider";
-import { verifyMediaBytes } from "./validation";
+import { verifyMediaBytes, withMediaProcessingSlot } from "./validation";
+import { runtimeImageProcessor } from "./image-processing/runtime";
 import { generateImageVariants, variantManifest, type VariantManifest } from "./public-image-variants";
 import type { StorageProvider } from "@/lib/storage/provider-types";
 import { applicationMediaUrl } from "@/lib/storage/media-url";
 import { readSessionIdentity } from "@/server/auth/session";
 import { consumeRateLimit } from "@/server/cache/rate-limit";
+import { imageMaxBytes } from "@/server/media/limits";
 
 const descriptor = z.object({ provider: z.enum(["supabase", "r2"]), contentType: z.string(),
   reserved: z.boolean(), state: z.enum(["pending", "ready", "deleted"]), owner: z.string().uuid().nullable() });
@@ -55,8 +58,16 @@ function requireWriteApproval(provider: StorageProviderName) {
  * closed explicitly) a Supabase-backed write fails closed: there is no automatic fallback when R2
  * is down, uploads simply pause and the user retries. Reads and deletes of legacy objects stay open.
  */
-function requireWritableProvider(provider: StorageProviderName) {
-  if (provider === "supabase" && !legacyStorageWritesOpen(readStorageEnv())) throw new Error("media uploads are unavailable");
+function requireWritableProvider(provider: StorageProviderName, namespace: MediaNamespace) {
+  // R2-only namespaces (Marketplace) never write to Supabase Storage, even while legacy writes are open.
+  if (provider === "supabase" && (isR2OnlyMedia(namespace) || !legacyStorageWritesOpen(readStorageEnv()))) {
+    throw new Error("media uploads are unavailable");
+  }
+}
+
+/** Reads of an R2-only namespace never touch Supabase Storage either. */
+export function requireR2ForRead(namespace: MediaNamespace, provider: StorageProviderName) {
+  if (isR2OnlyMedia(namespace) && provider !== "r2") throw new Error("media unavailable");
 }
 
 export async function authorizeMediaUpload(client: SupabaseClient, namespace: MediaNamespace, key: string, expectedBytes?: number) {
@@ -68,10 +79,10 @@ export async function authorizeMediaUpload(client: SupabaseClient, namespace: Me
   }
   const env = readStorageEnv();
   // Existing R2 records remain R2 when routing is disabled. Reserve is authoritative and rejects provider changes.
-  const provider = media.reserved ? media.provider : env.R2_STORAGE_ENABLED ? "r2" : "supabase";
-  requireWritableProvider(provider);
+  const provider = media.reserved ? media.provider : env.R2_STORAGE_ENABLED || isR2OnlyMedia(namespace) ? "r2" : "supabase";
+  requireWritableProvider(provider, namespace);
   requireWriteApproval(provider);
-  const maxBytes = mediaPolicy(namespace).maxBytes;
+  const maxBytes = await imageMaxBytes(namespace); // the stored, admin-configurable limit
   if (provider === "r2" && (!expectedBytes || !Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > maxBytes)) {
     throw new Error("upload size is outside policy");
   }
@@ -121,7 +132,7 @@ export async function verifyPendingMedia(client: SupabaseClient, namespace: Medi
   }
   const pending = await resolveMedia(client, namespace, key, "upload");
   if (!pending.owner) throw new Error("owner required");
-  requireWritableProvider(pending.provider);
+  requireWritableProvider(pending.provider, namespace);
   if (!pending.reserved) {
     const reserveClient = isOrganizationMedia(namespace) ? privilegedStorageClient() : client;
     const { error: reserveError } = await reserveClient.rpc("media_storage_reserve", {
@@ -132,11 +143,21 @@ export async function verifyPendingMedia(client: SupabaseClient, namespace: Medi
   }
   const provider = await mediaProvider(pending.provider === "supabase" ? privilegedStorageClient() : client, namespace, pending.provider, key);
   requireWriteApproval(pending.provider);
-  const maxBytes = mediaPolicy(namespace).maxBytes;
+  const maxBytes = await imageMaxBytes(namespace); // the stored, admin-configurable limit
   const bytes = await provider.readObject(key, maxBytes);
-  const verified = await verifyMediaBytes(bytes, pending.contentType, maxBytes);
-  await provider.commitVerifiedObject(key, bytes, verified.contentType);
-  const variants = await storeVariants(provider, namespace, key, bytes, verified.contentType);
+  const checked = await verifyMediaBytes(bytes, pending.contentType, maxBytes);
+  // On R2 the stored original is the verified upload RE-ENCODED (sRGB, bounded edge, no personal metadata).
+  // Fail closed: an image whose metadata cannot be removed is refused, never stored as uploaded.
+  // The legacy Supabase provider cannot replace an object (keys are immutable, commit is a no-op), so there the
+  // stored bytes ARE the upload: re-encoding would make the receipt describe bytes that were never stored.
+  // The receipt must always describe the stored object, so that path attests the upload as it is.
+  const stored = pending.provider === "r2" && checked.contentType.startsWith("image/") && reencodesOriginal(namespace)
+    ? (await withMediaProcessingSlot(() => runtimeImageProcessor().reencodeOriginal(bytes, checked.contentType, maxBytes))).bytes
+    : bytes;
+  const verified = stored === bytes ? checked
+    : { ...checked, size: stored.byteLength, sha256: createHash("sha256").update(stored).digest("hex") };
+  await provider.commitVerifiedObject(key, stored, verified.contentType);
+  const variants = await storeVariants(provider, namespace, key, stored, verified.contentType);
   const admin = privilegedStorageClient();
   const { error } = await admin.rpc("media_storage_attest", {
     p_namespace: namespace, p_key: key, p_owner: pending.owner, p_provider: pending.provider,

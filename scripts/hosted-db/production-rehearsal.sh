@@ -12,6 +12,11 @@
 # Reuse an earlier, already verified backup without contacting Production at all (no link, no password, no query):
 #   bash production-rehearsal.sh --resume-backup ~/aladdin-production-rehearsal-<date>
 # The earlier folder is only read; results go to a new folder ending in -resumed.
+# Recovery check only (no migrations): add --restore-only. It validates the backup, restores it into the throwaway local
+# stack and prints PASS only if the Auth/Storage schema, the public/app schema fingerprint, every row count and the
+# parameter grants equal Production's and the backup files are unchanged. It skips the pending-migration steps, so it also
+# works when Production is fully migrated. Needs a backup folder with its metadata (e.g. from this script's own backup step).
+#   bash production-rehearsal.sh --sha <commit> --resume-backup ~/aladdin-production-rehearsal-<date> --restore-only
 # Test mode (Claude, local only): REHEARSAL_SOURCE_DB_URL=postgresql://...@127.0.0.1:PORT/postgres
 #   REHEARSAL_VERSIONS_DIR=<dir with gotrue-version, storage-version, postgres-version> pins the stack like `link` does.
 set -euo pipefail
@@ -34,9 +39,10 @@ rows() { node -e 'let b="";process.stdin.on("data",d=>b+=d).on("end",()=>{const 
 PINS="gotrue-version storage-version postgres-version"
 for f in schema-fingerprint.sql schema-detail.sql security-tail.sql rowcounts.sql auth-storage-columns.sql local-only-roles-cleanup.sql \
          local-default-privileges-reset.sql local-noseed-fingerprint.txt local-noseed-detail.txt; do [ -s "$KIT/$f" ] || { echo "missing $KIT/$f"; exit 1; }; done
-RESUME=""
+RESUME=""; RESTORE_ONLY=""
 while [ $# -gt 0 ]; do
   case "$1" in
+    --restore-only) RESTORE_ONLY=1; shift;;
     --resume-backup) RESUME="${2:?usage: --resume-backup <earlier rehearsal folder, or its backup folder>}"; shift 2;;
     --sha) SHA="${2:?usage: --sha <40-hex commit on origin/main>}"; shift 2;;
     *) echo "unknown option: $1"; exit 1;;
@@ -162,6 +168,7 @@ fi
 echo "Backup validation passed: checksums, file list, metadata, row counts and migration history are consistent."
 
 # 2. What a push would apply. Unknown versions on Production stop the rehearsal: they need review first.
+if [ -n "$RESTORE_ONLY" ]; then : > "$OUT/pending.txt"; echo "Restore-only run: the pending-migration steps are skipped."; else
 ls supabase/migrations/*.sql | xargs -n1 basename | cut -c1-14 | sort > "$OUT/history-files.txt"
 comm -13 "$OUT/history-files.txt" "$OUT/history-production.txt" > "$OUT/only-on-production.txt"
 comm -23 "$OUT/history-files.txt" "$OUT/history-production.txt" > "$OUT/pending.txt"
@@ -174,6 +181,7 @@ echo "Pending: $(wc -l < "$OUT/pending.txt") migrations. Only on Production: $(w
   || { echo "pending set differs from the reviewed one ($EXPECT_PENDING), see pending.txt: stopping"; exit 1; }
 OOO="$(awk -v l="$(tail -1 "$OUT/history-production.txt")" '$0 < l' "$OUT/pending.txt" | tr '\n' ' ' | sed 's/ $//')"
 [ "$OOO" = "20261105090001" ] || [ -z "$OOO" ] || { echo "unexpected out-of-order pending versions: $OOO"; exit 1; }
+fi
 
 # 3. Restore into a throwaway local stack and prove the restore is exact.
 R="$OUT/stack"; mkdir -p "$R/supabase/migrations"; cp -r supabase/templates "$R/supabase/"
@@ -252,6 +260,25 @@ lq "$OUT/.p.sql" > "$OUT/parameter-acl-restored.txt"
 diff -q "$OUT/parameter-acl-production.txt" "$OUT/parameter-acl-restored.txt" >/dev/null || RESTORE="$RESTORE; PARAMETER GRANTS DIFFER"
 # Names, hashes and privileges only (no row data): which objects stand behind a fingerprint difference.
 lq "$KIT/schema-detail.sql" > "$OUT/detail-restored.txt"
+
+if [ -n "$RESTORE_ONLY" ]; then
+  # Recovery check only: nothing is applied. PASS needs an exact restore, identical Auth/Storage (checked above) and untouched backup files.
+  set +e
+  ( cd "$B" && shasum -a 256 -c --quiet "$OUT/backup.SHA256SUMS" >/dev/null 2>&1 ) && cmp -s <(tr -d '\r' < "$B/SHA256SUMS") <(tr -d '\r' < "$OUT/backup.SHA256SUMS") \
+    && BACKUP=unchanged || BACKUP=CHANGED
+  set -e
+  {
+    echo "Production recovery check $(date -u +%FT%TZ), release commit $SHA (restore only, no migrations applied)"
+    if [ -n "$RESUME" ]; then echo "Backup: reused from $RESUME (Production was not contacted by this run)"; else echo "Backup: taken by this run"; fi
+    echo "Backup validation: passed ($(wc -l < "$OUT/rowcounts-production.txt") table row counts, $(wc -l < "$OUT/history-production.txt") history versions)"
+    echo "Auth/Storage schema versus Production: $AUTHSTORAGE"
+    echo "Restore of the backup: $RESTORE (public/app schema fingerprint, the row count of every restored table, parameter grants)"
+    echo "Production backup files: $BACKUP since the checksum was taken"
+  } > "$OUT/REPORT.txt"
+  cat "$OUT/REPORT.txt"
+  if [ "$RESTORE" != exact ] || [ "$BACKUP" != unchanged ]; then echo "RECOVERY CHECK: FAIL (restore=$RESTORE, backup=$BACKUP)"; exit 1; fi
+  echo "RECOVERY CHECK: PASS"; exit 0
+fi
 
 # 4. Apply exactly what `db push` would apply, the same way (one file at a time, recorded in history).
 cp supabase/migrations/*.sql "$R/supabase/migrations/"

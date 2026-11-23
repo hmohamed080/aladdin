@@ -17,6 +17,8 @@
  *   - destructive-looking statements (drop table/column/function/view/type/schema, renames, column type changes,
  *     truncate, and drop-and-recreate of a function signature) FAIL unless the file carries a reviewed marker:
  *         -- migration-policy: destructive-reviewed - <why this is safe, and which earlier release made it safe>
+ *     or the file is pinned under `destructive` in supabase/migration-policy-reviewed.json by the sha256 of its LF-normalised text (only for a
+ *     file that is already applied somewhere and so cannot be edited to add the marker; a later edit breaks the pin and fails again)
  *   - a version that is not newer than the newest migration already on the base branch FAILS unless the file carries
  *         -- migration-policy: out-of-order-reviewed - <why, e.g. reconciling history that is already applied>
  *     or the file is pinned in supabase/migration-policy-reviewed.json by the sha256 of its LF-normalised text (for a file that is
@@ -119,7 +121,7 @@ export function contentHash(sql) {
   return createHash("sha256").update(sql.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10))).digest("hex");
 }
 
-export function evaluatePr({ changes, readFile, baseFiles, reviewed = {} }) {
+export function evaluatePr({ changes, readFile, baseFiles, reviewed = {}, reviewedDestructive = {} }) {
   const failures = [];
   const warnings = [];
   const baseVersions = baseFiles.map(versionOf).filter(Boolean);
@@ -170,9 +172,18 @@ export function evaluatePr({ changes, readFile, baseFiles, reviewed = {} }) {
     const risks = findRisks(sql);
     if (risks.length > 0) {
       const marker = readMarker(sql, "destructive");
+      const pin = reviewedDestructive[path];
       const detail = risks.map((r) => `    line ${r.line}: [${r.rule}] ${r.text} - ${r.why}`).join("\n");
       if (marker && !marker.invalid) {
         warnings.push(`${path}: destructive-looking statements accepted via reviewed marker: ${marker}\n${detail}`);
+      } else if (pin && pin.sha256 === contentHash(sql) && typeof pin.reason === "string" && pin.reason.trim().length >= 15) {
+        // For a migration ALREADY applied somewhere, which therefore cannot be edited to add the marker: the review is bound to
+        // the exact content, so any later edit fails this check again.
+        warnings.push(`${path}: destructive-looking statements accepted via the pinned review in supabase/migration-policy-reviewed.json: ${pin.reason.trim()}
+${detail}`);
+      } else if (pin) {
+        failures.push(`${path}: pinned as destructive-reviewed in supabase/migration-policy-reviewed.json, but the file no longer matches the pinned sha256 (or the reason is too short). Re-review it and update the pin.
+${detail}`);
       } else {
         failures.push(
           `${path}: destructive-looking statements. The database is migrated BEFORE the new application is promoted, so the OLD application ` +
@@ -218,6 +229,9 @@ export function main(argv) {
     readFile: (p) => readFileSync(join(root, p), "utf8"),
     reviewed: existsSync(join(root, "supabase/migration-policy-reviewed.json"))
       ? (JSON.parse(readFileSync(join(root, "supabase/migration-policy-reviewed.json"), "utf8")).out_of_order ?? {})
+      : {},
+    reviewedDestructive: existsSync(join(root, "supabase/migration-policy-reviewed.json"))
+      ? (JSON.parse(readFileSync(join(root, "supabase/migration-policy-reviewed.json"), "utf8")).destructive ?? {})
       : {},
   });
 

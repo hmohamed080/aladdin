@@ -7,8 +7,9 @@ vi.mock("@/lib/env/storage", () => ({ readStorageEnv: () => env.storage }));
 vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_SUPABASE_URL: env.supabase }) }));
 import { CloudflareR2StorageProvider, createR2Client } from "./r2-provider";
 import { ACCEPTANCE_SUPABASE_REF, PRODUCTION_SUPABASE_REF } from "@/lib/storage/environment-guard";
+import { ENVIRONMENT_MANIFEST } from "@/lib/storage/environment-manifest";
 
-const base = { R2_ACCOUNT_ID: "a".repeat(32), R2_ACCESS_KEY_ID: "k", R2_SECRET_ACCESS_KEY: "s" };
+const base = { R2_ACCOUNT_ID: ENVIRONMENT_MANIFEST.production.r2AccountId!, R2_ACCESS_KEY_ID: "k", R2_SECRET_ACCESS_KEY: "s" };
 const set = (appEnv: string, bucket: string, ref: string, extra: Record<string, unknown> = {}) => {
   env.storage = { ...base, APP_ENV: appEnv, R2_PRIVATE_BUCKET: bucket, ...extra };
   env.supabase = `https://${ref}.supabase.co`;
@@ -19,7 +20,13 @@ describe("R2 client refuses the wrong environment", () => {
   it("works for the approved Acceptance setup", () => {
     expect(() => new CloudflareR2StorageProvider("avatar")).not.toThrow();
   });
-  it("refuses a look-alike Acceptance bucket and any Production use until approved", () => {
+  it("works for the approved Production setup and refuses an unpinned account", () => {
+    set("production", "aladdin-media-private", PRODUCTION_SUPABASE_REF, { R2_SITE_BUCKET: "aladdin-site-media" });
+    expect(() => createR2Client()).not.toThrow();
+    set("production", "aladdin-media-private", PRODUCTION_SUPABASE_REF, { R2_ACCOUNT_ID: "b".repeat(32) });
+    expect(() => createR2Client()).toThrow("media environment refused");
+  });
+  it("refuses a look-alike Acceptance bucket and any unapproved Production bucket", () => {
     set("staging", "evil-acceptance-copy", ACCEPTANCE_SUPABASE_REF);
     expect(() => new CloudflareR2StorageProvider("avatar")).toThrow("media environment refused");
     set("production", "aladdin-media-production-private", PRODUCTION_SUPABASE_REF);

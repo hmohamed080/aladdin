@@ -32,8 +32,12 @@ test("real checked-in preview config is fail-closed and permitted", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /PASS/);
 });
-test("preview config refuses enabled WhatsApp delivery", () => {
-  assertBlocked("enabled delivery", o => { o.vars.WHATSAPP_DELIVERY_ENABLED = "true"; });
+test("preview config accepts only the literal strings true or false for the delivery permit, and only for the Acceptance Worker", () => {
+  for (const bad of ["TRUE", "1", "yes", "", " true"]) assertBlocked("permit " + JSON.stringify(bad), o => { o.vars.WHATSAPP_DELIVERY_ENABLED = bad; });
+  assertBlocked("missing permit", o => { delete o.vars.WHATSAPP_DELIVERY_ENABLED; });
+  // The permit cannot ride on a production-looking Worker: name and environment are pinned independently.
+  assertBlocked("permit on a production-named Worker", o => { o.name = "aladdin-whatsapp-otp-production"; });
+  assertBlocked("permit with production environment", o => { o.vars.OTP_ENVIRONMENT = "production"; });
 });
 test("preview config refuses production Worker name", () => {
   assertBlocked("production Worker", o => { o.name = "aladdin-frontend-production"; });
@@ -56,7 +60,7 @@ test("preview config refuses re-binding the Supabase Send-SMS-hook secret", () =
 });
 test("preview config requires recipient mode open and environment acceptance, with no allowlist anywhere", () => {
   assert.equal(baseline.vars.OTP_RECIPIENT_MODE, "open");
-  assert.equal(baseline.vars.WHATSAPP_DELIVERY_ENABLED, "false");
+  assert.equal(baseline.vars.WHATSAPP_DELIVERY_ENABLED, "true"); // permit only; the audited D1 switch starts OFF and attestation is separate
   assertBlocked("allowlist mode", o => { o.vars.OTP_RECIPIENT_MODE = "allowlist"; });
   assertBlocked("missing mode", o => { delete o.vars.OTP_RECIPIENT_MODE; });
   assertBlocked("production marker", o => { o.vars.OTP_ENVIRONMENT = "production"; });

@@ -27,6 +27,7 @@ export const AUDIT_ACTIONS = [
   "verification.review_started",
   "verification.changes_requested",
   "verification.approved",
+  "verification.admin_initiated",
   "verification.rejected",
   "profile.listed",
   "profile.hidden",

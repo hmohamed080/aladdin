@@ -20,7 +20,7 @@ function database(start: string) {
   mocks.rpc.mockImplementation(async (name: string) => {
     if (name === "my_registration_state") return { data: state, error: null };
     if (name === "record_consent") state = "account_type_pending";
-    if (name === "onboarding_select_account_type") state = "username_pending";
+    if (name === "onboarding_select_account_type") state = "access_ready";
     return { data: null, error: null };
   });
 }
@@ -45,9 +45,17 @@ describe("completeEntryOAuth", () => {
     expect(mocks.rpc.mock.calls.map(([name]) => name)).not.toContain("onboarding_select_account_type");
   });
 
-  it("applies an open account type picked on the landing page", async () => {
+  it("applies an open account type picked on the landing page, with no age confirmation needed", async () => {
     database("consent_pending");
-    expect((await call({ accountType: "showroom_dealer" })).path).toBe("/auth/finish-registration");
+    expect((await call({ accountType: "showroom_dealer" })).path).toBe("/home");
+    expect(mocks.rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "business", p_account_type: "showroom_dealer" });
+  });
+
+  it("OAuth first-time registration needs no age confirmation, and a stray ageConfirmed parameter changes nothing", async () => {
+    mocks.exchange.mockResolvedValue({ data: { user }, error: null });
+    mocks.landing.mockResolvedValue("/home");
+    database("consent_pending");
+    expect((await call({ accountType: "showroom_dealer", ageConfirmed: false } as never)).path).toBe("/home");
     expect(mocks.rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "business", p_account_type: "showroom_dealer" });
   });
 
@@ -95,6 +103,11 @@ describe("completeEntryOAuth", () => {
 });
 
 describe("entryCallbackUrl", () => {
+  it("carries no age flag: only a sanitized next and an open account type", () => {
+    expect(entryCallbackUrl("https://aladdindecore.com", null, "supplier")).toBe("https://aladdindecore.com/auth/callback?type=supplier");
+    expect((entryCallbackUrl as (...a: unknown[]) => string)("https://aladdindecore.com", null, "supplier", true)).not.toContain("ageConfirmed");
+  });
+
   it("carries only an allow-listed next and an open account type", () => {
     expect(entryCallbackUrl("https://aladdindecore.com", "/b2b/products", "supplier")).toBe("https://aladdindecore.com/auth/callback?next=%2Fb2b%2Fproducts&type=supplier");
     expect(entryCallbackUrl("https://aladdindecore.com", "https://evil.test", "admin")).toBe("https://aladdindecore.com/auth/callback");

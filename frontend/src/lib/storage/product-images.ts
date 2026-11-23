@@ -7,13 +7,14 @@
  *
  * PURE ON PURPOSE — no `server-only`, no Supabase client.
  */
+import { IMAGE_MAX_BYTES } from "@/lib/media/upload-limits";
 
 export const PRODUCT_IMAGE_BUCKET = "product-images";
 /**
  * Mirrors the bucket's `file_size_limit`. It is the ceiling of the PREPARED upload
  * (`resizeImageForUpload` fits every photo under it), not of the photo a person picks.
  */
-export const PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const PRODUCT_IMAGE_MAX_BYTES = IMAGE_MAX_BYTES;
 export const PRODUCT_IMAGE_MAX_COUNT = 3;
 export const PRODUCT_IMAGE_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export type ProductImageContentType = (typeof PRODUCT_IMAGE_ALLOWED_TYPES)[number];

@@ -10,10 +10,9 @@ import type { CanonicalPhone } from "@/lib/contact/phone";
 import { readPhoneVerificationEnv } from "@/lib/env/phone-verification";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
-import { isUsernameWellFormed } from "@/lib/identity/username";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { createPhoneSignUpUser, deleteCraftsmanPasswordUser, isCanonicalPhoneTaken, saveVerifiedBirthDate } from "@/lib/supabase/admin-server";
-import { displayNameSchema, parseBirthDate, passwordWithContextSchema } from "@/features/auth-password-preview/password-policy";
+import { createPhoneSignUpUser, deleteCraftsmanPasswordUser, isCanonicalPhoneTaken } from "@/lib/supabase/admin-server";
+import { displayNameSchema, passwordWithContextSchema } from "@/features/auth-password-preview/password-policy";
 import { phoneAuthLimit } from "@/server/auth/phone-auth-limit";
 import { captchaTokenFrom, isCaptchaFailure } from "@/server/auth/captcha";
 import { clientIpFrom, turnstileHostnamesFrom, verifyTurnstileToken } from "@/server/auth/turnstile";
@@ -29,8 +28,9 @@ import type { Database } from "@/types/database.types";
  *
  *   1. requestPhoneSignUp — validates every field, checks Turnstile with Siteverify (no GoTrue call happens here), applies the durable
  *      phone limiter, then asks the authority to open a challenge for a random REGISTRATION id. The authority generates and MACs the code,
- *      and the delivery adapter sends it AFTER this reply (Next `after`), so the reply never depends on delivery: a number that already
- *      belongs to an account gets the same screen, the same timing and simply no message. The registration fields ride a SEALED cookie
+ *      and the delivery adapter sends it AFTER this reply (Next `after`), so the reply never depends on delivery. A number that already
+ *      belongs to an account is answered with `phoneExists` BEFORE any challenge (after Turnstile and the limiter), so nobody waits for a code
+ *      that will never come; the authority still suppresses delivery for a taken number as a second line. The registration fields ride a SEALED cookie
  *      (AES-256-GCM, httpOnly, 10 minutes, /auth only) because nothing exists in Auth yet.
  *   2. verifyPhoneSignUp — the authority checks the code (attempt caps live there) and returns ONE single-use GRANT for exactly that phone
  *      alias. Only then is the Auth user created, through the Admin API with the grant in app_metadata (the database guard refuses a
@@ -61,9 +61,7 @@ type Pending = {
   cid: string;
   name: string;
   phone: CanonicalPhone;
-  username: string;
   accountType: string;
-  birthDate: string;
   password: string;
   locale: Locale;
   exp: number;
@@ -126,8 +124,8 @@ async function callerIp(): Promise<string | null> {
 }
 
 /**
- * Opens (or, on resend, replaces) the challenge through the authority. The authority's reply is identical for a free and a taken
- * number; this function must not add any await on delivery or any branch that depends on whether the number is registered.
+ * Opens (or, on resend, replaces) the challenge through the authority. The authority's own reply is identical for a free and a taken
+ * number (it is the second line behind the explicit check in requestPhoneSignUp); this function adds no await on delivery.
  * `getPhoneSignupService()` is called here, inside the server action, because it wires Next `after()` to the request.
  */
 async function startChallenge(rid: string, phone: CanonicalPhone, locale: Locale): Promise<{ cid: string } | { code: string }> {
@@ -165,14 +163,10 @@ export async function requestPhoneSignUp(formData: FormData, phone: CanonicalPho
 
   const name = displayNameSchema.safeParse(formData.get("displayName"));
   if (!name.success) return fail(name.error.issues[0]?.message ?? E("fullNameRequired"));
-  const username = String(formData.get("username") ?? "").trim();
-  if (!isUsernameWellFormed(username)) return fail("registration.error.usernameShape");
   const choice = CHOICES_BY_KEY[String(formData.get("accountType") ?? "")];
   if (!choice || choice.comingSoon || choice.transitional || !choice.accountType) return fail(E("accountTypeRequired"));
-  const password = passwordWithContextSchema([phone.e164, phone.national, username]).safeParse(formData.get("password"));
+  const password = passwordWithContextSchema([phone.e164, phone.national]).safeParse(formData.get("password"));
   if (!password.success) return fail(password.error.issues[0]?.message ?? E("passwordTooShort"));
-  const birthDate = parseBirthDate(formData.get("birthDate"));
-  if (!birthDate.ok) return fail(birthDate.code);
   if (!CONSENT_TYPES.every((type) => formData.get(`consent_${type}`) === "on")) return fail(E("consentRequired"));
 
   // Never replace a signed-in person's identity or create a second account.
@@ -187,11 +181,17 @@ export async function requestPhoneSignUp(formData: FormData, phone: CanonicalPho
   const limited = await phoneAuthLimit("sign-up", phone.e164, await headers());
   if (limited !== "allowed") return fail(limited === "limited" ? E("rateLimited") : E("sendFailed"));
 
-  // There is deliberately NO "is this number registered?" check here: the answer would be a phone-number existence oracle. A number that
-  // already has an account goes through the same screens and simply receives no code (the authority suppresses delivery).
-  const { data: available, error: availabilityError } = await supabase.rpc("username_available", { p_username: username });
-  if (availabilityError || typeof available !== "boolean") return fail(E("sendFailed"));
-  if (!available) return fail("registration.error.usernameUnavailable");
+  // A number that already has an account is told so, with a way to log in instead (product decision, 2026-11-12): the person must not wait for
+  // a WhatsApp code that will never arrive. This answer is an existence signal, so it sits BEHIND the same guards as everything else here:
+  // Turnstile (Siteverify, above), then the durable per-IP (10) and per-number (5) budget (above). Nothing is sent, sealed or staged for a
+  // taken number. A lookup that fails never guesses "free": it stops the sign-up. The authority still suppresses delivery for a taken number
+  // as a second line (a race between this check and the challenge, or a number that became taken meanwhile).
+  try {
+    if (await isCanonicalPhoneTaken(phone.e164)) return fail(E("phoneExists"));
+  } catch (error) {
+    logStepFailure("phone_precheck", error as { code?: string });
+    return fail(E("sendFailed"));
+  }
 
   // Fail closed BEFORE a code is requested: without the cookie secret the pending sign-up cannot be kept, so no message may be sent.
   try {
@@ -211,9 +211,7 @@ export async function requestPhoneSignUp(formData: FormData, phone: CanonicalPho
     cid: started.cid,
     name: name.data,
     phone,
-    username,
     accountType: choice.key,
-    birthDate: birthDate.value,
     password: password.data,
     locale,
     exp: Date.now() + COOKIE_TTL_MS,
@@ -238,7 +236,7 @@ export async function resendPhoneSignUpCode(formData: FormData): Promise<PhoneSi
 }
 
 class InitializationError extends Error {
-  constructor(readonly outcome: "phone_taken" | "username_taken" | "captcha" | "failed") {
+  constructor(readonly outcome: "phone_taken" | "captcha" | "failed") {
     super(outcome);
   }
 }
@@ -248,7 +246,6 @@ async function initializeAccount(supabase: Client, userId: string, pending: Pend
     const { error } = await call;
     if (!error) return;
     if (name === "phone" && error.code === "23505") throw new InitializationError("phone_taken");
-    if (name === "username" && error.code === "23505") throw new InitializationError("username_taken");
     logStepFailure(name, error);
     throw new InitializationError("failed");
   };
@@ -264,14 +261,7 @@ async function initializeAccount(supabase: Client, userId: string, pending: Pend
     p_national: pending.phone.national,
     p_e164: pending.phone.e164,
   }));
-  await step("username", supabase.rpc("profile_set_username", { p_username: pending.username }));
   await step("display_name", supabase.rpc("profile_set_display_name", { p_display_name: pending.name }));
-  try {
-    await saveVerifiedBirthDate(userId, pending.birthDate);
-  } catch {
-    logStepFailure("birth_date", null);
-    throw new InitializationError("failed");
-  }
   // Last: the profile now holds exactly the proven number, so the authority can stamp phone_verified_at for it. Anything but a clean
   // "attached" (grant expired, wrong user, wrong number, feature switched off meanwhile) fails the whole sign-up and rolls it back.
   const attached = await service.attach(userId, grant.id);
@@ -362,7 +352,6 @@ export async function verifyPhoneSignUp(formData: FormData): Promise<PhoneSignUp
     if (outcome !== "captcha") await clearCookie();
     if (!(error instanceof InitializationError)) logStepFailure("initialization", error as { code?: string });
     if (outcome === "phone_taken") return fail(E("phoneExists"));
-    if (outcome === "username_taken") return fail("registration.error.usernameUnavailable");
     if (outcome === "captcha") return fail(E("captchaRejected"));
     return fail(E("verifyFailed"));
   }

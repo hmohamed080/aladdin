@@ -9,7 +9,6 @@ import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "@/features/auth-password-preview/password-input";
 import { TurnstileWidget } from "@/features/auth-password-preview/turnstile-widget";
 import { DISPLAY_NAME_MAX_LENGTH } from "@/features/auth-password-preview/password-policy";
-import { BirthDateSelect } from "@/features/auth-password-preview/birth-date-select";
 import { requestStaffSignUp, verifyStaffSignUp, type StaffInvitationState } from "@/server/actions/staff-invitation";
 
 const CONSENT_TYPES = ["terms", "privacy", "pilot"] as const;
@@ -26,7 +25,7 @@ function FieldError({ code }: { code?: string }) {
 
 /**
  * Registration for an invited staff member. The same fields, rules, CAPTCHA and 6-digit e-mail code as marketplace sign-up, minus the
- * account type and the username: a staff account never gets a marketplace persona. The invitation token is not a field here; the server
+ * account type: a staff account never gets a marketplace persona. The invitation token is not a field here; the server
  * reads it from its httpOnly handoff cookie, so nothing sensitive lives in this form or in the URL.
  */
 export function StaffRegisterForm() {
@@ -86,13 +85,6 @@ export function StaffRegisterForm() {
           onChange={(e) => setPassword(e.target.value)}
           placeholder={t("authPasswordPreview.passwordLabel")}
         />
-        <p id="birthDateLabel" className="mt-xs text-label font-medium text-fg-secondary">
-          {t("authPasswordPreview.signUp.birthDateLabel")}
-        </p>
-        <BirthDateSelect invalid={Boolean(sendState.code && /birthDate/i.test(sendState.code))} describedBy="birthDateHint" />
-        <p id="birthDateHint" className="text-label text-fg-muted">
-          {t("authPasswordPreview.signUp.birthDateHint")}
-        </p>
         <label htmlFor="displayName" className="sr-only">
           {t("authPasswordPreview.fullNameLabel")}
         </label>
@@ -105,16 +97,17 @@ export function StaffRegisterForm() {
           maxLength={DISPLAY_NAME_MAX_LENGTH}
           placeholder={t("authPasswordPreview.fullNameLabel")}
         />
+        {/* PROPOSED INTERIM, pending legal approval: replaces the retired birth-date fields. */}
         {CONSENT_TYPES.map((type) => (
           <input key={type} type="hidden" name={`consent_${type}`} value="on" />
         ))}
         <p className="mt-xs text-center text-label text-fg-muted" data-sign-up-agreement>
           {t("authPasswordPreview.signUp.agreementPrefix")}{" "}
-          <Link href="/legal/terms" target="_blank" className="font-semibold text-fg-secondary hover:underline">
+          <Link href="/legal/terms" prefetch={false} target="_blank" className="font-semibold text-fg-secondary hover:underline">
             {t("entryAuth.terms")}
           </Link>{" "}
           {t("entryAuth.and")}{" "}
-          <Link href="/legal/privacy" target="_blank" className="font-semibold text-fg-secondary hover:underline">
+          <Link href="/legal/privacy" prefetch={false} target="_blank" className="font-semibold text-fg-secondary hover:underline">
             {t("entryAuth.privacy")}
           </Link>
           . {t("authPasswordPreview.signUp.agreementSuffix")}

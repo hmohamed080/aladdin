@@ -59,5 +59,5 @@ service token (the fulfilled response carries its `Set-Cookie`). This part is si
 the first hosted run. `e2e-access-routing/access-routing.spec.ts` (real Chromium, local servers, run by `ci.yml` and before the
 hosted suite) fails if the token reaches another origin, an Access login host, or a cross-origin subresource.
 
-`/installer/sign-in` is a permanent redirect to `/auth/sign-in`: the smoke test asserts status 308 and the same-origin
-destination without following it.
+`/installer/sign-in` is retired and has no redirect (removed 2026-11-15): the smoke test asserts status 404 on the Acceptance
+host. On the public production domain Cloudflare blocks the path (403) before it reaches the app.

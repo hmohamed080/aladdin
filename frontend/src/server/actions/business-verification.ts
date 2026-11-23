@@ -10,11 +10,11 @@ import {
   isBvDocType,
   isBvKey,
   mapBvError,
-  BV_MAX_BYTES,
 } from "@/lib/business-verification/contract";
 import type { FormState } from "@/server/actions/sales-forms";
 import type { UploadGrant } from "@/lib/storage/provider-types";
 import { authorizeMediaUpload, removeMedia, verifyPendingMedia } from "@/server/storage/media";
+import { imageMaxBytes } from "@/server/media/limits";
 
 /**
  * Business verification actions. Nothing is decided here: every rule (who may upload, submit, review or
@@ -38,7 +38,7 @@ export async function requestBvUploadAction(input: {
 }): Promise<BvTicket> {
   if (!UUID_SHAPE.test(input.orgId) || !isBvDocType(input.docType)) return { ok: false, code: "states.genericRetry" };
   if (!isBvContentType(input.contentType)) return { ok: false, code: "businessVerification.errors.fileType" };
-  if (!(input.sizeBytes > 0 && input.sizeBytes <= BV_MAX_BYTES)) return { ok: false, code: "businessVerification.errors.fileSize" };
+  if (!(input.sizeBytes > 0 && input.sizeBytes <= (await imageMaxBytes("verification")))) return { ok: false, code: "businessVerification.errors.fileSize" };
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("business_verification_document_request_upload", {
     p_org_id: input.orgId,

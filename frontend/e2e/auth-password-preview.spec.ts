@@ -6,9 +6,7 @@ import {
   readNewOtp,
   reachLanding,
   newMessageSubjectsFor,
-  registerWithPassword,
   selectAccountType,
-  fillBirthDate,
   SIGN_IN_BUTTON,
   SIGN_IN_IDENTIFIER_LABEL,
   SIGN_UP_BUTTON,
@@ -39,31 +37,16 @@ function uniqueEmail(tag: string): string {
   return `pw-e2e-${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 }
 
-/**
- * A syntactically valid, almost-certainly-unused username per call. The
- * descriptive TEST tag is sanitized for test-data generation only (letters and
- * digits, starts with a letter) — production validation is never relaxed, it
- * would correctly refuse a tag like "enum-existing". A base-36 timestamp plus
- * randomness keeps it unique within 3-24 characters.
- */
-function uniqueUsername(tag: string): string {
-  const safe = tag.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/^[0-9]+/, "").slice(0, 10) || "user";
-  const suffix = `${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 4).toString(36)}`;
-  return `${safe}${suffix}`.slice(0, 24);
-}
-
 const STRONG_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
 
-/** Fills the one sign-up form (ADR-0025): contact, password, birthday, name, username, account type. Consents are one agreement line, not checkboxes. */
+/** Fills the one sign-up form (ADR-0025): contact, password, name, and account type. Consents are one agreement line, not checkboxes. */
 async function fillSignUp(
   page: import("@playwright/test").Page,
-  { email, username, password }: { email: string; username: string; password: string },
+  { email, password }: { email: string; password: string },
 ): Promise<void> {
   await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(email);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
-  await fillBirthDate(page);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-  await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
   await selectAccountType(page);
 }
 
@@ -99,7 +82,7 @@ async function expectAppLanding(page: import("@playwright/test").Page): Promise<
   } catch {
     // Fail fast with the evidence needed to tell the causes apart: an
     // expired/invalid code or a rate limit leaves us on the OTP step with an
-    // alert; a username problem lands on finish-registration / username; any
+    // alert; a missing account type lands on finish-registration; any
     // other route is unexpected.
     const path = new URL(page.url()).pathname;
     const alerts = (await page.getByRole("alert").allInnerTexts()).map((t) => t.trim()).filter(Boolean);
@@ -151,7 +134,7 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
   test("weak password is rejected in place (no signUp sent, fields preserved)", async ({ page, request }) => {
     const email = uniqueEmail("weakpw");
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: email, username: uniqueUsername("weakpw"), password: "qwerty12345" });
+    await fillSignUp(page, { email: email, password: "qwerty12345" });
 
     const seen = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
@@ -174,7 +157,7 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
       if (f === page.mainFrame()) visited.push(new URL(f.url()).pathname);
     });
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: email, username: uniqueUsername("signup"), password: STRONG_PASSWORD });
+    await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
 
     const seen = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
@@ -192,9 +175,8 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
 
     await expectAppLanding(page);
-    // The username was entered ONCE: no recovery screen was ever shown...
+    // No recovery screen was ever shown, and the retired username step just routes onward (no username is collected).
     expect(visited.filter((p) => /finish-registration|\/onboarding\/username/.test(p))).toEqual([]);
-    // ...and it was persisted: the username step now refuses this account.
     await page.goto("/onboarding/username");
     await expectAppLanding(page);
     // The Full Name entered at Step 1 is the CONFIRMED display name.
@@ -206,65 +188,11 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
   });
 });
 
-/**
- * Claims a username through the canonical password sign-up in its own
- * browser context, so a later registration can collide with a genuinely taken
- * name. Returns the claimed username.
- */
-async function claimUsernameViaCanonicalSignUp(
-  browser: import("@playwright/test").Browser,
-  request: import("@playwright/test").APIRequestContext,
-): Promise<string> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  const username = uniqueUsername("owner");
-  await registerWithPassword(page, request, { email: uniqueEmail("owner"), username });
-  await context.close();
-  return username;
-}
-
-test.describe("Username availability is checked BEFORE signUp() (entered once; no Auth user or email for an unavailable name)", () => {
-  // The exact username-field error (registration.error.usernameUnavailable),
-  // anchored — a loose /غير متاح/ also matches the three Arabic "Coming
-  // Soon" account-type descriptions on the same form.
-  const USERNAME_UNAVAILABLE =
-    /^(That username isn't available\. Try another\.|اسم المستخدم هذا غير متاح\. جرّب اسمًا آخر\.)$/i;
-
-  async function submitWithUsername(page: import("@playwright/test").Page, email: string, username: string) {
+test.describe("Sign-up asks for no age confirmation", () => {
+  test("the sign-up form has no age checkbox and registers without one", async ({ page }) => {
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: email, username: username, password: STRONG_PASSWORD });
-    await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
-  }
-
-  async function expectStillOnStep1(page: import("@playwright/test").Page, request: import("@playwright/test").APIRequestContext, email: string, username: string) {
-    await expect(page.getByRole("alert").filter({ hasText: USERNAME_UNAVAILABLE })).toBeVisible({
-      timeout: SIGNUP_STEP2_TIMEOUT_MS,
-    });
-    await expect(page.getByText(NEXT_STEP_TEXT)).toHaveCount(0);
-    await expect(page.locator('input[autocomplete="one-time-code"]')).toHaveCount(0);
-    // The user's values are still there to correct.
-    await expect(page.getByLabel(SIGN_UP_CONTACT_LABEL)).toHaveValue(email);
-    await expect(page.getByLabel(/^username$|^اسم المستخدم$/i)).toHaveValue(username);
-    // signUp() never ran: no confirmation email exists for this address.
-    expect(await messageIdsFor(request, email)).toEqual(new Set());
-    // Neutral: never says why.
-    await expect(page.getByText(/reserved|محجوز/i)).toHaveCount(0);
-  }
-
-  test("a username another account already owns is refused on Step 1 — no OTP step, no email", async ({ page, request, browser }) => {
-    const taken = await claimUsernameViaCanonicalSignUp(browser, request);
-    const email = uniqueEmail("taken");
-    // Uniqueness is case-insensitive, so a case variant is equally unavailable.
-    const attempt = taken.toUpperCase();
-    await submitWithUsername(page, email, attempt);
-    await expectStillOnStep1(page, request, email, attempt);
-  });
-
-  test("a reserved username gets the SAME neutral unavailable response", async ({ page, request }) => {
-    const email = uniqueEmail("reserved");
-    await submitWithUsername(page, email, "admin");
-    await expectStillOnStep1(page, request, email, "admin");
+    await expect(page.locator('input[name="ageConfirmed"]')).toHaveCount(0);
+    await expect(page.getByText(/18 or older|١٨ عامًا/)).toHaveCount(0);
   });
 });
 
@@ -290,7 +218,7 @@ test.describe("CAPTCHA — required on Create Account and Forgot Password, verif
     // : undefined`, which happened to cover the new codes for free.
     await page.route("https://challenges.cloudflare.com/**", (route) => route.abort());
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: email, username: uniqueUsername("nocaptcha"), password: STRONG_PASSWORD });
+    await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
 
     // Never a token to wait for — the script itself never loaded.
     await expect(page.locator('input[name="captchaToken"]')).toHaveValue("");
@@ -327,7 +255,7 @@ test.describe("CAPTCHA — required on Create Account and Forgot Password, verif
 async function registerAccount(page: import("@playwright/test").Page, request: import("@playwright/test").APIRequestContext, tag: string): Promise<string> {
   const email = uniqueEmail(tag);
   await page.goto("/auth/sign-up");
-  await fillSignUp(page, { email: email, username: uniqueUsername(tag), password: STRONG_PASSWORD });
+  await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
   const seen = await messageIdsFor(request, email);
   await waitForCaptchaToken(page);
   await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
@@ -339,31 +267,41 @@ async function registerAccount(page: import("@playwright/test").Page, request: i
   return email;
 }
 
-test.describe("Account enumeration normalization (§Account enumeration)", () => {
-  test("registering with an email that already belongs to a CONFIRMED account gets the SAME neutral response and the SAME OTP screen as a genuine new registration — never 'already exists'", async ({ page, request }) => {
-    const existingEmail = await registerAccount(page, request, "enum-existing");
+test.describe("Already-registered email on sign-up (explicit warning, 2026-11-12)", () => {
+  test("registering with an email that already belongs to a CONFIRMED account warns at once and offers 'Log in instead' with the email carried over - no code screen, nothing in the URL", async ({ page, request }) => {
+    const existingEmail = await registerAccount(page, request, "exists-warning");
     await signOutViaAccountMenu(page);
     await page.waitForURL(/\/sign-in/, { waitUntil: "commit" });
 
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: existingEmail, username: uniqueUsername("enum-resubmit"), password: "SomeOtherStrongPassword9!" });
+    await fillSignUp(page, { email: existingEmail, password: "SomeOtherStrongPassword9!" });
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
 
-    // Identical UI outcome to a genuine new signup — the neutral Step-2
-    // screen, never "user already exists" / "email already registered" or
-    // any equivalent.
+    // The warning appears under the field; the person is NOT sent to wait for a code that will never arrive.
+    await expect(page.locator("[data-existing-account]")).toContainText(/already registered|مسجّل بالفعل/i);
+    await expect(page.locator('[data-sign-up-step="email-code"]')).toHaveCount(0);
+
+    // One tap on "Log in instead" opens sign-in with the SAME email filled in; it travels in an httpOnly cookie, never the URL.
+    await expect(page.locator("[data-existing-account]").getByRole("link", { name: /recover your password|استعد كلمة المرور/i })).toHaveAttribute("href", "/auth/forgot-password");
+    await page.locator("[data-existing-account]").getByRole("button", { name: /^(sign in|سجّل الدخول)$/i }).click();
+    await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
+    expect(page.url()).not.toContain(encodeURIComponent(existingEmail));
+    expect(page.url()).not.toContain(existingEmail);
+    await expect(page.getByLabel(/mobile number or email|رقم الموبايل أو البريد الإلكتروني/i)).toHaveValue(existingEmail);
+  });
+
+  test("an interrupted (unconfirmed) email registration reopens on its code step after a refresh - there is no separate continue page", async ({ page }) => {
+    await page.goto("/auth/sign-up");
+    await fillSignUp(page, { email: uniqueEmail("restore"), password: "AnotherStrongPassword9!" });
+    await waitForCaptchaToken(page);
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
-    await expect(page.getByText(/already exists|already registered|موجود بالفعل|مسجل بالفعل/i)).toHaveCount(0);
 
-    // §5 — the neutral "no code hint" + a real way out (Forgot password) is
-    // visible right there, rather than leaving the caller waiting forever.
-    await expect(page.getByRole("link", { name: /forgot password|نسيت كلمة المرور/i })).toBeVisible();
-
-    // The original account's password is UNCHANGED — this never silently
-    // overwrote it or created a second identity.
-    await page.getByRole("link", { name: /forgot password|نسيت كلمة المرور/i }).click();
-    await page.waitForURL(/\/forgot-password$/, { waitUntil: "commit" });
+    await page.reload();
+    await expect(page.locator('[data-sign-up-step="email-code"]')).toBeVisible();
+    await page.goto("/auth/continue-registration");
+    await page.waitForURL(/\/auth\/sign-up/, { waitUntil: "commit" });
   });
 });
 
@@ -371,7 +309,7 @@ test.describe("Resend signup code (never re-submits the password, never re-regis
   test("resend delivers a fresh, working code without ever asking for the password again", async ({ page, request }) => {
     const email = uniqueEmail("resend");
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: email, username: uniqueUsername("resend"), password: STRONG_PASSWORD });
+    await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
     const seenAtSignup = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
@@ -400,7 +338,8 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
   test("after signUp() but before verifying, protected routes are denied exactly like a signed-out caller; after verifying, they resolve normally", async ({ page, request, context }) => {
     const email = uniqueEmail("session-guarantee");
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: email, username: uniqueUsername("session1"), password: STRONG_PASSWORD });
+    await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
+    const seenBeforeSubmit = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
@@ -431,13 +370,10 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
     // so `readNewOtp` deterministically reads the code this resubmission
     // actually generates, not whichever of two pending messages happens to
     // sort first.
+    // Coming back, the sign-up page reopens on the code step by itself (the unverified registration is remembered in this browser).
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: email, username: uniqueUsername("session2"), password: STRONG_PASSWORD });
-    const seenBeforeRetry = await messageIdsFor(request, email);
-    await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
-    await expectSignUpStep2(page);
-    const code = await readNewOtp(request, email, seenBeforeRetry);
+    await expect(page.locator('[data-sign-up-step="email-code"]')).toBeVisible();
+    const code = await readNewOtp(request, email, seenBeforeSubmit);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
 
@@ -449,10 +385,11 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
 });
 
 test.describe("Refresh / interruption behavior (§Refresh, back, interruption)", () => {
-  test("refreshing on the OTP step returns to Step 1 with no crash and no password anywhere in storage — resubmitting proceeds normally", async ({ page, request }) => {
+  test("refreshing on the OTP step reopens the code step with no crash and no password anywhere in storage — the same code still verifies", async ({ page, request }) => {
     const email = uniqueEmail("refresh");
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: email, username: uniqueUsername("refresh1"), password: STRONG_PASSWORD });
+    await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
+    const seenBeforeSubmit = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
@@ -471,19 +408,13 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     // Wait for the reloaded page to finish loading: fields typed into the server-rendered HTML before React
     // hydrates are reset by hydration, which made this resubmission flaky (empty name and email).
     await page.reload({ waitUntil: "load" });
-    await expect(page.getByLabel(SIGN_UP_CONTACT_LABEL)).toBeVisible();
-    await expect(page.getByLabel(/one-time code|الرمز لمرة واحدة/i)).toHaveCount(0);
+    // The unverified email registration is remembered in an httpOnly routing cookie (email only), so the page reopens on the code step.
+    await expect(page.locator('[data-sign-up-step="email-code"]')).toBeVisible();
+    await expect(page.getByLabel(SIGN_UP_CONTACT_LABEL)).toHaveCount(0);
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
 
-    // Resubmitting the SAME email (still unconfirmed from the first attempt)
-    // is exactly GoTrue's own obfuscated re-signup case — succeeds again,
-    // re-sending a new usable code, no corruption.
-    await fillSignUp(page, { email: email, username: uniqueUsername("refresh2"), password: STRONG_PASSWORD });
-    const seenBeforeResubmit = await messageIdsFor(request, email);
-    await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
-    await expectSignUpStep2(page);
-
-    const code = await readNewOtp(request, email, seenBeforeResubmit);
+    // The code sent before the refresh is still the one that verifies: nothing was re-sent, nothing was lost.
+    const code = await readNewOtp(request, email, seenBeforeSubmit);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
     await expectAppLanding(page);
@@ -492,7 +423,7 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
   test("a wrong/garbage code is rejected and the valid code can still be entered from the same screen", async ({ page, request }) => {
     const email = uniqueEmail("badcode");
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: email, username: uniqueUsername("badcode"), password: STRONG_PASSWORD });
+    await fillSignUp(page, { email: email, password: STRONG_PASSWORD });
     const seen = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
@@ -530,7 +461,7 @@ test.describe("Password-changed notification is absent on initial registration (
     const target = uniqueEmail("no-pwchanged-check");
     const seenFromStart = await messageIdsFor(request, target);
     await page.goto("/auth/sign-up");
-    await fillSignUp(page, { email: target, username: uniqueUsername("pwchanged"), password: STRONG_PASSWORD });
+    await fillSignUp(page, { email: target, password: STRONG_PASSWORD });
     const seenAtStart = await messageIdsFor(request, target);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();

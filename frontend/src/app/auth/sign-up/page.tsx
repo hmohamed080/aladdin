@@ -32,7 +32,7 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
       initialAccountType={initialAccountType}
       next={safe.startsWith("/auth/invite/") ? safe : undefined}
       providers={providers}
-      hasPendingRegistration={(await pendingRegistrationEmail()) !== null}
+      pendingEmail={await pendingRegistrationEmail()}
     />
   );
 }

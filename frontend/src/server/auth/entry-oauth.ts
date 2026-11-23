@@ -17,9 +17,9 @@ import type { Database } from "@/types/database.types";
  *
  * One button both signs in and signs up. A brand-new person accepts the
  * Terms and Privacy Policy by continuing (the notice sits under the buttons),
- * then finishes registration (account type, username) on the canonical
- * finish-registration screen; an account type picked on the landing page
- * (`?type=`) is applied for them, after the server re-checks it.
+ * then finishes registration (account type) on the canonical finish-registration
+ * screen; an account type picked on the landing page (`?type=`) is applied for
+ * them, after the server re-checks it.
  */
 
 export const OAUTH_PROVIDERS = ["google", "facebook"] as const;
@@ -131,8 +131,8 @@ export async function completeEntryOAuth(
     ({ data: state } = await supabase.rpc("my_registration_state"));
   }
 
-  if (state === "account_type_pending" || state === "username_pending") {
-    // Prefill the name the provider knows; the person still confirms the rest.
+  if (state === "account_type_pending") {
+    // Prefill the name the provider knows; the person still confirms the account type.
     const name = displayNameSchema.safeParse(data.user.user_metadata?.full_name ?? data.user.user_metadata?.name);
     if (name.success) {
       const { error: nameError } = await supabase.rpc("profile_set_display_name", { p_display_name: name.data });

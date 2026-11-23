@@ -12,7 +12,7 @@ export type Track = "consumer" | "professional" | "business";
 /** Where the "Continue" action actually takes the user, per track. */
 const NEXT_ROUTE: Record<Track, string> = {
   consumer: "/onboarding/consumer",
-  professional: "/onboarding/professional",
+  professional: "/onboarding/professional", // a Craftsman is redirected from here to /home/profile by the page itself
   business: "/onboarding/business",
 };
 

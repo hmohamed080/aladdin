@@ -63,11 +63,11 @@ describe("LandingMarketplaceSection", () => {
     }
   });
 
-  it("sends Add to cart to /marketplace (coming soon) without a cart", () => {
+  it("sends Add to cart to /market (coming soon) without a cart", () => {
     renderSection("ar");
     const links = screen.getAllByRole("link", { name: /أضف للسلة/ });
     expect(links.length).toBeGreaterThan(0);
-    for (const link of links) expect(link).toHaveAttribute("href", "/marketplace");
+    for (const link of links) expect(link).toHaveAttribute("href", "/market");
   });
 
   it("shows prices as tax-exclusive with the sale unit", () => {
@@ -80,7 +80,7 @@ describe("LandingMarketplaceSection", () => {
     const { container } = renderSection("en");
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Discover the Aladdin Marketplace");
     expect(container.querySelector("section")).toHaveAttribute("dir", "ltr");
-    expect(screen.getByRole("link", { name: /Explore More Products/ })).toHaveAttribute("href", "/marketplace");
+    expect(screen.getByRole("link", { name: /Explore More Products/ })).toHaveAttribute("href", "/market");
   });
 
   it("has the same filter and unit keys in both languages", () => {

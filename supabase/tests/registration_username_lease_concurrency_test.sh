@@ -50,7 +50,7 @@ save_sql() { # user name sleep
   cat <<SQL
 begin;
 set local role service_role;
-select 'LEASE:' || public.pending_registration_save('$1', '$2', 'persona_type', 'engineer');
+select 'LEASE:' || public.pending_registration_save('$1', '$2', 'persona_type', 'engineer', 30);
 select pg_sleep($3);
 commit;
 SQL

@@ -6,8 +6,12 @@ HERE="$(cd "$(dirname "$0")" && pwd)"; D="$(mktemp -d)"; trap 'rm -rf "$D"' EXIT
 bash "$HERE/build-repo.sh" "$D/repo" >/dev/null
 fail=0
 for f in "$HERE"/*.sh "$HERE"/*.py "$HERE"/*.sql; do
+  case "$(basename "$f")" in admin-initialize.sh|admin-initialize-test.sh)  # operator-only: must NOT ship (holds the service-role key)
+    [ ! -e "$D/repo/backup/$(basename "$f")" ] || { echo "FAIL  the built repo ships $(basename "$f")"; fail=1; }; continue ;; esac
   [ -f "$D/repo/backup/$(basename "$f")" ] || { echo "FAIL  the built repo lacks $(basename "$f")"; fail=1; }
 done
+# Owner-run source preservation (holds a full Storage-access key) must never ship into the backup repo either.
+[ ! -e "$D/repo/backup/preserve" ] || { echo "FAIL  the built repo ships ops/backups/preserve"; fail=1; }
 # Every kit file a script sources or runs must exist next to it in the built repo.
 for f in "$D"/repo/backup/*.sh; do
   for ref in $(grep -oE '"\$(HERE|LIB_DIR)/[A-Za-z0-9._-]+\.(sh|py)"' "$f" | sed -E 's|.*/([^"]+)"|\1|' | sort -u); do

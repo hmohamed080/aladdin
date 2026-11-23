@@ -2,6 +2,8 @@
 
 **Status:** Proposed · 2026-10-19 · Revision 2 (same day, owner decisions: no size or length caps, mixed photo/video order, Stream later behind a provider seam) · **Needs owner approval** before any hosted step (migration, R2 CORS rule, Worker route, transcode host). The code ships switched off (`VIDEO_ENABLED=false`, Worker `VIDEO_ROUTES="off"`); with it off nothing changes.
 
+**Amended by:** [ADR-0030](ADR-0030-site-wide-media-upload-policy.md) (2026-11-21): 100 MB per-file video cap replaces "no size cap"; the original is deleted only after the published output is verified.
+
 **Builds on:** [ADR-0018](ADR-0018-r2-edge-media-delivery.md) (private R2 + ticketed edge Worker + per-request Postgres decision) and [ADR-0019](ADR-0019-redis-cache-and-rate-limits.md) (Redis as accelerator only).
 
 ## Decision

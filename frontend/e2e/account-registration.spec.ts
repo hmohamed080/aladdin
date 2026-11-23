@@ -31,12 +31,12 @@ test.describe("account registration", () => {
     await page.goto("/auth/sign-up");
     await noOverflow(page);
 
-    // Full Name first, then email, username, the account-type dropdown and
+    // Full Name first, then email, the account-type dropdown and
     // the password pair. (The full create → OTP → app journey is Turnstile-
     // gated and covered by auth-password-preview.spec.ts.)
     await expect(page.getByLabel(/^full name$/i)).toHaveAttribute("placeholder", "Enter your full name");
     await expect(page.getByLabel(/^email address$/i)).toBeVisible();
-    await expect(page.getByLabel(/^username$/i)).toBeVisible();
+    await expect(page.getByLabel(/^username$/i)).toHaveCount(0); // no application username (Phase 1)
     await expect(page.locator('select[name="accountType"]')).toBeVisible();
     await expect(page.getByLabel(/^password$/i)).toBeVisible();
     await expect(page.getByLabel(/^confirm password$/i)).toBeVisible();

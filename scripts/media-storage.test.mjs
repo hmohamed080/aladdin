@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   assertEgressGuard, buildDelta, buildPlan, foldJournal, JournalWriteFailed, journalTargets, migrateRows, openJournal, OperatorError, parseArgs,
-  parseBytes, parseJournal, QuotaExceeded, rehashTargets, rollbackTargets, selectRun, objectsToDelete, reconciliation, runCleanup,
+  parseBytes, parseJournal, QuotaExceeded, rehashTargets, rollbackTargets, selectRun, objectsToDelete, reconciliation, runCleanup, purgeRejectedImages,
 } from "./media-storage.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -378,4 +378,16 @@ test("delta never assumes an R2 object it cannot compare is fine", async () => {
   const delta = await buildDelta(w.io, foldJournal([]), { namespaces: ["avatar"] });
   assert.equal(delta.total.notInJournal + delta.total.r2Native, 2);
   assert.equal(delta.cutoverReady, delta.total.notInJournal === 0, "an uncompared R2 row blocks readiness");
+});
+
+test("the cleanup job purges rejected marketplace images through the database and reports counts only", async () => {
+  const calls = [];
+  const supabase = { rpc: async (name, args) => { calls.push([name, args]); return { data: { expired: 2, forgotten: 1 }, error: null }; } };
+  assert.deepEqual(await purgeRejectedImages(supabase), { rejectedExpired: 2, rejectedForgotten: 1 });
+  assert.deepEqual(calls, [["marketplace_rejected_images_purge", undefined]]);
+});
+
+test("a database without the purge function does not stop the cleanup", async () => {
+  const supabase = { rpc: async () => ({ data: null, error: { code: "42883" } }) };
+  assert.deepEqual(await purgeRejectedImages(supabase), { rejectedPurge: "unavailable" });
 });

@@ -27,7 +27,7 @@ export function RecoveryForm({ next }: { next: string }) {
             </Link>
           </p>
           <p>
-            <Link href="/auth/sign-in" className="text-fg-muted hover:text-fg hover:underline">
+            <Link prefetch={false} href="/auth/sign-in" className="text-fg-muted hover:text-fg hover:underline">
               {t("support.backToSignIn")}
             </Link>
           </p>

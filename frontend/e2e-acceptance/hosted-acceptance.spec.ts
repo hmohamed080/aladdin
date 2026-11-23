@@ -156,7 +156,7 @@ async function signIn(context: BrowserContext, email: string, password: string, 
   try {
     await page.goto("/auth/sign-in", { waitUntil: "domcontentloaded" });
     if (HEADED) console.log(`[manual] ${who}: if Cloudflare shows a verification in the Chrome window, complete it (waiting up to ${TOKEN_WAIT_MS / 60_000} min).`);
-    await page.getByLabel(/^mobile number, username or email$/i).fill(email);
+    await page.getByLabel(/^mobile number or email$/i).fill(email);
     // A failed fill must never echo the value into the log or the uploaded report.
     await page.getByLabel(/^password$/i).fill(password).catch(() => {
       throw new Error(`The ${who} password field could not be filled on /auth/sign-in.`);
@@ -233,14 +233,9 @@ test.describe("public smoke", () => {
       for (const path of ["/", "/auth/sign-in", "/legal/terms"]) {
         expect((await apiGet(context, path)).status(), path).toBe(200);
       }
-      // The retired /installer/sign-in is a permanent redirect (next.config.ts). Check it WITHOUT following it: the status and
-      // that the destination is the same-origin /auth/sign-in (a redirect anywhere else, or a temporary one, is a failure).
+      // The retired /installer/sign-in has no redirect any more (next.config.ts): it must answer 404, not forward anywhere.
       const installer = await apiGet(context, "/installer/sign-in");
-      expect(installer.status(), "/installer/sign-in must be a permanent redirect").toBe(308);
-      const target = new URL(installer.headers()["location"] ?? "", required("ACCEPTANCE_BASE_URL"));
-      expect(`${target.origin}${target.pathname}`, "/installer/sign-in must redirect to /auth/sign-in on the same origin").toBe(
-        `${new URL(required("ACCEPTANCE_BASE_URL")).origin}/auth/sign-in`,
-      );
+      expect(installer.status(), "/installer/sign-in is retired and must answer 404").toBe(404);
       // A signed-out visitor to /showroom must be sent to the APP's sign-in page. Checked on the first hop, without following
       // it, so a Cloudflare Access login (a different, infrastructure redirect) can never be mistaken for the app's answer:
       // apiGet already fails on a cloudflareaccess.com / /cdn-cgi/access/ redirect.

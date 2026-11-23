@@ -9,8 +9,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * The account-type step — now the ONLY mandatory step `/onboarding` routes a
- * new registrant through before consent-only/username-only recovery
- * (Increment 7). No longer requires the profile/contact steps first — those
+ * new registrant through before consent-only recovery. No longer requires the profile/contact steps first — those
  * are no longer gating states at all.
  */
 export default async function OnboardingAccountTypePage() {
@@ -21,8 +20,9 @@ export default async function OnboardingAccountTypePage() {
     redirect("/onboarding");
   }
   // An account type is already recorded once state has advanced past this
-  // step — re-showing the picker here would be confusing/wrong.
-  if (state === "username_pending") redirect("/onboarding/username");
+  // step (including a legacy "username_pending" a pre-M1 database may still
+  // return) — re-showing the picker here would be confusing/wrong.
+  if (state !== "account_type_pending") redirect("/onboarding");
 
   const data = await getOnboardingData();
   // Recover the previously-chosen key from the stored track + concrete type so the

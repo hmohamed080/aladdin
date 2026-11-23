@@ -17,8 +17,9 @@ const ALLOWED_CALLERS: Record<string, string> = {
   "server/cache/rate-limit.ts": "per-user rate-limit counters",
   "server/video/uploads.ts": "video job ids pushed to the transcode wake-up list",
   "app/api/health/route.ts": "PING only",
+  "features/landing-brand/landing-brand-stats.server.ts": "the landing page's three platform counts (global, identical for everyone; a cache layer, the database stays the source)",
 };
-const ALLOWED_NAMESPACES = ["health", "jobs", "ref", "rl"];
+const ALLOWED_NAMESPACES = ["health", "jobs", "landing", "ref", "rl"];
 
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -56,6 +57,7 @@ describe("Redis use stays inside ADR-0019", () => {
     const writes = files.flatMap((file) =>
       [...file.text.matchAll(/redis\.(setEx|lPush|eval)\(/g)].map((match) => `${file.path}:${match[1] ?? ""}`));
     expect(writes.sort()).toEqual([
+      "features/landing-brand/landing-brand-stats.server.ts:setEx",
       "server/cache/rate-limit.ts:eval",
       "server/cache/reference.ts:setEx",
       "server/video/uploads.ts:lPush",
@@ -63,17 +65,26 @@ describe("Redis use stays inside ADR-0019", () => {
   });
 });
 
-describe("Redis stays off until accepted", () => {
-  it("ships disabled in .env.example and outside the workers.dev preview", () => {
+describe("Redis is on only where it was accepted", () => {
+  it("ships disabled in .env.example and is enabled only for the production Worker", () => {
     expect(readFileSync(join(FRONTEND, ".env.example"), "utf8")).toMatch(/^REDIS_CACHE_ENABLED=false$/m);
     const wrangler = readFileSync(join(FRONTEND, "wrangler.jsonc"), "utf8");
-    // The owner accepted Redis for the acceptance preview only (2026-10-24, cf-preview key prefix).
-    // Every other environment, production included, keeps it off.
-    const enabled = [...wrangler.matchAll(/"REDIS_CACHE_ENABLED"\s*:\s*"true"/g)].map((m) => m.index ?? 0);
+    // Redis ran on the acceptance preview from 2026-10-24; on 2026-11-15 the owner moved it to production only
+    // (key prefix `production`) so production gets the whole Free quota. Any other block keeps it off until its own approval.
     const preview = wrangler.indexOf('"preview": {');
     const production = wrangler.indexOf('"production": {');
     expect(preview).toBeGreaterThan(-1);
     expect(production).toBeGreaterThan(preview);
-    expect(enabled.every((at) => at > preview && at < production)).toBe(true);
+    const enabled = [...wrangler.matchAll(/"REDIS_CACHE_ENABLED"\s*:\s*"true"/g)].map((m) => m.index ?? 0);
+    expect(enabled.length).toBe(1);
+    expect(enabled[0]).toBeGreaterThan(production);
+    expect(wrangler.slice(preview, production)).toMatch(/"REDIS_CACHE_ENABLED"\s*:\s*"false"/);
+  });
+
+  it("keeps the production key prefix and has no Redis address on the preview", () => {
+    const wrangler = readFileSync(join(FRONTEND, "wrangler.jsonc"), "utf8");
+    const production = wrangler.indexOf('"production": {');
+    expect(wrangler.slice(0, production)).not.toMatch(/REDIS_REST_URL|REDIS_KEY_ENV/);
+    expect(wrangler.slice(production)).toMatch(/"REDIS_KEY_ENV"\s*:\s*"production"/);
   });
 });

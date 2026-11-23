@@ -21,6 +21,8 @@ export function OnboardingPanel({ state }: { state: RegistrationState }) {
 
   const copy: Record<string, { title: string; body: string }> = {
     manually_blocked: { title: t("onboarding.blockedTitle"), body: t("onboarding.blockedBody") },
+    // Before migration M1 the database can still return the retired "username_pending" state: a neutral notice, never a username form.
+    username_pending: { title: t("onboarding.legacyStateTitle"), body: t("onboarding.legacyStateBody") },
   };
 
   return (

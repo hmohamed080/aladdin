@@ -6,7 +6,9 @@
   // Reachability: PRIVATE. workers_dev is off and there are no routes, so the Worker has no public address; the Production frontend reaches it
   // through the service binding OTP_WORKER (frontend/wrangler.jsonc). Deploy this Worker BEFORE that frontend.
   //
-  // Shipped state: WHATSAPP_DELIVERY_ENABLED=false. Turning it on is the approved cutover, made by a reviewed change to this file AND the guard.
+  // WHATSAPP_DELIVERY_ENABLED=true is the ENVIRONMENT PERMIT only (the approved cutover, a reviewed change to this file AND the guards). It sends nothing by itself:
+  // a send also needs the audited Super Admin Delivery Switch ON (D1), configured limits (D1 otp_settings) and a fresh signed attestation from the app.
+  // Rollback: set it back to "false" (both guards accept either literal) and redeploy; docs/operations/PRODUCTION_OTP_WORKER_PERMIT.md.
   // Recipient mode is "open" (any valid mobile number, no allowlist): there is deliberately NO OTP_ALLOWED_RECIPIENTS variable or binding.
   // The daily limit and hard ceiling are NOT here: they are Super Admin settings stored in this Worker's D1 (table otp_settings).
   "$schema": "../../frontend/node_modules/wrangler/config-schema.json",
@@ -26,7 +28,7 @@
     "OTP_ENVIRONMENT": "production",
     "OTP_RECIPIENT_MODE": "open",
     "OTP_NOTIFY_URL": "https://aladdindecore.com/api/internal/whatsapp-otp/notify",
-    "WHATSAPP_DELIVERY_ENABLED": "false"
+    "WHATSAPP_DELIVERY_ENABLED": "true"
   },
   "triggers": { "crons": ["* * * * *"] },
   "secrets_store_secrets": [

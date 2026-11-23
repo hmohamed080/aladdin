@@ -31,14 +31,15 @@ function blocked(reason: string, change: (c: any) => void) {
   assert.match(r.stderr, /BLOCKED/);
 }
 
-test("the checked-in Production config passes: isolated, delivery OFF, open mode, no allowlist", () => {
+test("the checked-in Production config passes: isolated, delivery permit true (a permit only), open mode, no allowlist", () => {
   const r = invoke();
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /PASS/);
 });
 
-test("delivery cannot be enabled, and the environment/mode are pinned", () => {
-  blocked("delivery on", (c) => { c.vars.WHATSAPP_DELIVERY_ENABLED = "true"; });
+test("the permit accepts only the literal true or false, and the environment/mode are pinned", () => {
+  for (const bad of ["TRUE", "1", "yes", "", " true"]) blocked("permit " + JSON.stringify(bad), (c) => { c.vars.WHATSAPP_DELIVERY_ENABLED = bad; });
+  blocked("permit missing", (c) => { delete c.vars.WHATSAPP_DELIVERY_ENABLED; });
   blocked("allowlist mode", (c) => { c.vars.OTP_RECIPIENT_MODE = "allowlist"; });
   blocked("acceptance marker", (c) => { c.vars.OTP_ENVIRONMENT = "acceptance"; });
   blocked("local marker", (c) => { c.vars.OTP_ENVIRONMENT = "local"; });

@@ -1,16 +1,16 @@
+import { VIDEO_MAX_BYTES } from "./upload-limits";
+
 /**
- * Video upload rules shared by the browser, the server (signing) and, as CHECK
- * constraints, the database (20261021090015_media_videos.sql).
+ * Video upload rules shared by the browser, the server (signing) and, as a trigger on new rows, the
+ * database (20261121090001_media_policy_caps_and_rejected_purge.sql).
  *
- * There is NO product cap on size or length (ADR-0020 Revision 2). What remains
- * are storage-provider limits, stated rather than hidden:
- *   * one R2 object is at most 5 TiB;
- *   * a multipart upload has at most 10,000 parts, each at least 5 MiB except the
- *     last and at most 5 GiB, so the part size grows with the file;
+ * Site-wide cap: 100 MB per file (owner decision 2026-11-19; ADR-0030 supersedes the "no product
+ * cap" rule of ADR-0020 Revision 2). The storage provider's own limits stay far above it:
+ *   * a multipart upload has at most 10,000 parts, each at least 5 MiB except the last;
  *   * R2 aborts an unfinished multipart upload after seven days, so an upload
  *     expires after a day without activity or six days in all.
  */
-export const VIDEO_STORAGE_MAX_BYTES = 5 * 1024 ** 4;
+export const VIDEO_STORAGE_MAX_BYTES = VIDEO_MAX_BYTES;
 export const VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"] as const;
 export type VideoContentType = (typeof VIDEO_TYPES)[number];
 export const VIDEO_TITLE_MAX = 120;
