@@ -5,8 +5,8 @@
 # NOT to be run without the owner's separate explicit GO for Production. Acceptance is refused. Never uses --include-all, repair or reset.
 #   bash scripts/hosted-db/production-apply.sh --plan prod-catchup --sha <full 40-char origin/main sha> --backup-label <aladdin-production-YYYYMMDDTHHMMSSZ>
 # Any Production step needs a restore-verified PRODUCTION snapshot taken at 210 migrations or later, pinned in
-# PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS (acceptance-gate.mjs) after its restore test passed. None is pinned yet, so this script REFUSES to reach the
-# password prompt today. Recovery = three pinned forward-fixes, run in this order: media-notify-remove.sql, marketplace-remove.sql, prod-catchup-restore-previous.sql (sha256-checked; they restore functions, constraints and
+# PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS (acceptance-gate.mjs) after its restore test passed. Pinned: aladdin-production-20261123T142725Z (restore PASS); this script REFUSES to reach the
+# password prompt with any other label. Recovery = three pinned forward-fixes, run in this order: media-notify-remove.sql, marketplace-remove.sql, prod-catchup-restore-previous.sql (sha256-checked; they restore functions, constraints and
 # tables only: rows written after the push are recoverable ONLY from the backup).
 # Order: checkout gates -> recovery gate -> password (hidden) -> link -> PRE checks (history, dry run, permissions vs the pre contract, table counts,
 #        structure, catalog fingerprint) -> typed confirmation -> `supabase db push --linked` -> POST checks (history, permissions vs the post contract,
