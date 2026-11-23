@@ -37,7 +37,7 @@ export function SupportPanel({ contact }: { contact: string | null }) {
       title={t("support.title")}
       subtitle={t("support.intro")}
       footer={
-        <Link href="/auth/sign-in" className="text-fg-muted hover:text-fg hover:underline">
+        <Link prefetch={false} href="/auth/sign-in" className="text-fg-muted hover:text-fg hover:underline">
           {t("support.backToSignIn")}
         </Link>
       }

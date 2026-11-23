@@ -22,7 +22,7 @@ export function SignUpForm() {
       footer={
         <p>
           {t("auth.haveAccount")}{" "}
-          <Link href="/auth/sign-in" className="font-medium text-accent hover:underline">
+          <Link prefetch={false} href="/auth/sign-in" className="font-medium text-accent hover:underline">
             {t("auth.signInLink")}
           </Link>
         </p>
