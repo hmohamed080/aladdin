@@ -16,6 +16,9 @@
  *             (a pinned snapshot with >= 218 migrations: see RESTORE_VERIFIED_SNAPSHOTS).
  *   media-notify  20261121090001..003 (media caps, admin upload limits, notification templates) on top of Acceptance at 232 / 20261116100014.
  *             232 -> 235. Creates tables: pinned "media-notify" forward-fix plus a fresh restore-verified backup (>= 232 migrations).
+ *   registration-gate  20261122090001..002 (Admin registration-state column, the Pending-tab rule, and the central registration gate in the Data API
+ *             pre-request hook, ADR-0031) on top of Acceptance at 235 / 20261121090003. 235 -> 237. FUNCTION-ONLY (3 functions replaced, 2 added;
+ *             no table, row, policy or grant), so like media+m1 no backup is required: the recovery is the pinned "registration-gate" forward-fix.
  *   m3a       after `m1` is applied (Acceptance and Production are both at 209 today): only 20261112090001 (P1 M3a) is pending. 209 -> 210.
  *
  *   node acceptance-gate.mjs <plan> <migration-list.json> <dry-run.json> <migrations dir>
@@ -32,6 +35,8 @@ export const ACCEPTANCE_REF = "nxossqhdfltcqdwvbewi";
 const MEDIA = "20261110090001", M1 = "20261110090002", M3A = "20261112090001", BASE = "20261107090006";
 const ACC_218 = "20261116090001"; // latest on Acceptance: #192/#200 (20261115090001..006) and the organization approval state (20261116090001)
 const ACC_232 = "20261116100014"; // latest on Acceptance after the Marketplace plan (read 2026-11-22: 232 migrations)
+const ACC_235 = "20261121090003"; // latest on Acceptance after the media-notify plan (read 2026-11-22: 235 migrations)
+const RG_PENDING = ["20261122090001", "20261122090002"];
 const MN_PENDING = ["20261121090001", "20261121090002", "20261121090003"];
 const MKT_PENDING = Array.from({ length: 14 }, (_, i) => `202611161000${String(i + 1).padStart(2, "0")}`);
 /** changed = function names (schema.name, every overload) the plan is allowed to touch; nothing else may change in the catalog. */
@@ -204,6 +209,10 @@ export const PLANS = {
       "public.admin_notification_template_reset", "public.admin_notification_template_set", "public.admin_notification_templates",
       "public.marketplace_rejected_images_purge"
     ] },
+  // registration-gate: function-only. changed = the 3 functions it replaces and the 2 it adds (measured with catalog-fingerprint.sql before/after on a scratch
+  // copy: exactly these 5 function differences, nothing else). Recovery: the pinned forward-fix, proven to restore the exact live definitions of the 3 functions.
+  "registration-gate": { fixes: ["registration-gate"], recovery: "forward-fix", applied: 235, latest: ACC_235, pending: RG_PENDING, preContract: ACC_235, postContract: "20261122090002",
+    changed: ["app.api_pre_request", "app.admin_user_status_tab", "public.admin_users_directory", "app.admin_user_registration_state", "app.registration_gate_allows"] },
   "media+m1": { fixes: ["media", "m1"], recovery: "forward-fix", applied: 207, latest: BASE, pending: [MEDIA, M1], preContract: BASE, postContract: M1,
     changed: ["app.media_storage_key_assign", "public.media_migration_target_key", "public.media_migration_switch", "public.media_migration_rollback",
       "public.my_registration_state", "app.profile_completion", "public.admin_users_directory"] },
@@ -242,6 +251,9 @@ export const FORWARD_FIX = {
   marketplace: { file: "forward-fix/marketplace-remove.sql", sha256: "72bdfd9b68ef88f85338321d4eb79c711e2d0be3bbf1e708a96b001dee58b734" },
   // media-notify: refuses (RAISE) once an admin changed a limit or template or any notification was written from a template; never deletes user data.
   "media-notify": { file: "forward-fix/media-notify-remove.sql", sha256: "807149eb92e650ae6e3ffccea420fca110ba3a6bf3eed44f9a1be8f799ace6a5" },
+  // registration-gate: function-only. Restores app.api_pre_request, app.admin_user_status_tab and public.admin_users_directory to their exact pre-plan definitions (md5 of
+  // pg_get_functiondef and of the comment equal the live Acceptance values read before the plan) and drops the two added functions. Touches no data.
+  "registration-gate": { file: "forward-fix/registration-gate-restore-previous.sql", sha256: "39f99de6d09a5a7d1b5e0250091ec2eadaa37c56c55b3e382857fe43daf22d18" },
   verification: { file: "forward-fix/verification-restore-previous.sql", sha256: "a50cd460c243b3580927c1f8b8e84ec1cc1109048c9b08b055a06b470570fcac" },
   m1: { file: "forward-fix/m1-restore-previous.sql", sha256: "5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045" },
   m3a: { file: "forward-fix/m3a-restore-previous.sql", sha256: "d4161977e7664e3345d000ee87503fd3a5983935c81257dd082c0a5ef0b43ec3" },

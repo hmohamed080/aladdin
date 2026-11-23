@@ -260,3 +260,56 @@ test("verification forward-fix: one transaction, restores both removed guards an
     "DROP FUNCTION IF EXISTS public.admin_initiate_verification(", "ck_audit_action_known", "ck_verifications_reason_required"]) assert.ok(code.includes(needle), needle);
   assert.doesNotMatch(outside, /\b(insert\s+into|update\s+public|delete\s+from|truncate)\b/i);
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// plan "registration-gate": 20261122090001..002 on top of Acceptance at 235 / 20261121090003 (ADR-0031). Function-only.
+// ---------------------------------------------------------------------------------------------------------------------
+test("registration-gate: 2 pending, newer than the latest applied, 235 -> 237, chained after the media-notify plan", () => {
+  const P = PLANS["registration-gate"];
+  assert.deepEqual(P.pending, ["20261122090001", "20261122090002"]);
+  assert.equal(P.applied, PLANS["media-notify"].applied + PLANS["media-notify"].pending.length);
+  assert.equal(P.latest, PLANS["media-notify"].postContract);
+  assert.equal(P.preContract, P.latest);
+  assert.equal(P.postContract, "20261122090002");
+  assert.ok(P.pending.every((v) => v > P.latest));
+});
+
+test("registration-gate: the pending set is exactly the migration files after 20261121090003 in this checkout, until a later plan exists", () => {
+  const files = readdirSync(here("../../supabase/migrations")).filter((f) => f.endsWith(".sql")).map((f) => f.slice(0, 14)).sort();
+  assert.deepEqual(files.filter((v) => v > PLANS["registration-gate"].latest && v <= PLANS["registration-gate"].postContract), PLANS["registration-gate"].pending);
+});
+
+test("registration-gate: both permission contracts exist in this checkout", () => {
+  for (const v of [PLANS["registration-gate"].preContract, PLANS["registration-gate"].postContract]) assert.ok(readFileSync(here(`../../supabase/permissions/${v}.json`), "utf8").length > 1000, v);
+});
+
+test("registration-gate: the expected-change list is exactly the 3 replaced and 2 added functions (measured: 5 function differences, nothing else)", () => {
+  assert.deepEqual([...PLANS["registration-gate"].changed].sort(), [
+    "app.admin_user_registration_state", "app.admin_user_status_tab", "app.api_pre_request", "app.registration_gate_allows", "public.admin_users_directory",
+  ]);
+});
+
+test("registration-gate: function-only, so no backup is required; its only recovery is the pinned forward-fix", () => {
+  const P = PLANS["registration-gate"];
+  assert.ok(!P.freshBackup);
+  assert.deepEqual(P.fixes, ["registration-gate"]);
+  assert.deepEqual(checkRecovery({ plan: "registration-gate", label: "", forwardFixSha256: allShas() }), []);
+  has(checkRecovery({ plan: "registration-gate", label: "", forwardFixSha256: { ...allShas(), "registration-gate": "0".repeat(64) } }), /sha256|forward-fix/i);
+});
+
+test("registration-gate forward-fix: one transaction, function-only, replaces the three functions before it drops the two new ones, never touches data", () => {
+  const sql = readFileSync(here(FORWARD_FIX["registration-gate"].file), "utf8");
+  const code = sql.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+  assert.equal((code.match(/^begin;/gim) ?? []).length, 1);
+  assert.equal((code.match(/^commit;/gim) ?? []).length, 1);
+  const at = (needle) => { const i = code.indexOf(needle); assert.ok(i > -1, needle); return i; };
+  const lastReplace = Math.max(at("create or replace function app.api_pre_request()"), at("create or replace function app.admin_user_status_tab("), at("CREATE OR REPLACE FUNCTION public.admin_users_directory("));
+  assert.ok(lastReplace < at("DROP FUNCTION IF EXISTS app.registration_gate_allows(text, text);"), "replace before drop");
+  assert.ok(lastReplace < at("DROP FUNCTION IF EXISTS app.admin_user_registration_state(uuid);"), "replace before drop");
+  for (const forbidden of [/\binsert\s+into\b/i, /\bupdate\s+public\./i, /\bdelete\s+from\b/i, /\btruncate\b/i, /\bdrop\s+table\b/i, /\balter\s+table\b/i, /\bgrant\b/i, /\brevoke\b/i, /\bcascade\b/i])
+    assert.ok(!forbidden.test(code), String(forbidden));
+  // the restored hook no longer references the gate functions it is about to drop
+  const hook = code.slice(at("create or replace function app.api_pre_request()"), at("comment on function app.api_pre_request()"));
+  assert.ok(!/registration_gate_allows|admin_user_registration_state/.test(hook));
+  assert.ok(!/registration_gate_allows|admin_user_registration_state/.test(code.slice(at("CREATE OR REPLACE FUNCTION public.admin_users_directory("), at("DROP FUNCTION IF EXISTS app.registration_gate_allows"))));
+});
