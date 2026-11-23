@@ -65,6 +65,11 @@ export type NavKey =
   | "leads"
   | "followUps"
   | "products"
+  // Selling to consumers on the public Marketplace. Not a membership capability:
+  // it appears only for an organization a platform admin approved as a seller.
+  | "marketplaceProducts"
+  | "marketplaceAreas"
+  | "marketplaceDelivery"
   // Business — running the organization itself
   | "points"
   | "projects"
@@ -73,7 +78,9 @@ export type NavKey =
   | "activity"
   | "settings";
 
-export type NavSection = "overview" | "supply" | "buying" | "network" | "selling" | "business";
+// `marketplace` is the B2C seller group: selling to CONSUMERS on the public
+// Marketplace. It is deliberately not part of `selling` (the B2B sales pipeline).
+export type NavSection = "overview" | "supply" | "buying" | "network" | "selling" | "marketplace" | "business";
 
 const SALES = [
   "sales.read",
@@ -105,6 +112,17 @@ const BROWSE = ["catalog.read", "catalog.write", "catalog.publish", "rfq.create"
  */
 const JOBS = ["job.post", "job.manage"];
 
+/**
+ * The Marketplace seller entitlement.
+ *
+ * NOT a membership capability and never stored on a membership: the shell adds
+ * it to the nav input only when the ACTIVE organization holds an approved
+ * `marketplace_seller_accounts` row (a platform admin decision). It is listed in
+ * the exact-gate set so `org.manage` cannot unlock it — being the owner of a
+ * showroom is eligibility, never authorization to sell on the Marketplace.
+ */
+export const MARKETPLACE_SELL_ENTITLEMENT = "marketplace.sell";
+
 export const NAV_CAPS: Record<NavKey, string[] | null> = {
   home: null,
 
@@ -135,6 +153,9 @@ export const NAV_CAPS: Record<NavKey, string[] | null> = {
   leads: SALES,
   followUps: SALES,
   products: ["catalog.write", "catalog.publish"],
+  marketplaceProducts: [MARKETPLACE_SELL_ENTITLEMENT],
+  marketplaceAreas: [MARKETPLACE_SELL_ENTITLEMENT],
+  marketplaceDelivery: [MARKETPLACE_SELL_ENTITLEMENT],
 
   // Points is the caller's OWN standing on the platform, not an organization
   // record, so no capability could gate it and none does. The page is SHIPPED —
@@ -160,7 +181,7 @@ export const NAV_CAPS: Record<NavKey, string[] | null> = {
  * make `activity.read` untruthful. Keep this exemption narrow and deliberate;
  * every other module continues to inherit the existing blanket unlock.
  */
-const EXACT_CAPABILITY_NAV_KEYS: ReadonlySet<NavKey> = new Set(["activity"]);
+const EXACT_CAPABILITY_NAV_KEYS: ReadonlySet<NavKey> = new Set(["activity", "marketplaceProducts", "marketplaceAreas", "marketplaceDelivery"]);
 
 /**
  * Canonical order within each section, per stance; sections render in this order.
@@ -178,6 +199,9 @@ const BUYER_SECTIONS: { section: NavSection; keys: NavKey[] }[] = [
   { section: "buying", keys: ["purchaseRequests", "offers", "orders", "productOffers", "catalog", "saved"] },
   { section: "network", keys: ["suppliers", "technicians", "jobs", "institutions"] },
   { section: "selling", keys: ["customers", "leads", "followUps", "products"] },
+  // B2C — only ever reachable with the admin-granted seller entitlement, and only
+  // a showroom (buyer stance) can be approved, so the seller layout has no copy.
+  { section: "marketplace", keys: ["marketplaceProducts", "marketplaceAreas", "marketplaceDelivery"] },
   { section: "business", keys: ["points", "projects", "team", "reports", "activity", "settings"] },
 ];
 

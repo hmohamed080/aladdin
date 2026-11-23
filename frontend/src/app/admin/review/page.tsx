@@ -2,7 +2,6 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { previewReviewQueue, type ReviewQueueItem } from "@/server/queries/admin-preview";
-import { PREVIEW_ORG_REQUESTS } from "@/features/admin-preview/fixtures";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatAdminDate } from "@/lib/ui/format";
@@ -17,7 +16,7 @@ import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
-type Kind = "orgRequest" | ReviewQueueItem["kind"];
+type Kind = ReviewQueueItem["kind"];
 
 type Entry = {
   key: string;
@@ -30,24 +29,23 @@ type Entry = {
   /** Third line: type-specific context (reward eligibility, "no Points", …). */
   context: string | null;
   status: "submitted" | "underReview";
-  /** Fixture-backed (no backend yet). */
-  fixture: boolean;
 };
 
 /**
- * Review Center — Phase 0D (PD-015). One queue, four visually separate request
- * types: All · Organization Requests · Network Referrals · Verifications (plus
- * the existing Sales referrals, which the real `/admin/verifications` queue
- * also carries).
+ * Review Center. One queue of three visually separate request types: Network Referrals · Verifications · Sales referrals.
  *
- * Real: verifications, Sales referrals and Network referrals (the same three
- * read models the live queue uses). Fixture, labelled: Organization Requests —
- * no record or lifecycle exists for "add my own organization" yet (BL-023), and
- * per PD-015 they are NOT retrofitted into `network_referrals`.
+ * COUNT SEMANTICS (pinned by page.test.tsx):
+ *   - the "All" tab and each type tab count the whole real queue and ignore the search box and the page;
+ *   - the header count is the number of items matching the current tab AND search, across every page;
+ *   - the rows on screen are one page (pageSize) of exactly those matching items.
+ *
+ * Real records only: verifications, Sales referrals and Network referrals (the same three
+ * read models the live queue uses). The Organization Request samples that used to be listed here
+ * (no backend, "Preview only") were removed from this operational queue; an organization's own
+ * application is a real `verifications` row and appears under Verifications.
  *
  * The types stay visually distinct on purpose: a coloured lead edge and badge
- * per type, Organization Requests state that they carry no Points, Network
- * Referrals show reward eligibility.
+ * per type; Network Referrals show reward eligibility.
  */
 export default async function PreviewReviewQueuePage({
   searchParams,
@@ -61,21 +59,9 @@ export default async function PreviewReviewQueuePage({
   const m = getMessages(locale);
   const { tab: tabParam, q, page: pageParam, pageSize: pageSizeParam } = await searchParams;
   const t = m.admin.preview.review;
-  const orgTypeLabels = m.orgType as Record<string, string>;
 
   const real = await previewReviewQueue(supabase);
   const entries: Entry[] = [
-    ...PREVIEW_ORG_REQUESTS.map((r): Entry => ({
-      key: `orgRequest-${r.id}`,
-      kind: "orgRequest",
-      href: `/admin/review/org-request/${r.id}`,
-      title: r.orgName,
-      at: r.requestedAt,
-      summary: `${t.orgRequest.requester}: ${r.requesterName} · ${orgTypeLabels[r.orgType] ?? r.orgType} · ${r.city}`,
-      context: t.orgRequest.noPoints,
-      status: r.status,
-      fixture: true,
-    })),
     ...real.map((item): Entry => {
       if (item.kind === "verification") {
         return {
@@ -87,7 +73,6 @@ export default async function PreviewReviewQueuePage({
           summary: (m.admin.verificationType as Record<string, string>)[item.row.verificationType] ?? item.row.verificationType,
           context: null,
           status: "submitted",
-          fixture: false,
         };
       }
       const isNetwork = item.kind === "networkReferral";
@@ -102,24 +87,19 @@ export default async function PreviewReviewQueuePage({
         // +100 only when a genuinely NEW organization is created, not on link-to-existing.
         context: isNetwork ? (item.row.matchId ? t.network.rewardNotEligible : t.network.rewardEligible) : null,
         status: "submitted",
-        fixture: false,
       };
     }),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
-  const tab = (["orgRequests", "networkReferrals", "verifications", "salesReferrals"] as const).find((v) => v === tabParam) ?? "";
+  const tab = (["networkReferrals", "verifications", "salesReferrals"] as const).find((v) => v === tabParam) ?? "";
   const tabKind: Record<string, Kind> = {
-    orgRequests: "orgRequest",
     networkReferrals: "networkReferral",
     verifications: "verification",
     salesReferrals: "salesReferral",
   };
-  // Counts are REAL Production items only. Fixture cards (no backend yet) stay listed, each badged
-  // "Preview only", but they never feed a counter — a number on a tab or header must not imply that
-  // sample data is a real queue.
-  const realEntries = entries.filter((e) => !e.fixture);
-  const count = (k: Kind) => realEntries.filter((e) => e.kind === k).length;
-  const hasFixtures = entries.some((e) => e.fixture);
+  // Every row is a REAL record (previewReviewQueue reads the live verification, network-referral and sales-referral queues);
+  // the header, the tab counts and the listed rows are all derived from the same list, so they cannot disagree.
+  const count = (k: Kind) => entries.filter((e) => e.kind === k).length;
 
   const query = (q ?? "").trim().toLowerCase();
   const filtered = entries
@@ -129,14 +109,12 @@ export default async function PreviewReviewQueuePage({
   const slice = paginate(filtered, pageParam, pageSize);
 
   const kindLabel: Record<Kind, string> = {
-    orgRequest: t.typeOrgRequest,
     networkReferral: t.typeNetworkReferral,
     verification: t.typeVerification,
     salesReferral: t.typeSalesReferral,
   };
   // A lead edge + badge tone per type, so the separated workflows are visible at a glance.
   const kindStyle: Record<Kind, { edge: string; tone: "accent" | "info" | "neutral" | "warning" }> = {
-    orgRequest: { edge: "bg-accent-solid", tone: "accent" },
     networkReferral: { edge: "bg-info", tone: "info" },
     verification: { edge: "bg-fg-muted", tone: "neutral" },
     salesReferral: { edge: "bg-warning", tone: "warning" },
@@ -144,7 +122,7 @@ export default async function PreviewReviewQueuePage({
 
   return (
     <div className="flex flex-col gap-lg">
-      <AdminHeader locale={locale} title={t.title} subtitle={t.subtitle} count={filtered.filter((e) => !e.fixture).length} />
+      <AdminHeader locale={locale} title={t.title} subtitle={t.subtitle} count={filtered.length} />
 
       <TabLinks
         basePath="/admin/review"
@@ -154,8 +132,7 @@ export default async function PreviewReviewQueuePage({
         keep={{ q }}
         label={t.title}
         tabs={[
-          { value: "", label: t.tabs.all, count: realEntries.length },
-          { value: "orgRequests", label: `${t.tabs.orgRequests} · ${m.admin.preview.previewOnlyBadge}` },
+          { value: "", label: t.tabs.all, count: entries.length },
           { value: "networkReferrals", label: t.tabs.networkReferrals, count: count("networkReferral") },
           { value: "verifications", label: t.tabs.verifications, count: count("verification") },
           { value: "salesReferrals", label: t.tabs.salesReferrals, count: count("salesReferral") },
@@ -165,12 +142,6 @@ export default async function PreviewReviewQueuePage({
       <p role="note" className="-mt-2 text-label text-fg-muted">
         {t.separationNote}
       </p>
-      {hasFixtures ? (
-        <p role="note" className="-mt-2 text-label text-fg-muted">
-          {t.fixtureNote}
-        </p>
-      ) : null}
-
       <AutoFilters fields={[{ kind: "text", name: "q", placeholder: m.admin.preview.users.searchPlaceholder }]} />
 
       {filtered.length === 0 ? (
@@ -192,7 +163,6 @@ export default async function PreviewReviewQueuePage({
                         <bdi dir="auto">{e.title}</bdi>
                       </p>
                       <Badge tone={kindStyle[e.kind].tone}>{kindLabel[e.kind]}</Badge>
-                      {e.fixture ? <Badge tone="warning">{m.admin.preview.previewOnlyBadge}</Badge> : null}
                     </div>
                     <p className="text-label text-fg-muted">
                       <bdi dir="auto">{e.summary}</bdi> · {t.submittedOn}: {formatAdminDate(e.at, locale)}

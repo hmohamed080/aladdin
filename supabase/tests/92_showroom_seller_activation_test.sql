@@ -21,19 +21,21 @@ insert into public.verifications(id,subject_type,organization_id,verification_ty
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}',true);
 select lives_ok($$select public.review_start('92a00001-0000-4000-8000-000000000092')$$,'authorized administrator starts review');
-select throws_ok($$select public.review_approve('92a00001-0000-4000-8000-000000000092',false)$$,'22023',null,'administrator cannot approve without detailed address');
-select throws_ok($$select public.apply_organization_verification('92a00001-0000-4000-8000-000000000092')$$,'22023',null,'activation still requires approved review');
+-- Owner policy (20261115090002): an authorized Administrator may approve a showroom regardless of how complete its business details
+-- are. SELLING stays gated by the address: showroom_seller_ready and the publish / quotation / order guards are unchanged.
+select lives_ok($$select public.review_approve('92a00001-0000-4000-8000-000000000092',false)$$,'D: an administrator may approve a showroom whose address is still missing');
+select lives_ok($$select public.apply_organization_verification('92a00001-0000-4000-8000-000000000092')$$,'D: the approved showroom is activated');
+select set_config('request.jwt.claims','{"sub":"92000001-0000-4000-8000-000000000092","role":"authenticated"}',true);
+select throws_ok(format('select public.set_product_published(%L,true,1)',current_setting('test.product')),'42501',null,'D: an approved showroom WITHOUT an address still cannot publish');
+reset role;
+select ok(not app.showroom_seller_ready(current_setting('test.org')::uuid),'D: approved but incomplete: selling stays blocked');
+set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"92000001-0000-4000-8000-000000000092","role":"authenticated"}',true);
 select lives_ok(format('select public.branch_update_i18n(%L,null,null,%L,null,null)',(select primary_branch_id from public.memberships where organization_id=current_setting('test.org')::uuid),'10 Showroom Street'),'B: owner adds address through existing authorized branch editor');
-select is((select is_verified from public.organizations where id=current_setting('test.org')::uuid),false,'address alone does not grant approval');
-select throws_ok(format('select public.set_product_published(%L,true,1)',current_setting('test.product')),'42501',null,'complete address without approval cannot publish');
+select is((select is_verified from public.organizations where id=current_setting('test.org')::uuid),true,'adding the address keeps the approval');
 reset role;
 select ok(app.showroom_profile_complete(current_setting('test.org')::uuid),'B: mandatory business data complete');
-select ok(not app.showroom_seller_ready(current_setting('test.org')::uuid),'B: selling remains blocked pending approval');
 set local role authenticated;
-select set_config('request.jwt.claims','{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}',true);
-select lives_ok($$select public.review_approve('92a00001-0000-4000-8000-000000000092',false)$$,'C: authorized approval accepted after completion');
-select lives_ok($$select public.apply_organization_verification('92a00001-0000-4000-8000-000000000092')$$,'C: approved complete showroom activates');
 select set_config('request.jwt.claims','{"sub":"92000001-0000-4000-8000-000000000092","role":"authenticated"}',true);
 select lives_ok(format('select public.product_audiences_set(%L, array[''supplier''])',current_setting('test.product')),'C: audience chosen (Showroom publishing requires one)');
 select lives_ok(format('select public.set_product_published(%L,true,1)',current_setting('test.product')),'C: activated approved showroom publishes');

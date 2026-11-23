@@ -253,7 +253,9 @@ select is((select count(*)::int from live_actions l where not exists (select 1 f
             and l.a not in ('whatsapp_otp.delivery_requested', 'whatsapp_otp.delivery_changed', 'whatsapp_otp.delivery_change_failed')
             -- 20261107090006 (Backup & Recovery console) adds exactly these eight.
             and l.a not in ('backup.environment_initialized', 'backup.settings_changed', 'backup.production_activated', 'backup.production_deactivated',
-                            'backup.run_requested', 'backup.run_dispatched', 'backup.run_failed', 'backup.run_verified')), 0,
+                            'backup.run_requested', 'backup.run_dispatched', 'backup.run_failed', 'backup.run_verified')
+            -- 20261115090002 (Admin-initiated verification) adds exactly this one.
+            and l.a <> 'verification.admin_initiated'), 0,
   'nothing else was added: only feature actions on top of main (a later migration that adds more must extend this fixture)');
 select is((select count(*)::int from live_actions l where l.a in ('phone_verification.started', 'phone_verification.completed')), 2,
   'Phase B1 added exactly its two phone verification audit actions');

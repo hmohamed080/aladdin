@@ -182,3 +182,24 @@ test("a pinned out-of-order review passes only while the file still matches its 
   assert.equal(call(sql, pin(contentHash(sql), "short")).failures.length, 1, "a pin needs a real reason");
   assert.equal(call(sql, {}).failures.length, 1, "no pin and no marker still fails");
 });
+
+test("a pinned destructive review passes only while the file still matches its sha256", async () => {
+  const { contentHash } = await import("./migration-policy.mjs");
+  const sql = "drop function if exists app.old_guard();\r\n";
+  const path = "supabase/migrations/20261201090001_drop_guard.sql";
+  const pin = (sha256, reason = "applied on Acceptance already; trigger function with no callers") => ({ [path]: { sha256, reason } });
+  const call = (text, reviewedDestructive) =>
+    evaluatePr({ changes: [{ status: "A", path }], baseFiles: ["supabase/migrations/20261009090001_x.sql"], readFile: () => text, reviewedDestructive });
+  assert.equal(call(sql, pin(contentHash(sql))).failures.length, 0, "matching pin is accepted (CRLF is normalised)");
+  assert.equal(call(sql, pin(contentHash(sql))).warnings.length, 1, "and is reported as a reviewed exception");
+  assert.equal(call("drop function if exists app.other_guard();\n", pin(contentHash(sql))).failures.length, 1, "an edited file no longer matches the pin");
+  assert.equal(call(sql, pin(contentHash(sql), "short")).failures.length, 1, "a pin needs a real reason");
+  assert.equal(call(sql, {}).failures.length, 1, "no pin and no marker still fails");
+  assert.equal(call("drop table public.users;\n", pin(contentHash("drop table public.users;\n"))).failures.length, 0, "a pin covers exactly the pinned file");
+  const other = "supabase/migrations/20261201090002_other.sql";
+  assert.equal(
+    evaluatePr({ changes: [{ status: "A", path: other }], baseFiles: [], readFile: () => sql, reviewedDestructive: pin(contentHash(sql)) }).failures.length,
+    1,
+    "the pin does not extend to any other migration",
+  );
+});

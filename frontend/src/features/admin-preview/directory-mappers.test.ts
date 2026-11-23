@@ -106,13 +106,13 @@ describe("organizations", () => {
   it("maps a directory page and derives verification state from real fields", () => {
     const page = mapOrgsPage({
       rows: [
-        { id: "o1", name: "A", org_type: "supplier", status: "pending_verification", is_verified: false, created_at: "2026-01-01T00:00:00Z", member_count: 3, branch_count: 1, owner: { user_id: "u1", display_name: "Owner" } },
-        { id: "o2", name: "B", org_type: "importer", status: "active", is_verified: true, created_at: "2026-01-02T00:00:00Z", owner: null },
+        { id: "o1", name: "A", org_type: "supplier", status: "pending_verification", is_verified: false, approval_state: "pending", created_at: "2026-01-01T00:00:00Z", member_count: 3, branch_count: 1, owner: { user_id: "u1", display_name: "Owner" } },
+        { id: "o2", name: "B", org_type: "importer", status: "active", is_verified: true, approval_state: "approved", created_at: "2026-01-02T00:00:00Z", owner: null },
       ],
       total: 2,
       page: 1,
       page_size: 10,
-      counts: { all: 2, pending: 1, verified: 1, suspended: 0 },
+      counts: { all: 2, pending: 1, verified: 1, suspended: 0, rejected: 0 },
     });
     expect(page?.rows.map((o) => o.verificationState)).toEqual(["pending", "verified"]);
     expect(page?.rows[0]?.owner).toEqual({ userId: "u1", displayName: "Owner" });
@@ -124,6 +124,7 @@ describe("organizations", () => {
       id: "o1",
       name: "A",
       status: "active",
+      approval_state: "approved",
       created_at: "2026-01-01T00:00:00Z",
       referred_by: { user_id: "u9", display_name: "Referrer" },
       owners: [{ user_id: "u1", display_name: "Owner" }, {}],
@@ -136,7 +137,7 @@ describe("organizations", () => {
     expect(d?.branches[0]).toMatchObject({ id: "b1", nameAr: "الرئيسي", isActive: true });
     expect(d).not.toHaveProperty("memberCount");
     expect(d?.businessVerifiedAt).toBeNull();
-    expect(mapOrgDetail({ id: "o1", name: "A", status: "active", created_at: "2026-01-01T00:00:00Z", business_verified_at: "2026-10-17T00:00:00Z" })?.businessVerifiedAt).toBe("2026-10-17T00:00:00Z");
+    expect(mapOrgDetail({ id: "o1", name: "A", status: "active", approval_state: "approved", created_at: "2026-01-01T00:00:00Z", business_verified_at: "2026-10-17T00:00:00Z" })?.businessVerifiedAt).toBe("2026-10-17T00:00:00Z");
   });
 });
 

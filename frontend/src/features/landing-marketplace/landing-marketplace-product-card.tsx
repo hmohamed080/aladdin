@@ -73,8 +73,8 @@ export function LandingMarketplaceProductCard({ product }: { product: LandingPro
           {was ? <del className={styles.was} aria-label={`${t.was}: ${was}`}>{was}</del> : null}
         </div>
         <p className={styles.unitNote}>{t.units[product.unit]}</p>
-        {/* No cart yet: the button opens /marketplace, which says the Marketplace is coming soon. */}
-        <Link href="/marketplace" className={styles.addToCart}>
+        {/* No cart yet: the button opens /market, which says the Marketplace is coming soon. */}
+        <Link href="/market" className={styles.addToCart}>
           <ShoppingBagIcon size={18} />
           {t.addToCart}
         </Link>

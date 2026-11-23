@@ -362,3 +362,13 @@ a.registerItem:hover { background: color-mix(in srgb, var(--lb-cream) 60%, trans
 .social a { transition: transform 0.2s ease, background 0.2s ease; }
 .social a:hover { transform: translateY(-2px); background: var(--lb-sand-soft); }
 @media (prefers-reduced-motion: reduce) { .page *, .page *::before, .page *::after { animation: none !important; transition: none !important; } }
+
+/* Live Marketplace: header cart and real product cards (shown only while the Marketplace is open). */
+.cartLink { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--lb-sand); color: var(--lb-cream); }
+.cartBadge { position: absolute; inset-block-start: -4px; inset-inline-end: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--lb-terra); color: var(--lb-cream); font-size: 11px; font-weight: 800; line-height: 20px; text-align: center; }
+.cardLive .cardBody { flex-direction: column; align-items: stretch; }
+.cardLive .cardBody a, .cardLive .cardBody > div > a { color: inherit; }
+.cardSeller { font-size: 12px; font-weight: 500; color: var(--lb-ink-2); }
+.cartAdd { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--lb-terra); color: var(--lb-cream); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.cartAdd:disabled { opacity: 0.55; cursor: not-allowed; }
+.cartAddDone { background: var(--lb-navy-2); }

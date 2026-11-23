@@ -46,7 +46,7 @@ export function InvitePanel({
         title={t("invite.title")}
         subtitle=""
         footer={
-          <Link href="/auth/sign-in" className="text-fg-muted hover:text-fg hover:underline">
+          <Link prefetch={false} href="/auth/sign-in" className="text-fg-muted hover:text-fg hover:underline">
             {t("support.backToSignIn")}
           </Link>
         }
@@ -101,16 +101,16 @@ export function InvitePanel({
         ) : isSignedIn ? (
           <>
             <p className="text-body text-warning">{t("invite.notMatches")}</p>
-            <Link href={`/auth/sign-in?next=${encodeURIComponent(returnTo)}`} className="w-full">
+            <Link prefetch={false} href={`/auth/sign-in?next=${encodeURIComponent(returnTo)}`} className="w-full">
               <Button variant="outline" className="w-full">{t("invite.signInToAccept")}</Button>
             </Link>
           </>
         ) : (
           <div className="flex flex-col gap-sm">
-            <Link href="/auth/sign-up" className="w-full">
+            <Link prefetch={false} href="/auth/sign-up" className="w-full">
               <Button variant="primary" className="w-full">{t("invite.createToAccept")}</Button>
             </Link>
-            <Link href={`/auth/sign-in?next=${encodeURIComponent(returnTo)}`} className="w-full">
+            <Link prefetch={false} href={`/auth/sign-in?next=${encodeURIComponent(returnTo)}`} className="w-full">
               <Button variant="outline" className="w-full">{t("invite.signInToAccept")}</Button>
             </Link>
           </div>

@@ -1,3 +1,22 @@
+- Acceptance (`nxossqhdfltcqdwvbewi`) is at 237 migrations, latest `20261122090002` (registration gate applied 2026-11-23, see the section below). The frontend matching `main` `b7de7c6b` is deployed to the preview Worker (version `41b77bf4-53b4-408d-9891-b527c540b0c6`). Production is untouched (last recorded 207).
+
+## Registration gate on Acceptance (ADR-0031 PR 1 + security fix) - 2026-11-23
+- Applied to Acceptance by the owner with `acceptance-apply.sh --plan registration-gate` from `main` `b7de7c6b` (PRs #226, #227, #229): `20261122090001` (Admin users registration state) and `20261122090002` (central registration gate in `app.api_pre_request`). Function-only, so no backup was needed. Post-push gate: 237 applied, none pending, permissions match contract `20261122090002` (900 functions), catalog diff exactly the five plan functions, media/storage counts verified.
+- Recovery if ever needed: the pinned forward-fix `scripts/hosted-db/forward-fix/registration-gate-restore-previous.sql` (sha256 `39f99de6d09a5a7d1b5e0250091ec2eadaa37c56c55b3e382857fe43daf22d18`, owner GO only).
+- Post-apply refusal smoke test PASSED (owner-run, 2026-11-23, `registration-gate-smoke.mjs` with a real access token of a `consent_pending` account): a table UPDATE/DELETE/INSERT, a state-changing RPC and the `graphql_public` schema were refused with HTTP 403 `registration_incomplete`; a read, `my_registration_state` and `my_account_status` still worked. The optional finished-account check was not run live (covered by pgTAP 143 and the local 78-check sweep).
+- Not covered: phone sign-up UI (WhatsApp/OTP authority is OFF), Google/Facebook OAuth in a browser. Known step-6 gap: `invitation_accept` creates an active membership that the grandfather clause treats as registered without a consent check.
+- Production is untouched. Throwaway Acceptance test account `xinewi8470@anonmart.com` (finished registration) remains; the owner may delete it.
+
+## Production frontend version - 2026-11-23
+- `aladdin-frontend-production` serves version `1718d6d5-1ee7-4b47-9bfb-70ecb3448c4d` at 100% (10% at about 10:10 UTC, 100% at about 10:14 UTC), built from `main` `5427eedb` by `cloudflare-production.yml` (`frontend-upload`, `match-live`) and promoted by hand from the dashboard. It contains Next.js 16.4.6 (#228), `prefetch={false}` on the Terms/Privacy links that open in a new tab (#230) and the anonymous Landing page edge cache (#231, `LANDING_EDGE_CACHE_SECONDS=300`, response header `x-landing-cache`). Rollback target: the previous version `56c08eae` (dashboard Deployments, or `wrangler rollback --env production`).
+- Checked after activation (from a single machine, anonymous): 20 of 20 requests to `/` returned `HIT`; `/auth/sign-in`, `/legal/terms`, `/legal/privacy` and `/market` returned 200; requests with a Cookie, a query string or an `RSC` header were never cached. NOT measured: the effect on `_rsc` requests, on `Network connection lost` errors, on Worker CPU, and logged-in pages. That needs 24 hours of traffic compared with the 24 hours before (about 30% `_rsc`, 63 errors, median CPU about 240 ms).
+
+## Marketplace notification templates (draft PR, not deployed) - 2026-11-21
+- Branch `feat/mkt-notification-templates-20261121`: migration `20261121090003` (templates, history, `notifications.content`, six `marketplace.*` event types) is NOT applied to Acceptance or Production (local isolated stack only). Admin page `/admin/notification-templates`. No emitter calls it yet (PR 5 and PR 6).
+
+## Site-wide media policy (draft PR, not deployed) - 2026-11-21
+- Branch `feat/mkt-media-policy-20261121` (ADR-0030, Proposed): 10 MB image / 100 MB video per-file caps, re-encoded originals without personal metadata, video original deleted only after verification, rejected Marketplace images purged after 2 days. Migration `20261121090001` is NOT applied to Acceptance or Production (local isolated stack only). Nothing deployed.
+
 ## Redis moved from preview to production only (draft PR, not deployed) - 2026-11-15
 - Owner decision: preview `REDIS_CACHE_ENABLED=false`; only production uses Redis (whole 500,000 commands a month). The live preview keeps its current Redis settings until a version with this config is deployed. Preview acceptance runs then exercise the in-memory / Postgres fallback, not Redis.
 
@@ -6,7 +25,8 @@
 - Live Production is unchanged until a version with this config is deployed and promoted. Budget: the 500,000 commands a month are shared with the preview. Rollback: `REDIS_CACHE_ENABLED=false`.
 
 ## Legacy URLs blocked at Cloudflare; retired entry redirects removed (draft PR) - 2026-11-15
-- Production Cloudflare zone `aladdindecore.com` has 1 custom WAF rule, "Block legacy website paths" (Block, active, first): the old site's `/b2b_web_site/`, `/b2c/accounts/`, `/uploads/albums_images/`, `/b2b/api/uptime-home`, and the retired `/installer/`, `/temporary/craftsman/`, `/showroom/sign-*` URLs answer 403 at the edge. Bot Fight Mode is off. Undo: delete or disable the rule.
+- Production Cloudflare zone `aladdindecore.com` has the custom WAF rule "Block legacy website paths" (rule 1) (Block, active, first): the old site's `/b2b_web_site/`, `/b2c/accounts/`, `/uploads/albums_images/`, `/b2b/api/uptime-home`, and the retired `/installer/`, `/temporary/craftsman/`, `/showroom/sign-*` URLs answer 403 at the edge. Bot Fight Mode is off. Undo: delete or disable the rule.
+- Same zone, added 2026-11-16 (owner-approved): custom rule 2 "Block common scanner paths" (Block): paths containing `/wp-`, `xmlrpc`, `phpmyadmin`, `/.env`, `/.git`, `/.aws`, `/.docker`, `/.ssh`, `/.anthropic`, `/.vscode`, `/.DS_Store`, `client_secrets.json`, `/api/dev/`, or ending `.php .asp .aspx .jsp .sql .bak .yml .yaml` answer 403 at the edge (`/.well-known/` is not matched). Rate-limiting rule "Rate limit auth POST": more than 20 POSTs to `/auth/*` from one IP in 10 s are blocked for 10 s (the Free plan only allows 10 s windows). Min TLS is 1.2. Undo: delete or disable the rule.
 - Branch `chore/remove-retired-entry-redirects-20261115` removes the six redirects for the retired entry pages from `next.config.ts` (they 404 once deployed). Not merged, not deployed; Acceptance and Production still redirect until then.
 
 ## Account identity Phase 1 planning (draft PR-0, docs only) - 2026-11-10

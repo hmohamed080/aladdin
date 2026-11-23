@@ -4,6 +4,12 @@
 #   media      apply 20261110090001 only (Track C media ids-only keys)          207 -> 208
 #   m1         apply 20261110090002 only (P1 M1); media must already be applied 208 -> 209
 #   media+m1   apply both, in order, one plain push                             207 -> 209
+#   media-notify 20261121090001..003 (media caps, upload limits, notification templates), one plain push 232 -> 235. Creates tables:
+#              needs --backup-label of a FRESH restore-verified snapshot (>= 232 migrations); runs only from origin/main.
+#   registration-gate 20261122090001..002 (Admin registration state, central registration gate in the pre-request hook; ADR-0031), one plain push
+#              235 -> 237. FUNCTION-ONLY: no backup required; recovery is the pinned forward-fix. After it, run registration-gate-smoke.mjs (owner).
+#   marketplace 14 migrations (20261116100001..014), one plain push                          218 -> 232. Creates tables: needs
+#              --backup-label of a FRESH restore-verified snapshot (>= 218 migrations) and runs only from origin/main (merge #190, #192, #200 and the 20261116090001 work first).
 # NOT to be run without the owner's separate explicit GO. Production is refused. Never uses --include-all, repair or reset.
 #   bash scripts/hosted-db/acceptance-apply.sh --plan <plan> --sha <full 40-char origin/main sha> [--backup-label <pinned restore-verified snapshot>]
 #   No backup label is required: every plan's migrations are function-only (no table DDL, no DML, no stored row rewritten) and each has a
@@ -29,7 +35,7 @@ export LC_ALL=C
 ACC="nxossqhdfltcqdwvbewi"; PROD="kkpkgjrweysgvhvkhzun"
 PLAN=""; SHA=""; LABEL=""
 while [ $# -gt 0 ]; do case "$1" in --plan) PLAN="${2:-}"; shift 2;; --sha) SHA="${2:-}"; shift 2;; --backup-label) LABEL="${2:-}"; shift 2;; *) echo "unknown argument $1"; exit 2;; esac; done
-[[ "$PLAN" =~ ^(media|m1|m3a|media\+m1)$ ]] || { echo "usage: --plan media|m1|m3a|media+m1 --sha <40-char sha> [--backup-label <label>]"; exit 2; }
+[[ "$PLAN" =~ ^(media|m1|m3a|media\+m1|marketplace|media-notify|registration-gate)$ ]] || { echo "usage: --plan media|m1|m3a|media+m1|marketplace|media-notify|registration-gate --sha <40-char sha> [--backup-label <label>]"; exit 2; }
 [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: --plan <plan> --sha <40-char sha> [--backup-label <label>]"; exit 2; }
 [ -z "$LABEL" ] || [[ "$LABEL" =~ ^aladdin-acceptance-[0-9]{8}T[0-9]{6}Z$ ]] || { echo "--backup-label must look like aladdin-acceptance-YYYYMMDDTHHMMSSZ"; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"

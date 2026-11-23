@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { describeLocation } from "@/lib/location/describe-location";
-import { loadOrganizationsDirectory } from "@/server/queries/admin-directory";
+import { loadOrganizationsDirectory, loadPendingOrganizationVerifications } from "@/server/queries/admin-directory";
 import { parseOrgsDirectoryParams, pageWindow } from "@/features/admin-preview/directory-params";
 import { localizedName, type AdminDirectoryOrg } from "@/features/admin-preview/directory-mappers";
 import { getMessages } from "@/lib/i18n/translate";
@@ -13,9 +13,9 @@ import { DataTable, RecordCell, Monogram, type Column } from "@/components/ui/da
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
 import { RowIconLink, RowIconDisabled } from "@/features/admin-preview/row-icon-button";
-import { RowIconAction } from "@/features/admin-preview/row-icon-action";
+import { UserVerificationControls } from "@/features/admin/user-verification-controls";
 import { AutoFilters, SortableHeader } from "@/features/admin-preview/auto-filters";
-import { EyeIcon, SettingsIcon, CheckIcon, XIcon } from "@/components/ui/icons";
+import { EyeIcon, SettingsIcon } from "@/components/ui/icons";
 import { TablePagination } from "@/features/admin-preview/table-pagination";
 import { requireAdminRoute } from "@/server/authorization/admin";
 import { can } from "@/lib/permissions/admin";
@@ -51,13 +51,18 @@ export default async function PreviewOrganizationsPage({
   const m = getMessages(locale);
   const params = parseOrgsDirectoryParams(await searchParams);
   const result = await loadOrganizationsDirectory(supabase, params);
+  // Verify / Reject are drawn only for a holder of `organizations.verify` (the RPCs re-check it) and act on the
+  // organization's OPEN approval request — one bounded read for this page's rows, never one per row.
+  const canVerify = can(access, "organizations.verify");
+  const pendingByOrg =
+    result.ok && canVerify ? await loadPendingOrganizationVerifications(supabase, result.data.rows.map((o) => o.id)) : new Map();
 
   const d = m.admin.preview.directory;
   const t = m.admin.preview.organizations;
   const userCols = m.admin.preview.users.columns;
   const typeLabels = m.orgType as Record<string, string>;
   const statusLabels = m.admin.status as Record<string, string>;
-  const verificationStateLabels = m.admin.preview.users.verificationState;
+  const approvalLabels = m.admin.orgs.approvalState as Record<string, string>;
   const cols = t.columns;
   const rowActionLabels = t.rowActions;
   const platform = m.admin.preview.platformView;
@@ -122,10 +127,10 @@ export default async function PreviewOrganizationsPage({
     },
     {
       key: "verification",
-      header: cols.verification ?? m.admin.orgs.verification,
+      header: cols.verification,
       minWidth: "8rem",
       nowrap: true,
-      cell: (o) => <StatusBadge status={o.verificationState} label={verificationStateLabels[o.verificationState]} />,
+      cell: (o) => <StatusBadge status={o.approvalState} label={approvalLabels[o.approvalState] ?? o.approvalState} />,
     },
     { key: "members", header: cols.members, minWidth: "6rem", numeric: true, secondary: true, cell: (o) => formatNumber(o.memberCount, locale) },
     { key: "branches", header: cols.branches, minWidth: "6rem", numeric: true, secondary: true, cell: (o) => formatNumber(o.branchCount, locale) },
@@ -165,26 +170,9 @@ export default async function PreviewOrganizationsPage({
             {/* No public organization route exists on Aladdin — a made-up URL would 404. */}
             <RowIconDisabled label={platform.viewOnPlatform} reason={platform.orgNotAvailable} Icon={EyeIcon} />
             <RowIconLink href={`/admin/organizations/${o.id}`} label={platform.manage} Icon={SettingsIcon} />
-            {o.status === "pending_verification" ? (
-              <>
-                <RowIconAction
-                  label={rowActionLabels.verify}
-                  icon={<CheckIcon size={16} />}
-                  tone="success"
-                  title={m.admin.preview.orgOverview.availableActions}
-                  confirmLabel={rowActionLabels.verify}
-                  confirmVariant="primary"
-                />
-                <RowIconAction
-                  label={rowActionLabels.reject}
-                  icon={<XIcon size={16} />}
-                  tone="danger"
-                  title={m.admin.preview.review.rejectTitle}
-                  body={m.admin.preview.review.rejectBody}
-                  confirmLabel={rowActionLabels.reject}
-                  confirmVariant="danger"
-                />
-              </>
+            {/* Real decisions: the same actions as the Verifications queue (permission, state machine, audit). */}
+            {canVerify && (o.status === "pending_verification" || pendingByOrg.has(o.id)) ? (
+              <UserVerificationControls subjectId={o.id} pending={pendingByOrg.get(o.id) ?? null} compact subjectType="organization" canInitiate />
             ) : null}
             {canSuspend ? (
               <SuspensionAction m={m} subjectType="organization" subjectId={o.id} suspended={o.status === "suspended"} compact />
@@ -239,6 +227,7 @@ export default async function PreviewOrganizationsPage({
           { value: "pending", label: m.admin.preview.users.statusTabs.pending, count: counts.pending },
           { value: "verified", label: m.admin.preview.users.statusTabs.verified, count: counts.verified },
           { value: "suspended", label: m.admin.preview.users.statusTabs.suspended, count: counts.suspended },
+          { value: "rejected", label: m.admin.preview.users.statusTabs.rejected, count: counts.rejected },
         ]}
       />
 

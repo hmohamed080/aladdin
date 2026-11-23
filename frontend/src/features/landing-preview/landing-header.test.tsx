@@ -10,9 +10,9 @@ vi.mock("@/lib/i18n/context", () => ({
 vi.mock("@/components/layout/switchers", () => ({ LanguageSwitch: () => <button type="button">EN</button> }));
 
 describe("landing header: marketplace link", () => {
-  it("always points at /marketplace (the coming-soon page) and keeps anchors on the home page", () => {
+  it("always points at /market (the coming-soon page) and keeps anchors on the home page", () => {
     render(<LandingHeader anchorBase="/" />);
-    expect(screen.getByRole("link", { name: "السوق" })).toHaveAttribute("href", "/marketplace");
+    expect(screen.getByRole("link", { name: "السوق" })).toHaveAttribute("href", "/market");
     // in-page anchors keep their base so they return to the home page from other routes
     expect(screen.getByRole("link", { name: "عن المنصة" })).toHaveAttribute("href", "/#how-it-works");
   });

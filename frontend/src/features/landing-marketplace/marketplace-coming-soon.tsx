@@ -23,7 +23,7 @@ const content = {
   },
 } as const;
 
-/** The /marketplace placeholder: the landing header and footer around a coming-soon message. */
+/** The /market placeholder: the landing header and footer around a coming-soon message. */
 export function MarketplaceComingSoon() {
   const { locale, dir } = useI18n();
   const t = content[locale];

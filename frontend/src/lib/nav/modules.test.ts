@@ -1,5 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { allowedNavKeys, allowedNavSections, navLabelKey, navOrder, NAV_ORDER } from "./modules";
+import {
+  allowedNavKeys,
+  allowedNavSections,
+  navLabelKey,
+  navOrder,
+  NAV_ORDER,
+  MARKETPLACE_SELL_ENTITLEMENT,
+} from "./modules";
+
+/** The modules `org.manage` must NOT unlock: each needs its own exact grant. */
+/** The B2C seller group, in menu order: products, then where the showroom delivers, then what it charges. */
+const MARKETPLACE_KEYS = ["marketplaceProducts", "marketplaceAreas", "marketplaceDelivery"] as const;
+const EXACT_GATED = new Set(["activity", "marketplaceProducts", "marketplaceAreas", "marketplaceDelivery"]);
 import { ROLE_PRESETS } from "@/lib/org/roles";
 
 /**
@@ -50,10 +62,42 @@ describe("allowedNavKeys", () => {
     expect(keys).toContain("saved");
   });
 
-  it("keeps the org.manage blanket unlock for every module except exact-gated activity", () => {
+  it("keeps the org.manage blanket unlock for every module except the exact-gated ones", () => {
     expect(allowedNavKeys(["org.manage"])).toEqual(
-      NAV_ORDER.filter((key) => key !== "activity"),
+      NAV_ORDER.filter((key) => !EXACT_GATED.has(key)),
     );
+  });
+
+  it("shows the Marketplace items (products, delivery areas, delivery prices) ONLY with the admin-granted seller entitlement", () => {
+    // Owning a showroom is eligibility, never authorization to sell on the Marketplace.
+    for (const key of MARKETPLACE_KEYS) {
+      expect(allowedNavKeys(["org.manage"])).not.toContain(key);
+      expect(allowedNavKeys(ROLE_PRESETS.catalog_manager)).not.toContain(key);
+      expect(allowedNavKeys(["catalog.write", "catalog.publish"])).not.toContain(key);
+      expect(allowedNavKeys(["org.manage", MARKETPLACE_SELL_ENTITLEMENT])).toContain(key);
+    }
+  });
+
+  it("puts Marketplace products in its OWN B2C group, never under B2B Sales", () => {
+    const sections = allowedNavSections(["org.manage", MARKETPLACE_SELL_ENTITLEMENT]);
+    const selling = sections.find((s) => s.section === "selling");
+    const marketplace = sections.find((s) => s.section === "marketplace");
+    expect(selling?.keys).not.toContain("marketplaceProducts");
+    expect(marketplace?.keys).toEqual(MARKETPLACE_KEYS);
+    // The group sits after B2B Sales and before running the business.
+    const order = sections.map((s) => s.section);
+    expect(order.indexOf("marketplace")).toBe(order.indexOf("selling") + 1);
+    expect(order.indexOf("marketplace")).toBeLessThan(order.indexOf("business"));
+  });
+
+  it("draws no Marketplace group at all without the entitlement", () => {
+    expect(allowedNavSections(["org.manage"]).map((s) => s.section)).not.toContain("marketplace");
+  });
+
+  it("never offers Marketplace products to a supply-side organization", () => {
+    for (const key of MARKETPLACE_KEYS) {
+      expect(allowedNavKeys(["org.manage", MARKETPLACE_SELL_ENTITLEMENT], "seller")).not.toContain(key);
+    }
   });
 
   it("gates people-ops behind org.members.manage", () => {
@@ -76,7 +120,7 @@ describe("allowedNavSections", () => {
     expect(sections.every((s) => s.keys.length > 0)).toBe(true);
   });
 
-  it("returns every section for an org manager, without exact-gated activity", () => {
+  it("returns every section for an org manager, without the exact-gated modules", () => {
     const sections = allowedNavSections(["org.manage"]);
     expect(sections.map((s) => s.section)).toEqual([
       "overview",
@@ -86,7 +130,7 @@ describe("allowedNavSections", () => {
       "business",
     ]);
     expect(sections.flatMap((s) => s.keys)).toEqual(
-      NAV_ORDER.filter((key) => key !== "activity"),
+      NAV_ORDER.filter((key) => !EXACT_GATED.has(key)),
     );
   });
 
@@ -169,8 +213,9 @@ describe("seller stance", () => {
   it("exposes exactly the buyer's modules plus the customer directory", () => {
     // Proof there is no second, drifting module set: the two layouts hold the
     // same keys, in different places.
-    const seller = new Set(navOrder("seller"));
-    const buyer = new Set(NAV_ORDER);
+    const seller = new Set<string>(navOrder("seller"));
+    // ...except Marketplace selling, which only a showroom can be approved for.
+    const buyer = new Set<string>(NAV_ORDER.filter((k) => !(MARKETPLACE_KEYS as readonly string[]).includes(k)));
     for (const k of buyer) expect(seller.has(k)).toBe(true);
     expect([...seller].filter((k) => !buyer.has(k))).toEqual(["buyers"]);
   });
