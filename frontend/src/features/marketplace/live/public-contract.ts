@@ -65,9 +65,6 @@ export type DeliveryTerms = {
   max_days: number | null;
   earliest: string | null;
   latest: string | null;
-  cutoff_time: string | null;
-  after_cutoff: boolean;
-  seconds_to_cutoff: number | null;
   free_min_egp: number | null;
   next_day: { fee_egp: number; arrival: string } | null;
   pickup_available: boolean;

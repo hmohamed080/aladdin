@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { countdownText, dateRangeText, dateText, daysRangeText, estimateText, feeText, freeReasonText, placeFromParams } from "./delivery-model";
+import { dateRangeText, dateText, daysRangeText, estimateText, feeText, freeReasonText, placeFromParams } from "./delivery-model";
 import type { DeliveryTerms } from "./public-contract";
 
 const terms = (patch: Partial<DeliveryTerms> = {}): DeliveryTerms => ({
   configured: true, status: "available", fee_egp: 80, fee_min_egp: null, fee_max_egp: null, prep_days: 2, min_days: 3, max_days: 4,
-  earliest: "2026-11-26", latest: "2026-11-27", cutoff_time: "14:00", after_cutoff: false, seconds_to_cutoff: 3600, free_min_egp: null,
+  earliest: "2026-11-26", latest: "2026-11-27", free_min_egp: null,
   next_day: null, pickup_available: false, pickup_instructions: null, free_shipping: false, free_reason: null, product_free: false, ...patch,
 });
 
@@ -40,15 +40,11 @@ describe("estimate wording", () => {
   });
 });
 
-describe("dates and countdown", () => {
+describe("dates", () => {
   it("formats a calendar day without a time-zone shift", () => {
     expect(dateText("2026-11-26", "en")).toMatch(/Thu.*26.*Nov/);
     expect(dateRangeText("2026-11-26", "2026-11-26", "en")).toBe(dateText("2026-11-26", "en"));
     expect(dateRangeText("2026-11-26", "2026-11-27", "en")).toContain("–");
-  });
-  it("formats a countdown and never goes negative", () => {
-    expect(countdownText(3661)).toBe("01:01:01");
-    expect(countdownText(-5)).toBe("00:00:00");
   });
 });
 

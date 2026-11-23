@@ -57,7 +57,6 @@ a.official:hover { text-decoration: underline; }
 .deliveryStrong { font-weight: 700; }
 .deliveryMuted { margin: 0; font-size: .8125rem; color: var(--stone); }
 .deliveryWarn { margin: 0; font-size: .8125rem; color: var(--danger); }
-.countdown { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--success); }
 .faster { border-block-start: 1px solid var(--quartz-line); padding-block-start: 8px; }
 .faster summary { cursor: pointer; font-size: .875rem; font-weight: 700; min-height: 32px; display: flex; align-items: center; }
 .faster p { margin: 6px 0 0; font-size: .875rem; }

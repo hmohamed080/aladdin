@@ -30,8 +30,8 @@
 --
 -- DELIVERY ESTIMATE (rules from PR 8's contract, applied as written there):
 --   row         = the buyer's area row, else the governorate row, and it must carry a fee;
---   estimate    = today (Africa/Cairo) + [1 if past the showroom's cut-off] + preparation_days + duration_min..max (calendar days);
---   next day    = the row's optional next-day option arrives the day after the (cut-off adjusted) order day, for its extra fee;
+--   estimate    = today (Africa/Cairo) + preparation_days + duration_min..max (calendar days); NO order cut-off (24h Marketplace);
+--   next day    = the row's optional next-day option arrives the day after today, for its extra fee;
 --   free ship   = product flagged, OR the chosen row's fee is 0, OR order value >= the row's free_shipping_min_egp,
 --                 else the showroom-wide minimum. A card/page judges one unit of the product.
 --   no area yet = a range over all the showroom's covered places (fastest..slowest) and a fee range.
@@ -114,13 +114,9 @@ declare
                                 where l.organization_id = p_seller and l.is_active and l.supports_pickup);
   v_ready    boolean;
   v_prep     smallint;
-  v_cutoff   time;
   v_free_min numeric;
   v_pick_txt text;
   v_now      timestamp := (now() at time zone 'Africa/Cairo');
-  v_after    boolean := false;
-  v_shift    integer := 0;
-  v_secs     integer;
   v_status   text;
   v_fee      numeric;
   v_fee_min  numeric;
@@ -139,12 +135,9 @@ begin
                      and a.attname = 'duration_min_days' and not a.attisdropped);
 
   if v_ready then
-    select s.preparation_days, s.order_cutoff_time, s.free_shipping_min_egp, s.pickup_instructions
-      into v_prep, v_cutoff, v_free_min, v_pick_txt
+    select s.preparation_days, s.free_shipping_min_egp, s.pickup_instructions
+      into v_prep, v_free_min, v_pick_txt
       from public.marketplace_seller_delivery_settings s where s.seller_organization_id = p_seller;
-    v_after := v_cutoff is not null and v_now::time > v_cutoff;
-    v_shift := case when v_after then 1 else 0 end;
-    v_secs := case when v_cutoff is not null and not v_after then extract(epoch from (v_cutoff - v_now::time))::integer end;
   end if;
 
   if v_gov is not null then
@@ -187,16 +180,13 @@ begin
     'fee_min_egp', v_fee_min,
     'fee_max_egp', v_fee_max,
     'prep_days', v_prep,
-    'min_days', case when v_ready and v_prep is not null and v_dmin is not null then v_shift + v_prep + v_dmin end,
-    'max_days', case when v_ready and v_prep is not null and v_dmax is not null then v_shift + v_prep + v_dmax end,
-    'earliest', case when v_ready and v_prep is not null and v_dmin is not null then to_char(v_now::date + (v_shift + v_prep + v_dmin), 'YYYY-MM-DD') end,
-    'latest',   case when v_ready and v_prep is not null and v_dmax is not null then to_char(v_now::date + (v_shift + v_prep + v_dmax), 'YYYY-MM-DD') end,
-    'cutoff_time', case when v_cutoff is not null then to_char(v_cutoff, 'HH24:MI') end,
-    'after_cutoff', v_after,
-    'seconds_to_cutoff', v_secs,
+    'min_days', case when v_ready and v_prep is not null and v_dmin is not null then v_prep + v_dmin end,
+    'max_days', case when v_ready and v_prep is not null and v_dmax is not null then v_prep + v_dmax end,
+    'earliest', case when v_ready and v_prep is not null and v_dmin is not null then to_char(v_now::date + (v_prep + v_dmin), 'YYYY-MM-DD') end,
+    'latest',   case when v_ready and v_prep is not null and v_dmax is not null then to_char(v_now::date + (v_prep + v_dmax), 'YYYY-MM-DD') end,
     'free_min_egp', v_row_free,
     'next_day', case when v_gov is not null and coalesce(v_nd, false)
-                     then jsonb_build_object('fee_egp', v_nd_fee, 'arrival', to_char(v_now::date + (v_shift + 1), 'YYYY-MM-DD')) end,
+                     then jsonb_build_object('fee_egp', v_nd_fee, 'arrival', to_char(v_now::date + 1, 'YYYY-MM-DD')) end,
     'pickup_available', v_pickup,
     'pickup_instructions', v_pick_txt);
 end;

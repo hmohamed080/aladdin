@@ -49,13 +49,6 @@ export function dateRangeText(earliest: string, latest: string | null, locale: L
   return `${a} – ${dateText(latest, locale)}`;
 }
 
-/** hh:mm:ss of a countdown, never negative. */
-export function countdownText(seconds: number): string {
-  const s = Math.max(0, Math.floor(seconds));
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
-}
-
 /** The delivery fee line for the chosen place: «Free», the fee, or null while no place is chosen. */
 export function feeText(terms: DeliveryTerms, locale: Locale): string | null {
   const t = deliveryCopy[locale];

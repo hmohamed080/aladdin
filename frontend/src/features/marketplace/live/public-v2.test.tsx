@@ -19,7 +19,7 @@ const card = (patch: Partial<PublicCard> = {}): PublicCard => ({
 
 const terms = (patch: Partial<DeliveryTerms> = {}): DeliveryTerms => ({
   configured: true, status: "available", fee_egp: 80, fee_min_egp: null, fee_max_egp: null, prep_days: 2, min_days: 3, max_days: 4,
-  earliest: "2026-11-26", latest: "2026-11-27", cutoff_time: "14:00", after_cutoff: false, seconds_to_cutoff: 3600, free_min_egp: 1000,
+  earliest: "2026-11-26", latest: "2026-11-27", free_min_egp: 1000,
   next_day: { fee_egp: 60, arrival: "2026-11-24" }, pickup_available: true, pickup_instructions: "Ask for the front desk", free_shipping: false, free_reason: null,
   product_free: false, ...patch,
 });
@@ -67,11 +67,11 @@ describe("ProductCard", () => {
 });
 
 describe("DeliveryBlock", () => {
-  it("shows the arrival dates, the fee, the countdown, the faster option and pickup", () => {
+  it("shows the arrival dates, the fee, the faster option and pickup", () => {
     en(<DeliveryBlock locale="en" terms={terms()} place={{ gov: "cairo", area: "" }} unitPrice={450} />);
     expect(screen.getByText(/Get it Thu 26 Nov – Fri 27 Nov/)).toBeInTheDocument();
     expect(screen.getByText("Delivery fee:", { exact: false })).toHaveTextContent("EGP 80");
-    expect(screen.getByText("Order within 01:00:00")).toBeInTheDocument();
+    expect(screen.queryByText(/Order within/)).not.toBeInTheDocument();
     expect(screen.getByText("Faster delivery options")).toBeInTheDocument();
     expect(screen.getByText("Ask for the front desk")).toBeInTheDocument();
   });
@@ -94,16 +94,13 @@ describe("DeliveryBlock", () => {
     const { unmount } = en(<DeliveryBlock locale="en" terms={terms({ status: "not_available", fee_egp: null, earliest: null })} place={{ gov: "luxor", area: "" }} unitPrice={450} />);
     expect(screen.getByText("This showroom does not deliver to your area")).toBeInTheDocument();
     unmount();
-    en(<DeliveryBlock locale="en" terms={terms({ configured: false, min_days: null, max_days: null, earliest: null, latest: null, cutoff_time: null, seconds_to_cutoff: null })} place={{ gov: "cairo", area: "" }} unitPrice={450} />);
+    en(<DeliveryBlock locale="en" terms={terms({ configured: false, min_days: null, max_days: null, earliest: null, latest: null })} place={{ gov: "cairo", area: "" }} unitPrice={450} />);
     expect(screen.getByText("The showroom will confirm its delivery details soon.")).toBeInTheDocument();
   });
 
-  it("explains an elapsed cut-off and renders nothing without terms", () => {
-    const { container, unmount } = en(<DeliveryBlock locale="en" terms={null} place={null} unitPrice={1} />);
+  it("renders nothing without terms", () => {
+    const { container } = en(<DeliveryBlock locale="en" terms={null} place={null} unitPrice={1} />);
     expect(container).toBeEmptyDOMElement();
-    unmount();
-    en(<DeliveryBlock locale="ar" terms={terms({ after_cutoff: true, seconds_to_cutoff: null })} place={{ gov: "cairo", area: "" }} unitPrice={450} />);
-    expect(screen.getByText("تجاوزت موعد الطلب اليومي؛ يُحتسب طلبك من الغد.")).toBeInTheDocument();
   });
 });
 

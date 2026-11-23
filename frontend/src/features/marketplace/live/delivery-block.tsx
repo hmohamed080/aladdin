@@ -1,10 +1,9 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import { TruckIcon } from "@/components/ui/icons";
 import type { Locale } from "../marketplace-types";
-import { countdownText, dateRangeText, dateText, daysRangeText, feeText, freeReasonText } from "./delivery-model";
+import { dateRangeText, dateText, daysRangeText, feeText, freeReasonText } from "./delivery-model";
 import { fmtEgp } from "./live-copy";
 import { deliveryCopy } from "./live-delivery-copy";
 import { PlacePicker } from "./place-picker";
@@ -15,19 +14,6 @@ import styles from "../marketplace-v2.module.css";
 export function termsForPrice(terms: DeliveryTerms, unitPrice: number | null): DeliveryTerms {
   if (terms.free_shipping || terms.free_min_egp === null || unitPrice === null || unitPrice < Number(terms.free_min_egp)) return terms;
   return { ...terms, free_shipping: true, free_reason: "threshold" };
-}
-
-function Countdown({ seconds, onDone, label }: { seconds: number; onDone: () => void; label: (time: string) => string }) {
-  const [left, setLeft] = useState(seconds);
-  useEffect(() => {
-    if (left <= 0) {
-      onDone();
-      return;
-    }
-    const id = window.setTimeout(() => setLeft((v) => v - 1), 1000);
-    return () => window.clearTimeout(id);
-  }, [left, onDone]);
-  return <span className={styles.countdown}>{label(countdownText(left))}</span>;
 }
 
 /**
@@ -73,13 +59,6 @@ export function DeliveryBlock({ locale, terms, place, unitPrice }: { locale: Loc
         <p className={styles.deliveryLine}>{t.rangeAll(daysRangeText(terms.min_days ?? 0, terms.max_days ?? 0, locale))}</p>
       ) : null}
       {!terms.configured && v.status !== "not_available" ? <p className={styles.deliveryMuted}>{t.unconfigured}</p> : null}
-
-      {terms.cutoff_time && terms.seconds_to_cutoff !== null && v.status !== "not_available" ? (
-        <p className={styles.deliveryLine}>
-          <Countdown seconds={terms.seconds_to_cutoff} onDone={() => router.refresh()} label={t.orderWithin} />
-        </p>
-      ) : null}
-      {terms.after_cutoff ? <p className={styles.deliveryMuted}>{t.afterCutoff}</p> : null}
 
       {fee ? (
         <p className={styles.deliveryLine}>
