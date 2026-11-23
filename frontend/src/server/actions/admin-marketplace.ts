@@ -19,32 +19,59 @@ const MEDIA = "/admin/marketplace/media";
 
 const SELLER_RPC = {
   approve: "admin_marketplace_seller_approve",
+  reject: "admin_marketplace_seller_reject",
   suspend: "admin_marketplace_seller_suspend",
   revoke: "admin_marketplace_seller_revoke",
   reinstate: "admin_marketplace_seller_reinstate",
 } as const;
 export type SellerTransition = keyof typeof SELLER_RPC;
 
+export type SellerTransitionInput = {
+  /** Internal admin reason. Required for everything except approve. */
+  reason: string;
+  /** The owner-facing message: a preset id, or custom text ("other") in Arabic AND English, never both. */
+  presetId?: string | null;
+  messageAr?: string | null;
+  messageEn?: string | null;
+};
+
+/** Maps a refusal of the seller RPCs (plain messages, Postgres codes) to a stable code. */
+function sellerErrorCode(error: { message?: string; code?: string }): string {
+  const parsed = parseSellerError(error.message);
+  if (parsed.code !== "unexpected") return parsed.code;
+  if (error.code === "42501") return "not_permitted";
+  if (error.code === "23514") return "transition_refused";
+  if (error.code === "22023") {
+    if (/reason/.test(error.message ?? "")) return "reason_required";
+    return "message_invalid";
+  }
+  return "unexpected";
+}
+
 export async function sellerTransitionAction(
   organizationId: string,
   action: SellerTransition,
-  reason: string,
+  input: SellerTransitionInput,
 ): Promise<AdminResult<{ status: string }>> {
   if (!(action in SELLER_RPC)) return { ok: false, code: "invalid_action" };
-  if (reason.trim().length < 3) return { ok: false, code: "reason_required" };
+  const reason = input.reason.trim();
+  if (action !== "approve" && reason.length < 3) return { ok: false, code: "reason_required" };
+  const messageAr = input.messageAr?.trim() || null;
+  const messageEn = input.messageEn?.trim() || null;
+  const presetId = input.presetId || null;
+  // one preset, or two custom texts (both languages), never a mix and never one language alone
+  if (presetId && (messageAr || messageEn)) return { ok: false, code: "message_invalid" };
+  if (Boolean(messageAr) !== Boolean(messageEn)) return { ok: false, code: "message_invalid" };
   const supabase = await getServerSupabase();
-  const { data, error } = await supabase.rpc(SELLER_RPC[action], { p_organization_id: organizationId, p_reason: reason.trim() });
-  if (error) {
-    const parsed = parseSellerError(error.message);
-    // the seller RPCs (Migration 04) raise plain messages; map the permission and state refusals
-    const code =
-      parsed.code !== "unexpected" ? parsed.code
-      : error.code === "42501" ? "not_permitted"
-      : error.code === "23514" ? "transition_refused"
-      : error.code === "22023" ? "reason_required"
-      : "unexpected";
-    return { ok: false, code };
-  }
+  const { data, error } = await supabase.rpc(SELLER_RPC[action], {
+    p_organization_id: organizationId,
+    // explicit nulls: the five-argument signature has no defaults, and an omitted key would fall back to the old (uuid, text) function
+    p_reason: reason || null,
+    p_preset_id: presetId,
+    p_message_ar: messageAr,
+    p_message_en: messageEn,
+  });
+  if (error) return { ok: false, code: sellerErrorCode(error) };
   revalidatePath(SELLERS);
   return { ok: true, status: String(data) };
 }
