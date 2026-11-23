@@ -30,7 +30,7 @@ export function VideoManager({ scope, productId, videos, canPublish, showList = 
       <div className="flex flex-col gap-1">
         <h2 id="video-manager-title" className="text-title text-fg">{t("video.title")}</h2>
         <p className="max-w-prose text-body text-fg-secondary">
-          {t(scope === "portfolio" ? "video.subtitlePortfolio" : "video.subtitleProduct")}
+          {t(scope === "portfolio" ? "video.subtitlePortfolio" : scope === "marketplace" ? "video.subtitleMarketplace" : "video.subtitleProduct")}
         </p>
       </div>
       <VideoUploader scope={scope} productId={productId} onDone={() => router.refresh()} />
@@ -93,7 +93,8 @@ export function VideoCard({ video, canPublish, onChange, extra }: {
         <div className="min-w-0">
           <p className="truncate text-label font-medium text-fg">{video.title}</p>
           <p className="text-caption text-fg-secondary">
-            {video.state === "ready" ? (video.isPublic ? t("video.status.published") : t("video.status.private")) : t(`video.state.${video.state}`)}
+            {video.review ? (video.state === "ready" ? t(`video.review.${video.review.status}`) : t(`video.state.${video.state}`))
+              : video.state === "ready" ? (video.isPublic ? t("video.status.published") : t("video.status.private")) : t(`video.state.${video.state}`)}
             {video.durationSeconds ? ` · ${formatDuration(video.durationSeconds)}` : ""}
           </p>
         </div>
@@ -114,6 +115,7 @@ export function VideoCard({ video, canPublish, onChange, extra }: {
         )}
         {extra ? <span className="ms-auto flex items-center gap-1">{extra}</span> : null}
       </div>
+      {video.review?.status === "rejected" && <RejectionNote ar={video.review.messageAr} en={video.review.messageEn} />}
       {error && <InlineError>{error}</InlineError>}
     </Card>
   );
@@ -185,5 +187,16 @@ function VideoUploader({ scope, productId, onDone }: { scope: VideoScope; produc
         <p className="text-caption text-fg-secondary">{t("video.resumeHint")}</p>
       )}
     </Card>
+  );
+}
+
+/** The reviewer's message to the seller, in the interface language (falls back to the other one). */
+function RejectionNote({ ar, en }: { ar: string | null; en: string | null }) {
+  const { t, locale } = useI18n();
+  const text = locale === "ar" ? ar ?? en : en ?? ar;
+  return (
+    <p className="text-caption text-danger" data-testid="video-rejection">
+      <span className="font-medium">{t("video.review.rejectedNote")}</span>{text ? ` ${text}` : ""}
+    </p>
   );
 }

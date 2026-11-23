@@ -55,6 +55,12 @@ describe("beginSchema", () => {
     expect(beginSchema.safeParse({ ...base, scope: "product" }).success).toBe(false);
     expect(beginSchema.safeParse({ ...base, scope: "product", productId: ID }).success).toBe(true);
   });
+  it("binds productId to marketplace scope the same way", () => {
+    const base = { title: "t", contentType: "video/mp4", bytes: 10 };
+    expect(beginSchema.safeParse({ ...base, scope: "marketplace" }).success).toBe(false);
+    expect(beginSchema.safeParse({ ...base, scope: "marketplace", productId: ID }).success).toBe(true);
+    expect(beginSchema.safeParse({ ...base, scope: "marketplace", productId: ID, projectId: ID }).success).toBe(false);
+  });
   it("refuses other types, and sizes beyond the platform ceiling (the limit of the place is checked when the upload begins)", () => {
     expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/x-msvideo", bytes: 10 }).success).toBe(false);
     expect(beginSchema.safeParse({ scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 100 * 1024 * 1024 }).success).toBe(true);
@@ -72,6 +78,32 @@ describe("beginVideoUpload", () => {
     const refused = client({ video_upload_begin: { data: ID, error: null } });
     await expect(beginVideoUpload(refused, { scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 60 * 1024 * 1024 }, uploads())).rejects.toMatchObject({ code: "too_large" });
     expect(refused.rpc).not.toHaveBeenCalled();
+  });
+
+  it("sends a marketplace video to the database as the caller with the marketplace scope and its product, after the limit check", async () => {
+    mocks.videoMax.mockResolvedValueOnce(Number.MAX_SAFE_INTEGER);
+    const c = client({ video_upload_begin: { data: ID, error: null } });
+    await beginVideoUpload(c, { scope: "marketplace", productId: "bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb", title: "t", contentType: "video/mp4", bytes: 20 }, uploads());
+    expect(mocks.videoMax).toHaveBeenCalledWith("marketplace");
+    expect(c.rpc).toHaveBeenCalledWith("video_upload_begin", { p_scope: "marketplace", p_product_id: "bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb",
+      p_title: "t", p_content_type: "video/mp4", p_bytes: 20 });
+    expect(mocks.admin).toHaveBeenCalledWith("video_upload_attach", { p_id: ID, p_upload_id: "up-1" });
+  });
+
+  it("refuses a marketplace video for someone without org.manage, before any R2 work", async () => {
+    mocks.videoMax.mockResolvedValueOnce(Number.MAX_SAFE_INTEGER);
+    const c = client({ video_upload_begin: { data: null, error: { code: "42501" } } });
+    const u = uploads();
+    await expect(beginVideoUpload(c, { scope: "marketplace", productId: ID, title: "t", contentType: "video/mp4", bytes: 20 }, u))
+      .rejects.toMatchObject({ code: "not_allowed" });
+    expect((u as unknown as { create: ReturnType<typeof vi.fn> }).create).not.toHaveBeenCalled();
+  });
+
+  it("maps the three-video limit to the limit error", async () => {
+    mocks.videoMax.mockResolvedValueOnce(Number.MAX_SAFE_INTEGER);
+    const c = client({ video_upload_begin: { data: null, error: { code: "23514" } } });
+    await expect(beginVideoUpload(c, { scope: "marketplace", productId: ID, title: "t", contentType: "video/mp4", bytes: 20 }, uploads()))
+      .rejects.toMatchObject({ code: "limit" });
   });
 
   it("plans larger parts for a file that would need more than 10,000", async () => {

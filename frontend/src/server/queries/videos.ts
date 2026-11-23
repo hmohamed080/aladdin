@@ -14,6 +14,8 @@ export type ManagedVideo = VideoSummary & {
   playback: VideoPlayback | null;
   /** The portfolio project it belongs to, or null. */
   projectId?: string | null;
+  /** Marketplace videos only: the admin review result. The internal reason is never selected. */
+  review?: { status: "pending" | "approved" | "rejected"; messageAr: string | null; messageEn: string | null } | null;
 };
 
 type Row = {
@@ -53,6 +55,24 @@ export async function listManagedVideos(target: { scope: "portfolio" } | { scope
       : null;
     return { ...video, scope: row.scope, state: row.state as ManagedVideo["state"], isPublic: row.visibility === "public",
       failureCode: row.failure_code, createdAt: row.created_at, playback, projectId: row.project_id };
+  }));
+}
+
+/**
+ * One Marketplace product's videos for the seller's managers (org.manage of the seller). The definer RPC decides
+ * who may list them and returns the review result; the internal reason is never returned. A refusal gives an empty list.
+ */
+export async function listMarketplaceVideos(productId: string): Promise<ManagedVideo[]> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_product_video_list", { p_product_id: productId });
+  if (error) return [];
+  return Promise.all((data ?? []).map(async (row) => {
+    const video = summary({ ...row, sort_order: null });
+    const playback = row.state === "ready" ? await privateVideoPlayback(supabase, video, { workspace: null }).catch(() => null) : null;
+    return { ...video, scope: "marketplace" as const, state: row.state as ManagedVideo["state"], isPublic: false,
+      failureCode: row.failure_code, createdAt: row.created_at, playback,
+      review: row.review_status
+        ? { status: row.review_status as "pending" | "approved" | "rejected", messageAr: row.review_message_ar, messageEn: row.review_message_en } : null };
   }));
 }
 

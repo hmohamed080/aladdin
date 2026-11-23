@@ -28,7 +28,11 @@ export const VIDEO_PARTS_PER_REQUEST = 8;
 /** Parallel part uploads in the browser. */
 export const VIDEO_UPLOAD_CONCURRENCY = 3;
 
-export type VideoScope = "portfolio" | "product";
+export type VideoScope = "portfolio" | "product" | "marketplace";
+/** The admin-configurable limit place a scope follows (a Marketplace video uses the product place). */
+export function videoLimitPlace(scope: VideoScope): "portfolio" | "product" {
+  return scope === "portfolio" ? "portfolio" : "product";
+}
 export type VideoState = "uploading" | "processing" | "ready" | "failed" | "deleted";
 
 export function isVideoType(value: unknown): value is VideoContentType {
