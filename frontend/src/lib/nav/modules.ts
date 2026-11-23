@@ -67,6 +67,7 @@ export type NavKey =
   | "products"
   // Selling to consumers on the public Marketplace. Not a membership capability:
   // it appears only for an organization a platform admin approved as a seller.
+  | "marketplaceApproval"
   | "marketplaceProducts"
   | "marketplaceAreas"
   | "marketplaceDelivery"
@@ -123,6 +124,14 @@ const JOBS = ["job.post", "job.manage"];
  */
 export const MARKETPLACE_SELL_ENTITLEMENT = "marketplace.sell";
 
+/**
+ * The Marketplace approval-request entitlement: the owner of a showroom that is NOT (yet) an approved seller sees one
+ * module, "Marketplace approval", where the standing is shown and approval can be requested (also after a rejection).
+ * Like the sell entitlement it is never a membership capability and `org.manage` cannot unlock it; the shell adds it only
+ * for an owner of an active showroom whose seller account is missing, pending, rejected, suspended or revoked.
+ */
+export const MARKETPLACE_REQUEST_ENTITLEMENT = "marketplace.request";
+
 export const NAV_CAPS: Record<NavKey, string[] | null> = {
   home: null,
 
@@ -153,6 +162,7 @@ export const NAV_CAPS: Record<NavKey, string[] | null> = {
   leads: SALES,
   followUps: SALES,
   products: ["catalog.write", "catalog.publish"],
+  marketplaceApproval: [MARKETPLACE_REQUEST_ENTITLEMENT],
   marketplaceProducts: [MARKETPLACE_SELL_ENTITLEMENT],
   marketplaceAreas: [MARKETPLACE_SELL_ENTITLEMENT],
   marketplaceDelivery: [MARKETPLACE_SELL_ENTITLEMENT],
@@ -181,7 +191,7 @@ export const NAV_CAPS: Record<NavKey, string[] | null> = {
  * make `activity.read` untruthful. Keep this exemption narrow and deliberate;
  * every other module continues to inherit the existing blanket unlock.
  */
-const EXACT_CAPABILITY_NAV_KEYS: ReadonlySet<NavKey> = new Set(["activity", "marketplaceProducts", "marketplaceAreas", "marketplaceDelivery"]);
+const EXACT_CAPABILITY_NAV_KEYS: ReadonlySet<NavKey> = new Set(["activity", "marketplaceApproval", "marketplaceProducts", "marketplaceAreas", "marketplaceDelivery"]);
 
 /**
  * Canonical order within each section, per stance; sections render in this order.
@@ -201,7 +211,7 @@ const BUYER_SECTIONS: { section: NavSection; keys: NavKey[] }[] = [
   { section: "selling", keys: ["customers", "leads", "followUps", "products"] },
   // B2C — only ever reachable with the admin-granted seller entitlement, and only
   // a showroom (buyer stance) can be approved, so the seller layout has no copy.
-  { section: "marketplace", keys: ["marketplaceProducts", "marketplaceAreas", "marketplaceDelivery"] },
+  { section: "marketplace", keys: ["marketplaceApproval", "marketplaceProducts", "marketplaceAreas", "marketplaceDelivery"] },
   { section: "business", keys: ["points", "projects", "team", "reports", "activity", "settings"] },
 ];
 

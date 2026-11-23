@@ -6,12 +6,13 @@ import {
   navOrder,
   NAV_ORDER,
   MARKETPLACE_SELL_ENTITLEMENT,
+  MARKETPLACE_REQUEST_ENTITLEMENT,
 } from "./modules";
 
 /** The modules `org.manage` must NOT unlock: each needs its own exact grant. */
 /** The B2C seller group, in menu order: products, then where the showroom delivers, then what it charges. */
 const MARKETPLACE_KEYS = ["marketplaceProducts", "marketplaceAreas", "marketplaceDelivery"] as const;
-const EXACT_GATED = new Set(["activity", "marketplaceProducts", "marketplaceAreas", "marketplaceDelivery"]);
+const EXACT_GATED = new Set(["activity", "marketplaceApproval", "marketplaceProducts", "marketplaceAreas", "marketplaceDelivery"]);
 import { ROLE_PRESETS } from "@/lib/org/roles";
 
 /**
@@ -76,6 +77,15 @@ describe("allowedNavKeys", () => {
       expect(allowedNavKeys(["catalog.write", "catalog.publish"])).not.toContain(key);
       expect(allowedNavKeys(["org.manage", MARKETPLACE_SELL_ENTITLEMENT])).toContain(key);
     }
+  });
+
+  it("shows the single Marketplace approval item ONLY with the request entitlement, never to an approved seller's group", () => {
+    expect(allowedNavKeys(["org.manage"])).not.toContain("marketplaceApproval");
+    expect(allowedNavKeys(["org.manage", MARKETPLACE_SELL_ENTITLEMENT])).not.toContain("marketplaceApproval");
+    const withRequest = allowedNavKeys(["org.manage", MARKETPLACE_REQUEST_ENTITLEMENT]);
+    expect(withRequest).toContain("marketplaceApproval");
+    for (const key of MARKETPLACE_KEYS) expect(withRequest).not.toContain(key);
+    expect(allowedNavSections(["org.manage", MARKETPLACE_REQUEST_ENTITLEMENT]).find((s) => s.section === "marketplace")?.keys).toEqual(["marketplaceApproval"]);
   });
 
   it("puts Marketplace products in its OWN B2C group, never under B2B Sales", () => {
@@ -215,7 +225,7 @@ describe("seller stance", () => {
     // same keys, in different places.
     const seller = new Set<string>(navOrder("seller"));
     // ...except Marketplace selling, which only a showroom can be approved for.
-    const buyer = new Set<string>(NAV_ORDER.filter((k) => !(MARKETPLACE_KEYS as readonly string[]).includes(k)));
+    const buyer = new Set<string>(NAV_ORDER.filter((k) => k !== "marketplaceApproval" && !(MARKETPLACE_KEYS as readonly string[]).includes(k)));
     for (const k of buyer) expect(seller.has(k)).toBe(true);
     expect([...seller].filter((k) => !buyer.has(k))).toEqual(["buyers"]);
   });
