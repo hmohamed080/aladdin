@@ -41,3 +41,10 @@ test("rows without a storage key are counted, not checked", async () => {
   const r = await verify(io([row("a", { storage_key: null })], new Map()));
   assert.deepEqual([r.checked, r.noKey], [0, 1]);
 });
+
+test("--list-problems names only the records that are not ok", async () => {
+  const w = io([row("a"), row("b")], new Map([["o/a", bytes]]));
+  const r = await verify(w, { listProblems: true });
+  assert.deepEqual(r.problems.map((p) => [p.verdict, p.object_key]), [["missing", "b"]]);
+  assert.equal((await verify(io([row("a")], new Map([["o/a", bytes]])))).problems, undefined);
+});

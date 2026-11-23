@@ -2,7 +2,9 @@
 // recorded size (and, with --deep, the recorded sha256). Use it when no migration journal exists (media-storage.mjs
 // `rehash` needs one). It never writes, deletes or overwrites anything and prints COUNTS only (no keys, owners or names).
 //
-//   node scripts/media-r2-verify.mjs --project <ref> [--namespace avatar,portfolio] [--deep]
+//   node scripts/media-r2-verify.mjs --project <ref> [--namespace avatar,portfolio] [--deep] [--list-problems]
+// --list-problems also prints, for each record that is not ok, its verdict, namespace and the two opaque id keys
+// (UUID-shaped; no file names or owners) so the Supabase source of exactly those records can be checked.
 //
 // Needs, in the owner's own environment: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (reads media_storage_locations),
 // R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (read access is enough), R2_PRIVATE_BUCKET.
@@ -25,9 +27,10 @@ export function judge(row, head, bytes) {
 }
 
 /** Runs the verification with injected io: rows(), head(key) -> {size}|null, body(key) -> Uint8Array|null. */
-export async function verify(io, { deep = false, concurrency = 8 } = {}) {
+export async function verify(io, { deep = false, concurrency = 8, listProblems = false } = {}) {
   const rows = await io.rows();
   const result = { checked: 0, ok: 0, missing: 0, sizeMismatch: 0, hashMismatch: 0, noKey: 0, deep };
+  const problems = [];
   const queue = rows.filter((r) => { if (!r.storage_key) { result.noKey++; return false; } return true; });
   let next = 0;
   async function worker() {
@@ -38,15 +41,17 @@ export async function verify(io, { deep = false, concurrency = 8 } = {}) {
       const bytes = deep && head ? await io.body(row.storage_key) : null;
       const verdict = judge(row, head, bytes);
       result.checked++; result[verdict]++;
+      if (listProblems && verdict !== "ok") problems.push({ verdict, namespace: row.namespace, object_key: row.object_key, storage_key: row.storage_key });
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(queue.length, 1)) }, worker));
+  if (listProblems) result.problems = problems;
   return result;
 }
 
 export async function main(argv = process.argv.slice(2)) {
   const opt = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : undefined; };
-  const project = opt("--project"); const deep = argv.includes("--deep");
+  const project = opt("--project"); const deep = argv.includes("--deep"); const listProblems = argv.includes("--list-problems");
   const namespaces = opt("--namespace")?.split(",");
   if (!project) throw new VerifyError("--project <ref> is required");
   const { readMaintenanceEnv } = await import("../frontend/src/lib/env/media-maintenance.mjs");
@@ -81,7 +86,7 @@ export async function main(argv = process.argv.slice(2)) {
       return new Uint8Array(await r.Body.transformToByteArray());
     },
   };
-  const result = await verify(io, { deep });
+  const result = await verify(io, { deep, listProblems });
   console.log(JSON.stringify({ project, ...result }));
   if (result.missing || result.sizeMismatch || result.hashMismatch) process.exitCode = 1;
 }
