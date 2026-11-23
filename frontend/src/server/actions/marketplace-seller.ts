@@ -361,3 +361,16 @@ export async function setProductFreeShippingAction(
   revalidatePath(DELIVERY_PATH);
   return { ok: true, freeShipping: Boolean((data as { free_shipping?: boolean }).free_shipping) };
 }
+
+/**
+ * The showroom owner asks for Marketplace approval (first time, or again after a rejection). Authority (org.manage on the
+ * organization) and eligibility are decided by the database; this only reports the outcome as a stable code.
+ */
+export async function requestSellerApprovalAction(organizationId: string): Promise<{ ok: true } | { ok: false; code: string }> {
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.rpc("marketplace_seller_request_approval", { p_organization_id: organizationId });
+  if (error) return { ok: false, code: error.code === "42501" ? "not_permitted" : error.code === "23514" ? "transition_refused" : "unexpected" };
+  revalidatePath("/showroom/marketplace");
+  revalidatePath(PRODUCTS_PATH);
+  return { ok: true };
+}
