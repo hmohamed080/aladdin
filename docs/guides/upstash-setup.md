@@ -1,7 +1,7 @@
 # Upstash Redis setup (owner guide)
 
 **Purpose:** connect the existing Upstash account to Aladdin's optional Redis accelerator ([ADR-0019](../decisions/ADR-0019-redis-cache-and-rate-limits.md)) safely, starting on the Free plan.
-**Current decision:** one Free database, used by Preview first and Production second. The owner's database `alert-bedbug-148148.upstash.io` already exists, so use it rather than creating another. The code ships with `REDIS_CACHE_ENABLED=false`.
+**Current decision:** one Free database, used by Preview first and Production second. The owner's database `alert-bedbug-148148.upstash.io` already exists, so use it rather than creating another. The code ships with `REDIS_CACHE_ENABLED=false` in `.env.example`; the preview Worker had it on from 2026-10-24 until 2026-11-15, when the owner moved it to production only (key prefix `production`, token in `secrets.required`) so production gets the whole Free quota.
 
 **Transport:** two, chosen by configuration ([ADR-0019, Workers runtime](../decisions/ADR-0019-redis-cache-and-rate-limits.md#revision-2026-10-20-workers-runtime)):
 - **TCP + TLS** with `REDIS_URL` (`rediss://…:6379`): the web app on Node (local development), and the backend (job locks, video job queue).

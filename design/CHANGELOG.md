@@ -9,6 +9,21 @@ Each entry uses: Added · Changed · Fixed · Deprecated · Removed · Migration
 
 ---
 
+## 1.2.0 — 2026-11-15 — Brand-landing palette registered
+
+### Added
+- **`brandLanding` scope** in [`tokens/colors.json`](./tokens/colors.json): four owner-approved primitives for the public landing page `/` only — `landing-navy` `#071A2D`, `landing-sand` `#D8C7A6`, `landing-terra` `#B96F52`, `landing-cream` `#F2E9D8` — mirrored in `DESIGN.md` frontmatter, `frontend/src/styles/tokens.css` (`--landing-*`) and Tailwind `brand.landing-*`.
+- The landing consumes them through scoped `--lb-*` variables; every other tone on that page (soft grounds, hairlines, secondary text, shadows, scrims) is a `color-mix()` or an alpha of those four. No white, black or other hue.
+
+### Changed
+- `terra` measures 3.3:1 on cream, so small accent text uses the derived `terra-text` (terra mixed with navy, >= 4.5:1); terra itself is kept for icons, step numbers and fills.
+
+### Migration notes
+- Product UI is unaffected and keeps consuming the semantic tokens. The landing is light-only and Arabic-RTL by owner decision; it has no dark counterpart.
+- `tokens/colors.json` already carried `1.1.0` without a changelog entry; this entry supersedes it.
+
+---
+
 ## 1.0.0 — 2026-08-01 — Foundation finalized & hardened
 
 First approved, hardened Design System foundation. No product components implemented yet; the token contract is ready to build against.

@@ -184,8 +184,8 @@ test.describe("Direct entry after registration", () => {
     // The page needs a governorate and the years before it will save the specialties it asks for together.
     await page.locator("button#governorate").click();
     await page.getByRole("listbox").getByRole("option").first().click();
-    // "Save draft" stays on the page and reports the result; "Save and continue" would redirect to /home.
-    await page.getByTestId("profile-save-draft").click();
+    // "Save changes" stays on /home/profile and reports the result.
+    await page.getByTestId("profile-save").click();
     await expect(page.getByTestId("profile-save-message")).toHaveText(/saved/i, { timeout: 20_000 });
     await page.reload();
     await expect(page.getByText(label, { exact: true }).first()).toBeVisible();

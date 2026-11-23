@@ -59,7 +59,7 @@ export function PasswordSignInForm({
       footer={
         <p>
           {t("authPasswordPreview.signIn.noAccount")}{" "}
-          <Link href="/auth/sign-up" className="font-semibold text-accent hover:underline">
+          <Link prefetch={false} href="/auth/sign-up" className="font-semibold text-accent hover:underline">
             {t("authPasswordPreview.signIn.signUpLink")}
           </Link>
         </p>

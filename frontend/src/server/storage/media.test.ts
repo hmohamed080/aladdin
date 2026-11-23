@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 vi.mock("server-only", () => ({}));
+vi.mock("@/server/media/limits", async () => { const { DEFAULT_IMAGE_LIMITS: d } = await import("@/lib/media/limits"); return { imageMaxBytes: async (p: keyof typeof d) => d[p], invalidateMediaLimitCache: () => undefined }; });
 const adminRpc = vi.hoisted(() => vi.fn());
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({ rpc: adminRpc, storage: { from: () => ({ createSignedUrl: sign, remove }) } }) }));
 vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co" }) }));
@@ -18,7 +19,7 @@ vi.mock("./r2-provider", () => ({ CloudflareR2StorageProvider: class {
   constructor(...args: unknown[]) { r2Keys.push(args); }
   createUploadUrl = r2Upload; readObject = r2.readObject; commitVerifiedObject = r2.commitVerifiedObject; putVariant = r2.putVariant; deleteObject = (key: string) => r2.deleteObject(key);
 } }));
-import { authorizeMediaUpload, readMediaUrl, removeMedia, verifyPendingMedia } from "./media";
+import { authorizeMediaUpload, readMediaUrl, removeMedia, requireR2ForRead, verifyPendingMedia } from "./media";
 
 const OWNER = "70000009-0000-4000-8000-000000000009";
 const OBJECT = `u/${OWNER}/portfolio/70000009-0000-4000-8000-0000000000aa/original.png`;
@@ -51,7 +52,7 @@ describe("mixed-provider authorization and finalization", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(bytes))));
     await verifyPendingMedia(client, "product", "key.png");
     expect(rpc).not.toHaveBeenCalledWith("organization_media_resolve", expect.objectContaining({ p_operation: "read" }));
-    expect(adminRpc).toHaveBeenCalledWith("media_storage_attest", expect.objectContaining({ p_namespace: "product", p_size: bytes.length }));
+    expect(adminRpc).toHaveBeenCalledWith("media_storage_attest", expect.objectContaining({ p_namespace: "product", p_size: expect.any(Number) }));
   });
   it("refuses missing bytes without writing a verification receipt", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
@@ -63,8 +64,49 @@ describe("mixed-provider authorization and finalization", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(bytes))));
     await verifyPendingMedia(client, "portfolio", "key.png");
     expect(adminRpc).toHaveBeenCalledWith("media_storage_attest", expect.objectContaining({
-      p_owner: OWNER, p_size: bytes.length, p_content_type: "image/png", p_sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      p_owner: OWNER, p_size: expect.any(Number), p_content_type: "image/png", p_sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
     }));
+    expect(bytes.length).toBeGreaterThan(0);
+  });
+  it("stores a re-encoded original without personal metadata and attests THOSE bytes", async () => {
+    rpc.mockResolvedValue({ data: { ...pending, provider: "r2", contentType: "image/jpeg" }, error: null });
+    const uploaded = await sharp({ create: { width: 3000, height: 1500, channels: 3, background: "white" } })
+      .withExif({ IFD0: { Make: "PrivatePhone" }, IFD3: { GPSLatitudeRef: "N", GPSLatitude: "30/1 2/1 3/1" } }).jpeg().toBuffer();
+    expect((await sharp(uploaded).metadata()).exif).toBeDefined();
+    r2.readObject.mockResolvedValue(new Uint8Array(uploaded));
+    await verifyPendingMedia(client, "portfolio", "key.jpg");
+    const stored = r2.commitVerifiedObject.mock.calls[0]![1] as Uint8Array;
+    const meta = await sharp(stored).metadata();
+    expect(meta.exif).toBeUndefined();
+    expect(Buffer.from(stored).toString("latin1")).not.toContain("PrivatePhone");
+    expect(Math.max(meta.width!, meta.height!)).toBe(2560);
+    // the receipt describes the stored bytes, not the upload
+    const { createHash } = await import("node:crypto");
+    expect(adminRpc).toHaveBeenCalledWith("media_storage_attest", expect.objectContaining({
+      p_size: stored.byteLength, p_sha256: createHash("sha256").update(stored).digest("hex"),
+    }));
+    // variants derive from the stored original
+    expect(r2.putVariant).toHaveBeenCalledTimes(3);
+  });
+  it("on the legacy Supabase path attests the bytes that are actually stored, never a re-encoded copy", async () => {
+    rpc.mockResolvedValue({ data: { ...pending, provider: "supabase", contentType: "image/jpeg" }, error: null });
+    const uploaded = await sharp({ create: { width: 3000, height: 1500, channels: 3, background: "white" } })
+      .withExif({ IFD0: { Make: "PrivatePhone" } }).jpeg().toBuffer();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(uploaded))));
+    await verifyPendingMedia(client, "portfolio", "key.jpg");
+    const { createHash } = await import("node:crypto");
+    expect(adminRpc).toHaveBeenCalledWith("media_storage_attest", expect.objectContaining({
+      p_size: uploaded.byteLength, p_sha256: createHash("sha256").update(uploaded).digest("hex"),
+    }));
+    expect(r2.commitVerifiedObject).not.toHaveBeenCalled();
+  });
+  it("keeps verification documents exactly as uploaded", async () => {
+    rpc.mockResolvedValue({ data: { ...pending, provider: "r2", contentType: "image/jpeg" }, error: null });
+    const uploaded = await sharp({ create: { width: 64, height: 64, channels: 3, background: "white" } })
+      .withExif({ IFD0: { Make: "PrivatePhone" } }).jpeg().toBuffer();
+    r2.readObject.mockResolvedValue(new Uint8Array(uploaded));
+    await verifyPendingMedia(client, "verification", "key.jpg");
+    expect(Buffer.from(r2.commitVerifiedObject.mock.calls[0]![1] as Uint8Array).equals(uploaded)).toBe(true);
   });
   it("blocks wrong-type bytes and authorization refusal before privileged writes", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("<script>bad</script>")));
@@ -167,6 +209,29 @@ describe("R2 is the only home of new media bytes", () => {
     await expect(authorizeMediaUpload(client, "portfolio", "key.png", 93)).rejects.toThrow("R2 unavailable");
     expect(upload).not.toHaveBeenCalled();
     expect(sign).not.toHaveBeenCalled();
+  });
+  it("routes a new Marketplace upload to R2 even while R2 routing is off, never to Supabase", async () => {
+    settings.R2_STORAGE_ENABLED = false;
+    rpc.mockResolvedValue({ data: fresh, error: null });
+    r2Upload.mockResolvedValue({ provider: "r2" });
+    await authorizeMediaUpload(client, "marketplace", "key.png", 93);
+    expect(adminRpc).toHaveBeenCalledWith("media_storage_reserve", expect.objectContaining({ p_namespace: "marketplace", p_provider: "r2" }));
+    expect(upload).not.toHaveBeenCalled(); expect(sign).not.toHaveBeenCalled();
+  });
+  it("refuses a Marketplace upload that is already reserved on Supabase", async () => {
+    rpc.mockResolvedValue({ data: pending, error: null });
+    await expect(authorizeMediaUpload(client, "marketplace", "key.png", 93)).rejects.toThrow("unavailable");
+    expect(upload).not.toHaveBeenCalled(); expect(r2Upload).not.toHaveBeenCalled();
+  });
+  it("refuses to verify Marketplace bytes held on Supabase, even with legacy writes open", async () => {
+    rpc.mockResolvedValue({ data: pending, error: null });
+    await expect(verifyPendingMedia(client, "marketplace", "key.png")).rejects.toThrow("unavailable");
+    expect(writes()).not.toContain("media_storage_attest");
+  });
+  it("refuses to read Marketplace bytes from a non-R2 provider", () => {
+    expect(() => requireR2ForRead("marketplace", "supabase")).toThrow("unavailable");
+    expect(() => requireR2ForRead("marketplace", "r2")).not.toThrow();
+    expect(() => requireR2ForRead("portfolio", "supabase")).not.toThrow();
   });
   it("still allows legacy Supabase writes before activation (default) so the current release is unchanged", async () => {
     rpc.mockResolvedValue({ data: pending, error: null });

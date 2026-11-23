@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
+import { OPEN_VERIFICATION_STATUSES } from "@/lib/admin/verification-status";
 import type { OrgsDirectoryParams, UsersDirectoryParams } from "@/features/admin-preview/directory-params";
 import {
   mapOrgDetail,
@@ -139,4 +140,94 @@ export async function loadOrganizationRegistration(supabase: Client, orgId: stri
       address: b.address_ar ?? b.address_en,
     })),
   };
+}
+
+/** A verification request still waiting for an administrative decision. */
+export type PendingUserVerification = { id: string; status: string; verificationType: string };
+
+/**
+ * The open administrative verification request of each given user — ONE bounded read for a directory page
+ * (at most one page of ids), never a read per row. Business verification has its own queue and is excluded.
+ * When a user has several open requests the newest wins. A user with none is simply absent from the map.
+ * RLS decides what the caller may see; a failed read returns an empty map (the row then offers no decision
+ * rather than a wrong one) and is logged.
+ */
+export async function loadPendingUserVerifications(
+  supabase: Client,
+  userIds: readonly string[],
+): Promise<Map<string, PendingUserVerification>> {
+  const out = new Map<string, PendingUserVerification>();
+  if (userIds.length === 0) return out;
+  const { data, error } = await supabase
+    .from("verifications")
+    .select("id, user_id, status, verification_type, submitted_at")
+    .eq("subject_type", "user")
+    .in("user_id", [...userIds])
+    .in("status", [...OPEN_VERIFICATION_STATUSES])
+    .neq("verification_type", "business")
+    .order("submitted_at", { ascending: false });
+  if (error) {
+    console.error("[admin-directory] pending verifications failed", error);
+    return out;
+  }
+  for (const v of data ?? []) {
+    if (v.user_id && !out.has(v.user_id)) out.set(v.user_id, { id: v.id, status: v.status, verificationType: v.verification_type });
+  }
+  return out;
+}
+
+/**
+ * The open organization-approval request of each given organization — ONE bounded read for a directory page.
+ * Business verification (its own queue and permission) is excluded, mirroring the user loader.
+ */
+export async function loadPendingOrganizationVerifications(
+  supabase: Client,
+  organizationIds: readonly string[],
+): Promise<Map<string, PendingUserVerification>> {
+  const out = new Map<string, PendingUserVerification>();
+  if (organizationIds.length === 0) return out;
+  const { data, error } = await supabase
+    .from("verifications")
+    .select("id, organization_id, status, verification_type, submitted_at")
+    .eq("subject_type", "organization")
+    .eq("verification_type", "organization")
+    .in("organization_id", [...organizationIds])
+    .in("status", [...OPEN_VERIFICATION_STATUSES])
+    .order("submitted_at", { ascending: false });
+  if (error) {
+    console.error("[admin-directory] pending organization verifications failed", error);
+    return out;
+  }
+  for (const v of data ?? []) {
+    if (v.organization_id && !out.has(v.organization_id)) out.set(v.organization_id, { id: v.id, status: v.status, verificationType: v.verification_type });
+  }
+  return out;
+}
+
+/**
+ * RECOVERY lookup (professional user approvals only: an organization approval is applied atomically by a database trigger, so it is never left unapplied): the newest request of this user that is APPROVED but whose apply step never completed
+ * (`applied_at` is null). The detail RPCs do not expose applied_at, and an account type / verified flag is not a reliable
+ * proxy (a registrant may already carry the declared type), so the page reads the request itself. RLS scopes the read to
+ * reviewers. A failed read returns null: the page then simply offers no recovery button, and the server action
+ * independently fails closed.
+ */
+export async function loadUnappliedApproval(
+  supabase: Client,
+  subjectId: string,
+): Promise<PendingUserVerification | null> {
+  if (!UUID.test(subjectId)) return null;
+  const { data, error } = await supabase
+    .from("verifications")
+    .select("id, status, verification_type")
+    .eq("subject_type", "user")
+    .eq("user_id", subjectId)
+    .eq("status", "approved")
+    .is("applied_at", null)
+    // Professional approvals only: identity approvals never set applied_at, so they must not read as an incomplete upgrade.
+    .eq("verification_type", "professional")
+    .order("submitted_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return { id: data.id, status: data.status, verificationType: data.verification_type };
 }

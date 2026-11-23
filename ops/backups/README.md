@@ -170,7 +170,7 @@ Part A is read-only preparation and changes nothing hosted. Part B changes hoste
    Once a lock is on, nobody can delete or overwrite a locked object until it expires, not even you. Only Production database snapshots are locked; the Acceptance trial bucket has no lock (it is disposable), and media copies are never locked (R2 90 days, legacy 30). `phase-a/` is left as it is. The Production bucket has no lock rules and only the default 7-day multipart-abort rule, which its lifecycle file repeats.
 5. **R2 API tokens, per project** (dashboard: R2, Manage API tokens). Each token is limited to ONE backup bucket; create the Acceptance pair first and the Production pair only at the Production GO:
    - `aladdin-acceptance-backup-write` / `-read` on `aladdin-acceptance-backups-weur`, and `aladdin-production-backup-write` / `-read` on `aladdin-production-db-backups`. *Write* is Object Read & Write, *read* is Object Read only. They become `R2_BACKUP_WRITE_KEY_ID` / `R2_BACKUP_WRITE_SECRET` and `R2_BACKUP_READ_KEY_ID` / `R2_BACKUP_READ_SECRET` in that project's environments only.
-   - `R2_MEDIA_READ_*`: *Object Read only* on that project's media bucket (Acceptance: `aladdin-r2-acceptance-20261011-private`). Never the backup bucket.
+   - `R2_MEDIA_READ_*`: *Object Read only* on that project's R2 media bucket (Acceptance: `aladdin-r2-acceptance-20261011-private`) **and** its site-media bucket (Acceptance: `aladdin-acceptance-site-media`; Production: `aladdin-media-private` and `aladdin-site-media`; see Site media). Nothing else, never the backup bucket.
 6. **The private repo** `hmohamed080/aladdin-backups` exists. Its contents are built from this folder, which stays the only source (never edit the built repo by hand):
    ```sh
    bash ops/backups/build-repo.sh ~/aladdin-backups              # inactive build: no schedule trigger in any workflow
@@ -204,6 +204,18 @@ Part A is read-only preparation and changes nothing hosted. Part B changes hoste
 10. Run *Daily backup* with label `production` and the confirmation `back up production`.
 11. Run the restore test with label `production`.
 
+### Production lock rules replace, they do not merge
+
+`wrangler r2 bucket lock set --file r2/production/lock.json` replaces every rule on the bucket. The file therefore carries, besides the three database rules, the two live indefinite **source-preservation** locks (`source-preservation/20261111-archive/`, `source-preservation/20261112/storage/`), and `retention-test.sh` fails if either is missing or if any lifecycle rule could expire `source-preservation/` or `phase-a/`. Run `wrangler r2 bucket lock list aladdin-production-db-backups` first and compare it with the file before applying.
+
+### Final acceptance (one exercise, at the end of Backup setup)
+
+**Order, no step skipped:** (1) Supabase Storage cleanup finishes; (2) remove `LEGACY_MEDIA_BACKUP` from `backup-production`, `backup-check-production` and `restore-test-production` (preflight FAILS while it is `1` in any of them); (3) `final-acceptance-preflight.py --label production` PASS; (4) ONE final restore exercise (Daily backup, then Monthly restore test); (5) a separate owner approval to activate (`PRODUCTION_BACKUP_ENABLED=true`, console schedule). Production activation never happens inside steps 1 to 4.
+
+**Lock/lifecycle apply is list, set, read back.** `lock set` and `lifecycle set` replace every rule: run `lock list` / `lifecycle list` first and compare with the file, then set, then run the same `list` again and confirm both `source-preservation/` locks plus the three database rules (lock) or the file's rules (lifecycle) are present.
+
+Individual components are tested offline and on Acceptance during implementation; the full backup-and-restore exercise runs ONCE, immediately before Production activation, never repeatedly. `python3 ops/backups/final-acceptance-preflight.py --label production` is read-only (variable values of non-secret settings, secret names only): it checks the four environments, the bucket pins, `R2_MEDIA_BACKUP=1` and `R2_SITE_BACKUP=1`, credential isolation of the control environment, and that `LEGACY_MEDIA_BACKUP` is not set (the backup job holds no service-role key, so the legacy step can only fail it; remove the variable after the Supabase Storage cleanup). On PASS it prints the manual runs, in order, each needing its own owner GO: *Daily backup* (label `production`, typed confirmation), then *Monthly restore test* (label `production`, newest snapshot). The exercise passes only if the `backup` and `restore` data jobs conclude `success` and the restore prints `RESULT: PASS`. Only then is the console schedule (Admin, `/admin/backups`) enabled. `final-acceptance-preflight-test.py` covers the checker offline.
+
 ## Acceptance validation and rollback
 
 Each check below must pass:
@@ -231,7 +243,7 @@ Rollback: set `ACCEPTANCE_BACKUP_SCHEDULE=off`. Nothing else runs on its own.
 
 ### Restore-test stack version
 
-`restore-test.sh` starts a throwaway local Supabase stack and refuses to restore (exit 2, "STACK MISMATCH") unless its Auth/Storage columns equal the backed-up project's. The stack comes from the pinned CLI (`RESTORE_SUPABASE_CLI_VERSION`, now 3.0.0: gotrue v2.197.0, storage-api v1.88.0, postgres 17.11.0.011), which reproduces Acceptance's managed schema (SCIM, MFA recovery codes, one-time-token expiry, storage versioning and bucket lifecycle). 2.110.0 (gotrue v2.193.0, storage-api v1.66.4) did not. When Supabase upgrades the hosted Auth/Storage, the guard fails again by design: bump the pin to the CLI whose `pkg/config/templates/Dockerfile` images match, never weaken the guard. `restore-pin-test.sh` pins both. 2026-11-08: Acceptance's Storage gained `bucket_lifecycle_states` and `lifecycle_abandoned_artifacts` (storage migrations 0076-0079), which no v2 CLI ships (2.122.1 = storage-api v1.84.19, through 0074); CLI 3.0.0's local stack matched Acceptance's 342 Auth/Storage columns exactly (same md5), so the pin moved to 3.0.0 and the guard did not change.
+`restore-test.sh` starts a throwaway local Supabase stack and refuses to restore (exit 2, "STACK MISMATCH") unless its Auth/Storage columns equal the backed-up project's. The stack comes from the pinned CLI (`RESTORE_SUPABASE_CLI_VERSION`, now 3.2.0: gotrue v2.198.0, storage-api v1.96.0, postgres 17.12.0.000; 3.0.0 lacked the 2026-09 one_time_tokens.link_token_hash and 2026-10 saml_providers.dedicated_scope columns and failed with STACK MISMATCH on 2026-11-22), which reproduces Acceptance's managed schema (SCIM, MFA recovery codes, one-time-token expiry, storage versioning and bucket lifecycle). 2.110.0 (gotrue v2.193.0, storage-api v1.66.4) did not. When Supabase upgrades the hosted Auth/Storage, the guard fails again by design: bump the pin to the CLI whose `pkg/config/templates/Dockerfile` images match, never weaken the guard. `restore-pin-test.sh` pins both. 2026-11-08: Acceptance's Storage gained `bucket_lifecycle_states` and `lifecycle_abandoned_artifacts` (storage migrations 0076-0079), which no v2 CLI ships (2.122.1 = storage-api v1.84.19, through 0074); CLI 3.0.0's local stack matched Acceptance's 342 Auth/Storage columns exactly (same md5), so the pin moved to 3.0.0 and the guard did not change.
 
 
 ## Acceptance activation runbook (automatic backups)

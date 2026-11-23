@@ -6,7 +6,6 @@ select no_plan();
 alter table public.products disable trigger showroom_product_publish_complete;
 alter table public.quotations disable trigger showroom_quotation_sell_complete;
 alter table public.orders disable trigger trg_zz_showroom_order_sell_complete;
-alter table public.verifications disable trigger showroom_review_complete;
 do $$
 declare i integer; org_id uuid; branch_id uuid; member_id uuid; product_id uuid; rfq_id uuid; quote_id uuid; order_id uuid; verification_id uuid;
 begin
@@ -53,7 +52,6 @@ $$;
 alter table public.products enable trigger showroom_product_publish_complete;
 alter table public.quotations enable trigger showroom_quotation_sell_complete;
 alter table public.orders enable trigger trg_zz_showroom_order_sell_complete;
-alter table public.verifications enable trigger showroom_review_complete;
 
 select ok(app.showroom_approval_current('94000001-0000-4000-8000-000000000094'),'active legacy approval still current');
 select ok(not app.showroom_approval_current('94000002-0000-4000-8000-000000000094'),'open exception does not override expired approval');

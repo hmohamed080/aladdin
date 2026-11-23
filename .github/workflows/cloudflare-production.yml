@@ -44,7 +44,7 @@
 #
 # Worker secrets: the backend's SUPABASE_URL and SUPABASE_ANON_KEY are the live project's public values and
 # are uploaded with the backend version. The frontend's SUPABASE_SERVICE_ROLE_KEY, TURNSTILE_SECRET_KEY and
-# AUTH_PASSWORD_PREVIEW_GRANT_SECRET are set by the owner with `wrangler secret put <NAME> --env production`
+# AUTH_PASSWORD_PREVIEW_GRANT_SECRET and REDIS_REST_TOKEN are set by the owner with `wrangler secret put <NAME> --env production`
 # (never in GitHub); `wrangler deploy` refuses the frontend until all three exist.
 #
 # Rollback: `wrangler rollback --env production` per Worker, or roll back to an earlier version in the

@@ -235,7 +235,7 @@ select is(pg_temp.q(:'padmin', $$ (public.admin_users_directory(p_search => 'Qua
 select is(pg_temp.q(:'padmin', $$ public.admin_users_directory(p_search => 'Quasar M3a') -> 'total' $$), '1', 'display-name search still finds the account');
 select is(pg_temp.q(:'padmin', $$ public.admin_users_directory(p_search => 'zxqwm3a') -> 'total' $$), '0', 'a username is not searchable');
 select is(pg_temp.q(:'padmin', $$ (select array_agg(k order by k) from jsonb_object_keys(public.admin_users_directory(p_search => 'Quasar M3a') -> 'rows' -> 0) k) $$),
-  '{account_type,city,completion,created_at,display_name,display_name_ar,display_name_en,email,flags,governorate,id,is_verified,latest_verification_status,organization,organization_count,phone,profile_id,public_profile_available,registered_account,status,verification_state}',
+  '{account_type,city,completion,created_at,display_name,display_name_ar,display_name_en,email,flags,governorate,id,is_verified,latest_verification_status,organization,organization_count,phone,profile_id,public_profile_available,registered_account,registration_state,status,verification_state}',
   'the directory row shape is unchanged except for the removed username key');
 select is(pg_temp.q(:'padmin', $$ (public.admin_users_list(p_search => 'Quasar M3a') -> 'rows' -> 0) ? 'username' $$), 'false',
   'the deprecated admin_users_list (delegates to the directory) carries no username key either');

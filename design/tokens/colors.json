@@ -1,7 +1,7 @@
 {
   "$schema": "../tokens/README.md#format",
   "name": "aladdin.colors",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Canonical Aladdin color tokens for 'The Aperture'. Primitives are fixed hex; semantic tokens are theme-aware and reference primitives via {primitives.<name>}. This file is the source of truth; DESIGN.md frontmatter, frontend/src/styles/tokens.css, and the Tailwind theme mirror it.",
   "maintenance": "Manually maintained. On any color change, edit this file first, then propagate to DESIGN.md frontmatter and frontend/src/styles/tokens.css (see tokens/README.md).",
   "primitives": {
@@ -137,6 +137,36 @@
       "workspace-pool-cool-2": { "value": "{primitives.navy-edge}" },
       "workspace-pool-warm": { "value": "{primitives.lumen}" },
       "workspace": { "value": "#131415", "note": "The Carbon ground. Literal for the same reason — see knownDrift." }
+    }
+  },
+  "brandLanding": {
+    "description": "Brand-landing scope (public landing page `/` only, light, Arabic-RTL). Owner-approved four-colour palette, 2026-11-15. NOTHING else may be used on that page: every other tone is a color-mix() or an alpha of these four, declared in frontend/src/features/landing-brand/landing-brand.module.css. Not for product UI, which keeps consuming the semantic tokens.",
+    "primitives": {
+      "landing-navy": {
+        "value": "#071A2D",
+        "description": "Ground of the hero, CTA and dark buttons; all text on light."
+      },
+      "landing-sand": {
+        "value": "#D8C7A6",
+        "description": "Borders, hairlines, accent word on navy, soft section grounds (mixed with cream)."
+      },
+      "landing-terra": {
+        "value": "#B96F52",
+        "description": "Accent: icons, step numbers, cart button. 3.3:1 on cream, so never small text on its own."
+      },
+      "landing-cream": {
+        "value": "#F2E9D8",
+        "description": "Page ground, cards, and all text on navy."
+      }
+    },
+    "derived": {
+      "navy-2": "navy 94% + cream",
+      "navy-3": "navy 84% + cream",
+      "sand-soft": "sand 45% + cream (section grounds)",
+      "sand-line": "sand 80% + cream (hairlines)",
+      "terra-text": "terra 62% + navy (small accent text; >= 4.5:1 on cream and on sand-soft)",
+      "ink-2": "navy 72% + cream (secondary text)",
+      "shadows / scrims": "navy at 4-87% alpha; glows: cream at 40-95% alpha"
     }
   },
   "knownDrift": {

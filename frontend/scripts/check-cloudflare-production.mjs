@@ -85,10 +85,20 @@ export function checkFrontend(config) {
   for (const [flag, want] of Object.entries(R2_ONLY_FLAGS)) {
     if (vars[flag] !== want) problems.push(`${label}: ${flag} must be "${want}" (R2-only media; Supabase Storage writes stay closed)`);
   }
-  for (const flag of ["REDIS_CACHE_ENABLED", "VIDEO_ENABLED", "MEDIA_EDGE_DELIVERY_ENABLED"]) {
+  for (const flag of ["VIDEO_ENABLED", "MEDIA_EDGE_DELIVERY_ENABLED"]) {
     if (flag in vars && vars[flag] !== "false") problems.push(`${label}: ${flag} must stay "false" until its own approval`);
   }
-  if (!("REDIS_CACHE_ENABLED" in vars)) problems.push(`${label}: REDIS_CACHE_ENABLED must be set to "false" explicitly`);
+  // Redis (owner-approved 2026-11-15, ADR-0019): explicit either way. When on it must use the REST transport (TCP does not
+  // work on Workers), the `production` key prefix (so it never touches the preview's entries) and a token that is a
+  // required secret, so a deploy without the token is refused instead of silently running without the cache.
+  if (!("REDIS_CACHE_ENABLED" in vars)) problems.push(`${label}: REDIS_CACHE_ENABLED must be set explicitly ("true" or "false")`);
+  if (vars.REDIS_CACHE_ENABLED === "true") {
+    if (!/^https:\/\/[a-z0-9-]+\.upstash\.io\/?$/.test(String(vars.REDIS_REST_URL ?? ""))) problems.push(`${label}: REDIS_REST_URL must be the https://<name>.upstash.io REST URL when Redis is on`);
+    if (vars.REDIS_KEY_ENV !== "production") problems.push(`${label}: REDIS_KEY_ENV must be "production" when Redis is on`);
+    requiredSecrets(env, ["REDIS_REST_TOKEN"], label, problems);
+  } else if (vars.REDIS_CACHE_ENABLED !== "false") {
+    problems.push(`${label}: REDIS_CACHE_ENABLED must be "true" or "false"`);
+  }
   requiredSecrets(env, ["SUPABASE_SERVICE_ROLE_KEY", "TURNSTILE_SECRET_KEY", "AUTH_PASSWORD_PREVIEW_GRANT_SECRET"], label, problems);
   return problems;
 }

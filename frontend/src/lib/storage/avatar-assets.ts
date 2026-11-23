@@ -28,6 +28,7 @@ export type AvatarContentType = (typeof AVATAR_ALLOWED_TYPES)[number];
 export type AvatarErrorCode =
   | "profileIdentity.avatar.errorType"
   | "profileIdentity.avatar.errorSize"
+  | "profileIdentity.avatar.errorTooLarge"
   | "profileIdentity.avatar.errorUpload";
 
 export type AvatarValidation = { ok: true } | { ok: false; code: AvatarErrorCode };

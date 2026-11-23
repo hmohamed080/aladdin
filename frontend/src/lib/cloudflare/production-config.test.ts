@@ -84,15 +84,41 @@ describe("Cloudflare production config (committed Wrangler files)", () => {
     for (const stage of ["check", "backend", "frontend-upload", undefined]) expect(checkCutoverStage(stage, undefined)).toEqual([]);
   });
 
-  it("refuses a public address, an acceptance resource or Redis switched on", () => {
+  it("refuses a public address or an acceptance resource", () => {
     const config = frontendConfig();
     config.env.production.workers_dev = true;
     config.env.production.vars.R2_PRIVATE_BUCKET = "aladdin-r2-acceptance-20261011-private";
-    config.env.production.vars.REDIS_CACHE_ENABLED = "true";
     const problems = checkFrontend(config);
     expect(problems.some((p) => p.includes("workers_dev"))).toBe(true);
     expect(problems.some((p) => p.includes("acceptance"))).toBe(true);
-    expect(problems.some((p) => p.includes("REDIS_CACHE_ENABLED"))).toBe(true);
+  });
+
+  it("runs Redis in production only with the REST URL, the production key prefix and a required token secret", () => {
+    const on = frontendConfig();
+    expect(on.env.production.vars.REDIS_CACHE_ENABLED).toBe("true");
+    expect((on.env.production.secrets as { required: string[] }).required).toContain("REDIS_REST_TOKEN");
+    expect(checkFrontend(on)).toEqual([]);
+
+    const wrongPrefix = frontendConfig();
+    wrongPrefix.env.production.vars.REDIS_KEY_ENV = "cf-preview";
+    expect(checkFrontend(wrongPrefix).some((p) => p.includes("REDIS_KEY_ENV"))).toBe(true);
+
+    const noUrl = frontendConfig();
+    delete noUrl.env.production.vars.REDIS_REST_URL;
+    expect(checkFrontend(noUrl).some((p) => p.includes("REDIS_REST_URL"))).toBe(true);
+
+    const noToken = frontendConfig();
+    const secrets = noToken.env.production.secrets as { required: string[] };
+    secrets.required = secrets.required.filter((n) => n !== "REDIS_REST_TOKEN");
+    expect(checkFrontend(noToken).some((p) => p.includes("REDIS_REST_TOKEN"))).toBe(true);
+
+    const unset = frontendConfig();
+    delete unset.env.production.vars.REDIS_CACHE_ENABLED;
+    expect(checkFrontend(unset).some((p) => p.includes("REDIS_CACHE_ENABLED"))).toBe(true);
+
+    const off = frontendConfig();
+    off.env.production.vars.REDIS_CACHE_ENABLED = "false";
+    expect(checkFrontend(off)).toEqual([]);
   });
 
   it("refuses Turnstile hostnames outside the live domain", () => {

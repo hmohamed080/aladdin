@@ -1,0 +1,19 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import MarketplacePage from "./page";
+
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "ar" }) }) }));
+// The closed Marketplace never reads the catalog; the live page's server query is server-only.
+vi.mock("@/server/queries/marketplace-public", () => ({ PUBLIC_SORTS: ["newest"], loadPublicCatalogPage: vi.fn(), loadPublicFacets: vi.fn() }));
+vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: vi.fn() }));
+vi.mock("@/server/media/marketplace-public-images", () => ({ marketplacePublicImageUrls: vi.fn() }));
+
+describe("/market: coming soon while the release flag is closed", () => {
+  it("shows the coming-soon message with the landing header and a way back home", async () => {
+    const { container } = render(await MarketplacePage({ searchParams: Promise.resolve({}) }));
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("السوق قريبًا");
+    expect(container.querySelector('[data-landing-preview-part="Header"]')).not.toBeNull();
+    expect(screen.getByRole("link", { name: "السوق" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "العودة للرئيسية" })).toHaveAttribute("href", "/");
+  });
+});

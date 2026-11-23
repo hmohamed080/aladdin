@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MediaNamespace } from "@/lib/storage/provider-types";
 import { mediaPolicy } from "@/lib/storage/media-policy";
+import { storedObjectCeiling } from "@/server/media/limits";
 import { mediaProvider, resolveMedia, privilegedStorageClient } from "./media";
 
 export const MEDIA_NO_STORE = {
@@ -33,7 +34,8 @@ export async function deliverMedia(client: SupabaseClient, namespace: MediaNames
       || (additionalAuthorization && !await additionalAuthorization())) {
       await upstream.body.cancel(); return mediaNotFound();
     }
-    const maxBytes = mediaPolicy(namespace).maxBytes;
+    // Stored files are served up to the platform ceiling: lowering an upload limit must not break files uploaded under the old one.
+    const maxBytes = storedObjectCeiling("image");
     const length = upstream.headers.get("content-length");
     if (length !== null && (!/^\d+$/.test(length) || Number(length) > maxBytes)) {
       await upstream.body.cancel(); return mediaNotFound();

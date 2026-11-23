@@ -20,11 +20,11 @@ export function StaffConsentStep() {
       <p className="text-body text-fg-secondary">{t("staffInvitation.consent.body")}</p>
       <Checkbox id="staff-consent-agree" name="consent_agree" checked={agreed} onChange={setAgreed}>
         {t("authPasswordPreview.signUp.agreementPrefix")}{" "}
-        <Link href="/legal/terms" target="_blank" className="font-semibold hover:underline">
+        <Link href="/legal/terms" prefetch={false} target="_blank" className="font-semibold hover:underline">
           {t("entryAuth.terms")}
         </Link>{" "}
         {t("entryAuth.and")}{" "}
-        <Link href="/legal/privacy" target="_blank" className="font-semibold hover:underline">
+        <Link href="/legal/privacy" prefetch={false} target="_blank" className="font-semibold hover:underline">
           {t("entryAuth.privacy")}
         </Link>
         . {t("authPasswordPreview.signUp.agreementSuffix")}

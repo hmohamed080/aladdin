@@ -245,6 +245,14 @@ select is((public.my_business_verification((select v::uuid from _ids where k = '
 select is(jsonb_array_length(public.my_business_verification((select v::uuid from _ids where k = 'o2')) -> 'requests'), 1, 'F10: the rejected request stays in the history');
 reset role;
 select is((select business_verified_at from public.organizations where id = (select v::uuid from _ids where k = 'o2')), null, 'F11: rejection grants no badge');
+select is((select count(*)::int from public.notifications n where n.subject_id = (select v::uuid from _ids where k = 'v2') and n.event_type = 'verification.rejected' and n.body_key = 'notifications.businessVerification.rejected.bodyReason' and n.params ->> 'reason' = 'The photo does not show a legal document'), 1, 'F12: the owner is notified of the rejection WITH the reason, exactly once');
+select is((select count(*)::int from public.notifications n where n.subject_id = (select v::uuid from _ids where k = 'v1') and n.event_type = 'verification.changes_requested' and n.body_key = 'notifications.businessVerification.infoRequested.bodyReason' and n.params ->> 'reason' = 'Upload the tax card too'), 1, 'F13: the more-information notification carries the requested changes');
+set local role authenticated;
+set local request.jwt.claims = :'del';
+select throws_ok(format('select public.business_verification_reject(%L, %L)', (select v from _ids where k = 'v2'), 'again'), '22023', null, 'F14: a retried rejection is refused and writes no second notification');
+reset role;
+select is((select count(*)::int from public.notifications n where n.subject_id = (select v::uuid from _ids where k = 'v2') and n.event_type = 'verification.rejected'), 1, 'F15: still exactly one rejection notification');
+
 
 select * from finish();
 rollback;

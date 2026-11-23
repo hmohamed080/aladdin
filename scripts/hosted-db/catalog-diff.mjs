@@ -39,8 +39,8 @@ export function diff(before, after) {
 }
 
 export function checkExpected(touched, expected) {
-  // an expected entry is an exact key or a schema-qualified function name (matches every overload: name + "(")
-  const hit = (k, e) => k === e || k.startsWith(e + "(");
+  // an expected entry is an exact key, a schema-qualified function name (matches every overload: name + "("), or a prefix ending in * (every key starting with it)
+  const hit = (k, e) => (e.endsWith("*") ? k.startsWith(e.slice(0, -1)) : k === e || k.startsWith(e + "("));
   const p = [];
   for (const k of touched.keys()) if (!expected.some((e) => hit(k, e))) p.push(`unexpected change: ${k} (${touched.get(k).join(", ")})`);
   for (const e of expected) if (![...touched.keys()].some((k) => hit(k, e))) p.push(`expected change missing: ${e}`);

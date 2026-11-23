@@ -49,10 +49,22 @@ for label in ("production", "acceptance"):
     if not any("abortMultipartUploadsTransition" in r for r in rules): bad.append(f"{label} lacks the multipart abort rule")
     if len(seen) != 6: bad.append(f"{label} has {len(seen)} expiry rules, wanted 6")
 lock_rules = json.load(open(f"{r2dir}/production/lock.json"))["rules"]
-if {r["prefix"] for r in lock_rules} != {f"db/production/{k}/" for k in want}: bad.append("production lock covers the wrong prefixes")
-for r in lock_rules:
+# `wrangler r2 bucket lock set` REPLACES every rule, so this file must also carry the two live source-preservation
+# locks (indefinite); otherwise applying it would silently unlock the preserved Supabase archive and encrypted delta.
+PRESERVE = {"source-preservation/20261111-archive/", "source-preservation/20261112/storage/"}
+db_rules = [r for r in lock_rules if r["prefix"].startswith("db/production/")]
+keep_rules = [r for r in lock_rules if r["prefix"] in PRESERVE]
+if {r["prefix"] for r in db_rules} != {f"db/production/{k}/" for k in want}: bad.append("production lock covers the wrong db prefixes")
+if {r["prefix"] for r in keep_rules} != PRESERVE or len(db_rules) + len(keep_rules) != len(lock_rules): bad.append("production lock must carry exactly the db rules and the two source-preservation rules")
+for r in keep_rules:
+    if r["condition"] != {"type": "Indefinite"} or r["enabled"] is not True: bad.append("a source-preservation lock is not enabled and indefinite")
+for r in db_rules:
     k = r["prefix"].split("/")[2]
     if r["condition"]["maxAgeSeconds"] != lock[k] * D: bad.append(f"lock {k} is not {lock[k]} days")
+for label in ("production", "acceptance"):
+    for r in json.load(open(f"{r2dir}/{label}/lifecycle.json"))["rules"]:
+        pre = r["conditions"]["prefix"]
+        if pre.startswith("source-preservation/") or pre.startswith("phase-a/"): bad.append(f"{label} lifecycle must never expire {pre}")
 import os
 if os.path.exists(f"{r2dir}/acceptance/lock.json"): bad.append("acceptance must not be locked (disposable trial bucket)")
 if any(r["prefix"].startswith("media/") for r in lock_rules): bad.append("media copies must never be locked")

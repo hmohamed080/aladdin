@@ -158,8 +158,8 @@ test.describe("Installer profile completion — one figure on every surface", ()
     await page.locator("button#governorate").click();
     await page.getByRole("listbox").getByRole("option").first().click();
     await page.getByRole("button", { name: "Within a week" }).click();
-    // "Save draft" stays on the page and reports the result; "Save and continue" would redirect to /home.
-    await page.getByTestId("profile-save-draft").click();
+    // "Save changes" stays on /home/profile and reports the result.
+    await page.getByTestId("profile-save").click();
     await expect(page.getByTestId("profile-save-message")).toBeVisible({ timeout: 20_000 });
 
     const afterForm = doneItems(userId);

@@ -2,6 +2,7 @@ import {
   VIDEO_PARTS_PER_REQUEST, VIDEO_STORAGE_MAX_BYTES, VIDEO_UPLOAD_CONCURRENCY,
   isVideoType, type VideoContentType, type VideoScope,
 } from "@/lib/media/video-policy";
+import { loadMediaLimitHints, videoHintBytes } from "@/lib/media/limits-client";
 
 /**
  * The browser side of a video upload. Bytes go from the file straight to R2
@@ -48,12 +49,11 @@ export function rememberedUpload(file: File): string | null {
 }
 
 /**
- * Type, and size only against R2's own 5 TiB object limit: there is no product
- * cap on size or length. Reading the duration needs no check, so it is not read.
+ * Type and the site-wide 100 MB per-file cap. Length is not limited, so the duration is not read.
  */
-export function checkVideoFile(file: File): VideoContentType {
+export function checkVideoFile(file: File, maxBytes: number = VIDEO_STORAGE_MAX_BYTES): VideoContentType {
   if (!isVideoType(file.type)) throw new UploadFailure("type");
-  if (file.size <= 0 || file.size > VIDEO_STORAGE_MAX_BYTES) throw new UploadFailure("size");
+  if (file.size <= 0 || file.size > maxBytes) throw new UploadFailure("size");
   return file.type;
 }
 
@@ -67,7 +67,7 @@ async function api<T>(fetcher: Fetcher, path: string, init?: { method?: string; 
   const body = await response.json().catch(() => ({})) as { error?: string } & T;
   if (!response.ok) {
     const map: Record<string, UploadErrorCode> = { limit: "limit", not_allowed: "not_allowed", rate_limited: "rate_limited",
-      invalid: "server", incomplete: "server", not_found: "server", unavailable: "server" };
+      too_large: "size", invalid: "server", incomplete: "server", not_found: "server", unavailable: "server" };
     throw new UploadFailure(map[body.error ?? ""] ?? "server");
   }
   return body;
@@ -110,7 +110,8 @@ export async function uploadVideo(options: UploadOptions): Promise<string> {
   const fetcher = options.fetcher ?? fetch.bind(globalThis);
   const putPart = options.putPart ?? xhrPut;
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
-  const contentType = checkVideoFile(file);
+  await loadMediaLimitHints();
+  const contentType = checkVideoFile(file, videoHintBytes(options.scope));
 
   let plan: Plan | null = null;
   const previous = rememberedUpload(file);

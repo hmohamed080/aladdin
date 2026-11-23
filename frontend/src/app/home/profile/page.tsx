@@ -23,6 +23,7 @@ import { videoEnabled } from "@/server/video/playback";
 import { loadMyIdentity, loadMyProfileCompletion } from "@/server/queries/profile-identity";
 import { loadMyServiceAreas } from "@/server/queries/service-areas";
 import { loadMyTrades } from "@/server/queries/trades";
+import { loadMyProfessionalVerification } from "@/server/queries/professional-verification";
 
 export const dynamic = "force-dynamic";
 
@@ -81,13 +82,14 @@ export default async function ProfileHubPage() {
   const completedJobsCount = assignmentCounts.completed;
 
   if (data.accountType === "installer_technician") {
-    const [identity, areas, trades, individual, projects, completion] = await Promise.all([
+    const [identity, areas, trades, individual, projects, completion, verification] = await Promise.all([
       loadMyIdentity(),
       loadMyServiceAreas(),
       loadMyTrades(),
       getIndividualOnboardingData(),
       loadMyPortfolioProjects(),
       loadMyProfileCompletion(),
+      loadMyProfessionalVerification(),
     ]);
     const answers = individual?.professional;
     return (
@@ -108,6 +110,7 @@ export default async function ProfileHubPage() {
           maxMedia: PORTFOLIO_MAX_PROJECT_MEDIA,
           videoEnabled: videoEnabled(),
           completion: completion ?? { percent: 0, missing: [] },
+          verification,
           publicProfileHref: publication.listed && publication.profileId ? `/p/${publication.profileId}` : null,
         }}
       />

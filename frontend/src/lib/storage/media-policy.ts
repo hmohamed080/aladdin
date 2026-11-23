@@ -5,6 +5,7 @@ import { PRODUCT_IMAGE_ALLOWED_TYPES, PRODUCT_IMAGE_BUCKET, PRODUCT_IMAGE_MAX_BY
 import { REQUEST_IMAGE_ALLOWED_TYPES, REQUEST_IMAGE_BUCKET, REQUEST_IMAGE_MAX_BYTES } from "./request-images";
 import { BV_ALLOWED_TYPES, BV_BUCKET, BV_MAX_BYTES } from "@/lib/business-verification/contract";
 import { ORGANIZATION_IMAGE_ALLOWED_TYPES, ORGANIZATION_IMAGE_BUCKET, ORGANIZATION_IMAGE_MAX_BYTES } from "./organization-image-assets";
+import { MARKETPLACE_IMAGE_ALLOWED_TYPES, MARKETPLACE_IMAGE_BUCKET, MARKETPLACE_IMAGE_MAX_BYTES } from "./marketplace-images";
 
 export function mediaPolicy(namespace: MediaNamespace) {
   if (namespace === "avatar") return { bucket: AVATAR_BUCKET, maxBytes: AVATAR_MAX_BYTES, types: AVATAR_ALLOWED_TYPES };
@@ -12,10 +13,29 @@ export function mediaPolicy(namespace: MediaNamespace) {
   if (namespace === "organization") return { bucket: ORGANIZATION_IMAGE_BUCKET, maxBytes: ORGANIZATION_IMAGE_MAX_BYTES, types: ORGANIZATION_IMAGE_ALLOWED_TYPES };
   if (namespace === "request") return { bucket: REQUEST_IMAGE_BUCKET, maxBytes: REQUEST_IMAGE_MAX_BYTES, types: REQUEST_IMAGE_ALLOWED_TYPES };
   if (namespace === "verification") return { bucket: BV_BUCKET, maxBytes: BV_MAX_BYTES, types: BV_ALLOWED_TYPES };
+  if (namespace === "marketplace") return { bucket: MARKETPLACE_IMAGE_BUCKET, maxBytes: MARKETPLACE_IMAGE_MAX_BYTES, types: MARKETPLACE_IMAGE_ALLOWED_TYPES };
   return ASSET_POLICY[namespace];
+}
+
+/**
+ * Namespaces whose bytes live in R2 ONLY: no Supabase Storage write, read or fallback, whatever the
+ * R2 flags say. When R2 is unavailable these uploads and reads fail explicitly instead of drifting.
+ */
+export function isR2OnlyMedia(namespace: MediaNamespace) {
+  return namespace === "marketplace";
 }
 
 /** Workspace- or organization-scoped namespaces are authorized by `organization_media_resolve`. */
 export function isOrganizationMedia(namespace: MediaNamespace) {
-  return namespace === "product" || namespace === "organization" || namespace === "request" || namespace === "verification";
+  return namespace === "product" || namespace === "organization" || namespace === "request" || namespace === "verification"
+    || namespace === "marketplace";
+}
+
+/**
+ * Namespaces whose images are kept as a RE-ENCODED original (sRGB, long edge at most 2560, personal
+ * metadata removed). Verification documents and certificates are evidence and stay byte-for-byte what
+ * the person uploaded.
+ */
+export function reencodesOriginal(namespace: MediaNamespace) {
+  return namespace !== "verification" && namespace !== "certificate";
 }

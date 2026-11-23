@@ -55,6 +55,30 @@ function getAdminClient(timeoutMs?: number): SupabaseClient<Database> {
   });
 }
 
+/** A person counts as "registered" once the account exists and is usable or waiting for its first sign-in (not suspended, not deactivated). */
+const REGISTERED_STATUSES = ["pending_verification", "active"] as const;
+
+/**
+ * The Landing page's public platform counts (registered accounts, businesses, published products). Service-role, read-only,
+ * `head` count queries on three tables, called only by `features/landing-brand/landing-brand-stats.ts`. It returns bare
+ * integers — no rows, no identifiers. Use it for nothing else.
+ *
+ * "Users" = every account that is registered (pending its first sign-in, or active). It is NOT `status = 'active'`, which only
+ * means "finished onboarding" (54 of 1028 on production). Platform staff (a handful) are counted like anyone else: excluding
+ * them needs `admin_role_assignments`, which the service role cannot read by design (20260929100001), so it would take a
+ * permissioned SQL function.
+ */
+export async function countLandingPublicStats(): Promise<{ users: number; organizations: number; products: number }> {
+  const db = getAdminClient(5_000);
+  const [users, organizations, products] = await Promise.all([
+    db.from("users").select("id", { count: "exact", head: true }).in("status", [...REGISTERED_STATUSES]),
+    db.from("organizations").select("id", { count: "exact", head: true }).eq("status", "active").is("deleted_at", null),
+    db.from("products").select("id", { count: "exact", head: true }).eq("status", "published").is("deleted_at", null),
+  ]);
+  for (const r of [users, organizations, products]) if (r.error || r.count === null) throw new Error("landing stats unavailable");
+  return { users: users.count ?? 0, organizations: organizations.count ?? 0, products: products.count ?? 0 };
+}
+
 /** How long one Auth Admin API call of an installer security change may take before its outcome is treated as unknown. */
 export const INSTALLER_SECURITY_ADMIN_TIMEOUT_MS = 15_000;
 

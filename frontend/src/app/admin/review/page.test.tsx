@@ -1,15 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, cleanup, screen, within } from "@testing-library/react";
+import { render, cleanup, screen } from "@testing-library/react";
 import { I18nProvider } from "@/lib/i18n/provider";
-import { PREVIEW_ORG_REQUESTS } from "@/features/admin-preview/fixtures";
 import { en } from "@/lib/i18n/messages/en";
 import { ar } from "@/lib/i18n/messages/ar";
 
 /**
- * Review Center counts (Admin Core stabilization): the queue lists REAL Production items plus fixture cards for the
- * Organization Request workflow, which has no backend yet. A counter must never imply a fixture is a real request:
- * "All" and the header count only real items, the fixture tab carries a "Preview only" label instead of a number,
- * and the fixture cards stay listed (each badged) for design review.
+ * Review Center: an operational queue of REAL records only. The Organization Request samples ("Preview only", no backend)
+ * were removed; the header count, the "All" tab and the listed rows come from the same list, so they cannot disagree, and no
+ * copy names an environment ("Production") or claims sample data.
  */
 const previewReviewQueue = vi.fn();
 const locale = { value: "en" };
@@ -64,49 +62,110 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe("Review Center - real vs Preview-only counts", () => {
-  it("'All' counts only real items; the fixture org requests are not in it", async () => {
-    previewReviewQueue.mockResolvedValue([verification(1), verification(2)]);
-    await renderPage();
-    expect(PREVIEW_ORG_REQUESTS.length).toBeGreaterThan(0);
-    // 2 real items, never 2 + fixtures
-    expect(tabCount(new RegExp(`^${en.admin.preview.review.tabs.all}`))).toBe("2");
-    expect(tabCount(new RegExp(`^${en.admin.preview.review.tabs.verifications}`))).toBe("2");
-  });
-
-  it("the Organization requests tab shows 'Preview only' instead of a number", async () => {
-    previewReviewQueue.mockResolvedValue([verification(1)]);
-    await renderPage();
-    const tab = screen.getAllByRole("link").find((a) => a.textContent?.includes(en.admin.preview.review.tabs.orgRequests));
-    expect(tab?.textContent).toContain(en.admin.preview.previewOnlyBadge);
-    expect(tab?.textContent).not.toMatch(/\d/);
-  });
-
-  it("the fixture cards stay listed, each badged, and a note explains they are never counted", async () => {
-    previewReviewQueue.mockResolvedValue([]);
-    const { container } = await renderPage();
-    expect(screen.getByText(en.admin.preview.review.fixtureNote)).toBeTruthy();
-    const badges = within(container).getAllByText(en.admin.preview.previewOnlyBadge);
-    expect(badges.length).toBeGreaterThanOrEqual(PREVIEW_ORG_REQUESTS.length);
-    // with zero real items the real count is 0 even though fixture cards are listed
-    expect(tabCount(new RegExp(`^${en.admin.preview.review.tabs.all}`))).toBe("0");
-  });
-
-  it("the page header count is the real count too", async () => {
+describe("Review Center - real records only", () => {
+  it("lists exactly the real items: the header count, the All tab and the rows agree", async () => {
     previewReviewQueue.mockResolvedValue([verification(1), verification(2), verification(3)]);
     const { container } = await renderPage();
+    expect(tabCount(new RegExp(`^${en.admin.preview.review.tabs.all}`))).toBe("3");
+    expect(tabCount(new RegExp(`^${en.admin.preview.review.tabs.verifications}`))).toBe("3");
     const header = container.querySelector("h1")?.parentElement?.textContent ?? "";
     expect(header).toMatch(/3/);
-    expect(header).not.toMatch(new RegExp(String(3 + PREVIEW_ORG_REQUESTS.length)));
+    expect(screen.getAllByText(/Real person \d/)).toHaveLength(3);
   });
 
-  it("works in Arabic: localized note and label, no numeric count on the Preview-only tab", async () => {
-    locale.value = "ar";
+  it("shows no sample organization requests, no Organization Requests tab and no Preview-only badge", async () => {
     previewReviewQueue.mockResolvedValue([verification(1)]);
+    const { container } = await renderPage();
+    expect(screen.queryByText(en.admin.preview.previewOnlyBadge)).toBeNull();
+    expect(screen.getAllByRole("link").some((a) => /Organization Requests/i.test(a.textContent ?? ""))).toBe(false);
+    for (const sample of ["Nile Home Showroom", "Delta Build Contracting", "Alex Glass"]) expect(container.textContent).not.toContain(sample);
+    expect(container.querySelector('a[href*="org-request"]')).toBeNull();
+  });
+
+  it("an empty queue is an empty state with a zero count, not sample cards", async () => {
+    previewReviewQueue.mockResolvedValue([]);
+    const { container } = await renderPage();
+    expect(tabCount(new RegExp(`^${en.admin.preview.review.tabs.all}`))).toBe("0");
+    expect(screen.getByText(en.admin.preview.review.empty)).toBeTruthy();
+    expect(container.querySelectorAll('a[href^="/admin/review/"]').length).toBe(0);
+  });
+
+  it("names no environment in its copy (English and Arabic)", () => {
+    for (const review of [en.admin.preview.review, ar.admin.preview.review]) {
+      expect(JSON.stringify(review)).not.toMatch(/Production|الإنتاج/);
+    }
+  });
+
+  it("works in Arabic with the same counts and no Preview-only badge", async () => {
+    locale.value = "ar";
+    previewReviewQueue.mockResolvedValue([verification(1), verification(2)]);
     await renderPage();
-    expect(screen.getByText(ar.admin.preview.review.fixtureNote)).toBeTruthy();
-    const tab = screen.getAllByRole("link").find((a) => a.textContent?.includes(ar.admin.preview.review.tabs.orgRequests));
-    expect(tab?.textContent).toContain(ar.admin.preview.previewOnlyBadge);
-    expect(tab?.textContent).not.toMatch(/[\d٠-٩]/);
+    expect(tabCount(new RegExp(`^${ar.admin.preview.review.tabs.all}`))).toMatch(/^(2|٢)$/);
+    expect(screen.queryByText(ar.admin.preview.previewOnlyBadge)).toBeNull();
+  });
+});
+
+describe("Review Center - count semantics under search, tabs and pagination", () => {
+  const network = (n: number) => ({
+    kind: "networkReferral" as const,
+    row: {
+      id: `10000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`,
+      displayName: `Net shop ${n}`,
+      referrerName: "Ref",
+      matchId: null,
+      createdAt: `2026-08-${String(n).padStart(2, "0")}T10:00:00Z`,
+    },
+  });
+  const verifications = () =>
+    Array.from({ length: 12 }, (_, i) => {
+      const v = verification((i % 9) + 1);
+      return { ...v, row: { ...v.row, id: `00000000-0000-4000-8000-0000000001${String(i).padStart(2, "0")}`, subjectName: `Real person ${i}` } };
+    });
+  const many = () => [...verifications(), network(1), network(2)];
+  const header = (c: HTMLElement) => c.querySelector("h1")?.parentElement?.textContent ?? "";
+  const headCount = (c: HTMLElement) => header(c).replace(en.admin.preview.review.title, "").match(/[\d٠-٩]+/)?.[0] ?? null;
+  const cards = (c: HTMLElement, kind?: string) =>
+    c.querySelectorAll(kind ? `a[href*="/admin/review/${kind}/"]` : 'a[href*="/admin/review/verification/"], a[href*="/admin/review/network-referral/"]');
+  const ALL_TAB = () => tabCount(new RegExp(`^${en.admin.preview.review.tabs.all}`));
+
+  it("tab counts are whole-queue totals; the header is the filtered total; rows are one page of the filtered set", async () => {
+    previewReviewQueue.mockResolvedValue(many());
+    const { container } = await renderPage({ pageSize: "10" });
+    expect(ALL_TAB()).toBe("14");
+    expect(headCount(container)).toBe("14");
+    expect(cards(container)).toHaveLength(10);
+  });
+
+  it("a tab filter changes the header and rows, never the tab counts", async () => {
+    previewReviewQueue.mockResolvedValue(many());
+    const { container } = await renderPage({ tab: "networkReferrals" });
+    expect(headCount(container)).toBe("2");
+    expect(cards(container, "network-referral")).toHaveLength(2);
+    expect(cards(container, "verification")).toHaveLength(0);
+    expect(ALL_TAB()).toBe("14");
+    expect(tabCount(new RegExp(`^${en.admin.preview.review.tabs.verifications}`))).toBe("12");
+  });
+
+  it("a search changes the header and rows (across every page), never the tab counts", async () => {
+    previewReviewQueue.mockResolvedValue(many());
+    const { container } = await renderPage({ q: "net shop 2", pageSize: "10" });
+    expect(headCount(container)).toBe("1");
+    expect(cards(container)).toHaveLength(1);
+    expect(ALL_TAB()).toBe("14");
+  });
+
+  it("page 2 shows the remainder of the same filtered set; the header still counts all of it", async () => {
+    previewReviewQueue.mockResolvedValue(many());
+    const { container } = await renderPage({ page: "2", pageSize: "10" });
+    expect(headCount(container)).toBe("14");
+    expect(cards(container)).toHaveLength(4);
+  });
+
+  it("a search with no match is an empty state with a zero header and unchanged tab counts", async () => {
+    previewReviewQueue.mockResolvedValue(many());
+    const { container } = await renderPage({ q: "zzz-no-match" });
+    expect(screen.getByText(en.admin.preview.review.empty)).toBeTruthy();
+    expect(headCount(container)).toBe("0");
+    expect(ALL_TAB()).toBe("14");
   });
 });

@@ -46,19 +46,17 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     );
   });
 
-  test("the retired phone pages permanently redirect to /auth", async ({ request }) => {
-    const expected: Record<string, string> = {
-      "/installer/sign-in": "/auth/sign-in",
-      "/installer/sign-up": "/auth/sign-up?type=installer_technician",
-      "/showroom/sign-in": "/auth/sign-in",
-      "/showroom/sign-up": "/auth/sign-up?type=showroom_dealer",
-      "/temporary/craftsman/sign-in": "/auth/sign-in",
-      "/temporary/craftsman/sign-up": "/auth/sign-up?type=installer_technician",
-    };
-    for (const [from, to] of Object.entries(expected)) {
-      const res = await request.get(from, { maxRedirects: 0 });
-      expect(res.status(), from).toBe(308);
-      expect(res.headers()["location"], from).toBe(to);
+  test("the retired phone pages are gone (404 for everyone, no redirect)", async ({ request }) => {
+    for (const path of [
+      "/installer/sign-in",
+      "/installer/sign-up",
+      "/showroom/sign-in",
+      "/showroom/sign-up",
+      "/temporary/craftsman/sign-in",
+      "/temporary/craftsman/sign-up",
+    ]) {
+      const res = await request.get(path, { maxRedirects: 0 });
+      expect(res.status(), path).toBe(404);
     }
   });
 

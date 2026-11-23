@@ -21,6 +21,7 @@
  * anything. A browser that skipped it entirely would be refused at the same three
  * places. See docs/database/professional-asset-storage.md.
  */
+import { IMAGE_MAX_BYTES } from "@/lib/media/upload-limits";
 
 /**
  * The two namespaces. They are separate BUCKETS rather than folders because
@@ -57,7 +58,7 @@ export const ASSET_POLICY: Readonly<Record<AssetNamespace, NamespacePolicy>> = {
   portfolio: {
     bucket: "professional-portfolio",
     types: ["image/jpeg", "image/png", "image/webp"],
-    maxBytes: 5 * 1024 * 1024,
+    maxBytes: IMAGE_MAX_BYTES,
   },
   /**
    * Evidence. PDF is what a certificate actually arrives as, and 10 MiB covers a

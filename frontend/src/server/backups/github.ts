@@ -53,6 +53,9 @@ async function github(env: BackupGithubEnv, path: string, init?: RequestInit): P
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${env.BACKUP_GITHUB_TOKEN}`,
       "X-GitHub-Api-Version": "2022-11-28",
+      // GitHub answers 403 "Request forbidden by administrative rules" to a request without a User-Agent, before it even looks at
+      // the token. A Worker's fetch sends none, so every dispatch was refused (the console showed `dispatch_failed`).
+      "User-Agent": "aladdin-admin-backups",
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...init?.headers,
     },

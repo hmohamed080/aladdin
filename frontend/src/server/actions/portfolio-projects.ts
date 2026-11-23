@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { submitCraftsmanVerificationIfComplete } from "@/server/profile/craftsman-verification";
 import { deleteProfessionalAsset } from "@/server/actions/professional-assets";
 import { startPortfolioUpload, type UploadTicket } from "@/server/actions/portfolio";
 import { deleteVideo } from "@/server/video/uploads";
@@ -59,6 +60,8 @@ export async function createProjectAction(input: Details): Promise<ProjectResult
   const { data, error } = await supabase.rpc("portfolio_project_create", {
     p_title: input.title, p_location: input.location ?? "", p_description: input.description ?? "" });
   if (error || typeof data !== "string") return { ok: false, code: mapError(error) };
+  // A first project can complete a Craftsman's profile; the database decides whether to file the request.
+  await submitCraftsmanVerificationIfComplete();
   refresh();
   return { ok: true, id: data };
 }
