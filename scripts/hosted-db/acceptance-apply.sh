@@ -12,6 +12,9 @@
 #              public catalog v2, product video; PRs #238-#241, #246, #249), one plain push 237 -> 244. Creates 6 tables, columns, constraints and seeds rows: needs
 #              --backup-label of a FRESH restore-verified snapshot (>= 237 migrations; none is pinned yet) and runs only from origin/main. Before and after the push this script
 #              also runs the read-only marketplace-v2-smoke.sql; after it the owner runs marketplace-v2-smoke.mjs http. See docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md.
+#   marketplace-slug 20261124090001 (seller public slug: 2 functions, 1 trigger, backfill of organizations.slug for approved sellers without one; PR #252), one plain push
+#              244 -> 245, on top of marketplace-v2. No table DDL, only NULL slugs are filled: no backup label required (the pinned forward-fix marketplace-slug is the recovery; the
+#              backfilled slugs are data and stay). Before and after the push this script runs the read-only marketplace-slug-smoke.sql. See docs/operations/MARKETPLACE_SLUG_ACCEPTANCE_PLAN_20261124.md.
 #   marketplace 14 migrations (20261116100001..014), one plain push                          218 -> 232. Creates tables: needs
 #              --backup-label of a FRESH restore-verified snapshot (>= 218 migrations) and runs only from origin/main (merge #190, #192, #200 and the 20261116090001 work first).
 # NOT to be run without the owner's separate explicit GO. Production is refused. Never uses --include-all, repair or reset.
@@ -39,7 +42,7 @@ export LC_ALL=C
 ACC="nxossqhdfltcqdwvbewi"; PROD="kkpkgjrweysgvhvkhzun"
 PLAN=""; SHA=""; LABEL=""
 while [ $# -gt 0 ]; do case "$1" in --plan) PLAN="${2:-}"; shift 2;; --sha) SHA="${2:-}"; shift 2;; --backup-label) LABEL="${2:-}"; shift 2;; *) echo "unknown argument $1"; exit 2;; esac; done
-[[ "$PLAN" =~ ^(media|m1|m3a|media\+m1|marketplace|media-notify|registration-gate|marketplace-v2)$ ]] || { echo "usage: --plan media|m1|m3a|media+m1|marketplace|media-notify|registration-gate|marketplace-v2 --sha <40-char sha> [--backup-label <label>]"; exit 2; }
+[[ "$PLAN" =~ ^(media|m1|m3a|media\+m1|marketplace|media-notify|registration-gate|marketplace-v2|marketplace-slug)$ ]] || { echo "usage: --plan media|m1|m3a|media+m1|marketplace|media-notify|registration-gate|marketplace-v2|marketplace-slug --sha <40-char sha> [--backup-label <label>]"; exit 2; }
 [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: --plan <plan> --sha <40-char sha> [--backup-label <label>]"; exit 2; }
 [ -z "$LABEL" ] || [[ "$LABEL" =~ ^aladdin-acceptance-[0-9]{8}T[0-9]{6}Z$ ]] || { echo "--backup-label must look like aladdin-acceptance-YYYYMMDDTHHMMSSZ"; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -94,6 +97,10 @@ if [ "$PLAN" = "marketplace-v2" ]; then
   run "pre: marketplace-v2 facts" "$OUT/mv2-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-v2-smoke.sql
   run "pre: marketplace-v2 smoke" "$OUT/mv2-pre.out" -- node scripts/hosted-db/marketplace-v2-smoke.mjs facts pre "$OUT/mv2-pre.json"; cat "$OUT/mv2-pre.out"
 fi
+if [ "$PLAN" = "marketplace-slug" ]; then
+  run "pre: marketplace-slug facts" "$OUT/slug-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-slug-smoke.sql
+  run "pre: marketplace-slug smoke" "$OUT/slug-pre.out" -- node scripts/hosted-db/marketplace-slug-smoke.mjs facts pre "$OUT/slug-pre.json" --applied 244 --latest 20261123160002; cat "$OUT/slug-pre.out"
+fi
 echo "pre-checks passed. Recovery: $RECOVERY${LABEL:+ (historical snapshot reference $LABEL, not a current recovery point)}"
 
 STEP="confirmation"
@@ -119,6 +126,10 @@ if [ "$PLAN" = "marketplace-v2" ]; then
   run "post: marketplace-v2 facts" "$OUT/mv2-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-v2-smoke.sql
   run "post: marketplace-v2 smoke" "$OUT/mv2-post.out" -- node scripts/hosted-db/marketplace-v2-smoke.mjs facts post "$OUT/mv2-post.json"; cat "$OUT/mv2-post.out"
   echo "NEXT (owner): deploy the frontend matching main, then run: node scripts/hosted-db/marketplace-v2-smoke.mjs http  (docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md)"
+fi
+if [ "$PLAN" = "marketplace-slug" ]; then
+  run "post: marketplace-slug facts" "$OUT/slug-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-slug-smoke.sql
+  run "post: marketplace-slug smoke" "$OUT/slug-post.out" -- node scripts/hosted-db/marketplace-slug-smoke.mjs facts post "$OUT/slug-post.json" --applied "$POST_APPLIED" --latest "$LATEST"; cat "$OUT/slug-post.out"
 fi
 STEP="done"; PUSHED=0
 echo "PASS: plan $PLAN applied to Acceptance $ACC; history $POST_APPLIED, permissions match $POST_CONTRACT, catalog diff limited to the plan's functions, media/storage counts verified."

@@ -22,9 +22,13 @@
  *   marketplace-v2  20261123090001, 100001, 120001, 130001, 150001, 160001, 160002 (PRs #238-#241, #246, #249) on top of Acceptance at 237 / 20261122090002. 237 -> 244. NOT function-only
  *             (6 tables, 24 columns on existing tables, 7 re-created constraints, seeded rows, one enum value): pinned "marketplace-v2" forward-fix and a fresh restore-verified
  *             backup taken at >= 237 migrations is MANDATORY (none is pinned yet: the newest, 232, is refused). See docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md.
- *   prod-marketplace-v2  PRODUCTION: the same seven migrations as marketplace-v2, 237 -> 244, on top of Production at 237 / 20261122090002 (prod-catchup applied by the owner
- *             2026-11-23, RUNTIME_STATE). Same measured catalog diff, same pinned forward-fix; needs a restore-verified PRODUCTION snapshot taken at >= 237 migrations (the pinned
- *             210 one is refused; none >= 237 is pinned). See docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md.
+ *   marketplace-slug  20261124090001 (seller public slug, PR #252: 2 functions, 1 trigger, backfill of organizations.slug for approved sellers) on top of Acceptance at 244 / 20261123160002.
+ *             244 -> 245. No table DDL: no fresh backup required; pinned "marketplace-slug" forward-fix (slugs written are data and stay). Applied to Acceptance BEFORE Production.
+ *             See docs/operations/MARKETPLACE_SLUG_ACCEPTANCE_PLAN_20261124.md. marketplace-v2 above stays as the historical, already applied Acceptance plan: its drift check
+ *             reports 20261124090001 as unplanned by design.
+ *   prod-marketplace-v2  PRODUCTION, COMBINED plan (owner decision 2026-11-24): the seven marketplace-v2 migrations + 20261124090001, 237 -> 245, on top of Production at 237 / 20261122090002
+ *             (prod-catchup applied by the owner 2026-11-23, RUNTIME_STATE). Same measured catalog diff + the 3 slug objects; two pinned forward-fixes, undo order marketplace-slug then
+ *             marketplace-v2; needs a restore-verified PRODUCTION snapshot taken at >= 237 migrations (the pinned 210 one is refused). See docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md.
  *   prod-catchup  PRODUCTION: the single plan 210 -> 237 (27 migrations, 20261114090001 .. 20261122090002, plus PC_LATER). Needs a restore-verified PRODUCTION snapshot (none pinned).
  *   m3a       after `m1` is applied (Acceptance and Production are both at 209 today): only 20261112090001 (P1 M3a) is pending. 209 -> 210.
  *
@@ -48,6 +52,9 @@ const ACC_237 = "20261122090002"; // latest on Acceptance after the registration
 const RG_PENDING = ["20261122090001", "20261122090002"];
 // marketplace-v2: the seven Marketplace migrations merged to main on 2026-11-23 (PRs #238-#241, #246, #249), on top of Acceptance at 237.
 const MV2_PENDING = ["20261123090001", "20261123100001", "20261123120001", "20261123130001", "20261123150001", "20261123160001", "20261123160002"];
+const ACC_244 = "20261123160002"; // latest on Acceptance after the marketplace-v2 plan (read 2026-11-24: 244 migrations)
+// marketplace-slug (PR #252): ONE migration merged after the seven above. Acceptance (244) gets it as its own small plan; Production gets it inside prod-marketplace-v2 (237 -> 245).
+const SLUG_PENDING = ["20261124090001"];
 const PROD_210 = "20261112090001"; // latest on PRODUCTION (read-only, 2026-11-23: 210 migrations)
 /**
  * prod-catchup: ONE Production plan from 210 / 20261112090001 to current main. PC_PENDING is the single list to edit at execution time: when Marketplace PR 5 / PR 6 (or any
@@ -66,6 +73,8 @@ const PC_BASE = [
 export const PC_LATER = []; // versions newer than 20261122090002 that this plan must also push (empty today)
 export const PC_LATER_CHANGED = []; // objects those later migrations add or change (function schema.name, or a key prefix ending in *)
 export const PC_PENDING = [...PC_BASE, ...PC_LATER];
+/** objects the slug migration adds (measured on a scratch replay: 2 functions, 1 trigger; the data effect is organizations.slug rows, which are not catalog objects) */
+export const SLUG_CHANGED = ["app.marketplace_assign_org_slug", "app.marketplace_seller_slug_trigger", "public.marketplace_seller_accounts.marketplace_seller_slug_assign"];
 const MN_PENDING = ["20261121090001", "20261121090002", "20261121090003"];
 const MKT_PENDING = Array.from({ length: 14 }, (_, i) => `202611161000${String(i + 1).padStart(2, "0")}`);
 /** changed = function names (schema.name, every overload) the plan is allowed to touch; nothing else may change in the catalog. */
@@ -532,16 +541,24 @@ export const PLANS = {
       "public.ux_marketplace_*",
       "public.ix_mp_*"
     ] },
+  // marketplace-slug: 20261124090001 on top of Acceptance at 244 / 20261123160002 (marketplace-v2 applied). 244 -> 245. Adds 2 functions and 1 trigger and fills organizations.slug
+  // for approved sellers that have none (data: only NULL slugs are written, nothing existing is overwritten). No table, column, grant or policy. Recovery: the pinned
+  // "marketplace-slug" forward-fix (drops the trigger and the 2 functions, refuses when it cannot prove that is safe; the backfilled slugs stay). Because no row is overwritten and no
+  // table is created, no fresh backup is required (the pinned 237 snapshot aladdin-acceptance-20261124T092536Z is still accepted as a historical reference).
+  // "changed" was MEASURED by scripts/hosted-db/marketplace-slug-scratch-proof.mjs (scratch container, throwaway database), not written by hand.
+  "marketplace-slug": { fixes: ["marketplace-slug"], recovery: "forward-fix", applied: 244, latest: ACC_244, pending: SLUG_PENDING, preContract: ACC_244, postContract: "20261124090001",
+    changed: SLUG_CHANGED },
   "media+m1": { fixes: ["media", "m1"], recovery: "forward-fix", applied: 207, latest: BASE, pending: [MEDIA, M1], preContract: BASE, postContract: M1,
     changed: ["app.media_storage_key_assign", "public.media_migration_target_key", "public.media_migration_switch", "public.media_migration_rollback",
       "public.my_registration_state", "app.profile_completion", "public.admin_users_directory"] },
 };
 
-// prod-marketplace-v2 (PRODUCTION, target "production"): the Production twin of "marketplace-v2". Production is at 237 / 20261122090002 (prod-catchup applied by the owner from main 8302aee9
-// on 2026-11-23, RUNTIME_STATE; to be re-read live by production-preflight.sh, which refuses any other history). Same seven pending versions, same measured "changed" list and same pinned
-// forward-fix (the scratch proof replays the missing migrations up to 20261122090002 and then these seven, which is the state Production is in after prod-catchup). Derived from the
-// Acceptance plan so the two can never drift apart; only the target differs. freshBackup: the pinned PRODUCTION snapshot (210 migrations) is refused, one taken at >= 237 is required.
-PLANS["prod-marketplace-v2"] = { ...PLANS["marketplace-v2"], target: "production", fixes: [...PLANS["marketplace-v2"].fixes], pending: [...MV2_PENDING], changed: [...PLANS["marketplace-v2"].changed] };
+// prod-marketplace-v2 (PRODUCTION, target "production"): the COMBINED Production plan (owner decision 2026-11-24): the seven marketplace-v2 migrations plus the slug migration, 237 -> 245, ONE plain push.
+// Production is at 237 / 20261122090002 (prod-catchup applied by the owner from main 8302aee9 on 2026-11-23, RUNTIME_STATE; re-read live by production-preflight.sh, which refuses any other
+// history). "changed" = the marketplace-v2 list plus SLUG_CHANGED (each measured separately by the scratch proofs; base -> slug is checked as one diff by marketplace-slug-scratch-proof.mjs).
+// Recovery: TWO pinned forward-fixes, in this order: marketplace-slug, then marketplace-v2. freshBackup: a restore-verified PRODUCTION snapshot taken at >= 237 migrations is required.
+PLANS["prod-marketplace-v2"] = { ...PLANS["marketplace-v2"], target: "production", fixes: ["marketplace-slug", "marketplace-v2"], pending: [...MV2_PENDING, ...SLUG_PENDING], postContract: SLUG_PENDING.at(-1),
+  changed: [...PLANS["marketplace-v2"].changed, ...SLUG_CHANGED] };
 
 /**
  * Recovery evidence (re-pinned 2026-11-11). Every plan's migrations replace or add functions only: CREATE OR REPLACE FUNCTION /
@@ -576,6 +593,9 @@ export const PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS = {
   // sha256 e030c87a32873a200dd55066d039a5fd0dfb1c746e7d033b5eaf9aebbaa354ff, schema fingerprint exact, 172 tables / 32355 rows exact, R2 media inventory exact: 1313 files,
   // 21 of 21 sampled restored with the recorded sha256) with Production at 210 migrations (latest 20261112090001). The snapshot the prod-catchup plan needs.
   "aladdin-production-20261123T142725Z": { backupRun: "45194259216", restoreRun: "45199513364", tables: 172, rows: 32355, migrations: 210 },
+  // 2026-11-24: taken (backup run 45405013111, ledger succeeded, complete coverage verified) and restore-tested (restore run 45406400001: RESULT PASS, sha256 9a3fa46f7f3e9f17122db58b69acc731435eeff534d5b8e5bb056e72d2151d9a,
+  // schema fingerprint exact, 207 tables / 33001 rows exact, R2 media inventory exact: 1318 files, 21 of 21 sampled restored) with Production at 237 migrations (latest 20261122090002). The snapshot the prod-marketplace-v2 plan needs.
+  "aladdin-production-20261124T133628Z": { backupRun: "45405013111", restoreRun: "45406400001", tables: 207, rows: 33001, migrations: 237 },
 };
 export const FORWARD_FIX = {
   // marketplace: refuses (RAISE) while any seller/product/order/import/stock row or marketplace media object exists; never deletes user data.
@@ -583,6 +603,9 @@ export const FORWARD_FIX = {
   // re-created, so it is valid at 218 too (the verification migrations never touch them).
   // verification: restores what 20261115090002..006 changed. Those migrations are already applied on Acceptance, so NO plan uses it today;
   // kept (reviewed, pinned) for a future rollback of them. It does NOT undo the rows they wrote (only a restore-tested backup can).
+  // marketplace-slug: drops the slug trigger and its 2 functions (20261124090001). Refuses (RAISE before any change) when another trigger, function body or object depends on them, or
+  // when the trigger is not the expected one. The backfilled organizations.slug values are data and are NOT reverted. Combined Production undo order: marketplace-slug, THEN marketplace-v2.
+  "marketplace-slug": { file: "forward-fix/marketplace-slug-remove.sql", sha256: "efd63ab7a3e48b56a70377fc4d16589a980c623d616e5eee5fe53b1c1f7b58a0" },
   marketplace: { file: "forward-fix/marketplace-remove.sql", sha256: "72bdfd9b68ef88f85338321d4eb79c711e2d0be3bbf1e708a96b001dee58b734" },
   // media-notify: refuses (RAISE) once an admin changed a limit or template or any notification was written from a template; never deletes user data.
   "media-notify": { file: "forward-fix/media-notify-remove.sql", sha256: "807149eb92e650ae6e3ffccea420fca110ba3a6bf3eed44f9a1be8f799ace6a5" },
