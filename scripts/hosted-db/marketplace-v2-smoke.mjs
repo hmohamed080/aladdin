@@ -8,7 +8,8 @@
  *
  * http (PowerShell):  $env:SMOKE_URL = "https://nxossqhdfltcqdwvbewi.supabase.co"; $env:SMOKE_PUBLISHABLE_KEY = "<the Acceptance publishable key>"
  * It only calls public, STABLE, anonymous-readable functions (marketplace_public_status / _catalog_page / _facets) and sends no user token. Only the
- * Acceptance project is accepted; Production is refused, a secret/service key is refused.
+ * Acceptance project is accepted by default; Production only with SMOKE_TARGET=production (plan prod-marketplace-v2; SMOKE_EXPECT_OPEN=false after the owner
+ * closed the Marketplace on purpose); any other project and any secret/service key is refused.
  *
  * What it cannot see (check by hand, see docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md): the Worker flags (VIDEO_ENABLED=false, VIDEO_ROUTES=off) and the
  * deployed frontend version.
@@ -18,6 +19,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const ACCEPTANCE_REF = "nxossqhdfltcqdwvbewi";
+export const PRODUCTION_REF = "kkpkgjrweysgvhvkhzun";
 export const NEW_TABLES = ["marketplace_free_shipping_products", "marketplace_seller_delivery_settings", "marketplace_seller_message_presets",
   "marketplace_seller_preset_events", "marketplace_seller_settings_events", "marketplace_video_events"];
 /** Seeds measured on the scratch replay (marketplace-v2-scratch-proof.mjs): 6 + 2 stock templates, 15 owner-message presets. */
@@ -85,7 +87,10 @@ export async function runHttp({ fetchImpl = fetch, env = process.env } = {}) {
   const out = (pass, text) => { lines.push(`${pass ? "PASS" : "FAIL"}  ${text}`); if (!pass) ok = false; };
   const url = (env.SMOKE_URL ?? "").replace(/\/+$/, ""), key = env.SMOKE_PUBLISHABLE_KEY ?? "";
   if (!url || !key) return { ok: false, lines: ["FAIL  set SMOKE_URL and SMOKE_PUBLISHABLE_KEY (see the header of this file)"] };
-  if (projectRef(url) !== ACCEPTANCE_REF) return { ok: false, lines: [`FAIL  refused: ${url} is not the Acceptance project (${ACCEPTANCE_REF}); this script never runs against Production or any other project`] };
+  // Acceptance by default. Production only when the owner says so explicitly (SMOKE_TARGET=production, plan prod-marketplace-v2); any other project is refused.
+  const want = env.SMOKE_TARGET === "production" ? PRODUCTION_REF : ACCEPTANCE_REF;
+  if (projectRef(url) !== want) return { ok: false, lines: [`FAIL  refused: ${url} is not the ${want === PRODUCTION_REF ? "Production" : "Acceptance"} project (${want})${want === ACCEPTANCE_REF ? "; set SMOKE_TARGET=production to smoke Production (read-only, anonymous)" : ""}`] };
+  const expectOpen = env.SMOKE_EXPECT_OPEN === "false" ? false : true; // after the owner closed the Marketplace on purpose, expect open=false
   if (key.startsWith("sb_secret_") || key.includes("service_role")) return { ok: false, lines: ["FAIL  refused: pass the PUBLISHABLE key, never a secret/service key"] };
   const rpc = async (name, body) => {
     const r = await fetchImpl(`${url}/rest/v1/rpc/${name}`, { method: "POST", headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -93,7 +98,7 @@ export async function runHttp({ fetchImpl = fetch, env = process.env } = {}) {
     return { status: r.status, json };
   };
   const s = await rpc("marketplace_public_status", {});
-  out(s.status === 200 && s.json?.open === true, `anonymous marketplace_public_status answers open=true (HTTP ${s.status} ${JSON.stringify(s.json)?.slice(0, 60)})`);
+  out(s.status === 200 && s.json?.open === expectOpen, `anonymous marketplace_public_status answers open=${expectOpen} (HTTP ${s.status} ${JSON.stringify(s.json)?.slice(0, 60)})`);
   const c = await rpc("marketplace_public_catalog_page", { p_limit: 1 });
   out(c.status === 200 && c.json && typeof c.json === "object", `anonymous marketplace_public_catalog_page answers (HTTP ${c.status})`);
   const f = await rpc("marketplace_public_facets", {});
