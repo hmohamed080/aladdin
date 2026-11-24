@@ -38,7 +38,7 @@ function LiveCard({ item }: { item: PublicCard }) {
           <span>{item.from_price_egp === null ? "—" : `${item.variant_count > 1 ? `${t.from} ` : ""}${fmtEgp(Number(item.from_price_egp), "ar")}`}</span>
           <span className={styles.cardSeller}>{t.soldBy(item.seller_name)}</span>
         </div>
-        {isMarketplaceOrderingEnabled() ? <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} className={styles.cartAdd} doneClassName={styles.cartAddDone} /> : null}
+        {isMarketplaceOrderingEnabled() ? <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} sellerSlug={item.seller_slug} className={styles.cartAdd} doneClassName={styles.cartAddDone} /> : null}
       </div>
     </li>
   );

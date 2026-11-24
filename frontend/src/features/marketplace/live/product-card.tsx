@@ -108,7 +108,7 @@ export function ProductCard({ item, locale, place }: { item: PublicCard; locale:
         {item.stock_left ? <p className={styles.lowStock}>{d.onlyLeft(fmtNum(item.stock_left, locale))}</p> : null}
         {isMarketplaceOrderingEnabled() ? (
           <div className={styles.cardAction}>
-            <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} className={cart.cardCart} doneClassName={cart.cardCartDone} />
+            <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} sellerSlug={item.seller_slug} className={cart.cardCart} doneClassName={cart.cardCartDone} />
           </div>
         ) : null}
       </div>

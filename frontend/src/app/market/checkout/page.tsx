@@ -6,7 +6,7 @@ import { MarketplaceShell } from "@/features/marketplace/marketplace-shell";
 import { LiveCheckoutPage } from "@/features/marketplace-orders/live-checkout-page";
 import { buyerCopy } from "@/features/marketplace-orders/buyer-copy";
 import styles from "@/features/marketplace/marketplace-cart.module.css";
-import { isMarketplacePreviewEnabled } from "@/lib/env";
+import { isMarketplaceOrderingEnabled, isMarketplacePreviewEnabled } from "@/lib/env";
 import { LOCALE_COOKIE, directionFor, resolveLocale } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/provider";
 import { getCurrentUser } from "@/server/auth/session";
@@ -31,6 +31,7 @@ export default async function MarketplaceCheckoutRoute({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   if (!isMarketplacePreviewEnabled()) redirect("/market");
+  if (!isMarketplaceOrderingEnabled()) redirect("/market");
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const c = buyerCopy[locale];
