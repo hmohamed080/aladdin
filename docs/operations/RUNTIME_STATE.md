@@ -1,6 +1,11 @@
 ## Marketplace cart and sign-in, PR 11 (draft PR, not deployed) - 2026-11-24
 - Branch `feat/mkt-cart-signin-20261124`: migration `20261124110001` (account cart, guest-cart merge, own-showroom rule on the cart and on `marketplace_orders`) is NOT applied to Acceptance or Production (rolled-back transactions on the local isolated stack only). Everything is behind `NEXT_PUBLIC_MARKETPLACE_ORDERING` = "true" (default off) and the Marketplace preview flag; the cart ends at a disabled "continue to checkout" until PR 12. Acceptance remains at 237 migrations, latest `20261122090002`; main's latest migration is `20261123160002`.
 
+## Marketplace v2 PRODUCTION apply plan prepared (draft PR, nothing applied) - 2026-11-24
+- Plan `prod-marketplace-v2` in `scripts/hosted-db/acceptance-gate.mjs` (target `production`): the same seven migrations as `marketplace-v2`, Production 237 / `20261122090002` -> 244 / `20261123160002`, derived from the Acceptance plan (same measured 315-object diff, same pinned forward-fix). Runbook: `docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md`. Run through `production-preflight.sh` / `production-apply.sh` (now accept `prod-marketplace-v2`; smoke before and after the push); Production HTTP smoke needs `SMOKE_TARGET=production`.
+- Production is recorded at 237 (prod-catchup applied 2026-11-23, section below); that value was NOT re-read live. The pinned Production snapshot (210) is refused: a restore-tested Production snapshot taken at >= 237 must be pinned first (none is; `aladdin-production-20261123T162323Z` has no recorded restore test). Nothing applied to Production or Acceptance; Acceptance `marketplace-v2` must succeed first (evidence list in the runbook).
+- `prod-catchup` can no longer run from current main (its drift check refuses the seven newer migrations); it is already applied, so that is expected.
+
 ## Marketplace v2 Acceptance apply plan prepared (draft PR, nothing applied) - 2026-11-23
 - Plan `marketplace-v2` in `scripts/hosted-db/acceptance-gate.mjs`: the seven Marketplace migrations merged to main on 2026-11-23 (`20261123090001`, `100001`, `120001`, `130001`, `150001`, `160001`, `160002`; PRs #238-#241, #246, #249), Acceptance 237 -> 244, permission contract `20261123160002`. Runbook: `docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md`. **Not applied** to Acceptance or Production; the owner runs `acceptance-apply.sh` with an explicit GO.
 - Needs a fresh restore-verified Acceptance snapshot (>= 237 migrations): **none is pinned**, the newest pinned one has 232 and is refused. Forward-fix `forward-fix/marketplace-v2-remove.sql` (guarded, object-level; the enum value and `media_verification_ready` are not undone). Acceptance itself is unchanged: 237, latest `20261122090002`.
@@ -35,6 +40,10 @@
 
 ## Marketplace publication gate v2 and product form (draft PR, not deployed) - 2026-11-23
 - Branch `feat/mkt-publication-gate-20261123` (Marketplace PR 7): migration `20261123130001` is NOT applied to Acceptance or Production (local isolated stack only). Adds the Marketplace open/close switch (`marketplace_open`, Super Admin permission `marketplace_platform.manage`, audited), per-product low-stock threshold with in-app owner notifications, stock-out withdrawal from the storefront, auto-unpublish on seller suspension, payment and delivery as publish conditions, changeable product type, 5 media slots. The Marketplace video upload path is still OFF. Existing published products of a seller without a payment method or delivery are unpublished on their next save.
+
+## Marketplace browse-only and seller slug (draft PR, not deployed) - 2026-11-24
+
+- Branch `feat/mkt-browse-only-slug-20261124`: migration `20261124090001` is NOT applied to Acceptance or Production (local isolated stack only). Adds the public slug of an approved seller (trigger + backfill). `NEXT_PUBLIC_MARKETPLACE_ORDERING` (unset = browse-only) hides add-to-cart and the cart entry; no variable was set anywhere.
 
 ## Marketplace notification templates (draft PR, not deployed) - 2026-11-21
 - Branch `feat/mkt-notification-templates-20261121`: migration `20261121090003` (templates, history, `notifications.content`, six `marketplace.*` event types) is NOT applied to Acceptance or Production (local isolated stack only). Admin page `/admin/notification-templates`. No emitter calls it yet (PR 5 and PR 6).

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { isMarketplaceOrderingEnabled } from "@/lib/env";
 import { BadgeCheckFilledIcon, PackageIcon, TruckIcon } from "@/components/ui/icons";
 import type { Locale } from "../marketplace-types";
 import { CartAddButton } from "./cart-add-button";
@@ -66,12 +67,10 @@ export function ProductCard({ item, locale, place }: { item: PublicCard; locale:
         )}
       </Link>
       <div className={styles.body}>
-        {item.seller_slug ? (
-          <p className={styles.sellerLine}>
-            <Link href={`/market/sellers/${item.seller_slug}`}>{item.seller_name}</Link>
-            {item.seller_official ? <OfficialBadge locale={locale} /> : null}
-          </p>
-        ) : null}
+        <p className={styles.sellerLine}>
+          {item.seller_slug ? <Link href={`/market/sellers/${item.seller_slug}`}>{item.seller_name}</Link> : <span>{item.seller_name}</span>}
+          {item.seller_official ? <OfficialBadge locale={locale} /> : null}
+        </p>
         <h3 className={styles.title}>
           <Link href={href}>{title}</Link>
         </h3>
@@ -107,9 +106,11 @@ export function ProductCard({ item, locale, place }: { item: PublicCard; locale:
         {notDelivered ? <p className={styles.pickup}>{d.notDelivered}</p> : null}
         {item.delivery?.pickup_available ? <p className={styles.pickup}>{d.pickup}</p> : null}
         {item.stock_left ? <p className={styles.lowStock}>{d.onlyLeft(fmtNum(item.stock_left, locale))}</p> : null}
-        <div className={styles.cardAction}>
-          <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} sellerSlug={item.seller_slug} className={cart.cardCart} doneClassName={cart.cardCartDone} />
-        </div>
+        {isMarketplaceOrderingEnabled() ? (
+          <div className={styles.cardAction}>
+            <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} sellerSlug={item.seller_slug} className={cart.cardCart} doneClassName={cart.cardCartDone} />
+          </div>
+        ) : null}
       </div>
     </article>
   );

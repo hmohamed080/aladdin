@@ -22,6 +22,9 @@
  *   marketplace-v2  20261123090001, 100001, 120001, 130001, 150001, 160001, 160002 (PRs #238-#241, #246, #249) on top of Acceptance at 237 / 20261122090002. 237 -> 244. NOT function-only
  *             (6 tables, 24 columns on existing tables, 7 re-created constraints, seeded rows, one enum value): pinned "marketplace-v2" forward-fix and a fresh restore-verified
  *             backup taken at >= 237 migrations is MANDATORY (none is pinned yet: the newest, 232, is refused). See docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md.
+ *   prod-marketplace-v2  PRODUCTION: the same seven migrations as marketplace-v2, 237 -> 244, on top of Production at 237 / 20261122090002 (prod-catchup applied by the owner
+ *             2026-11-23, RUNTIME_STATE). Same measured catalog diff, same pinned forward-fix; needs a restore-verified PRODUCTION snapshot taken at >= 237 migrations (the pinned
+ *             210 one is refused; none >= 237 is pinned). See docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md.
  *   prod-catchup  PRODUCTION: the single plan 210 -> 237 (27 migrations, 20261114090001 .. 20261122090002, plus PC_LATER). Needs a restore-verified PRODUCTION snapshot (none pinned).
  *   m3a       after `m1` is applied (Acceptance and Production are both at 209 today): only 20261112090001 (P1 M3a) is pending. 209 -> 210.
  *
@@ -533,6 +536,12 @@ export const PLANS = {
     changed: ["app.media_storage_key_assign", "public.media_migration_target_key", "public.media_migration_switch", "public.media_migration_rollback",
       "public.my_registration_state", "app.profile_completion", "public.admin_users_directory"] },
 };
+
+// prod-marketplace-v2 (PRODUCTION, target "production"): the Production twin of "marketplace-v2". Production is at 237 / 20261122090002 (prod-catchup applied by the owner from main 8302aee9
+// on 2026-11-23, RUNTIME_STATE; to be re-read live by production-preflight.sh, which refuses any other history). Same seven pending versions, same measured "changed" list and same pinned
+// forward-fix (the scratch proof replays the missing migrations up to 20261122090002 and then these seven, which is the state Production is in after prod-catchup). Derived from the
+// Acceptance plan so the two can never drift apart; only the target differs. freshBackup: the pinned PRODUCTION snapshot (210 migrations) is refused, one taken at >= 237 is required.
+PLANS["prod-marketplace-v2"] = { ...PLANS["marketplace-v2"], target: "production", fixes: [...PLANS["marketplace-v2"].fixes], pending: [...MV2_PENDING], changed: [...PLANS["marketplace-v2"].changed] };
 
 /**
  * Recovery evidence (re-pinned 2026-11-11). Every plan's migrations replace or add functions only: CREATE OR REPLACE FUNCTION /
