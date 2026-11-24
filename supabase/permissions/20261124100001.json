@@ -1,6 +1,6 @@
 {
  "version": "20261124100001",
- "source": "Exact function permission contract after 20261124100001_marketplace_buyer_addresses.sql: main contract 20261123160002 plus the PR 10 buyer-address functions. No existing function changed.",
+ "source": "Exact function permission contract after 20261124100001_marketplace_buyer_addresses.sql: main contract 20261124090001 plus the PR 10 buyer-address functions. No existing function changed.",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.marketplace_public_browse(text,text,text,text,integer,integer,numeric,numeric,jsonb,boolean,integer,text,text,text)",
@@ -7501,6 +7501,39 @@
      "grantable": false
     }
    ],
+   "definer": true,
+   "effective": {
+    "anon": false,
+    "service_role": false,
+    "authenticated": false,
+    "authenticator": false,
+    "dashboard_user": false,
+    "supabase_auth_admin": false,
+    "supabase_storage_admin": false
+   },
+   "signature": "app.marketplace_assign_org_slug(uuid)",
+   "schemaUsage": {
+    "anon": true,
+    "service_role": false,
+    "authenticated": true,
+    "authenticator": false,
+    "dashboard_user": false,
+    "supabase_auth_admin": false,
+    "supabase_storage_admin": false
+   }
+  },
+  {
+   "kind": "f",
+   "owner": "postgres",
+   "config": [
+    "search_path=\"\""
+   ],
+   "grants": [
+    {
+     "role": "postgres",
+     "grantable": false
+    }
+   ],
    "definer": false,
    "effective": {
     "anon": false,
@@ -9591,6 +9624,39 @@
     "supabase_storage_admin": false
    },
    "signature": "app.marketplace_seller_payment_ready(uuid)",
+   "schemaUsage": {
+    "anon": true,
+    "service_role": false,
+    "authenticated": true,
+    "authenticator": false,
+    "dashboard_user": false,
+    "supabase_auth_admin": false,
+    "supabase_storage_admin": false
+   }
+  },
+  {
+   "kind": "f",
+   "owner": "postgres",
+   "config": [
+    "search_path=\"\""
+   ],
+   "grants": [
+    {
+     "role": "postgres",
+     "grantable": false
+    }
+   ],
+   "definer": true,
+   "effective": {
+    "anon": false,
+    "service_role": false,
+    "authenticated": false,
+    "authenticator": false,
+    "dashboard_user": false,
+    "supabase_auth_admin": false,
+    "supabase_storage_admin": false
+   },
+   "signature": "app.marketplace_seller_slug_trigger()",
    "schemaUsage": {
     "anon": true,
     "service_role": false,
