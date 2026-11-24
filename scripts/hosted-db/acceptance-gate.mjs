@@ -23,11 +23,12 @@
  *             (6 tables, 24 columns on existing tables, 7 re-created constraints, seeded rows, one enum value): pinned "marketplace-v2" forward-fix and a fresh restore-verified
  *             backup taken at >= 237 migrations is MANDATORY (none is pinned yet: the newest, 232, is refused). See docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md.
  *   marketplace-slug  20261124090001 (seller public slug, PR #252: 2 functions, 1 trigger, backfill of organizations.slug for approved sellers) on top of Acceptance at 244 / 20261123160002.
- *             244 -> 245. No table DDL: no fresh backup required; pinned "marketplace-slug" forward-fix (slugs written are data and stay). Applied to Acceptance BEFORE Production.
+ *             + 20261124120001 (localized stock notifications, this stack): 2 migrations, 244 -> 246. No table DDL: no fresh backup required; pinned "marketplace-stock-notify" and
+ *             "marketplace-slug" forward-fixes (slugs written are data and stay; undo order stock-notify, then slug). Applied to Acceptance BEFORE Production.
  *             See docs/operations/MARKETPLACE_SLUG_ACCEPTANCE_PLAN_20261124.md. marketplace-v2 above stays as the historical, already applied Acceptance plan: its drift check
- *             reports 20261124090001 as unplanned by design.
- *   prod-marketplace-v2  PRODUCTION, COMBINED plan (owner decision 2026-11-24): the seven marketplace-v2 migrations + 20261124090001, 237 -> 245, on top of Production at 237 / 20261122090002
- *             (prod-catchup applied by the owner 2026-11-23, RUNTIME_STATE). Same measured catalog diff + the 3 slug objects; two pinned forward-fixes, undo order marketplace-slug then
+ *             reports 20261124090001 and 20261124120001 as unplanned by design.
+ *   prod-marketplace-v2  PRODUCTION, COMBINED plan (owner decision 2026-11-24): the seven marketplace-v2 migrations + 20261124090001 + 20261124120001, 237 -> 246, on top of Production at 237 / 20261122090002
+ *             (prod-catchup applied by the owner 2026-11-23, RUNTIME_STATE). Same measured catalog diff + the 3 slug objects; three pinned forward-fixes, undo order marketplace-stock-notify, marketplace-slug then
  *             marketplace-v2; needs a restore-verified PRODUCTION snapshot taken at >= 237 migrations (the pinned 210 one is refused). See docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md.
  *   prod-catchup  PRODUCTION: the single plan 210 -> 237 (27 migrations, 20261114090001 .. 20261122090002, plus PC_LATER). Needs a restore-verified PRODUCTION snapshot (none pinned).
  *   m3a       after `m1` is applied (Acceptance and Production are both at 209 today): only 20261112090001 (P1 M3a) is pending. 209 -> 210.
@@ -53,8 +54,10 @@ const RG_PENDING = ["20261122090001", "20261122090002"];
 // marketplace-v2: the seven Marketplace migrations merged to main on 2026-11-23 (PRs #238-#241, #246, #249), on top of Acceptance at 237.
 const MV2_PENDING = ["20261123090001", "20261123100001", "20261123120001", "20261123130001", "20261123150001", "20261123160001", "20261123160002"];
 const ACC_244 = "20261123160002"; // latest on Acceptance after the marketplace-v2 plan (read 2026-11-24: 244 migrations)
-// marketplace-slug (PR #252): ONE migration merged after the seven above. Acceptance (244) gets it as its own small plan; Production gets it inside prod-marketplace-v2 (237 -> 245).
+// marketplace-slug (PR #252): ONE migration merged after the seven above. Acceptance (244) gets it as its own small plan; Production gets it inside prod-marketplace-v2 (237 -> 246 with the stock-notify migration after it).
 const SLUG_PENDING = ["20261124090001"];
+// marketplace-stock-notify: ONE more migration stacked after the slug one (localized stock notifications: the English text carried the Arabic product name). EXPAND-only, same signature.
+const STOCK_PENDING = ["20261124120001"];
 const PROD_210 = "20261112090001"; // latest on PRODUCTION (read-only, 2026-11-23: 210 migrations)
 /**
  * prod-catchup: ONE Production plan from 210 / 20261112090001 to current main. PC_PENDING is the single list to edit at execution time: when Marketplace PR 5 / PR 6 (or any
@@ -74,6 +77,8 @@ export const PC_LATER = []; // versions newer than 20261122090002 that this plan
 export const PC_LATER_CHANGED = []; // objects those later migrations add or change (function schema.name, or a key prefix ending in *)
 export const PC_PENDING = [...PC_BASE, ...PC_LATER];
 /** objects the slug migration adds (measured on a scratch replay: 2 functions, 1 trigger; the data effect is organizations.slug rows, which are not catalog objects) */
+/** the stock notification migration CREATE OR REPLACEs one trigger function (same signature) and updates the DEFAULT texts of 2 template rows (data, not catalog objects) */
+export const STOCK_CHANGED = ["app.marketplace_stock_notify"];
 export const SLUG_CHANGED = ["app.marketplace_assign_org_slug", "app.marketplace_seller_slug_trigger", "public.marketplace_seller_accounts.marketplace_seller_slug_assign"];
 const MN_PENDING = ["20261121090001", "20261121090002", "20261121090003"];
 const MKT_PENDING = Array.from({ length: 14 }, (_, i) => `202611161000${String(i + 1).padStart(2, "0")}`);
@@ -541,13 +546,13 @@ export const PLANS = {
       "public.ux_marketplace_*",
       "public.ix_mp_*"
     ] },
-  // marketplace-slug: 20261124090001 on top of Acceptance at 244 / 20261123160002 (marketplace-v2 applied). 244 -> 245. Adds 2 functions and 1 trigger and fills organizations.slug
+  // marketplace-slug: 20261124090001 on top of Acceptance at 244 / 20261123160002 (marketplace-v2 applied). 244 -> 246 (slug + the stock-notify migration below). Slug: adds 2 functions and 1 trigger and fills organizations.slug
   // for approved sellers that have none (data: only NULL slugs are written, nothing existing is overwritten). No table, column, grant or policy. Recovery: the pinned
   // "marketplace-slug" forward-fix (drops the trigger and the 2 functions, refuses when it cannot prove that is safe; the backfilled slugs stay). Because no row is overwritten and no
   // table is created, no fresh backup is required (the pinned 237 snapshot aladdin-acceptance-20261124T092536Z is still accepted as a historical reference).
   // "changed" was MEASURED by scripts/hosted-db/marketplace-slug-scratch-proof.mjs (scratch container, throwaway database), not written by hand.
-  "marketplace-slug": { fixes: ["marketplace-slug"], recovery: "forward-fix", applied: 244, latest: ACC_244, pending: SLUG_PENDING, preContract: ACC_244, postContract: "20261124090001",
-    changed: SLUG_CHANGED },
+  "marketplace-slug": { fixes: ["marketplace-stock-notify", "marketplace-slug"], recovery: "forward-fix", applied: 244, latest: ACC_244, pending: [...SLUG_PENDING, ...STOCK_PENDING], preContract: ACC_244,
+    postContract: STOCK_PENDING.at(-1), changed: [...SLUG_CHANGED, ...STOCK_CHANGED] },
   "media+m1": { fixes: ["media", "m1"], recovery: "forward-fix", applied: 207, latest: BASE, pending: [MEDIA, M1], preContract: BASE, postContract: M1,
     changed: ["app.media_storage_key_assign", "public.media_migration_target_key", "public.media_migration_switch", "public.media_migration_rollback",
       "public.my_registration_state", "app.profile_completion", "public.admin_users_directory"] },
@@ -557,8 +562,8 @@ export const PLANS = {
 // Production is at 237 / 20261122090002 (prod-catchup applied by the owner from main 8302aee9 on 2026-11-23, RUNTIME_STATE; re-read live by production-preflight.sh, which refuses any other
 // history). "changed" = the marketplace-v2 list plus SLUG_CHANGED (each measured separately by the scratch proofs; base -> slug is checked as one diff by marketplace-slug-scratch-proof.mjs).
 // Recovery: TWO pinned forward-fixes, in this order: marketplace-slug, then marketplace-v2. freshBackup: a restore-verified PRODUCTION snapshot taken at >= 237 migrations is required.
-PLANS["prod-marketplace-v2"] = { ...PLANS["marketplace-v2"], target: "production", fixes: ["marketplace-slug", "marketplace-v2"], pending: [...MV2_PENDING, ...SLUG_PENDING], postContract: SLUG_PENDING.at(-1),
-  changed: [...PLANS["marketplace-v2"].changed, ...SLUG_CHANGED] };
+PLANS["prod-marketplace-v2"] = { ...PLANS["marketplace-v2"], target: "production", fixes: ["marketplace-stock-notify", "marketplace-slug", "marketplace-v2"], pending: [...MV2_PENDING, ...SLUG_PENDING, ...STOCK_PENDING],
+  postContract: STOCK_PENDING.at(-1), changed: [...new Set([...PLANS["marketplace-v2"].changed, ...SLUG_CHANGED, ...STOCK_CHANGED])] };
 
 /**
  * Recovery evidence (re-pinned 2026-11-11). Every plan's migrations replace or add functions only: CREATE OR REPLACE FUNCTION /
@@ -602,6 +607,9 @@ export const FORWARD_FIX = {
   // kept (reviewed, pinned) for a future rollback of them. It does NOT undo the rows they wrote (only a restore-tested backup can).
   // marketplace-slug: drops the slug trigger and its 2 functions (20261124090001). Refuses (RAISE before any change) when another trigger, function body or object depends on them, or
   // when the trigger is not the expected one. The backfilled organizations.slug values are data and are NOT reverted. Combined Production undo order: marketplace-slug, THEN marketplace-v2.
+  // marketplace-stock-notify: restores app.marketplace_stock_notify() to its exact pre-plan definition (md5 pinned in the file) and the DEFAULT texts + variables of the two stock templates
+  // (20261124120001). Refuses (RAISE) when an admin edit uses product_name_ar / product_name_en. Admin overrides, version and written notifications are never touched. Undo order: stock-notify, slug, v2.
+  "marketplace-stock-notify": { file: "forward-fix/marketplace-stock-notify-restore-previous.sql", sha256: "f43144328992e2067bef7b10dadf244660a958d7108a79650841322ac34f7450" },
   "marketplace-slug": { file: "forward-fix/marketplace-slug-remove.sql", sha256: "efd63ab7a3e48b56a70377fc4d16589a980c623d616e5eee5fe53b1c1f7b58a0" },
   marketplace: { file: "forward-fix/marketplace-remove.sql", sha256: "72bdfd9b68ef88f85338321d4eb79c711e2d0be3bbf1e708a96b001dee58b734" },
   // media-notify: refuses (RAISE) once an admin changed a limit or template or any notification was written from a template; never deletes user data.
