@@ -566,6 +566,9 @@ export const RESTORE_VERIFIED_SNAPSHOTS = {
   "aladdin-acceptance-20261116T152127Z": { backupRun: "43895224195", restoreRun: "43896940335", tables: 172, rows: 3149, migrations: 218 },
   // 2026-11-22: taken and restore-tested (CLI 3.2.0) with Acceptance at 232 migrations (latest 20261116100014); the fresh snapshot the media-notify plan needs.
   "aladdin-acceptance-20261122T100424Z": { backupRun: "45010533680", restoreRun: "45019578075", tables: 202, rows: 3815, migrations: 232 },
+  // 2026-11-24: taken (backup run 45364945893, ledger succeeded, complete coverage verified) and restore-tested (restore run 45373385249: RESULT PASS, sha256 e21e447db3fd4764f5a1ea4366df90c032d2e5415aab8db939d063c8ab6b39b8, schema fingerprint exact,
+  // 207 tables / 3895 rows exact, R2 media inventory exact: 22 files) with Acceptance at 237 migrations (latest 20261122090002). The fresh snapshot the marketplace-v2 plan needs.
+  "aladdin-acceptance-20261124T092536Z": { backupRun: "45364945893", restoreRun: "45373385249", tables: 207, rows: 3895, migrations: 237 },
 };
 /** Restore-verified PRODUCTION snapshots (label must start with aladdin-production-). A label is pinned here only after its restore test reported RESULT: PASS; every other Production label is refused. */
 export const PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS = {
