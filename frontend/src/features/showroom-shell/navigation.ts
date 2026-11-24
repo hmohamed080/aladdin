@@ -1,6 +1,6 @@
 import { HomeIcon, ClipboardIcon, StorefrontIcon, UserIcon, UsersIcon, BriefcaseIcon, GiftIcon, SettingsIcon, StarIcon, ScrollIcon, TagIcon, BarChartIcon, ActivityIcon, LayersIcon, BadgeCheckIcon, MapPinIcon, TruckIcon, MoneyIcon, ReceiptIcon } from "@/components/ui/icons";
 import type { InstallerNavItem } from "@/features/installer-dashboard-preview/installer-nav";
-import { MARKETPLACE_SELL_ENTITLEMENT, NAV_CAPS } from "@/lib/nav/modules";
+import { MARKETPLACE_REQUEST_ENTITLEMENT, MARKETPLACE_SELL_ENTITLEMENT, NAV_CAPS } from "@/lib/nav/modules";
 
 export const SHOWROOM_ROOT = "/showroom";
 /** The completed commerce modules that still live under /b2b; the Showroom shell now frames them (see b2b/layout). */
@@ -51,6 +51,9 @@ export const SHOWROOM_GROUPS = [
   // Selling to consumers on the public Marketplace (B2C). Drawn ONLY for an organization a platform admin approved as a
   // seller - an entitlement the shell adds to the capability list (see ShowroomFrame) - and never unlocked by org.manage.
   { label: { ar: "الماركت", en: "Marketplace" }, items: [
+    // The owner of a showroom that is NOT (yet) an approved seller reaches the approval request here (the request entitlement is added by ShowroomFrame);
+    // an approved seller sees the five modules below instead. Without this item an unapproved owner had no way to the page from the UI.
+    legacy("marketplace-approval", "/showroom/marketplace", "اعتماد المتجر", "Marketplace approval", StorefrontIcon, [MARKETPLACE_REQUEST_ENTITLEMENT]),
     legacy("marketplace-products", "/showroom/marketplace/products", "منتجات الماركت", "Marketplace products", StorefrontIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
     legacy("marketplace-orders", "/showroom/marketplace/orders", "طلبات الماركت", "Marketplace orders", ReceiptIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
     legacy("marketplace-areas", "/showroom/marketplace/areas", "المناطق", "Delivery areas", MapPinIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
@@ -77,6 +80,7 @@ export const SHOWROOM_GROUPS = [
 export function canNavigate(item: ShowroomNavItem, capabilities: readonly string[]) {
   // The activity log is an exact-capability module in the legacy workspace: org.manage must not unlock it.
   // Marketplace selling is an admin-granted entitlement of the organization: org.manage must not unlock it.
+  if (item.id === "marketplace-approval") return capabilities.includes(MARKETPLACE_REQUEST_ENTITLEMENT);
   if (item.id.startsWith("marketplace-")) return capabilities.includes(MARKETPLACE_SELL_ENTITLEMENT);
   if (item.id === "activity") return item.capabilities.some((cap) => capabilities.includes(cap));
   return !item.capabilities.length || capabilities.includes("org.manage") || item.capabilities.some((cap) => capabilities.includes(cap));

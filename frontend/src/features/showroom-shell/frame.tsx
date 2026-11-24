@@ -19,7 +19,8 @@ import { ShowroomShell } from "@/features/showroom-shell/shell";
 import { BranchSwitcher } from "@/components/layout/context-switchers";
 import { ShowroomWorkspaceMenu } from "@/features/showroom-shell/workspace-menu";
 import { loadMarketplaceSellerStatus } from "@/server/queries/marketplace-seller";
-import { MARKETPLACE_SELL_ENTITLEMENT } from "@/lib/nav/modules";
+import { MARKETPLACE_REQUEST_ENTITLEMENT, MARKETPLACE_SELL_ENTITLEMENT } from "@/lib/nav/modules";
+import { isMarketplacePreviewEnabled } from "@/lib/env";
 
 /**
  * The ONE Showroom frame. The suite routes and the finished commerce modules that still live under /b2b
@@ -43,7 +44,10 @@ export async function ShowroomFrame({ children }: { children: ReactNode }) {
     loadMarketplaceSellerStatus(supabase, org.organizationId),
   ]);
   const baseCapabilities = org.isApproved === true ? org.capabilities : [...org.capabilities, SHOWROOM_PENDING_MARKER];
-  const navCapabilities = sellerStatus === "approved" ? [...baseCapabilities, MARKETPLACE_SELL_ENTITLEMENT] : baseCapabilities;
+  // An owner of an approved-as-business showroom that is not an approved seller gets the one "Marketplace approval" item (same rule as the workspace shell);
+  // the database re-checks owner authority and eligibility when the request is sent.
+  const canAskForApproval = isMarketplacePreviewEnabled() && org.orgType === "showroom_dealer" && org.isApproved === true && org.capabilities.includes("org.manage") && sellerStatus !== "approved";
+  const navCapabilities = sellerStatus === "approved" ? [...baseCapabilities, MARKETPLACE_SELL_ENTITLEMENT] : canAskForApproval ? [...baseCapabilities, MARKETPLACE_REQUEST_ENTITLEMENT] : baseCapabilities;
   const chatContexts = conversationRows.length ? await resolveConversationDisplayContext(supabase, conversationRows) : new Map();
   if (branch.error) throw branch.error;
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
