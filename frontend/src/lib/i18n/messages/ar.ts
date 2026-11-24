@@ -2959,6 +2959,7 @@ export const ar: Messages = {
       title: "سجل التشغيل", empty: "لا توجد عمليات مسجلة بعد.", when: "الوقت", kind: "النوع", trigger: "طريقة البدء", statusLabel: "الحالة",
       requestedBy: "مقدم الطلب", reason: "السبب", github: "تفاصيل التشغيل", kindBackup: "نسخ احتياطي", kindRestoreTest: "اختبار استعادة",
       triggerSchedule: "تلقائي", triggerManual: "يدوي",
+      requestedBySystem: "النظام (جدولة)", noRunRecorded: "لم يُسجَّل رقم تشغيل",
       status: { requested: "مطلوب", dispatched: "تم الإرسال", running: "قيد التنفيذ", succeeded: "ناجح", failed: "فشل", skipped: "تم التجاوز", unknown: "غير متحقق" },
     },
     errors: {
