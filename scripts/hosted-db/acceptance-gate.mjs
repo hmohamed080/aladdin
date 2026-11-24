@@ -19,6 +19,12 @@
  *   registration-gate  20261122090001..002 (Admin registration-state column, the Pending-tab rule, and the central registration gate in the Data API
  *             pre-request hook, ADR-0031) on top of Acceptance at 235 / 20261121090003. 235 -> 237. FUNCTION-ONLY (3 functions replaced, 2 added;
  *             no table, row, policy or grant), so like media+m1 no backup is required: the recovery is the pinned "registration-gate" forward-fix.
+ *   marketplace-v2  20261123090001, 100001, 120001, 130001, 150001, 160001, 160002 (PRs #238-#241, #246, #249) on top of Acceptance at 237 / 20261122090002. 237 -> 244. NOT function-only
+ *             (6 tables, 24 columns on existing tables, 7 re-created constraints, seeded rows, one enum value): pinned "marketplace-v2" forward-fix and a fresh restore-verified
+ *             backup taken at >= 237 migrations is MANDATORY (none is pinned yet: the newest, 232, is refused). See docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md.
+ *   prod-marketplace-v2  PRODUCTION: the same seven migrations as marketplace-v2, 237 -> 244, on top of Production at 237 / 20261122090002 (prod-catchup applied by the owner
+ *             2026-11-23, RUNTIME_STATE). Same measured catalog diff, same pinned forward-fix; needs a restore-verified PRODUCTION snapshot taken at >= 237 migrations (the pinned
+ *             210 one is refused; none >= 237 is pinned). See docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md.
  *   prod-catchup  PRODUCTION: the single plan 210 -> 237 (27 migrations, 20261114090001 .. 20261122090002, plus PC_LATER). Needs a restore-verified PRODUCTION snapshot (none pinned).
  *   m3a       after `m1` is applied (Acceptance and Production are both at 209 today): only 20261112090001 (P1 M3a) is pending. 209 -> 210.
  *
@@ -38,7 +44,10 @@ const MEDIA = "20261110090001", M1 = "20261110090002", M3A = "20261112090001", B
 const ACC_218 = "20261116090001"; // latest on Acceptance: #192/#200 (20261115090001..006) and the organization approval state (20261116090001)
 const ACC_232 = "20261116100014"; // latest on Acceptance after the Marketplace plan (read 2026-11-22: 232 migrations)
 const ACC_235 = "20261121090003"; // latest on Acceptance after the media-notify plan (read 2026-11-22: 235 migrations)
+const ACC_237 = "20261122090002"; // latest on Acceptance after the registration-gate plan (read 2026-11-23: 237 migrations)
 const RG_PENDING = ["20261122090001", "20261122090002"];
+// marketplace-v2: the seven Marketplace migrations merged to main on 2026-11-23 (PRs #238-#241, #246, #249), on top of Acceptance at 237.
+const MV2_PENDING = ["20261123090001", "20261123100001", "20261123120001", "20261123130001", "20261123150001", "20261123160001", "20261123160002"];
 const PROD_210 = "20261112090001"; // latest on PRODUCTION (read-only, 2026-11-23: 210 migrations)
 /**
  * prod-catchup: ONE Production plan from 210 / 20261112090001 to current main. PC_PENDING is the single list to edit at execution time: when Marketplace PR 5 / PR 6 (or any
@@ -427,10 +436,112 @@ export const PLANS = {
       "public.notifications.content*",
       ...PC_LATER_CHANGED
     ] },
+  // marketplace-v2: 237 -> 244. Adds 6 tables (seller message presets and their events, seller delivery settings, per-product free shipping, seller settings
+  // events, product video events), columns, constraints and indexes, seeds rows (owner-message presets, 2 stock notification templates, 1 permission) and one enum
+  // value, and adds or re-creates functions (EXPAND only: changed signatures are added next to the old ones). Needs a fresh restore-verified backup (>= 237 migrations)
+  // and the pinned "marketplace-v2" forward-fix. "changed" was MEASURED by scripts/hosted-db/marketplace-v2-scratch-proof.mjs (scratch container, ROLLBACK), not written by hand.
+  "marketplace-v2": { fixes: ["marketplace-v2"], recovery: "forward-fix", freshBackup: true, applied: 237, latest: ACC_237, pending: MV2_PENDING, preContract: ACC_237, postContract: "20261123160002",
+    changed: [
+      "app.marketplace_delivery_terms",
+      "app.marketplace_free_shipping",
+      "app.marketplace_is_open",
+      "app.marketplace_media_verification_ready",
+      "app.marketplace_product_guard",
+      "app.marketplace_product_is_listed",
+      "app.marketplace_product_review_state",
+      "app.marketplace_product_ships_free",
+      "app.marketplace_public_image_key",
+      "app.marketplace_public_stock_left",
+      "app.marketplace_publication_blockers",
+      "app.marketplace_review_approve_image",
+      "app.marketplace_review_products",
+      "app.marketplace_seller_commerce_missing",
+      "app.marketplace_seller_delivery_ready",
+      "app.marketplace_seller_is_public",
+      "app.marketplace_seller_payment_ready",
+      "app.marketplace_seller_transition",
+      "app.marketplace_seller_unpublish_all",
+      "app.marketplace_settings_event",
+      "app.marketplace_settings_events_append_only",
+      "app.marketplace_stock_notify",
+      "app.marketplace_video_event",
+      "app.marketplace_video_free_slot",
+      "app.marketplace_video_manager",
+      "app.media_videos_enforce_cap",
+      "app.notify_from_template",
+      "app.video_writable",
+      "public.admin_marketplace_media_approve",
+      "public.admin_marketplace_pending_videos",
+      "public.admin_marketplace_platform_status",
+      "public.admin_marketplace_product_review_approve",
+      "public.admin_marketplace_product_review_queue",
+      "public.admin_marketplace_product_review_reject",
+      "public.admin_marketplace_product_review_summary",
+      "public.admin_marketplace_product_videos",
+      "public.admin_marketplace_seller_approve",
+      "public.admin_marketplace_seller_history_v2",
+      "public.admin_marketplace_seller_overview_v2",
+      "public.admin_marketplace_seller_preset_save",
+      "public.admin_marketplace_seller_presets",
+      "public.admin_marketplace_seller_reinstate",
+      "public.admin_marketplace_seller_reject",
+      "public.admin_marketplace_seller_revoke",
+      "public.admin_marketplace_seller_suspend",
+      "public.admin_marketplace_set_media_verification_ready",
+      "public.admin_marketplace_set_open",
+      "public.admin_marketplace_video_review",
+      "public.marketplace_checkout_place",
+      "public.marketplace_product_video_list",
+      "public.marketplace_public_browse",
+      "public.marketplace_public_cart",
+      "public.marketplace_public_catalog",
+      "public.marketplace_public_catalog_page",
+      "public.marketplace_public_delivery",
+      "public.marketplace_public_facets",
+      "public.marketplace_public_product",
+      "public.marketplace_public_seller",
+      "public.marketplace_public_status",
+      "public.marketplace_seller_commerce_readiness",
+      "public.marketplace_seller_delivery_areas_save",
+      "public.marketplace_seller_delivery_get",
+      "public.marketplace_seller_delivery_prices_save",
+      "public.marketplace_seller_delivery_terms_save",
+      "public.marketplace_seller_free_shipping_products_get",
+      "public.marketplace_seller_image_replace_request_upload",
+      "public.marketplace_seller_image_request_upload",
+      "public.marketplace_seller_images_update",
+      "public.marketplace_seller_payment_settings_get",
+      "public.marketplace_seller_payment_settings_save",
+      "public.marketplace_seller_pickup_set",
+      "public.marketplace_seller_product_free_shipping_set",
+      "public.marketplace_seller_product_publication_state",
+      "public.marketplace_seller_product_save",
+      "public.marketplace_seller_products_page",
+      "public.marketplace_seller_request_approval",
+      "public.media_edge_video",
+      "public.video_delete",
+      "public.video_update",
+      "public.video_upload_begin",
+      "public.media_video_scope",
+      "public.notifications.ck_notifications_event_type_known",
+      "public.media_videos.*",
+      "public.ix_media_videos_*",
+      "public.uq_media_videos_marketplace_slot",
+      "public.marketplace_*",
+      "public.ix_marketplace_*",
+      "public.ux_marketplace_*",
+      "public.ix_mp_*"
+    ] },
   "media+m1": { fixes: ["media", "m1"], recovery: "forward-fix", applied: 207, latest: BASE, pending: [MEDIA, M1], preContract: BASE, postContract: M1,
     changed: ["app.media_storage_key_assign", "public.media_migration_target_key", "public.media_migration_switch", "public.media_migration_rollback",
       "public.my_registration_state", "app.profile_completion", "public.admin_users_directory"] },
 };
+
+// prod-marketplace-v2 (PRODUCTION, target "production"): the Production twin of "marketplace-v2". Production is at 237 / 20261122090002 (prod-catchup applied by the owner from main 8302aee9
+// on 2026-11-23, RUNTIME_STATE; to be re-read live by production-preflight.sh, which refuses any other history). Same seven pending versions, same measured "changed" list and same pinned
+// forward-fix (the scratch proof replays the missing migrations up to 20261122090002 and then these seven, which is the state Production is in after prod-catchup). Derived from the
+// Acceptance plan so the two can never drift apart; only the target differs. freshBackup: the pinned PRODUCTION snapshot (210 migrations) is refused, one taken at >= 237 is required.
+PLANS["prod-marketplace-v2"] = { ...PLANS["marketplace-v2"], target: "production", fixes: [...PLANS["marketplace-v2"].fixes], pending: [...MV2_PENDING], changed: [...PLANS["marketplace-v2"].changed] };
 
 /**
  * Recovery evidence (re-pinned 2026-11-11). Every plan's migrations replace or add functions only: CREATE OR REPLACE FUNCTION /
@@ -480,6 +591,7 @@ export const FORWARD_FIX = {
   // "media-notify" and "marketplace" forward-fixes (re-proved against Production's pre-state: Production pre-state + 27 migrations + the three files = identical catalog fingerprint).
   // Undo order: media-notify, marketplace, prod-catchup.
   "prod-catchup": { file: "forward-fix/prod-catchup-restore-previous.sql", sha256: "1137c10d511193a4cee599a1105b5a3bbb6ae714fdd5f04b753a932c3740ce7a" },
+  "marketplace-v2": { file: "forward-fix/marketplace-v2-remove.sql", sha256: "6f2e8ec3b8bbdba721245479165240ef51608da61396cc4ae9250fddb4fabc6a" },
   verification: { file: "forward-fix/verification-restore-previous.sql", sha256: "a50cd460c243b3580927c1f8b8e84ec1cc1109048c9b08b055a06b470570fcac" },
   m1: { file: "forward-fix/m1-restore-previous.sql", sha256: "5fe0da1eb5f08143b52ff90c41294d7e0e45ed7b7017926b6296898acfd28045" },
   m3a: { file: "forward-fix/m3a-restore-previous.sql", sha256: "d4161977e7664e3345d000ee87503fd3a5983935c81257dd082c0a5ef0b43ec3" },
