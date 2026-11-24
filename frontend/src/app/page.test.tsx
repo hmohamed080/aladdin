@@ -4,7 +4,7 @@ import RootPage from "./page";
 
 const state = vi.hoisted(() => ({ users: 1200 as number | null, open: false, items: [] as unknown[] }));
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/env", () => ({ isMarketplacePreviewEnabled: () => state.open }));
+vi.mock("@/lib/env", () => ({ isMarketplacePreviewEnabled: () => state.open, isMarketplaceOrderingEnabled: () => state.open }));
 vi.mock("@/server/queries/marketplace-public", () => ({ loadPublicCatalogPage: async () => ({ items: state.items }) }));
 vi.mock("@/server/media/marketplace-public-images", () => ({ marketplacePublicImageUrls: async () => ({}) }));
 vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({}) }));
