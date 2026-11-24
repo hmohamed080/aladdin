@@ -16,6 +16,7 @@
 --   * decision payment_not_received -> the order does not change and the buyer's 48 h clock keeps running (the timer is untouched).
 --   * decision dismissed         -> no action on the order; the complaint becomes 'dismissed'.
 --   * an admin never moves money; every decision keeps a written note (3-500 characters).
+--   * a complaint pauses the buyer's 48 h only if it is filed BEFORE the deadline (mp:complaint_not_allowed afterwards), so it cannot be used to dodge the cancellation.
 --   * one complaint per dispute episode: a new complaint is refused (mp:complaint_exists) while one is open or under review, and also
 --     when one was already filed after the receipt was last flagged, so a decided complaint cannot be re-filed in a loop.
 
@@ -45,6 +46,8 @@ as $$
   select case when p_for in ('buyer', 'seller') and exists (
       select 1 from public.marketplace_orders o
        where o.id = p_order and o.source = 'v2' and o.payment_status = 'receipt_disputed' and o.status in ('preparing', 'ready')
+         and not exists (select 1 from public.marketplace_timers t where t.subject_type = 'order' and t.subject_id = o.id
+                           and t.kind = 'order_receipt_resubmit' and t.state = 'active' and t.expires_at <= now())
          and not exists (
            select 1 from public.marketplace_payment_complaints c
             where c.order_id = o.id
@@ -109,6 +112,13 @@ begin
   if v_role is null then raise exception 'mp:not_found' using errcode = '42501'; end if;
   if o.source <> 'v2' then raise exception 'mp:legacy_order' using errcode = '23514'; end if;
   if o.payment_status <> 'receipt_disputed' or o.status not in ('preparing', 'ready') then
+    raise exception 'mp:complaint_not_allowed' using errcode = '23514';
+  end if;
+
+  -- Deadline evasion: once the buyer's 48 h are over, a complaint cannot be used to dodge the cancellation. Only a complaint filed
+  -- BEFORE the deadline pauses the clock (the runner may lag a few minutes, so the deadline itself decides, not the runner).
+  if exists (select 1 from public.marketplace_timers t where t.subject_type = 'order' and t.subject_id = o.id
+              and t.kind = 'order_receipt_resubmit' and t.state = 'active' and t.expires_at <= now()) then
     raise exception 'mp:complaint_not_allowed' using errcode = '23514';
   end if;
 

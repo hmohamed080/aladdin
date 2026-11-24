@@ -403,6 +403,30 @@ select throws_ok(format($q$select public.admin_marketplace_payment_complaint_tak
 select throws_ok(format($q$select public.admin_marketplace_payment_complaint_decide(%L, 'dismissed', 'second admin tries')$q$, current_setting('t.k4')), '23514', 'mp:invalid_transition',
   'D67. nor decide it');
 
+-- deadline evasion: after the 48 h are over a complaint cannot be filed to dodge the cancellation
+select set_config('t.c7', pg_temp.mk_order('instapay_full', 'preparing', 'receipt_disputed', now() - interval '49 hours', 'order_receipt_resubmit'), true);
+select pg_temp.as_user(current_setting('t.buyer'));
+select is(app.marketplace_order_extra_actions(current_setting('t.c7')::uuid, 'buyer'), '{}'::text[], 'D68. file_complaint is not offered once the receipt deadline has passed');
+select throws_ok(format($q$select public.marketplace_payment_complaint_file(%L, 'transfer_made', null)$q$, current_setting('t.c7')), '23514', 'mp:complaint_not_allowed',
+  'D69. a complaint filed after the 48 h deadline is refused (no deadline evasion)');
+select set_config('t.c8', pg_temp.mk_order('instapay_full', 'preparing', 'receipt_disputed', now() - interval '47 hours', 'order_receipt_resubmit'), true);
+select is((public.marketplace_payment_complaint_file(current_setting('t.c8')::uuid, 'transfer_made', null) ->> 'state'), 'open',
+  'D70. a complaint filed before the deadline is accepted (and pauses the clock)');
+
+-- queue starvation: a paused timer must not take a batch slot from a runnable one
+select pg_temp.as_anon();
+delete from public.marketplace_timers where kind = 'return_seller_response';   -- the default PR 15 hook is a no-op: its timer would sit first in line
+select pg_temp.run(current_setting('t.t0')::timestamptz + interval '3000 hours', 500);   -- clear everything runnable first
+select set_config('t.c9', pg_temp.mk_order('instapay_full', 'preparing', 'receipt_disputed', current_setting('t.t0')::timestamptz + interval '2990 hours', 'order_receipt_resubmit'), true);
+select pg_temp.as_user(current_setting('t.buyer'));
+select public.marketplace_payment_complaint_file(current_setting('t.c9')::uuid, 'other', 'paused for review');
+select pg_temp.as_anon();
+select set_config('t.o9', pg_temp.mk_order('cod', 'new', 'pending', current_setting('t.t0')::timestamptz + interval '3000 hours', 'order_seller_start'), true);
+select is(pg_temp.run(current_setting('t.t0')::timestamptz + interval '3080 hours', 1), '{"processed":1,"reminders":0,"cancelled":1,"errors":0}'::jsonb,
+  'D71. with a batch of one, the paused (older) timer does not starve the runnable one');
+select is((select status from public.marketplace_orders where id = current_setting('t.c9')::uuid), 'preparing', 'D72. the paused order is untouched');
+select is((select status from public.marketplace_orders where id = current_setting('t.o9')::uuid), 'cancelled', 'D73. the runnable order was cancelled');
+
 -- ===========================================================================
 -- E. Isolation and append-only
 -- ===========================================================================
@@ -414,7 +438,7 @@ select throws_ok($q$delete from public.marketplace_payment_complaint_events$q$, 
 select throws_ok($q$insert into public.marketplace_payment_complaints (order_id, filed_by_role, reason) values (gen_random_uuid(), 'buyer', 'other')$q$, '23503', null,
   'E4. a complaint needs a real order');
 select is((select count(*)::int from public.notifications n where n.event_type = 'marketplace.order.payment_complaint_filed'
-            and n.recipient_user_id not in (current_setting('t.admin')::uuid)), 0, 'E5. no notification of a filing reaches a user without the permission');
+            and n.recipient_user_id not in (current_setting('t.admin')::uuid, current_setting('t.sales')::uuid)), 0, 'E5. no notification of a filing reaches a user without the permission (both holders are admins granted it)');
 
 select * from finish();
 rollback;

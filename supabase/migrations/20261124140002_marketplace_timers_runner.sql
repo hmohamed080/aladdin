@@ -281,6 +281,10 @@ begin
   for t in
     select * from public.marketplace_timers x
      where x.state = 'active' and (x.expires_at <= v_now or (x.next_remind_at is not null and x.next_remind_at <= v_now))
+       -- a receipt timer paused by an open complaint is not due: it must not occupy batch slots (queue starvation)
+       and not (x.kind = 'order_receipt_resubmit' and exists (
+             select 1 from public.marketplace_payment_complaints c
+              where c.order_id = x.subject_id and c.state in ('open', 'under_review')))
      order by least(x.expires_at, coalesce(x.next_remind_at, x.expires_at)), x.id
      limit v_limit
        for update skip locked
