@@ -24,7 +24,7 @@ jobs:
       - name: Verify and record actual job outcome
         env:
           BACKUP_LABEL: ${{ matrix.label }}
-          BACKUP_KIND: ${{ github.event.workflow_run.name == 'Daily backup' && 'backup' || 'restore_test' }}
+          BACKUP_KIND: ${{ startsWith(github.event.workflow_run.name, 'backup') && 'backup' || 'restore_test' }}
           TARGET_RUN_ID: ${{ github.event.workflow_run.id }}
           GITHUB_TOKEN: ${{ github.token }}
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}

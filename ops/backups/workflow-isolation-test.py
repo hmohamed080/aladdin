@@ -70,6 +70,15 @@ check("name: restore-control (" in (WF / "restore-test.yml").read_text() and "f'
 check("Claim run" in [s.get("name") for s in daily["control"]["steps"]] and "Claim run" in [s.get("name") for s in restore["restore-control"]["steps"]],
       "both control jobs have the `Claim run` step the reconciler looks for")
 claims = [next(x for x in job["steps"] if x.get("name") == "Claim run") for job in (daily["control"], restore["restore-control"])]
+# workflow_run.name is the RUN NAME when a workflow sets run-name, not the workflow name. Both workflows set one
+# ("backup (<label>) ..." / "restore (<label>) ..."), so comparing it to 'Daily backup' was always false and every
+# backup reconciled as a restore_test (job not found -> silent return -> the ledger row stayed open and blocked the
+# next scheduled claim, 2026-11-24). The kind must be derived from the run-name prefix.
+reconcile_text = (WF / "reconcile-runs.yml").read_text()
+check("run-name: backup (" in (WF / "daily-backup.yml").read_text() and "run-name: restore (" in (WF / "restore-test.yml").read_text(),
+      "both workflows set a run-name that starts with `backup (` / `restore (`")
+check("workflow_run.name == 'Daily backup'" not in reconcile_text and "startsWith(github.event.workflow_run.name, 'backup')" in reconcile_text,
+      "the reconciler derives the kind from the run-name prefix, not by comparing the run name to the workflow name")
 check(all(x.get("if") == "steps.control.outputs.run == 'true'" for x in claims),
       "a run is claimed only when the schedule decision is true (a paused or not-due poll leaves no ledger row)")
 check("Verify complete coverage" in [s.get("name") for s in daily["backup"]["steps"]] and "Verify complete coverage" in [s.get("name") for s in restore["restore"]["steps"]],
