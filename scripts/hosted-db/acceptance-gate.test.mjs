@@ -504,13 +504,14 @@ test("marketplace-v2: every function the 7 migrations create is covered by the e
   for (const e of ["public.media_video_scope", "public.notifications.ck_notifications_event_type_known", "public.marketplace_*", "app.marketplace_publication_blockers", "app.notify_from_template"]) assert.ok(P.changed.includes(e), e);
   assert.equal(new Set(P.changed).size, P.changed.length, "no duplicate entries");
 });
-test("marketplace-v2: a fresh restore-verified snapshot (>= 237 migrations) is mandatory; none is pinned yet, the 232 one is refused, and a future pin of 237+ passes", () => {
+test("marketplace-v2: a fresh restore-verified snapshot (>= 237 migrations) is mandatory; the 232 one is refused, and the pinned 237 snapshot (20261124T092536Z) passes", () => {
   const P = MV2(), shas = allShas();
   assert.equal(P.freshBackup, true);
   has(checkRecovery({ plan: "marketplace-v2", label: "", forwardFixSha256: shas }), /needs --backup-label of a fresh restore-verified snapshot \(migrations >= 237\)/);
   has(checkRecovery({ plan: "marketplace-v2", label: "aladdin-acceptance-20261122T100424Z", forwardFixSha256: shas }), /has 232 migrations; plan marketplace-v2 needs one taken at 237 or later/);
   has(checkRecovery({ plan: "marketplace-v2", label: "aladdin-acceptance-20261123T000000Z", forwardFixSha256: shas }), /not a pinned restore-verified snapshot/);
-  assert.ok(Object.values(RESTORE_VERIFIED_SNAPSHOTS).every((s) => s.migrations < 237), "no snapshot of 237+ is pinned in this PR: the owner takes and restore-tests it first, then pins it");
+  // 2026-11-24: the owner took and restore-tested the fresh snapshot (237) and it is pinned; the gate accepts exactly that label for this plan.
+  assert.deepEqual(checkRecovery({ plan: "marketplace-v2", label: "aladdin-acceptance-20261124T092536Z", forwardFixSha256: shas }), []);
   RESTORE_VERIFIED_SNAPSHOTS["aladdin-acceptance-20261123T000000Z"] = { backupRun: "x", restoreRun: "y", tables: 1, rows: 1, migrations: 237 };
   try { assert.deepEqual(checkRecovery({ plan: "marketplace-v2", label: "aladdin-acceptance-20261123T000000Z", forwardFixSha256: shas }), []); }
   finally { delete RESTORE_VERIFIED_SNAPSHOTS["aladdin-acceptance-20261123T000000Z"]; }
