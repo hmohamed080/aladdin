@@ -78,3 +78,16 @@ test("the smoke only reads: no INSERT/UPDATE/DELETE/DDL in the SQL, and the scri
   const js = readFileSync(new URL("./marketplace-v2-smoke.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(js, /method:\s*"(PATCH|PUT|DELETE)"/);
 });
+
+test("http: Production only with SMOKE_TARGET=production; Acceptance stays refused then; SMOKE_EXPECT_OPEN=false expects a closed Marketplace", async () => {
+  const prod = "https://kkpkgjrweysgvhvkhzun.supabase.co";
+  const never = async () => { throw new Error("must not be called"); };
+  assert.match((await runHttp({ fetchImpl: never, env: env({ SMOKE_URL: prod }) })).lines[0], /set SMOKE_TARGET=production/);
+  assert.match((await runHttp({ fetchImpl: never, env: env({ SMOKE_URL: prod, SMOKE_TARGET: "staging" }) })).lines[0], /not the Acceptance project/);
+  assert.match((await runHttp({ fetchImpl: never, env: env({ SMOKE_TARGET: "production" }) })).lines[0], /not the Production project/);
+  assert.match((await runHttp({ fetchImpl: never, env: env({ SMOKE_URL: "https://other.supabase.co", SMOKE_TARGET: "production" }) })).lines[0], /not the Production project/);
+  const answer = (open) => async (u) => res(200, String(u).endsWith("marketplace_public_status") ? { open } : {});
+  assert.equal((await runHttp({ fetchImpl: answer(true), env: env({ SMOKE_URL: prod, SMOKE_TARGET: "production" }) })).ok, true);
+  assert.equal((await runHttp({ fetchImpl: answer(false), env: env({ SMOKE_URL: prod, SMOKE_TARGET: "production" }) })).ok, false);
+  assert.equal((await runHttp({ fetchImpl: answer(false), env: env({ SMOKE_URL: prod, SMOKE_TARGET: "production", SMOKE_EXPECT_OPEN: "false" }) })).ok, true);
+});

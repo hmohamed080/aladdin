@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # READ-ONLY on Production (kkpkgjrweysgvhvkhzun): the real Supabase CLI history list and `db push --dry-run`, checked by
 # acceptance-gate.mjs. It never pushes. Run on the owner machine, from a clean checkout equal to origin/main.
-#   bash scripts/hosted-db/production-preflight.sh prod-catchup     (plan: prod-catchup only, see acceptance-gate.mjs; PRODUCTION, read-only)
+#   bash scripts/hosted-db/production-preflight.sh prod-catchup     (plans: prod-catchup | prod-marketplace-v2, see acceptance-gate.mjs; PRODUCTION, read-only)
+#   bash scripts/hosted-db/production-preflight.sh prod-marketplace-v2
 # The database password is read at a hidden prompt. `supabase/.temp` is removed on exit (unlinks again).
 set -euo pipefail
 export LC_ALL=C
 ACC="nxossqhdfltcqdwvbewi"; PROD="kkpkgjrweysgvhvkhzun"
 export GATE_TARGET=production
-PLAN="${1:-}"; [[ "$PLAN" =~ ^(prod-catchup)$ ]] || { echo "usage: $0 prod-catchup"; exit 2; }
+PLAN="${1:-}"; [[ "$PLAN" =~ ^(prod-catchup|prod-marketplace-v2)$ ]] || { echo "usage: $0 prod-catchup|prod-marketplace-v2"; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"; cd "$HERE/../.."
 sb() { pnpm exec supabase "$@"; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP" supabase/.temp' EXIT

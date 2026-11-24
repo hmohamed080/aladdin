@@ -3073,6 +3073,8 @@ export const en = {
       kindRestoreTest: "Restore test",
       triggerSchedule: "Schedule",
       triggerManual: "Manual",
+      requestedBySystem: "System (schedule)",
+      noRunRecorded: "No run id recorded",
       status: {
         requested: "Requested",
         dispatched: "Dispatched",
