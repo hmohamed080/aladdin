@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { LandingFooter } from "@/features/landing-preview/landing-footer";
 import { LandingHeader } from "@/features/landing-preview/landing-header";
+import { isMarketplaceOrderingEnabled } from "@/lib/env";
 import { useI18n } from "@/lib/i18n/context";
 import { useLiveCart } from "./live/live-cart-store";
 import brand from "@/styles/brand-2026.module.css";
@@ -18,7 +19,7 @@ export function MarketplaceShell({ children }: { children: ReactNode; showTitle?
   return (
     <div className={`${brand.brand} ${styles.page}`} dir={dir}>
       <div className={`${styles.container} ${styles.headerBand}`}>
-        <div className={styles.headerSlot}><LandingHeader anchorBase="/" showCart cartCount={liveCart.count} active="marketplace" /></div>
+        <div className={styles.headerSlot}><LandingHeader anchorBase="/" showCart={isMarketplaceOrderingEnabled()} cartCount={liveCart.count} active="marketplace" /></div>
       </div>
       <main className={styles.container}>{children}</main>
       <LandingFooter anchorBase="/" />

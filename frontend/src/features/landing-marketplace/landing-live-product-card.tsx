@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { isMarketplaceOrderingEnabled } from "@/lib/env";
 import { useI18n } from "@/lib/i18n/context";
 import { CartAddButton } from "@/features/marketplace/live/cart-add-button";
 import { useMarketplaceImageSrc } from "@/features/marketplace/live/image-urls";
@@ -35,7 +36,7 @@ export function LandingLiveProductCard({ item }: { item: PublicCard }) {
             {item.from_price_egp === null ? "—" : `${item.variant_count > 1 ? `${t.from} ` : ""}${fmtEgp(Number(item.from_price_egp), locale)}`}
           </span>
         </div>
-        <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} className={styles.addToCart} doneClassName={styles.addToCartDone} />
+        {isMarketplaceOrderingEnabled() ? <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} className={styles.addToCart} doneClassName={styles.addToCartDone} /> : null}
       </div>
     </article>
   );
