@@ -61,7 +61,7 @@ export function LiveProduct({ product, terms = null, place = null }: { product: 
 
       <div className={styles.detailGrid}>
         <div className={styles.gallery}>
-          <div className={v2.galleryRow}>
+          <div className={images.length > 1 ? v2.galleryRow : `${v2.galleryRow} ${v2.galleryRowSingle}`} data-gallery={images.length > 1 ? "strip" : "single"}>
             {images.length > 1 ? (
               <ul className={v2.thumbCol} aria-label={t.back}>
                 {images.map((img, i) => (

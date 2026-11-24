@@ -38,6 +38,24 @@ describe("LiveProduct specifications", () => {
   });
 });
 
+describe("LiveProduct gallery layout", () => {
+  const one: PublicProduct = { ...product, images: [{ image_id: "i1", is_primary: true, alt_text_ar: null, alt_text_en: null, variant_sku: null }] };
+  const two: PublicProduct = { ...one, images: [...one.images, { image_id: "i2", is_primary: false, alt_text_ar: null, alt_text_en: null, variant_sku: null }] };
+
+  it("a product with one image (or none) uses the single-column gallery so the preview is not squeezed into the 76px strip column", () => {
+    for (const p of [one, product]) {
+      const { container, unmount } = render(<I18nProvider locale="en" dir="ltr"><LiveProduct product={p} /></I18nProvider>);
+      expect(container.querySelector("[data-gallery]")?.getAttribute("data-gallery")).toBe("single");
+      unmount();
+    }
+  });
+
+  it("with several images the thumbnail strip stays beside the preview", () => {
+    const { container } = render(<I18nProvider locale="en" dir="ltr"><LiveProduct product={two} /></I18nProvider>);
+    expect(container.querySelector("[data-gallery]")?.getAttribute("data-gallery")).toBe("strip");
+  });
+});
+
 describe("LiveProduct v2 header", () => {
   const official: PublicProduct = {
     ...product, seller_slug: "nile", seller_official: true, stock_left: 2,
