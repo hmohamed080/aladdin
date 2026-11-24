@@ -439,7 +439,7 @@ Keys never removed or renamed by later PRs; later PRs only start filling `invoic
 | 17 | `app.marketplace_timer_open` / `_close` | `(p_subject_type text, p_subject_id uuid, p_kind text, p_started timestamptz)` / `(p_subject_type text, p_subject_id uuid, p_kind text, p_action text)` | idempotent: open on an existing active timer returns it; close on none is a no-op |
 | 18 | `app.marketplace_checkout_quote` | `(p_buyer uuid, p_lines jsonb, p_fulfilment text, p_address_id uuid, p_delivery_speed text, p_payment_method text)` returns `jsonb` | the single repricing function, called by `prepare` and again inside `confirm` |
 | 19 | `public.marketplace_checkout_sessions_purge` | `(p_retention interval default '7 days', p_limit integer default 200)` returns `integer` | **service role only**; expires old sessions and retires their unattached receipts into the media cleanup lifecycle |
-| 20 | `app.marketplace_complaint_admin_can_read` / `app.marketplace_return_evidence_can_read` / `..._metadata` | hooks, default body `false` / `null` | PR 14 and PR 15 replace these bodies (section 4.8) |
+| 20 | `app.marketplace_complaint_admin_can_read(p_order uuid)`, `app.marketplace_return_evidence_can_read(p_key text)`, `app.marketplace_return_evidence_metadata(p_key text)`, `app.marketplace_order_stock_alert(p_order uuid)` | hooks, default body `false` / `false` / `null` / no-op | PR 14 and PR 15 replace these bodies (section 4.6): complaint read and stock alert = PR 14, evidence hooks = PR 15 |
 
 **Checkout behaviour (fixed here):**
 
@@ -532,6 +532,142 @@ Some shared objects must change in more than one PR. Their rule:
 
 New `mp:` codes, owned by PR 12 and added to `contract.ts` there: `marketplace_closed`, `multi_seller_unsupported`, `seller_not_ready`, `receipt_required`, `quote_changed`, `idempotency_conflict`, `phone_unverified`, `address_missing`, `own_showroom`, `legacy_order`, `invalid_action`, `payment_dispute_open`, `preset_invalid`, `session_expired`, `session_not_found`. PR 14 adds `complaint_exists`, `complaint_not_allowed`. PR 15 adds `return_window_closed`, `return_not_eligible`, `evidence_required`, `return_exists`, `quantity_exceeds_order`. PR 13 adds `not_a_delivery_order`. Each PR edits only its own lines of that set (merge conflicts on that file are trivial: one-line additions).
 
----
+## 5. Timers
 
-> **Work in progress (first push).** Sections 1-4 above are final for coding. Sections 5 (timers), 6 (notifications), 7 (permissions), 8 (migration and pgTAP blocks), 9 (routes), 10 (flag) and 11 (open questions) follow in the next push of this branch.
+### 5.1 The job mechanism the repo already uses
+
+There is **no `pg_cron`** and no queue worker in this repo for Marketplace work. The existing pattern, used by the media cleanup (`marketplace_rejected_images_purge`, a service-role-only RPC run by the media cleanup tool `scripts/media-storage.mjs cleanup`) and by the two Cloudflare cron Workers (`backend/cloudflare/transcode`, cron `*/10 * * * *`, holds `SUPABASE_SERVICE_ROLE_KEY`; `edge/whatsapp-otp-worker`, cron `* * * * *`, holds no database credential and posts a signed event to an internal app route), is:
+
+1. **All logic lives in Postgres** as a bounded, idempotent, service-role-only function (Postgres is the only job authority; no job state anywhere else).
+2. **A scheduler outside Postgres only calls it**: a Cloudflare Worker cron trigger (the stack's host, ADR-0021/0022), or a manual script until a Worker is approved.
+
+Decision for PR 14: SQL = `public.marketplace_timers_run(p_limit, p_now)` (granted to `service_role` only, like `marketplace_rejected_images_purge`). Runner = a small new Worker `edge/marketplace-timers-worker` with `"triggers": { "crons": ["*/5 * * * *"] }` that calls that one RPC through PostgREST with the service-role key from the Workers secrets store (the transcode Worker precedent; a bounded RPC needs no signed app route). The same Worker also calls `marketplace_checkout_sessions_purge`; the existing media cleanup is left alone. Until the owner approves deploying that Worker, `scripts/marketplace-timers.mjs run` (PR 14, modelled on `scripts/media-storage.mjs`) runs the same RPC by hand; Acceptance verification uses `p_now` to simulate time (pgTAP and the script both accept it). **Deploying the Worker, its secret binding and enabling it on any hosted environment need the owner's approval; the PR ships code and a runbook, nothing hosted.**
+
+### 5.2 Timers and the data each one needs
+
+| Timer kind | Subject | Opens | Remind | Deadline | On expiry | Closes on |
+|---|---|---|---|---|---|---|
+| `order_seller_start` | order | transition 1 (`place`) | every **6 hours** while `status = 'new'` (`remind_every`) | **72 hours** after `placed_at` | transition 12 `cancel_timeout_seller`: stock `release`, buyer and seller notified | `start_preparing` (2), `cancel_by_buyer` (10), `cancel_by_seller` (11) |
+| `order_receipt_resubmit` | order | transition 8 (`flag_receipt_not_received`) | once, at **24 hours** (`remind_offsets = {24h}`) | **48 hours** after the flag | transition 13 `cancel_timeout_receipt` | `resubmit_receipt` (9), `accept_receipt` (7, also by the admin), any cancel |
+| `return_seller_response` | return | PR 15 `return_create` | at 24 h and 48 h (`remind_offsets = {24h, 48h}`) | **72 hours**, then escalate (no auto-approval) | hook `app.marketplace_return_timer_tick`: `in_admin_queue = true`, notify authorised admins | seller decision, buyer cancel, admin decision |
+| `return_refund_due` | return | PR 15 `received` | at 5 days (`remind_offsets = {5d}`) | **7 days** after the seller received the item | hook: notify seller once more, escalate to the admin queue | refund recorded |
+
+Elapsed clock time is used (72 h means 72 hours, not business days); delivery estimates use calendar days (a different rule, section 1.2). Timers keep running while the Marketplace is closed or the seller suspended.
+
+### 5.3 Runner semantics (`marketplace_timers_run`)
+
+- Select due timers: `state = 'active' and (expires_at <= p_now or next_remind_at <= p_now) order by least(expires_at, next_remind_at) for update skip locked limit p_limit`. Two overlapping runs never process the same timer.
+- **Expiry before reminder.** If `expires_at <= p_now` the timer expires (`state = 'expired'`); no reminder is sent for a timer that is expiring.
+- **One reminder per run, no burst.** If the Worker was down for 20 hours, the seller gets one reminder, and `next_remind_at` becomes `p_now + remind_every` (or the next offset still in the future), never three catch-up messages.
+- **Each timer is its own subtransaction.** The reminder notification, `reminders_sent + 1` and the new `next_remind_at` commit together. A failure in one timer (counted in the returned `errors`) never blocks the rest.
+- **Expiry goes through the core** (`app.marketplace_order_apply(..., 'cancel_timeout_seller', 'system', null, ...)`), which re-checks the current status under the order lock: an order that was started a second ago is a no-op and the timer is closed `done`. Stock effects and notifications therefore happen exactly once, by the machine's own idempotency rules (section 3.2).
+- Closing a timer is idempotent. A timer never reopens; a new dispute opens a new `order_receipt_resubmit` row.
+- The function returns counts only; the Worker logs them (numbers only, no ids), as the WhatsApp worker does.
+- Tests (PR 14, pgTAP): time travel with `p_now`; reminder cadence 6 h; catch-up produces one reminder; expiry at 72 h releases stock; started-just-before race; dispute timer 24 h / 48 h; overlap safety (second call finds nothing).
+
+## 6. Notification matrix (in-app only)
+
+Channel is **in-app for every row** (owner, 4C). Template key = `notifications.event_type` (same string), pattern `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`, seeded in both languages with declared variables by the PR named in the last column, rendered with PR 5's 9-argument `app.notify_from_template`, edited in the existing admin editor under `notification_templates.manage`. Seller recipients are `app.marketplace_notify_order_managers` (active members holding `order.manage` or `org.manage`); self-notification is suppressed by `app.notify`. Deep links are relative paths. **Standard variables** (all templates that mention them): `order_number`, `showroom_name`, `message` (the seller/preset/custom text, per language), `delivery_date`; extra variables are listed per row. PR 12 adds **every key below** to `ck_notifications_event_type_known` in its single statement (section 4.6); template rows are inserted only by the seeding PR.
+
+| # | Event | Recipient | Template key | Extra variables | Deep link | Emitted by (transition) / seeded by |
+|---|---|---|---|---|---|---|
+| 1 | New order arrived (the "sale from the store" message) | seller managers | `marketplace.order.placed` | `buyer_name`, `total` | `/showroom/marketplace/orders/<id>` | 1 / PR 12 |
+| 2 | Preparing started | buyer | `marketplace.order.preparing` | - | `/market/orders/<id>` | 2 / PR 12 |
+| 3 | Ready for pickup (pickup orders only) | buyer | `marketplace.order.ready_pickup` | - | same | 3 / PR 12 (not in the owner's list, open question 1) |
+| 4 | Shipped | buyer | `marketplace.order.shipped` | `tracking_number` | same | 4 / PR 12 |
+| 5 | Delivered | buyer | `marketplace.order.delivered` | - | same | 5 / PR 12 |
+| 6 | Buyer cancelled | seller managers | `marketplace.order.cancelled_by_buyer` | - | seller order page | 10 / PR 12 |
+| 7 | Seller cancelled (preset or custom reason) | buyer | `marketplace.order.cancelled_by_seller` | - | buyer order page | 11 / PR 12 |
+| 8 | «لم تصلني الفلوس» | buyer | `marketplace.order.receipt_disputed` | `hours_left` (48) | buyer order page | 8 / PR 12 |
+| 9 | Buyer re-uploaded the receipt | seller managers | `marketplace.order.receipt_resubmitted` | - | seller order page | 9 / PR 12 (added by this contract, open question 10) |
+| 10 | Order not started, reminder every 6 h | seller managers | `marketplace.order.reminder_seller_start` | `hours_waiting`, `hours_left` | seller order page | timer / PR 14 |
+| 11 | Auto-cancelled, seller did not start (72 h) | buyer **and** seller managers | `marketplace.order.cancelled_timeout_seller` | - | order page of each side | 12 / PR 14 |
+| 12 | Disputed receipt not re-uploaded, reminder at 24 h | buyer | `marketplace.order.reminder_receipt_resubmit` | `hours_left` (24) | buyer order page | timer / PR 14 |
+| 13 | Auto-cancelled, receipt not re-uploaded (48 h) | buyer and seller managers | `marketplace.order.cancelled_timeout_receipt` | - | order page of each side | 13 / PR 14 |
+| 14 | Payment complaint filed | admins holding `marketplace_payment_complaints.review` | `marketplace.order.payment_complaint_filed` | `filed_by` (buyer/seller), `reason` | `/admin/marketplace/payment-complaints` | `payment_complaint_file` / PR 14 |
+| 15 | Payment complaint decided | buyer and seller managers | `marketplace.order.payment_complaint_resolved` | - | order pages | `..._decide` / PR 14 (added by this contract, open question 10) |
+| 16 | Low stock / out of stock | seller managers | `marketplace.stock.low`, `marketplace.stock.out` | `product_name`, `available`, `threshold` | `/showroom/marketplace/products/<id>/edit` | hook `app.marketplace_order_stock_alert` (PR 12 calls it after `reserve`; default no-op) / PR 14. Fires once when `available` crosses the product's `low_stock_threshold` (PR 7) downward, and once at 0 |
+| 17 | Return requested | seller managers | `marketplace.return.requested` | `request_number` | `/showroom/marketplace/returns/<id>` | PR 15 |
+| 18 | Return approved / rejected (with message) | buyer | `marketplace.return.approved`, `marketplace.return.rejected` | `request_number` | `/market/returns/<id>` | PR 15 |
+| 19 | Seller reminders (24 h, 48 h) | seller managers | `marketplace.return.seller_reminder` | `request_number`, `hours_left` | seller return page | PR 15 |
+| 20 | Escalated to the admin queue (72 h silence, or complaint) | admins holding `marketplace_returns.review` | `marketplace.return.escalated` | `request_number`, `reason` | `/admin/marketplace/returns` | PR 15 |
+| 21 | Admin reminded the seller / admin decided | seller managers / buyer and seller managers | `marketplace.return.admin_reminder`, `marketplace.return.admin_decided` | `request_number` | return pages | PR 15 |
+| 22 | Return received, refund sent, refund confirmed | buyer / buyer / seller managers | `marketplace.return.received`, `marketplace.return.refund_sent`, `marketplace.return.refund_confirmed` | `request_number`, `amount` | return pages | PR 15 |
+
+Variables hold plain text; money is formatted by the writer per language (`p_vars_ar` / `p_vars_en`); `delivery_date` is the order's estimate range ("12-14 Dec"). Notification bodies never contain a phone number, an address or a receipt link.
+
+## 7. Permissions and admin queues
+
+| Permission key | Resource / action | Default holders | Owner PR | Guards |
+|---|---|---|---|---|
+| `marketplace_payment_complaints.review` | `marketplace_payment_complaints` / `review` | Super Admin, **locked**; the owner grants it to chosen admins through the existing admin role editor (a grantable permission, like `marketplace_media.moderate`) | PR 14 | `admin_marketplace_payment_complaints`, `_get`, `_take`, `_decide`; reading the receipts of an order that has a complaint; recipient set of notification 14 |
+| `marketplace_returns.review` | `marketplace_returns` / `review` | Super Admin, locked; grantable | PR 15 | `admin_marketplace_returns`, `_get`, `_remind_seller`, `_decide`; reading return evidence of an escalated return; recipient set of notification 20 |
+
+Rules:
+
+- Inserted exactly like `notification_templates.view/manage` in `20261121090003` and `marketplace_platform.manage` in `20261123130001` (`admin_permissions` row with a `sort_order`, `admin_role_permissions` row `is_locked = true` for `super_admin`, `on conflict do nothing`). New `sort_order` values: payment complaints 114, returns 115.
+- The two permissions are **separate** from `marketplace_sellers.manage`, `marketplace_media.moderate`, `marketplace_platform.manage` and `notification_templates.*`. An admin without the permission gets `mp:not_permitted` (errcode 42501) from every admin function and is never a notification recipient; the admin pages answer the usual not-found.
+- **Seller-side authority is unchanged**: `order.manage` or `org.manage` (`app.marketplace_can_manage_orders`). No new membership capability is introduced in this phase.
+- **Buyer-side**: every buyer RPC is bound to `auth.uid()` and the order's `buyer_user_id`; an id is never trusted from the payload.
+- Presets (`order_cancel_seller`, `order_cancel_buyer`, `payment_issue`, `return_reason`, `return_reject`) are edited only under `notification_templates.manage`, with PR 5's reason and event trail; they are deactivated, never deleted.
+- **Permission contract files** (`supabase/permissions/<version>.json`, generated by `node supabase/tests/b1/permission_contract.mjs <container> generate`, checked by `scripts/migration-permission-gate.mjs`): each file is a **full snapshot** of every function's effective grants. Therefore: merge order is 12, 13, 14, 15; each PR copies the previous PR's last file as its base, applies its own migrations on a tree that already contains the previous PR, regenerates its own file named after its **last** migration version, and reviews that the diff contains only its own functions. Later PRs rebase onto `main` after the earlier PR merges and regenerate again. Never hand-edit a snapshot; never regenerate on a tree missing the previous PR.
+
+## 8. Migration and pgTAP blocks
+
+Versions are 14-digit timestamps; a PR may use any version inside its block, in order, and must not use another PR's block. Numbers are reserved even if unused.
+
+| PR | Migration block | pgTAP block | Concurrency scripts (`supabase/tests/`) | Last permission snapshot |
+|---|---|---|---|---|
+| 12 | `20261124120001` - `20261124129999` | `300` - `329` | `marketplace_checkout_concurrency_test.sh` | named after its last migration |
+| 13 | `20261124130001` - `20261124139999` | `330` - `359` | none | same rule |
+| 14 | `20261124140001` - `20261124149999` | `360` - `389` | `marketplace_timers_concurrency_test.sh` | same rule |
+| 15 | `20261124150001` - `20261124159999` | `390` - `419` | `marketplace_returns_concurrency_test.sh` | same rule |
+
+Existing numbers for orientation: PR 8 `203`, PR 9 `220`-`222`, PR 10 `240`, PR 11 `260`. File naming follows `<number>_marketplace_<topic>_test.sql`. PR 12's first migration is `20261124120001_marketplace_checkout_order_model.sql` (its agent's choice, accepted).
+
+Suggested internal split (not binding on the version digits):
+
+- **PR 12** `120001` orders/items/events/proofs/products alters + CHECK widening + backfill + new tables; further files for shared vocabularies (notification event types, preset actions + admin preset functions + seeds for `order_cancel_seller`, `order_cancel_buyer`, `payment_issue`, media function rebuild, templates 1-9), the state machine/document/actions/notify helpers, the checkout RPCs, the wrappers, grants and the purge function.
+- **PR 13** `130001` invoices + sequence; `130002` read RPCs v2, waybill, shipment update; document rebuild.
+- **PR 14** `140001` permission + complaints tables; `140002` timer runner, handlers, stock alert hook body, notify rebuild; `140003` complaint and admin RPCs, templates 10-16; document/actions rebuild.
+- **PR 15** `150001` permission + returns tables + return settings; `150002` return RPCs, hooks, templates 17-22, `return_reason`/`return_reject` seed rows; `150003` order document/actions/notify rebuild.
+
+Every migration states in its header: what it adds, which earlier PR it needs, that nothing is dropped, and the security model (RLS on, no client grant). Each PR's pgTAP covers: every function (happy path, each `mp:` error), isolation per table, the stock invariant (`stock_state` agrees with `marketplace_stock_movements`), idempotent replay, and the permission gate (an admin without the key is refused). `scripts/migration-policy.mjs` must pass (no drops, no signature changes of promoted functions).
+
+## 9. Frontend ownership (routes and components)
+
+Existing routes today: `/market/cart`, `/market/checkout`, `/market/orders`, `/market/orders/[orderId]`, `/showroom/marketplace/orders`, `/showroom/marketplace/orders/[orderId]`, `/showroom/marketplace/payments` (payment settings), admin `/admin/marketplace`, `/admin/marketplace/media`, `/admin/marketplace/videos`; existing code `frontend/src/features/marketplace-orders/*` and `frontend/src/server/actions/marketplace-orders.ts`.
+
+| Owner | Routes | Components / modules |
+|---|---|---|
+| **PR 12** | `/market/checkout` (rewritten: delivery or pickup, payment choice, receipt upload before confirm, quote, non-returnable disclosure, «تأكيد الطلب»); `/market/checkout/confirmed/[checkoutId]` (thank-you: greeting by name, order number, progress, address, payment method, summary) | New folder `features/marketplace-checkout/*`; new `server/actions/marketplace-checkout.ts` (prepare, receipt upload and confirm, confirm). PR 12 is the **only** PR that edits `features/marketplace-orders/contract.ts` for the new statuses, payment values, error codes and `OrderDocumentV2` types, and it makes the legacy order views compile (type adaptation only, no redesign). It edits `server/actions/marketplace-orders.ts` only to add the seller-action, buyer-cancel-v2 and receipt-resubmit actions |
+| **PR 13** | `/market/orders` and `/market/orders/[orderId]` (Noon layout, progress bar, timeline, tracking, reorder, invoice); `/market/orders/[orderId]/invoice`; `/showroom/marketplace/orders` (tabs, search, date filter); `/showroom/marketplace/orders/[orderId]` (actions from `document.actions`, cancel dialog with presets, receipt review with «لم تصلني الفلوس», buyer receipt re-upload panel); `/showroom/marketplace/orders/[orderId]/waybill` and `/invoice` (print views) | Owns the `features/marketplace-orders/*` views and copy (`buyer-copy.ts`, seller copy) and `server/queries` for the v2 reads; renders actions through a **registry keyed by action name that ignores unknown names**, so PR 14 and PR 15 add buttons without touching the page shell |
+| **PR 14** | `/admin/marketplace/payment-complaints` (+ detail); small slots inside PR 13's order pages: the complaint dialog (`file_complaint` action) and the dispute countdown copy | New folder `features/marketplace-admin-complaints/*`; `edge/marketplace-timers-worker/*`; `scripts/marketplace-timers.mjs`; admin nav entry gated by the permission |
+| **PR 15** | `/market/orders/[orderId]/return` (request wizard with evidence upload), `/market/returns`, `/market/returns/[id]`, `/showroom/marketplace/returns`, `/showroom/marketplace/returns/[id]`, `/showroom/marketplace/return-policy` (seller return settings), `/admin/marketplace/returns`; the non-returnable control inside the seller product form; the disclosure badge on product page and cart (data comes from PR 12's `non_returnable` key) | New folders `features/marketplace-returns/*` and `features/marketplace-admin-returns/*`; one-line addition to the product form (PR 7 file) |
+
+PR 10 owns `/settings/addresses`, PR 11 owns `/market/cart` and the sign-in modal; PR 12 only links to them. Design: Craftsman system and semantic tokens only (root `AGENTS.md`, Design System authority); copy in Arabic and English via the existing i18n message files; no technical wording in the UI.
+
+## 10. The flag and the switch
+
+- **Ordering stays hidden** behind `NEXT_PUBLIC_MARKETPLACE_ORDERING === "true"` (`isMarketplaceOrderingEnabled()` in `frontend/src/lib/env/index.ts`; `.env.example` documents it as empty = browse-only). Every new buyer route (`/market/checkout*`, `/market/orders*`, `/market/returns*`) and every add-to-cart/checkout entry point is guarded by it exactly like the existing buttons; with the flag off they redirect to `/market` (or answer not-found for order and return detail routes). Seller and admin pages for orders, returns and complaints are **not** behind the flag (a seller must always be able to see and finish orders that exist), and show nothing when no orders exist.
+- **PR 12 normalizes the checkout guard**: today `/market/checkout` checks only `isMarketplacePreviewEnabled()`; the rewritten page must check **both** `isMarketplacePreviewEnabled()` and `isMarketplaceOrderingEnabled()`. No new environment variable is introduced by PRs 12-15.
+- **Server side**: every checkout RPC refuses with `mp:marketplace_closed` when `app.marketplace_is_open()` is false, and `app.marketplace_seller_is_public(seller)` must hold at `prepare` and `confirm`. The flag is a **frontend** gate only; the database never reads it, so the Marketplace open/close switch is the server-side kill switch and the flag the release switch. Orders that already exist continue through the machine whatever the switch says (section 3.2).
+- Production follows Acceptance: flags and the switch are enabled on Production only after verification on Acceptance, with the owner's approval of each hosted step.
+
+## 11. Open questions for the owner (plain language)
+
+None of these re-opens a closed decision. Each has a recommendation; the contract already assumes the recommendation so coding is not blocked, and a different answer is a small change.
+
+1. **Pickup orders: tell the buyer when the order is ready to collect?** Your notification list says preparing, shipped and delivered. A pickup customer has no "shipped". *Recommendation:* send one extra message "ready for pickup" for pickup orders only (template `marketplace.order.ready_pickup`; one more text, nothing else changes). The contract includes it; say so if you want it removed.
+2. **When a payment complaint is decided, what exactly happens?** *Recommendation:* the admin picks one of three outcomes. "Payment is valid": the order's payment counts as received and the seller carries on. "Money not received": nothing changes, the buyer's 48 hours keep running. "Dismissed": no action. The admin never moves money, and every decision keeps a written note.
+3. **Who may file a payment complaint?** *Recommendation:* the buyer (he says he paid) or the showroom (the buyer keeps not answering), only while the receipt is marked "money not received".
+4. **Can the seller still cancel after the order is marked ready (stock already taken out)?** The old system allowed it. *Recommendation:* yes until it is shipped, with a reason, and the units return to stock automatically. After shipping he uses "delivery failed".
+5. **Return evidence: photos only, or also video?** Video needs the heavy video pipeline and is slow for a buyer on mobile data. *Recommendation:* photos only for now (up to 6, 10 MB each); add video later if disputes show a need.
+6. **If a showroom is suspended or the Marketplace is closed, what happens to orders already placed?** *Recommendation:* they carry on as normal (the seller can still prepare, timers still run, so an ignored order still auto-cancels after 72 hours). Only new purchases stop. An admin tool to cancel an order by hand is not included; say if you want one.
+7. **Free shipping in a cart that mixes products.** If only some products are marked "free shipping", does the whole order ship free? *Recommendation:* no. The delivery fee is waived only when every product in the order is marked free, when the delivery area is priced free, or when the order reaches the showroom's free-shipping minimum.
+8. **Exchange for a different product or price.** *Recommendation:* in this version an exchange is only for the same product or a same-price variant (the showroom hands over the replacement). Anything with a price difference is handled as a return plus a new order.
+9. **Invoice.** What the buyer and seller print is an order invoice with the showroom's and buyer's details and the totals (prices exclude VAT, as today). It is **not** an official tax invoice and does not connect to the tax authority's e-invoicing system. *Recommendation:* label it "order invoice" now, and ask your accountant or lawyer, together with the Terms review, whether e-invoicing is required before launch.
+10. **Two extra messages added.** "The buyer sent a new receipt" (to the showroom) and "complaint decided" (to buyer and showroom). *Recommendation:* keep both; without them the other side never learns the outcome.
+11. **New Cloudflare timer service.** The 6-hour reminders and 72-hour cancellations need a small scheduled service. *Recommendation:* approve building it and deploying it first on Acceptance only; until then a manual script does the same job for testing. Nothing is deployed without your approval.
+
+Already closed and **not** asked again: calendar-day delivery with no cut-off; buyer place travels in the URL only; no contact element for the showroom on any page (in-platform messages tied to the order come later); one preset system (PR 5's `marketplace_seller_message_presets`); signed-in cart is last-writer-wins; seller cannot buy from his own showroom; pilot with one selling showroom.
