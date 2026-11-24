@@ -1897,7 +1897,10 @@ as $$
     -- a receipt: the buyer who uploaded it, and (once it is attached to an order) the showroom's order managers
     select 1 from public.marketplace_payment_proofs pr left join public.marketplace_orders o on o.id = pr.order_id
     where pr.object_key = p_key and pr.upload_state = 'confirmed'
-      and (pr.created_by = (select auth.uid()) or (o.id is not null and app.marketplace_can_manage_orders(o.seller_organization_id))))
+      and (pr.created_by = (select auth.uid())
+           -- the showroom's order managers, only while the showroom organization is live (the receipt metadata carries no organization)
+           or (o.id is not null and app.marketplace_can_manage_orders(o.seller_organization_id)
+               and exists (select 1 from public.organizations so where so.id = o.seller_organization_id and so.deleted_at is null))))
   or app.marketplace_complaint_admin_can_read(p_key)
   or app.marketplace_return_evidence_can_read(p_key);
 $$;

@@ -701,6 +701,30 @@ select ok(app.marketplace_order_document_v2(current_setting('t.o6')::uuid, 'buye
           and app.marketplace_order_document_v2(current_setting('t.o6')::uuid, 'buyer') ? 'return_window', 'I8. the keys later PRs fill exist already');
 select is(app.marketplace_order_document_v2(current_setting('t.o4')::uuid, 'seller') -> 'events' @> '[{"action":"receipt_disputed"}]'::jsonb, true, 'I9. the seller timeline carries the dispute');
 select is(app.marketplace_order_actions(current_setting('t.o6')::uuid, 'buyer'), '{}'::text[], 'I10. a delivered order offers the buyer nothing in this PR');
+-- a receipt attached to an order: the showroom's order managers read it only while the showroom organization is live
+reset role;
+select set_config('t.rk', (select pr.object_key from public.marketplace_payment_proofs pr join public.marketplace_orders o on o.id = pr.order_id
+  where o.seller_organization_id = current_setting('t.a')::uuid and pr.upload_state = 'confirmed' limit 1), true);
+select set_config('t.rbuyer', (select pr.created_by::text from public.marketplace_payment_proofs pr where pr.object_key = current_setting('t.rk')), true);
+select ok(current_setting('t.rk') is not null, 'I10a. fixture: an attached, confirmed receipt exists');
+select pg_temp.as_user(current_setting('t.seller'));
+select is(public.media_storage_resolve('marketplace', current_setting('t.rk'), 'read') is not null
+          or public.organization_media_resolve('marketplace', current_setting('t.rk'), 'read') is not null, true,
+  'I10b. the showroom owner can read an attached receipt while the organization is live');
+reset role;
+set local session_replication_role = replica;
+update public.organizations set deleted_at = now() where id = current_setting('t.a')::uuid;
+set local session_replication_role = origin;
+select pg_temp.as_user(current_setting('t.seller'));
+select is(public.organization_media_resolve('marketplace', current_setting('t.rk'), 'read'), null,
+  'I10c. members of a soft-deleted showroom organization cannot read buyer receipts');
+select pg_temp.as_user(current_setting('t.rbuyer'));
+select is(public.organization_media_resolve('marketplace', current_setting('t.rk'), 'read') is not null, true,
+  'I10d. the buyer still reads their own receipt');
+reset role;
+set local session_replication_role = replica;
+update public.organizations set deleted_at = null where id = current_setting('t.a')::uuid;
+set local session_replication_role = origin;
 -- legacy v1 checkout still works for the promoted app and stays legacy
 reset role;
 select pg_temp.as_user(current_setting('t.buyer2'));
