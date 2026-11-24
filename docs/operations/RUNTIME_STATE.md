@@ -1,3 +1,7 @@
+## Marketplace timers and payment complaints, PR 14 (draft PR, not deployed) - 2026-11-24
+
+- Migrations `20261124140001-3` exist only on the PR branch; applied nowhere hosted. The timers Worker `edge/marketplace-timers-worker` is not deployed and no secret or variable is set; `scripts/marketplace-timers.mjs` is the manual alternative. Ordering stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. Admin queue `/admin/marketplace/payment-complaints` needs the grantable permission `marketplace_payment_complaints.review`.
+
 ## Marketplace saved addresses, PR 10 (draft PR, not deployed) - 2026-11-24
 
 - Migration `20261124100001` (buyer addresses) exists only on the PR branch; applied nowhere hosted. Page `/settings/addresses` follows `NEXT_PUBLIC_MARKETPLACE_PREVIEW` and is not linked publicly; ordering stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. `NEXT_PUBLIC_MAPS_PROVIDER` / `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` are unset everywhere (map provider = none). The phone verification authority is unchanged and still OFF.
