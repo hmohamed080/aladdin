@@ -91,6 +91,16 @@ describe("product page (PR 7)", () => {
     expect(screen.queryByText("حفظ والعودة للمنتجات")).toBeNull();
   });
 
+  it("Save as draft needs the product fields only: no stock and no image does not block it, while Save still does (owner decision 2026-11-24)", async () => {
+    save.mockResolvedValue({ ok: true, id: "p1", variants: [{ id: "v1", sku: "WP-1" }] });
+    renderForm("en", { product: product({ images: [], variants: [{ id: "v1", sku: "WP-1", selling_unit: "roll", price_egp: 10, status: "active", attributes: { color: "beige" }, stock: [] }] }) });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/red/));
+    expect(save).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Save as draft" }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  });
+
   it("marks every missing required field red on Save and does not call the server", async () => {
     renderForm("en");
     const before = document.querySelectorAll("[data-invalid='true']").length; // only the store-setup rows
