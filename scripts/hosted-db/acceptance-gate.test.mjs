@@ -465,3 +465,80 @@ test("production scripts: Production only, plan prod-catchup only, hidden passwo
   assert.ok(apply.includes('[ -e .git ]'), "works from a git worktree too");
   for (const f of ["acceptance-apply.sh", "acceptance-preflight.sh"]) assert.ok(!/prod-(batch1|catchup)/.test(readFileSync(here(`./${f}`), "utf8")), `${f} must not accept the Production plan`);
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// plan "marketplace-v2": 20261123090001, 100001, 120001, 130001, 150001, 160001, 160002 on top of Acceptance at 237 / 20261122090002
+// ---------------------------------------------------------------------------------------------------------------------
+const MV2 = () => PLANS["marketplace-v2"];
+const MV2_VERSIONS = ["20261123090001", "20261123100001", "20261123120001", "20261123130001", "20261123150001", "20261123160001", "20261123160002"];
+const mv2Files = () => readdirSync(here("../../supabase/migrations")).filter((f) => f.endsWith(".sql")).map((f) => f.slice(0, 14)).sort();
+test("marketplace-v2: 7 pending in order, all newer than the latest applied, 237 -> 244, chained after registration-gate", () => {
+  const P = MV2();
+  assert.deepEqual(P.pending, MV2_VERSIONS);
+  assert.equal(P.applied, 237); assert.equal(P.latest, PLANS["registration-gate"].postContract);
+  assert.equal(P.applied + P.pending.length, 244);
+  assert.equal(P.postContract, "20261123160002"); assert.equal(P.preContract, "20261122090002");
+  assert.deepEqual(checkAcceptance({ plan: "marketplace-v2", list: list("marketplace-v2"), dry: dry(P.pending), localVersions: mv2Files() }), []);
+  assert.deepEqual(checkAcceptancePost({ plan: "marketplace-v2", list: { migrations: [...appliedFor(P), ...P.pending.map((v) => ({ local: v, remote: v }))] } }), []);
+});
+test("marketplace-v2: refuses the 244 state (already applied), a partial push and an extra migration", () => {
+  const P = MV2();
+  has(checkAcceptance({ plan: "marketplace-v2", list: { migrations: [...appliedFor(P), ...P.pending.map((v) => ({ local: v, remote: v }))] }, dry: dry([]), localVersions: mv2Files() }), /applied migrations, expected 237/);
+  has(checkAcceptance({ plan: "marketplace-v2", list: list("marketplace-v2"), dry: dry(P.pending.slice(0, 5)), localVersions: mv2Files() }), /dry run would push/);
+  has(checkAcceptance({ plan: "marketplace-v2", list: list("marketplace-v2", [{ local: "20261124090001", remote: null }]), dry: dry([...P.pending, "20261124090001"]), localVersions: mv2Files() }), /pending is/);
+});
+test("marketplace-v2: the pending set is exactly the migration files after 20261122090002 in this checkout, until a later plan exists; both permission contracts exist", () => {
+  assert.deepEqual(mv2Files().filter((v) => v > MV2().latest && v <= MV2().postContract), MV2().pending);
+  assert.deepEqual(pendingDrift({ plan: "marketplace-v2", localVersions: mv2Files().filter((v) => v <= MV2().postContract) }), { unplanned: [], missing: [] });
+  for (const v of [MV2().preContract, MV2().postContract]) assert.ok(readFileSync(here(`../../supabase/permissions/${v}.json`), "utf8").length > 100);
+});
+test("marketplace-v2: every function the 7 migrations create is covered by the expected-change list (derived from the SQL, not written by hand)", () => {
+  const P = MV2(), dir = here("../../supabase/migrations");
+  const hit = (k) => P.changed.some((e) => (e.endsWith("*") ? k.startsWith(e.slice(0, -1)) : k === e || k.startsWith(e + "(")));
+  const miss = [];
+  for (const f of readdirSync(dir).filter((f) => P.pending.includes(f.slice(0, 14)))) {
+    const sql = readFileSync(`${dir}/${f}`, "utf8").replace(/--.*$/gm, "");
+    for (const m of sql.matchAll(/create\s+(?:or\s+replace\s+)?function\s+((?:public|app)\.[a-z_0-9]+)\s*\(/gi)) if (!hit(m[1].toLowerCase())) miss.push(`${f}: ${m[1]}`);
+  }
+  assert.deepEqual(miss, []);
+  for (const e of ["public.media_video_scope", "public.notifications.ck_notifications_event_type_known", "public.marketplace_*", "app.marketplace_publication_blockers", "app.notify_from_template"]) assert.ok(P.changed.includes(e), e);
+  assert.equal(new Set(P.changed).size, P.changed.length, "no duplicate entries");
+});
+test("marketplace-v2: a fresh restore-verified snapshot (>= 237 migrations) is mandatory; none is pinned yet, the 232 one is refused, and a future pin of 237+ passes", () => {
+  const P = MV2(), shas = allShas();
+  assert.equal(P.freshBackup, true);
+  has(checkRecovery({ plan: "marketplace-v2", label: "", forwardFixSha256: shas }), /needs --backup-label of a fresh restore-verified snapshot \(migrations >= 237\)/);
+  has(checkRecovery({ plan: "marketplace-v2", label: "aladdin-acceptance-20261122T100424Z", forwardFixSha256: shas }), /has 232 migrations; plan marketplace-v2 needs one taken at 237 or later/);
+  has(checkRecovery({ plan: "marketplace-v2", label: "aladdin-acceptance-20261123T000000Z", forwardFixSha256: shas }), /not a pinned restore-verified snapshot/);
+  assert.ok(Object.values(RESTORE_VERIFIED_SNAPSHOTS).every((s) => s.migrations < 237), "no snapshot of 237+ is pinned in this PR: the owner takes and restore-tests it first, then pins it");
+  RESTORE_VERIFIED_SNAPSHOTS["aladdin-acceptance-20261123T000000Z"] = { backupRun: "x", restoreRun: "y", tables: 1, rows: 1, migrations: 237 };
+  try { assert.deepEqual(checkRecovery({ plan: "marketplace-v2", label: "aladdin-acceptance-20261123T000000Z", forwardFixSha256: shas }), []); }
+  finally { delete RESTORE_VERIFIED_SNAPSHOTS["aladdin-acceptance-20261123T000000Z"]; }
+  has(checkRecovery({ plan: "marketplace-v2", label: "aladdin-acceptance-20261122T100424Z", forwardFixSha256: { ...shas, "marketplace-v2": "0".repeat(64) } }), /sha256/);
+});
+test("marketplace-v2 forward-fix: one transaction, every guard before the first change, only the seeded rows are deleted, enum value and prior flag documented", () => {
+  const sql = readFileSync(here(FORWARD_FIX["marketplace-v2"].file), "utf8");
+  const code = sql.split("\n").filter((l) => !l.startsWith("--")).join("\n");
+  assert.match(code, /^begin;/m); assert.match(code, /commit;\s*$/);
+  const low = code.toLowerCase();
+  const firstChange = Math.min(...["drop trigger", "drop table", "delete from", "drop column"].map((s) => low.indexOf(s)).filter((i) => i > -1));
+  const lastGuard = code.lastIndexOf("select pg_temp.mv2_guard(");
+  assert.ok(lastGuard > -1 && lastGuard < firstChange, "all guards precede the first change");
+  for (const t of ["marketplace_seller_preset_events", "marketplace_seller_message_presets", "marketplace_seller_delivery_settings", "marketplace_free_shipping_products", "marketplace_seller_settings_events", "marketplace_video_events"]) {
+    assert.ok(code.includes(`public.${t}`), `guards ${t}`); assert.match(code, new RegExp(`drop table if exists public\\.${t} cascade`));
+  }
+  assert.equal((code.match(/^delete from/gim) ?? []).length, 3, "top-level deletes only: the 2 stock templates, the Super Admin grant and the permission (function bodies may delete)");
+  assert.doesNotMatch(code.replace(/$function$[sS]*?$function$/g, ""), /btruncateb|deletes+froms+public.marketplace_/i);
+  assert.ok(low.indexOf("disable trigger trg_admin_role_permissions_guard") < low.indexOf("delete from public.admin_role_permissions") && low.indexOf("enable trigger trg_admin_role_permissions_guard") > low.indexOf("delete from public.admin_role_permissions"));
+  assert.ok(low.indexOf("create or replace function app.marketplace_publication_blockers") < low.indexOf("drop function if exists app.marketplace_is_open"), "old definitions are restored before new functions are dropped");
+  assert.doesNotMatch(code, /drop function(?! if exists)/i, "every function drop is IF EXISTS");
+  assert.match(sql, /enum value public\.media_video_scope 'marketplace'"?/); assert.match(sql, /media_verification_ready was set to true/);
+  assert.ok(!/cascade/i.test(code.replace(/drop table if exists [a-z_.]+ cascade/gi, "")), "CASCADE only on the six new tables");
+});
+test("marketplace-v2: the apply script knows the plan and runs the smoke before the push and after it; the preflight accepts the plan", () => {
+  const apply = readFileSync(here("./acceptance-apply.sh"), "utf8"), pre = readFileSync(here("./acceptance-preflight.sh"), "utf8");
+  assert.match(apply, /marketplace-v2\)\$ \]\]/); assert.match(pre, /marketplace-v2\)\$ \]\]/);
+  const push = apply.indexOf('STEP="push"');
+  assert.ok(apply.indexOf("marketplace-v2-smoke.mjs facts pre") > -1 && apply.indexOf("marketplace-v2-smoke.mjs facts pre") < push);
+  assert.ok(apply.indexOf("marketplace-v2-smoke.mjs facts post") > push);
+});
