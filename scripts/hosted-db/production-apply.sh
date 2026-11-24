@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # APPLIES the pending migrations of ONE named plan to PRODUCTION (kkpkgjrweysgvhvkhzun) ONLY, with every gate before and after.
 # Plan: prod-catchup = ALL 27 pending migrations 20261114090001 .. 20261122090002 (plus PC_LATER in acceptance-gate.mjs), 210 -> 237, in ONE plain push (a push always sends every unapplied local migration).
-# See docs/operations/PRODUCTION_CATCHUP_PLAN_20261123.md and acceptance-gate.mjs (the plan is marked target "production").
+# Plan: prod-marketplace-v2 = the seven Marketplace migrations 20261123090001 .. 20261123160002, 237 -> 244, one plain push, on top of Production at 237 (prod-catchup already applied). Recovery:
+# the pinned forward-fix marketplace-v2-remove.sql; needs a restore-verified PRODUCTION snapshot taken at >= 237 migrations; runs the read-only marketplace-v2-smoke.sql before and after the push.
+# See docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md and docs/operations/PRODUCTION_CATCHUP_PLAN_20261123.md and acceptance-gate.mjs (the plan is marked target "production").
 # NOT to be run without the owner's separate explicit GO for Production. Acceptance is refused. Never uses --include-all, repair or reset.
-#   bash scripts/hosted-db/production-apply.sh --plan prod-catchup --sha <full 40-char origin/main sha> --backup-label <aladdin-production-YYYYMMDDTHHMMSSZ>
+#   bash scripts/hosted-db/production-apply.sh --plan prod-catchup|prod-marketplace-v2 --sha <full 40-char origin/main sha> --backup-label <aladdin-production-YYYYMMDDTHHMMSSZ>
 # Any Production step needs a restore-verified PRODUCTION snapshot taken at 210 migrations or later, pinned in
 # PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS (acceptance-gate.mjs) after its restore test passed. Pinned: aladdin-production-20261123T142725Z (restore PASS); this script REFUSES to reach the
 # password prompt with any other label. Recovery = three pinned forward-fixes, run in this order: media-notify-remove.sql, marketplace-remove.sql, prod-catchup-restore-previous.sql (sha256-checked; they restore functions, constraints and
@@ -20,8 +22,8 @@ ACC="nxossqhdfltcqdwvbewi"; PROD="kkpkgjrweysgvhvkhzun"
 export GATE_TARGET=production
 PLAN=""; SHA=""; LABEL=""
 while [ $# -gt 0 ]; do case "$1" in --plan) PLAN="${2:-}"; shift 2;; --sha) SHA="${2:-}"; shift 2;; --backup-label) LABEL="${2:-}"; shift 2;; *) echo "unknown argument $1"; exit 2;; esac; done
-[[ "$PLAN" =~ ^(prod-catchup)$ ]] || { echo "usage: --plan prod-catchup --sha <40-char sha> --backup-label <aladdin-production-YYYYMMDDTHHMMSSZ>"; exit 2; }
-[[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: --plan prod-catchup --sha <40-char sha> --backup-label <label>"; exit 2; }
+[[ "$PLAN" =~ ^(prod-catchup|prod-marketplace-v2)$ ]] || { echo "usage: --plan prod-catchup|prod-marketplace-v2 --sha <40-char sha> --backup-label <aladdin-production-YYYYMMDDTHHMMSSZ>"; exit 2; }
+[[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: --plan prod-catchup|prod-marketplace-v2 --sha <40-char sha> --backup-label <label>"; exit 2; }
 [[ "$LABEL" =~ ^aladdin-production-[0-9]{8}T[0-9]{6}Z$ ]] || { echo "--backup-label (required) must look like aladdin-production-YYYYMMDDTHHMMSSZ"; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # Plan facts come from acceptance-gate.mjs (single source): PRE_CONTRACT POST_CONTRACT N_PENDING POST_APPLIED LATEST EXPECT_CHANGED PENDING_VERSIONS
@@ -72,6 +74,10 @@ run "pre: permissions vs $PRE_CONTRACT" "$OUT/perms-pre.out" -- node scripts/hos
 run "pre: table counts" "$OUT/counts-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/table-counts.sql
 run "pre: structure" "$OUT/struct-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/acceptance-structure.sql
 run "pre: catalog fingerprint" "$OUT/fp-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/catalog-fingerprint.sql
+if [ "$PLAN" = "prod-marketplace-v2" ]; then
+  run "pre: marketplace-v2 facts" "$OUT/mv2-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-v2-smoke.sql
+  run "pre: marketplace-v2 smoke" "$OUT/mv2-pre.out" -- node scripts/hosted-db/marketplace-v2-smoke.mjs facts pre "$OUT/mv2-pre.json"; cat "$OUT/mv2-pre.out"
+fi
 echo "pre-checks passed. Recovery: $RECOVERY${LABEL:+ (restore-verified Production snapshot $LABEL)}"
 
 STEP="confirmation"
@@ -93,5 +99,10 @@ run "post: structure" "$OUT/struct-post.json" -- sb db query --linked -o json -f
 run "post: catalog fingerprint" "$OUT/fp-post.json" -- sb db query --linked -o json -f scripts/hosted-db/catalog-fingerprint.sql
 run "post: validation" "$OUT/post.out" -- node scripts/hosted-db/acceptance-postcheck.mjs "$PLAN" "$OUT/struct-pre.json" "$OUT/counts-pre.json" "$OUT/struct-post.json" "$OUT/counts-post.json"; cat "$OUT/post.out"
 run "post: catalog diff (exactly the plan's functions changed)" "$OUT/diff.out" -- node scripts/hosted-db/catalog-diff.mjs "$OUT/fp-pre.json" "$OUT/fp-post.json" --expect-changed "$EXPECT_CHANGED"; cat "$OUT/diff.out"
+if [ "$PLAN" = "prod-marketplace-v2" ]; then
+  run "post: marketplace-v2 facts" "$OUT/mv2-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-v2-smoke.sql
+  run "post: marketplace-v2 smoke" "$OUT/mv2-post.out" -- node scripts/hosted-db/marketplace-v2-smoke.mjs facts post "$OUT/mv2-post.json"; cat "$OUT/mv2-post.out"
+  echo "NEXT (owner): deploy the matching frontend to aladdin-frontend-production (upload-only, 10% then 100% by hand), then: SMOKE_TARGET=production node scripts/hosted-db/marketplace-v2-smoke.mjs http  (docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md)"
+fi
 STEP="done"; PUSHED=0
 echo "PASS: plan $PLAN applied to Production $PROD; history $POST_APPLIED, permissions match $POST_CONTRACT, catalog diff limited to the plan's functions, media/storage counts verified."
