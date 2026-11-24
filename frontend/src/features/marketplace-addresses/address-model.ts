@@ -13,7 +13,7 @@ import type { BuyerPlace } from "@/features/marketplace/live/public-contract";
 export const ADDRESS_KINDS = ["home", "work", "other"] as const;
 export type AddressKind = (typeof ADDRESS_KINDS)[number];
 export const MAX_ADDRESSES = 10;
-export const LOCATION_SOURCES = ["manual", "catalogue", "map"] as const;
+export const LOCATION_SOURCES = ["manual", "catalogue", "device", "map"] as const;
 export type LocationSource = (typeof LOCATION_SOURCES)[number];
 
 /** A saved address as `marketplace_buyer_addresses()` returns it. */
@@ -22,12 +22,13 @@ export type SavedAddress = {
   kind: AddressKind;
   nickname: string | null;
   governorate_key: string;
-  area_key: string | null;
+  area_key: string;
   district: string | null;
-  street: string;
+  street: string | null;
   building: string | null;
-  floor_apartment: string | null;
-  directions: string | null;
+  floor: string | null;
+  apartment: string | null;
+  landmark: string | null;
   latitude: number | null;
   longitude: number | null;
   location_source: LocationSource;
@@ -59,12 +60,13 @@ export const addressDraftSchema = z
     kind: z.enum(ADDRESS_KINDS),
     nickname: optionalText(40),
     governorate_key: z.string().refine((v) => govKeys.has(v), "unknown_governorate"),
-    area_key: z.string().trim().max(64).transform((v) => (v === "" ? null : v)).nullable().optional().transform((v) => v ?? null),
+    area_key: z.string().trim().min(1, "area_required").max(64),
     district: optionalText(80),
-    street: text(160).refine((v) => v.length >= 3, "street_short"),
+    street: text(160).optional().transform((v) => (v === undefined || v === "" ? null : v)),
     building: optionalText(40),
-    floor_apartment: optionalText(40),
-    directions: optionalText(200),
+    floor: optionalText(20),
+    apartment: optionalText(20),
+    landmark: optionalText(120),
     latitude: optionalCoordinate,
     longitude: optionalCoordinate,
     location_source: z.enum(LOCATION_SOURCES).default("manual"),
@@ -86,7 +88,19 @@ export const addressDraftSchema = z
         ctx.addIssue({ code: "custom", path: ["latitude"], message: "pin_outside_egypt" });
       }
     }
-    if (a.location_source === "map" && !hasLat) ctx.addIssue({ code: "custom", path: ["latitude"], message: "invalid_pin" });
+    // The place keys are always required (delivery fee and estimate come from them). Without coordinates street, building,
+    // floor, apartment and landmark are required too; with coordinates (device location or pin) they are optional.
+    if (!hasLat) {
+      if (a.street === null) ctx.addIssue({ code: "custom", path: ["street"], message: "street_required" });
+      else if (a.street.length < 3) ctx.addIssue({ code: "custom", path: ["street"], message: "street_short" });
+      if (a.building === null) ctx.addIssue({ code: "custom", path: ["building"], message: "building_required" });
+      if (a.floor === null) ctx.addIssue({ code: "custom", path: ["floor"], message: "floor_required" });
+      if (a.apartment === null) ctx.addIssue({ code: "custom", path: ["apartment"], message: "apartment_required" });
+      if (a.landmark === null) ctx.addIssue({ code: "custom", path: ["landmark"], message: "landmark_required" });
+    } else if (a.street !== null && a.street.length < 3) {
+      ctx.addIssue({ code: "custom", path: ["street"], message: "street_short" });
+    }
+    if ((a.location_source === "map" || a.location_source === "device") && !hasLat) ctx.addIssue({ code: "custom", path: ["latitude"], message: "invalid_pin" });
   });
 
 export type AddressDraft = z.input<typeof addressDraftSchema>;
@@ -95,6 +109,12 @@ export type ValidAddress = z.output<typeof addressDraftSchema>;
 /** Validation issue code -> the short field name under `buyerAddresses.field.*` (and the form field it belongs to). */
 export const ISSUE_FIELD: Record<string, string> = {
   street_short: "street",
+  street_required: "street",
+  building_required: "building",
+  floor_required: "floor",
+  apartment_required: "apartment",
+  landmark_required: "landmark",
+  area_required: "area",
   name_required: "name",
   invalid_phone: "phone",
   unknown_governorate: "governorate",
@@ -129,9 +149,19 @@ export function placeLabel(a: Pick<SavedAddress, "governorate_key" | "area_key">
   return area ? `${area}${locale === "ar" ? "، " : ", "}${gov}` : gov;
 }
 
-/** A one-line street summary: "12 Street, building 4, floor/apartment 3". Order and wording belong to the caller's labels. */
-export function streetLine(a: Pick<SavedAddress, "street" | "building" | "floor_apartment" | "district">, labels: { building: string; floorApartment: string }): string {
-  return [a.street, a.district, a.building ? `${labels.building} ${a.building}` : null, a.floor_apartment ? `${labels.floorApartment} ${a.floor_apartment}` : null]
+/** A one-line summary: "Street, building 4, floor 3, apartment 7, landmark". Order and wording belong to the caller's labels. */
+export function streetLine(
+  a: Pick<SavedAddress, "street" | "building" | "floor" | "apartment" | "landmark" | "district">,
+  labels: { building: string; floor: string; apartment: string },
+): string {
+  return [
+    a.street,
+    a.district,
+    a.building ? `${labels.building} ${a.building}` : null,
+    a.floor ? `${labels.floor} ${a.floor}` : null,
+    a.apartment ? `${labels.apartment} ${a.apartment}` : null,
+    a.landmark,
+  ]
     .filter((p): p is string => !!p)
     .join("، ");
 }

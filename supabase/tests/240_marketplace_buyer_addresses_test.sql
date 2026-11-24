@@ -12,7 +12,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(45);
+select plan(56);
 
 select set_config('t.a', '70000001-0000-4000-8000-000000000001', true);
 select set_config('t.b', '70000002-0000-4000-8000-000000000002', true);
@@ -24,7 +24,7 @@ update public.profiles set phone_e164 = null, phone_country_iso2 = null, phone_n
 
 create function pg_temp.addr(p_id text, p_extra jsonb default '{}'::jsonb) returns jsonb language sql as $$
   select jsonb_build_object('id', p_id, 'kind', 'home', 'governorate_key', 'cairo', 'area_key', current_setting('t.cairo_area'),
-    'street', '12 Example Street', 'building', '4', 'floor_apartment', '3 / 7',
+    'street', '12 Example Street', 'building', '4', 'floor', '3', 'apartment', '7', 'landmark', 'next to the pharmacy',
     'recipient_first_name', 'Test', 'recipient_last_name', 'Buyer', 'recipient_phone_e164', '+201999000001') || p_extra;
 $$;
 
@@ -153,6 +153,34 @@ select throws_ok($$insert into public.marketplace_buyer_addresses (id, user_id, 
 reset role;
 set local role anon;
 select throws_ok($$select public.marketplace_buyer_addresses()$$, '42501', null, 'G5. anon cannot call the RPCs');
+
+-- ===========================================================================
+-- H. Manual fields and shared location (owner decisions 2026-11-24)
+-- ===========================================================================
+reset role;
+delete from public.marketplace_buyer_addresses where user_id = current_setting('t.b')::uuid;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"70000002-0000-4000-8000-000000000002","role":"authenticated"}';
+select throws_ok($$select public.marketplace_buyer_address_save(pg_temp.addr('b0000000-0000-4000-8000-00000000b001', '{"street":null,"building":null}'))$$, '22023', null,
+  'H1. without coordinates the street and the building are required');
+select throws_ok($$select public.marketplace_buyer_address_save(pg_temp.addr('b0000000-0000-4000-8000-00000000b001', '{"floor":null}'))$$, '22023', null,
+  'H1b. without coordinates the floor is required');
+select throws_ok($$select public.marketplace_buyer_address_save(pg_temp.addr('b0000000-0000-4000-8000-00000000b001', '{"apartment":null,"landmark":null}'))$$, '22023', null,
+  'H1c. without coordinates the apartment and the landmark are required'); 
+select throws_ok($$select public.marketplace_buyer_address_save(pg_temp.addr('b0000000-0000-4000-8000-00000000b001', '{"building":""}'))$$, '22023', null,
+  'H2. a missing building alone is refused without coordinates');
+select throws_ok($$select public.marketplace_buyer_address_save(pg_temp.addr('b0000000-0000-4000-8000-00000000b001', '{"area_key":""}'))$$, '22023', null,
+  'H3. the area is always required');
+select throws_ok($$select public.marketplace_buyer_address_save(pg_temp.addr('b0000000-0000-4000-8000-00000000b001', '{"area_key":null,"latitude":"30.04","longitude":"31.23","location_source":"device"}'))$$, '22023', null,
+  'H4. the area stays required even when the location is shared');
+select throws_ok($$select public.marketplace_buyer_address_save(pg_temp.addr('b0000000-0000-4000-8000-00000000b001', '{"location_source":"device"}'))$$, '22023', null,
+  'H5. a device location needs coordinates');
+select throws_ok($$select public.marketplace_buyer_address_save(pg_temp.addr('b0000000-0000-4000-8000-00000000b001', jsonb_build_object('landmark', repeat('x', 121))))$$, '22023', null,
+  'H6. the landmark is length-limited');
+select lives_ok($$select public.marketplace_buyer_address_save(pg_temp.addr('b0000000-0000-4000-8000-00000000b002', '{"street":null,"building":null,"floor":null,"apartment":null,"landmark":null,"latitude":"30.0444201234","longitude":"31.235712","location_source":"device"}'))$$,
+  'H7. with coordinates the street, building, floor, apartment and landmark are optional');
+select is((select latitude::text from public.marketplace_buyer_addresses where id = 'b0000000-0000-4000-8000-00000000b002'), '30.044420', 'H8. coordinates are stored with bounded precision (6 decimals)');
+select is((public.marketplace_buyer_checkout_readiness('b0000000-0000-4000-8000-00000000b002') ->> 'area_key') is not null, true, 'H9. the place keys are still returned for the delivery estimate');
 reset role;
 select is((select count(*)::int from public.marketplace_buyer_address_events where user_id = current_setting('t.a')::uuid and kind = 'created'), 11,
   'G6. every creation left an event (ten saved plus the deleted one)');

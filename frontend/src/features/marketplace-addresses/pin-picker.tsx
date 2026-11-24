@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button, Input, LabeledField } from "@/components/ui/controls";
+import { Button } from "@/components/ui/controls";
 import { InlineError } from "@/components/ui/primitives";
 import type { MapsConfig } from "@/lib/env/maps";
 import { useI18n } from "@/lib/i18n/context";
+import { requestDeviceLocation } from "./device-location";
 import { DEFAULT_MAP_CENTER, isInsideEgypt, loadGoogleMaps } from "./map-provider";
 
 /**
@@ -23,12 +24,23 @@ export function PinPicker({
   config: MapsConfig;
   lat: string;
   lng: string;
-  onChange: (lat: string, lng: string) => void;
+  onChange: (lat: string, lng: string, source?: "device" | "map") => void;
 }) {
   const { t, locale } = useI18n();
   const [failed, setFailed] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const useMap = config.provider === "google" && !failed;
   const hasPin = lat !== "" && lng !== "";
+
+  async function share() {
+    setLocating(true);
+    setLocationError(null);
+    const r = await requestDeviceLocation();
+    setLocating(false);
+    if (r.ok) onChange(r.lat, r.lng, "device");
+    else setLocationError(`buyerAddresses.form.location.${r.reason}`);
+  }
 
   return (
     <fieldset className="flex flex-col gap-sm" data-testid="pin-picker">
@@ -38,15 +50,13 @@ export function PinPicker({
         <GoogleMapPin config={config} locale={locale} lat={lat} lng={lng} onChange={onChange} onFail={() => setFailed(true)} />
       ) : (
         <>
-          {config.provider === "none" ? <p className="text-label text-fg-muted">{t("buyerAddresses.form.pinManualHint")}</p> : null}
-          <div className="grid grid-cols-2 gap-sm">
-            <LabeledField label={t("buyerAddresses.form.latitude")} htmlFor="addr-lat">
-              <Input id="addr-lat" dir="ltr" inputMode="decimal" value={lat} onChange={(e) => onChange(e.target.value.trim(), lng)} autoComplete="off" />
-            </LabeledField>
-            <LabeledField label={t("buyerAddresses.form.longitude")} htmlFor="addr-lng">
-              <Input id="addr-lng" dir="ltr" inputMode="decimal" value={lng} onChange={(e) => onChange(lat, e.target.value.trim())} autoComplete="off" />
-            </LabeledField>
+          <p className="text-label text-fg-muted">{t("buyerAddresses.form.locationHint")}</p>
+          <div>
+            <Button variant="outline" size="sm" disabled={locating} onClick={share} data-testid="share-location">
+              {locating ? t("buyerAddresses.form.locating") : t("buyerAddresses.form.useMyLocation")}
+            </Button>
           </div>
+          {locationError ? <InlineError>{t(locationError)}</InlineError> : null}
         </>
       )}
       {hasPin ? (

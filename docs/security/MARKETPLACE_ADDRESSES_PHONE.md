@@ -35,7 +35,7 @@ The recipient mobile is **verified by the existing phone verification authority*
 
 | Provider | Place search | Pin |
 |---|---|---|
-| `none` (today) | Egypt catalogue search (Arabic/English, spelling variants, typos) + governorate/area lists | optional latitude/longitude fields, street/building text |
+| `none` (today, owner decision 2026-11-24: Google not needed now) | Egypt catalogue search (Arabic/English, spelling variants, typos) + governorate/area lists | the buyer's own device location (browser Geolocation API, no key, no third-party call) |
 | `google` (after the owner's decision) | catalogue + Places autocomplete (Egypt only) | draggable pin; a failed load falls back to `none` |
 
 The Google adapter (`map-provider.ts`, `pin-picker.tsx`) is **not verified against the live service** (no key or billing account exists). Tested: the script URL, single-flight loader and retry, mapping Google address components onto catalogue keys. Variables are documented in `frontend/.env.example`; none is set anywhere.
@@ -49,6 +49,10 @@ Pricing changed in March 2025: free usage is per SKU per month (Essentials SKUs 
 3. Create a **browser key** restricted to the site's HTTP referrers (production and Acceptance domains) and to those two APIs; never a server key.
 4. The app limits spend by design: the script loads only when the address form opens; autocomplete needs 3+ characters, is debounced 400 ms and returns at most 5 predictions; catalogue search and manual entry cost nothing; no geocoding or directions call exists.
 5. Then set `NEXT_PUBLIC_MAPS_PROVIDER=google` and the key in the deployment (owner action; this PR sets nothing).
+
+## 6b. Fields and location (owner decisions, 2026-11-24)
+
+Fields in order: governorate, area, street, building, floor, apartment number, landmark. Governorate and area are ALWAYS required (the delivery fee and estimate come from those keys; coordinates cannot give them without reverse geocoding, which needs a map provider). Without coordinates all seven are required. "Use my current location" fills latitude/longitude from the browser (permission prompt explained; denied, unavailable, timeout, unsupported and outside-Egypt each have a message and fall back to manual entry). **Assumption to confirm:** with coordinates, street, building, floor, apartment and landmark are optional. Coordinates are rounded to 6 decimals, owner-only under RLS, never logged, never in a URL or an event.
 
 ## 7. Owner decisions
 

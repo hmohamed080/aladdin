@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button, Checkbox, Input, LabeledField, Select, Textarea } from "@/components/ui/controls";
+import { Button, Checkbox, Input, LabeledField, Select } from "@/components/ui/controls";
 import { PhoneField } from "@/components/ui/phone-field";
 import { InlineError } from "@/components/ui/primitives";
 import { splitE164, type CanonicalPhone } from "@/lib/contact/phone";
@@ -42,11 +42,11 @@ export function AddressForm({
   const [kind, setKind] = useState<AddressKind>(initial?.kind ?? "home");
   const [gov, setGov] = useState(initial?.governorate_key ?? "");
   const [area, setArea] = useState(initial?.area_key ?? "");
-  const [district, setDistrict] = useState(initial?.district ?? "");
   const [street, setStreet] = useState(initial?.street ?? "");
   const [building, setBuilding] = useState(initial?.building ?? "");
-  const [floorApartment, setFloorApartment] = useState(initial?.floor_apartment ?? "");
-  const [directions, setDirections] = useState(initial?.directions ?? "");
+  const [floor, setFloor] = useState(initial?.floor ?? "");
+  const [apartment, setApartment] = useState(initial?.apartment ?? "");
+  const [landmark, setLandmark] = useState(initial?.landmark ?? "");
   const [nickname, setNickname] = useState(initial?.nickname ?? "");
   const [first, setFirst] = useState(initial?.recipient_first_name ?? "");
   const [last, setLast] = useState(initial?.recipient_last_name ?? "");
@@ -124,8 +124,8 @@ export function AddressForm({
     if (pending) return;
     const e164 = phone?.e164 ?? (phoneInvalid ? "" : (initial?.recipient_phone_e164 ?? accountPhone ?? ""));
     const draft = {
-      id, kind, nickname, governorate_key: gov, area_key: area, district, street, building, floor_apartment: floorApartment, directions,
-      latitude: lat || null, longitude: lng || null, location_source: lat && lng ? "map" : source === "catalogue" ? "catalogue" : "manual",
+      id, kind, nickname, governorate_key: gov, area_key: area, street, building, floor, apartment, landmark,
+      latitude: lat || null, longitude: lng || null, location_source: lat && lng ? (source === "device" ? "device" : "map") : source === "catalogue" ? "catalogue" : "manual",
       recipient_first_name: first, recipient_last_name: last, recipient_phone_e164: e164, make_default: makeDefault,
     };
     const issue = firstAddressIssue(draft);
@@ -144,6 +144,8 @@ export function AddressForm({
     onSaved();
   }
 
+  // street, building, floor, apartment and landmark are required unless the location was shared
+  const opt = lat && lng ? t("buyerAddresses.form.optional") : undefined;
   const fieldError = (name: string) => (error?.field === name ? error.message : undefined);
 
   return (
@@ -196,26 +198,27 @@ export function AddressForm({
         </LabeledField>
       </div>
 
-      <PinPicker config={mapsConfig} lat={lat} lng={lng} onChange={(a, b) => { setLat(a); setLng(b); if (a && b) setSource("map"); }} />
-      {fieldError("pin") || fieldError("pinOutside") ? <InlineError>{fieldError("pin") ?? fieldError("pinOutside")}</InlineError> : null}
-
-      <LabeledField label={t("buyerAddresses.form.street")} htmlFor="addr-street" error={fieldError("street") ?? fieldError("characters")}>
+      <LabeledField label={t("buyerAddresses.form.street")} htmlFor="addr-street" error={fieldError("street") ?? fieldError("characters")} optional={opt}>
         <Input id="addr-street" value={street} onChange={(e) => setStreet(e.target.value)} maxLength={160} autoComplete="off" />
       </LabeledField>
       <div className="grid gap-sm sm:grid-cols-3">
-        <LabeledField label={t("buyerAddresses.form.district")} htmlFor="addr-district">
-          <Input id="addr-district" value={district} onChange={(e) => setDistrict(e.target.value)} maxLength={80} autoComplete="off" />
-        </LabeledField>
-        <LabeledField label={t("buyerAddresses.form.building")} htmlFor="addr-building">
+        <LabeledField label={t("buyerAddresses.form.building")} htmlFor="addr-building" error={fieldError("building")} optional={opt}>
           <Input id="addr-building" value={building} onChange={(e) => setBuilding(e.target.value)} maxLength={40} autoComplete="off" />
         </LabeledField>
-        <LabeledField label={t("buyerAddresses.form.floorApartment")} htmlFor="addr-floor">
-          <Input id="addr-floor" value={floorApartment} onChange={(e) => setFloorApartment(e.target.value)} maxLength={40} autoComplete="off" />
+        <LabeledField label={t("buyerAddresses.form.floor")} htmlFor="addr-floor" error={fieldError("floor")} optional={opt}>
+          <Input id="addr-floor" value={floor} onChange={(e) => setFloor(e.target.value)} maxLength={20} autoComplete="off" />
+        </LabeledField>
+        <LabeledField label={t("buyerAddresses.form.apartment")} htmlFor="addr-apartment" error={fieldError("apartment")} optional={opt}>
+          <Input id="addr-apartment" value={apartment} onChange={(e) => setApartment(e.target.value)} maxLength={20} autoComplete="off" />
         </LabeledField>
       </div>
-      <LabeledField label={t("buyerAddresses.form.directions")} htmlFor="addr-directions">
-        <Textarea id="addr-directions" value={directions} onChange={(e) => setDirections(e.target.value)} maxLength={200} rows={2} />
+      <LabeledField label={t("buyerAddresses.form.landmark")} htmlFor="addr-landmark" error={fieldError("landmark")} optional={opt}>
+        <Input id="addr-landmark" value={landmark} onChange={(e) => setLandmark(e.target.value)} maxLength={120} autoComplete="off" />
       </LabeledField>
+
+      <PinPicker config={mapsConfig} lat={lat} lng={lng} onChange={(a, b, src) => { setLat(a); setLng(b); if (a && b) setSource(src ?? "map"); }} />
+      {fieldError("pin") || fieldError("pinOutside") ? <InlineError>{fieldError("pin") ?? fieldError("pinOutside")}</InlineError> : null}
+
       <LabeledField label={t("buyerAddresses.form.nickname")} htmlFor="addr-nickname">
         <Input id="addr-nickname" value={nickname} onChange={(e) => setNickname(e.target.value)} maxLength={40} placeholder={t("buyerAddresses.form.nicknamePlaceholder")} autoComplete="off" />
       </LabeledField>

@@ -9,6 +9,8 @@ const save = vi.fn();
 const del = vi.fn();
 const setDefault = vi.fn();
 const start = vi.fn();
+const locate = vi.fn();
+vi.mock("./device-location", () => ({ requestDeviceLocation: (...a: unknown[]) => locate(...a) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/server/actions/marketplace-addresses", () => ({
   saveBuyerAddressAction: (...a: unknown[]) => save(...a),
@@ -24,7 +26,7 @@ const ACCT = "+201012345678";
 function address(over: Partial<SavedAddress> = {}): SavedAddress {
   return {
     id: "11111111-1111-4111-8111-111111111111", kind: "home", nickname: null, governorate_key: "cairo", area_key: "maadi", district: null,
-    street: "Road 9", building: "4", floor_apartment: null, directions: null, latitude: null, longitude: null, location_source: "manual",
+    street: "Road 9", building: "4", floor: null, apartment: null, landmark: null, latitude: null, longitude: null, location_source: "manual",
     recipient_first_name: "Sara", recipient_last_name: "Ali", recipient_phone_e164: ACCT, recipient_phone_verified: false, is_default: true,
     created_at: "2026-11-24T10:00:00Z", ...over,
   };
@@ -32,7 +34,7 @@ function address(over: Partial<SavedAddress> = {}): SavedAddress {
 const none = { provider: "none" } as const;
 
 beforeEach(() => {
-  [refresh, save, del, setDefault, start].forEach((m) => m.mockReset());
+  [refresh, save, del, setDefault, start, locate].forEach((m) => m.mockReset());
 });
 
 describe("addresses view", () => {
@@ -41,10 +43,14 @@ describe("addresses view", () => {
     expect(screen.getByText("You have no saved address yet.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Add an address" }));
     expect(screen.getByTestId("address-form")).toBeTruthy();
-    // no map provider: the manual coordinate fallback is offered, no map
+    // no map provider: no map, and the browser-location button is offered
     expect(screen.getByTestId("pin-picker")).toBeTruthy();
     expect(screen.queryByTestId("google-map")).toBeNull();
-    expect(screen.getByLabelText("Latitude (optional)")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use my current location" })).toBeTruthy();
+    // the manual fields, in the owner's order
+    const order = ["addr-gov", "addr-area", "addr-street", "addr-building", "addr-floor", "addr-apartment", "addr-landmark"].map((id) => document.getElementById(id));
+    expect(order.every(Boolean)).toBe(true);
+    for (let i = 1; i < order.length; i++) expect(order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("never prints the full mobile number and shows the derived verification state", () => {
@@ -105,5 +111,48 @@ describe("addresses view", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add an address" }));
     fireEvent.change(screen.getByLabelText("Search for your area"), { target: { value: "maadie" } });
     expect(screen.getByTestId("place-suggestions").textContent).toContain("Maadi, Cairo");
+  });
+  it("fills the location from the browser, makes street and building optional and offers removal", async () => {
+    locate.mockResolvedValue({ ok: true, lat: "30.044420", lng: "31.235712" });
+    renderWithI18n(<AddressesView addresses={[]} accountPhone={null} mapsConfig={none} />, "en");
+    fireEvent.click(screen.getByRole("button", { name: "Add an address" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use my current location" }));
+    await waitFor(() => expect(screen.getByText("Location saved")).toBeTruthy());
+    // the numbers themselves are never printed
+    expect(document.body.textContent).not.toContain("30.0444");
+    expect(document.querySelector('label[for="addr-street"]')?.textContent).toContain("optional");
+    for (const id of ["addr-building", "addr-floor", "addr-apartment", "addr-landmark"]) {
+      expect(document.querySelector(`label[for="${id}"]`)?.textContent).toContain("optional");
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Remove the location" }));
+    for (const id of ["addr-street", "addr-building", "addr-floor", "addr-apartment", "addr-landmark"]) {
+      expect(document.querySelector(`label[for="${id}"]`)?.textContent).not.toContain("optional");
+    }
+  });
+
+  it.each([
+    ["denied", "Location permission was declined. You can allow it in your browser settings, or fill in the address instead."],
+    ["timeout", "Finding your location took too long. Try again, or fill in the address instead."],
+    ["unavailable", "Your location is not available right now. Fill in the address instead."],
+    ["unsupported", "This browser cannot share a location. Fill in the address instead."],
+  ])("explains a %s location and falls back to manual entry", async (reason, message) => {
+    locate.mockResolvedValue({ ok: false, reason });
+    renderWithI18n(<AddressesView addresses={[]} accountPhone={null} mapsConfig={none} />, "en");
+    fireEvent.click(screen.getByRole("button", { name: "Add an address" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use my current location" }));
+    await waitFor(() => expect(screen.getByText(message)).toBeTruthy());
+    expect(screen.queryByText("Location saved")).toBeNull();
+    expect((document.getElementById("addr-street") as HTMLInputElement).disabled).toBe(false);
+  });
+
+  it("still demands the governorate and area after the location is shared", async () => {
+    locate.mockResolvedValue({ ok: true, lat: "30.044420", lng: "31.235712" });
+    renderWithI18n(<AddressesView addresses={[]} accountPhone={null} mapsConfig={none} />, "en");
+    fireEvent.click(screen.getByRole("button", { name: "Add an address" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use my current location" }));
+    await waitFor(() => expect(screen.getByText("Location saved")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Save address" }));
+    await waitFor(() => expect(screen.getByText("Choose a governorate.")).toBeTruthy());
+    expect(save).not.toHaveBeenCalled();
   });
 });

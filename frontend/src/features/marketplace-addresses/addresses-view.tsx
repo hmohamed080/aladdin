@@ -69,7 +69,7 @@ export function AddressesView({ addresses, accountPhone, mapsConfig }: { address
                 {a.is_default ? <Badge>{t("buyerAddresses.list.defaultBadge")}</Badge> : null}
               </div>
               <p className="text-body text-fg">{placeLabel(a, locale)}</p>
-              <p className="text-body text-fg-secondary">{streetLine(a, { building: t("buyerAddresses.list.buildingLabel"), floorApartment: t("buyerAddresses.list.floorLabel") })}</p>
+              <p className="text-body text-fg-secondary">{streetLine(a, { building: t("buyerAddresses.list.buildingLabel"), floor: t("buyerAddresses.list.floorLabel"), apartment: t("buyerAddresses.list.apartmentLabel") })}</p>
               <p className="text-label text-fg-muted">
                 {t("buyerAddresses.list.recipient", { name: `${a.recipient_first_name} ${a.recipient_last_name}` })} · <bdi dir="ltr">{maskPhone(a.recipient_phone_e164)}</bdi>
               </p>

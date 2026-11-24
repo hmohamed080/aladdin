@@ -36,15 +36,16 @@ create table public.marketplace_buyer_addresses (
   kind                 text        not null,
   nickname             text,
   governorate_key      text        not null,
-  area_key             text,
+  area_key             text        not null,
   district             text,
-  street               text        not null,
+  street               text,
   building             text,
-  floor_apartment      text,
-  directions           text,
+  floor                text,
+  apartment            text,
+  landmark             text,
   latitude             numeric(9,6),
   longitude            numeric(9,6),
-  -- how the location was fixed: typed in (manual), picked from the place catalogue search, or a map pin
+  -- how the location was fixed: typed in (manual), picked from the place catalogue search, the buyer's own device location (device), or a map pin
   location_source      text        not null default 'manual',
   recipient_first_name text        not null,
   recipient_last_name  text        not null,
@@ -53,26 +54,30 @@ create table public.marketplace_buyer_addresses (
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now(),
   constraint ck_mp_buyer_addr_kind check (kind in ('home', 'work', 'other')),
-  constraint ck_mp_buyer_addr_source check (location_source in ('manual', 'catalogue', 'map')),
+  constraint ck_mp_buyer_addr_source check (location_source in ('manual', 'catalogue', 'device', 'map')),
   constraint ck_mp_buyer_addr_gov check (governorate_key ~ '^[a-z0-9][a-z0-9-]{0,63}$'),
-  constraint ck_mp_buyer_addr_area check (area_key is null or area_key ~ '^[a-z0-9][a-z0-9-]{0,63}$'),
+  constraint ck_mp_buyer_addr_area check (area_key ~ '^[a-z0-9][a-z0-9-]{0,63}$'),
   constraint ck_mp_buyer_addr_phone check (recipient_phone_e164 ~ '^\+[1-9]\d{1,14}$'),
   constraint ck_mp_buyer_addr_text check (
-    char_length(street) between 3 and 160
+    (street is null or char_length(street) between 3 and 160)
     and (nickname is null or char_length(nickname) between 1 and 40)
     and (district is null or char_length(district) between 1 and 80)
     and (building is null or char_length(building) between 1 and 40)
-    and (floor_apartment is null or char_length(floor_apartment) between 1 and 40)
-    and (directions is null or char_length(directions) between 1 and 200)
+    and (floor is null or char_length(floor) between 1 and 20)
+    and (apartment is null or char_length(apartment) between 1 and 20)
+    and (landmark is null or char_length(landmark) between 1 and 120)
     and char_length(recipient_first_name) between 1 and 40
     and char_length(recipient_last_name) between 1 and 40),
   -- an Egypt bounding box (a pin outside the country is a mistake, not a delivery address); both or neither
+  -- Without coordinates street, building, floor, apartment and landmark are ALL required; with coordinates (device location or pin) they are optional.
+  -- The governorate and the area are ALWAYS required: the delivery fee and estimate are computed from those keys.
+  constraint ck_mp_buyer_addr_where check (latitude is not null or (street is not null and building is not null and floor is not null and apartment is not null and landmark is not null)),
   constraint ck_mp_buyer_addr_pin check (
     (latitude is null and longitude is null)
     or (latitude between 21.5 and 31.95 and longitude between 24.5 and 37.0))
 );
 comment on table public.marketplace_buyer_addresses is
-  'Saved buyer delivery addresses. PERSONAL DATA (name, phone, street): owner-only RLS, no client write grant, written only by the marketplace_buyer_address_* RPCs. governorate_key / area_key are the keys of app.place_governorates / app.place_cities, the same keys marketplace_delivery_rates uses, so a showroom delivery quote can be priced from a saved address. Never log or put these values in a URL.';
+  'Saved buyer delivery addresses. PERSONAL DATA (name, phone, street, landmark, coordinates): owner-only RLS, no client write grant, written only by the marketplace_buyer_address_* RPCs. governorate_key / area_key are the keys of app.place_governorates / app.place_cities, the same keys marketplace_delivery_rates uses, so a showroom delivery quote can be priced from a saved address. Never log or put these values in a URL.';
 comment on column public.marketplace_buyer_addresses.recipient_phone_e164 is
   'Canonical E.164 recipient mobile. Whether it is VERIFIED is derived, never stored: it equals profiles.phone_e164 and profiles.phone_verified_at is not null (the phone verification authority is the only writer of that proof).';
 
@@ -148,7 +153,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
   select jsonb_build_object(
     'id', a.id, 'kind', a.kind, 'nickname', a.nickname,
     'governorate_key', a.governorate_key, 'area_key', a.area_key, 'district', a.district,
-    'street', a.street, 'building', a.building, 'floor_apartment', a.floor_apartment, 'directions', a.directions,
+    'street', a.street, 'building', a.building, 'floor', a.floor, 'apartment', a.apartment, 'landmark', a.landmark,
     'latitude', a.latitude, 'longitude', a.longitude, 'location_source', a.location_source,
     'recipient_first_name', a.recipient_first_name, 'recipient_last_name', a.recipient_last_name,
     'recipient_phone_e164', a.recipient_phone_e164,
@@ -181,8 +186,8 @@ comment on function public.marketplace_buyer_addresses() is
 -- ---------------------------------------------------------------------------
 -- 5. Save (create or update, idempotent on the client-supplied id)
 -- ---------------------------------------------------------------------------
--- p_address: { id, kind, nickname?, governorate_key, area_key?, district?, street, building?, floor_apartment?,
---              directions?, latitude?, longitude?, location_source?, recipient_first_name, recipient_last_name,
+-- p_address: { id, kind, nickname?, governorate_key, area_key, district?, street?, building?, floor?, apartment?,
+--              landmark?, latitude?, longitude?, location_source?, recipient_first_name, recipient_last_name,
 --              recipient_phone_e164, make_default? }
 -- Errors (SQLSTATE): 42501 not signed in / id belongs to someone else; 22023 invalid input; 54000 address limit (10).
 create function public.marketplace_buyer_address_save(p_address jsonb)
@@ -205,7 +210,7 @@ declare
   v_count   integer;
   v_has     boolean;
   v_row     public.marketplace_buyer_addresses;
-  s_nick text; s_dist text; s_bld text; s_flr text; s_dir text;
+  s_nick text; s_dist text; s_bld text; s_flr text; s_apt text; s_lmk text;
 begin
   if v_uid is null then
     raise exception 'authentication required' using errcode = '42501';
@@ -229,7 +234,7 @@ begin
   v_kind   := lower(btrim(coalesce(p_address ->> 'kind', '')));
   v_gov    := lower(btrim(coalesce(p_address ->> 'governorate_key', '')));
   v_area   := nullif(lower(btrim(coalesce(p_address ->> 'area_key', ''))), '');
-  v_street := btrim(coalesce(p_address ->> 'street', ''));
+  v_street := nullif(btrim(coalesce(p_address ->> 'street', '')), '');
   v_first  := btrim(coalesce(p_address ->> 'recipient_first_name', ''));
   v_last   := btrim(coalesce(p_address ->> 'recipient_last_name', ''));
   v_phone  := btrim(coalesce(p_address ->> 'recipient_phone_e164', ''));
@@ -237,29 +242,30 @@ begin
   s_nick := nullif(btrim(coalesce(p_address ->> 'nickname', '')), '');
   s_dist := nullif(btrim(coalesce(p_address ->> 'district', '')), '');
   s_bld  := nullif(btrim(coalesce(p_address ->> 'building', '')), '');
-  s_flr  := nullif(btrim(coalesce(p_address ->> 'floor_apartment', '')), '');
-  s_dir  := nullif(btrim(coalesce(p_address ->> 'directions', '')), '');
+  s_flr  := nullif(btrim(coalesce(p_address ->> 'floor', '')), '');
+  s_apt  := nullif(btrim(coalesce(p_address ->> 'apartment', '')), '');
+  s_lmk  := nullif(btrim(coalesce(p_address ->> 'landmark', '')), '');
 
   if v_kind not in ('home', 'work', 'other') then raise exception 'invalid address type' using errcode = '22023'; end if;
-  if v_source not in ('manual', 'catalogue', 'map') then raise exception 'invalid location source' using errcode = '22023'; end if;
+  if v_source not in ('manual', 'catalogue', 'device', 'map') then raise exception 'invalid location source' using errcode = '22023'; end if;
   if not exists (select 1 from app.place_governorates g where g.key = v_gov) then
     raise exception 'unknown governorate' using errcode = '22023';
   end if;
   if v_area is not null and not exists (select 1 from app.place_cities c where c.governorate_key = v_gov and c.key = v_area) then
     raise exception 'unknown area' using errcode = '22023';
   end if;
-  if char_length(v_street) not between 3 and 160 then raise exception 'invalid street' using errcode = '22023'; end if;
+  if v_street is not null and char_length(v_street) not between 3 and 160 then raise exception 'invalid street' using errcode = '22023'; end if;
   if char_length(v_first) not between 1 and 40 or char_length(v_last) not between 1 and 40 then
     raise exception 'invalid recipient name' using errcode = '22023';
   end if;
   if v_phone !~ '^\+[1-9]\d{1,14}$' then raise exception 'invalid recipient phone' using errcode = '22023'; end if;
   -- control characters and line breaks never belong in an address field
-  if concat_ws(' ', v_street, v_first, v_last, s_nick, s_dist, s_bld, s_flr, s_dir) ~ '[[:cntrl:]]' then
+  if concat_ws(' ', v_street, v_first, v_last, s_nick, s_dist, s_bld, s_flr, s_apt, s_lmk) ~ '[[:cntrl:]]' then
     raise exception 'invalid characters' using errcode = '22023';
   end if;
   if (s_nick is not null and char_length(s_nick) > 40) or (s_dist is not null and char_length(s_dist) > 80)
-     or (s_bld is not null and char_length(s_bld) > 40) or (s_flr is not null and char_length(s_flr) > 40)
-     or (s_dir is not null and char_length(s_dir) > 200) then
+     or (s_bld is not null and char_length(s_bld) > 40) or (s_flr is not null and char_length(s_flr) > 20)
+     or (s_apt is not null and char_length(s_apt) > 20) or (s_lmk is not null and char_length(s_lmk) > 120) then
     raise exception 'a field is too long' using errcode = '22023';
   end if;
 
@@ -277,7 +283,10 @@ begin
     end if;
     v_lat := round(v_lat, 6); v_lng := round(v_lng, 6);
   end if;
-  if v_source = 'map' and v_lat is null then raise exception 'a map pin needs coordinates' using errcode = '22023'; end if;
+  if v_source in ('map', 'device') and v_lat is null then raise exception 'a pin needs coordinates' using errcode = '22023'; end if;
+  -- area is always required; without coordinates street, building, floor, apartment and landmark are too
+  if v_area is null then raise exception 'area required' using errcode = '22023'; end if;
+  if v_lat is null and (v_street is null or s_bld is null or s_flr is null or s_apt is null or s_lmk is null) then raise exception 'address details required' using errcode = '22023'; end if;
 
   v_default := coalesce((p_address ->> 'make_default')::boolean, false);
 
@@ -302,9 +311,9 @@ begin
       update public.marketplace_buyer_addresses set is_default = false where user_id = v_uid and is_default;
     end if;
     insert into public.marketplace_buyer_addresses (id, user_id, kind, nickname, governorate_key, area_key, district, street, building,
-        floor_apartment, directions, latitude, longitude, location_source, recipient_first_name, recipient_last_name,
+        floor, apartment, landmark, latitude, longitude, location_source, recipient_first_name, recipient_last_name,
         recipient_phone_e164, is_default)
-    values (v_id, v_uid, v_kind, s_nick, v_gov, v_area, s_dist, v_street, s_bld, s_flr, s_dir, v_lat, v_lng, v_source,
+    values (v_id, v_uid, v_kind, s_nick, v_gov, v_area, s_dist, v_street, s_bld, s_flr, s_apt, s_lmk, v_lat, v_lng, v_source,
         v_first, v_last, v_phone, v_default)
     returning * into v_row;
     perform app.marketplace_buyer_address_event(v_uid, v_id, 'created');
@@ -314,7 +323,7 @@ begin
     end if;
     update public.marketplace_buyer_addresses
        set kind = v_kind, nickname = s_nick, governorate_key = v_gov, area_key = v_area, district = s_dist, street = v_street,
-           building = s_bld, floor_apartment = s_flr, directions = s_dir, latitude = v_lat, longitude = v_lng,
+           building = s_bld, floor = s_flr, apartment = s_apt, landmark = s_lmk, latitude = v_lat, longitude = v_lng,
            location_source = v_source, recipient_first_name = v_first, recipient_last_name = v_last,
            recipient_phone_e164 = v_phone, is_default = (v_exists.is_default or v_default)
      where id = v_id
