@@ -593,6 +593,9 @@ export const PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS = {
   // sha256 e030c87a32873a200dd55066d039a5fd0dfb1c746e7d033b5eaf9aebbaa354ff, schema fingerprint exact, 172 tables / 32355 rows exact, R2 media inventory exact: 1313 files,
   // 21 of 21 sampled restored with the recorded sha256) with Production at 210 migrations (latest 20261112090001). The snapshot the prod-catchup plan needs.
   "aladdin-production-20261123T142725Z": { backupRun: "45194259216", restoreRun: "45199513364", tables: 172, rows: 32355, migrations: 210 },
+  // 2026-11-24: taken (backup run 45405013111, ledger succeeded, complete coverage verified) and restore-tested (restore run 45406400001: RESULT PASS, sha256 9a3fa46f7f3e9f17122db58b69acc731435eeff534d5b8e5bb056e72d2151d9a,
+  // schema fingerprint exact, 207 tables / 33001 rows exact, R2 media inventory exact: 1318 files, 21 of 21 sampled restored) with Production at 237 migrations (latest 20261122090002). The snapshot the prod-marketplace-v2 plan needs.
+  "aladdin-production-20261124T133628Z": { backupRun: "45405013111", restoreRun: "45406400001", tables: 207, rows: 33001, migrations: 237 },
 };
 export const FORWARD_FIX = {
   // marketplace: refuses (RAISE) while any seller/product/order/import/stock row or marketplace media object exists; never deletes user data.

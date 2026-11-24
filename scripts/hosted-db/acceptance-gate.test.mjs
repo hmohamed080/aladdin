@@ -384,7 +384,7 @@ test("prod-catchup: a push of only part of the pending list or one with an extra
 });
 test("prod-catchup: needs a restore-verified PRODUCTION snapshot; only the pinned one counts (fail closed) and an Acceptance snapshot never counts", () => {
   assert.equal(PC().freshBackup, true);
-  assert.deepEqual(PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS, { "aladdin-production-20261123T142725Z": { backupRun: "45194259216", restoreRun: "45199513364", tables: 172, rows: 32355, migrations: 210 } });
+  assert.deepEqual(PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS, { "aladdin-production-20261123T142725Z": { backupRun: "45194259216", restoreRun: "45199513364", tables: 172, rows: 32355, migrations: 210 }, "aladdin-production-20261124T133628Z": { backupRun: "45405013111", restoreRun: "45406400001", tables: 207, rows: 33001, migrations: 237 } });
   assert.ok(Object.keys(PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS).every((k) => k.startsWith("aladdin-production-")));
   assert.deepEqual(checkRecovery({ plan: "prod-catchup", label: "aladdin-production-20261123T142725Z", forwardFixSha256: allShas() }), []);
   const shas = allShas();
@@ -568,13 +568,14 @@ test("prod-marketplace-v2: the Acceptance gate refuses it, the Production gate r
   const at210 = { migrations: [...hist(209), { local: "20261112090001", remote: "20261112090001" }, ...PLANS["prod-catchup"].pending.map((v) => ({ local: v, remote: null })), ...P.pending.map((v) => ({ local: v, remote: null }))] };
   has(checkAcceptance({ target: "production", plan: "prod-marketplace-v2", list: at210, dry: dry([...PLANS["prod-catchup"].pending, ...P.pending]), localVersions: mv2Files() }), /applied migrations, expected 237/);
 });
-test("prod-marketplace-v2: needs a restore-verified PRODUCTION snapshot at >= 237 migrations; the pinned 210 one and every Acceptance label are refused; a future 237+ pin passes", () => {
+test("prod-marketplace-v2: needs a restore-verified PRODUCTION snapshot at >= 237 migrations; the pinned 210 one and every Acceptance label are refused; the pinned 237 snapshot (20261124T133628Z) passes", () => {
   const shas = allShas();
   has(checkRecovery({ plan: "prod-marketplace-v2", label: "", forwardFixSha256: shas }), /needs --backup-label of a fresh restore-verified snapshot \(migrations >= 237\)/);
   has(checkRecovery({ plan: "prod-marketplace-v2", label: "aladdin-production-20261123T142725Z", forwardFixSha256: shas }), /has 210 migrations; plan prod-marketplace-v2 needs one taken at 237 or later/);
   has(checkRecovery({ plan: "prod-marketplace-v2", label: "aladdin-acceptance-20261122T100424Z", forwardFixSha256: shas }), /not a pinned restore-verified PRODUCTION snapshot/);
   has(checkRecovery({ plan: "prod-marketplace-v2", label: "aladdin-production-20261123T162323Z", forwardFixSha256: shas }), /not a pinned restore-verified PRODUCTION snapshot/);
-  assert.ok(Object.values(PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS).every((s) => s.migrations < 237), "no 237+ Production snapshot is pinned in this PR: its restore test must report PASS first");
+  // 2026-11-24: the owner took and restore-tested the fresh Production snapshot (237, RESULT PASS) and it is pinned; the gate accepts exactly that label for this plan.
+  assert.deepEqual(checkRecovery({ plan: "prod-marketplace-v2", label: "aladdin-production-20261124T133628Z", forwardFixSha256: shas }), []);
   PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS["aladdin-production-20261124T000000Z"] = { backupRun: "x", restoreRun: "y", tables: 1, rows: 1, migrations: 237 };
   try { assert.deepEqual(checkRecovery({ plan: "prod-marketplace-v2", label: "aladdin-production-20261124T000000Z", forwardFixSha256: shas }), []); }
   finally { delete PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS["aladdin-production-20261124T000000Z"]; }
@@ -582,7 +583,7 @@ test("prod-marketplace-v2: needs a restore-verified PRODUCTION snapshot at >= 23
 });
 test("prod-marketplace-v2: pending set equals the migration files after 20261122090002 on this checkout (drift check passes today); both permission contracts exist", () => {
   assert.deepEqual(pendingDrift({ plan: "prod-marketplace-v2", localVersions: mv2Files().filter((v) => v <= PMV2().postContract) }), { unplanned: [], missing: [] });
-  assert.deepEqual(pendingDrift({ plan: "prod-marketplace-v2", localVersions: [...mv2Files(), "20261125090001"] }).unplanned, ["20261125090001"]);
+  assert.deepEqual(pendingDrift({ plan: "prod-marketplace-v2", localVersions: [...mv2Files().filter((v) => v <= PMV2().postContract), "20261125090001"] }).unplanned, ["20261125090001"]);
   for (const c of [PMV2().preContract, PMV2().postContract]) assert.ok(readdirSync(here("../../supabase/permissions")).includes(`${c}.json`), c);
 });
 test("production scripts: prod-marketplace-v2 runs the marketplace-v2 smoke before the push and after it; the Acceptance scripts do not know the plan", () => {
