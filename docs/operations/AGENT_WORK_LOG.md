@@ -1,3 +1,12 @@
+## 2026-11-24 - Marketplace v2: gated PRODUCTION plan `prod-marketplace-v2` (prepared, NOT applied)
+
+- Scope: branch `feat/production-gate-marketplace-20261124` off `origin/main` (2ee54124). Plan, scripts, tests and runbook `docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md`. No hosted connection, no secret.
+- Finding: the brief assumed Production at 207/210, but RUNTIME_STATE records `prod-catchup` already applied (237, 2026-11-23). The plan therefore starts at 237. Re-running `prod-catchup` from current main is impossible (drift check) and unnecessary.
+- Changes: `PLANS["prod-marketplace-v2"]` (derived from `marketplace-v2`, target production, freshBackup, fix `marketplace-v2`); `production-apply.sh` / `production-preflight.sh` accept it and run the marketplace-v2 smoke before and after the push; `marketplace-v2-smoke.mjs http` accepts Production only with `SMOKE_TARGET=production` (and `SMOKE_EXPECT_OPEN=false`).
+- Validation: `node --test *.test.mjs` in scripts/hosted-db 300 pass; `bash -n` on both production scripts; `drift prod-marketplace-v2` matches; `recovery` with the 210 snapshot is refused.
+- Not verified: everything hosted (live 237 state, dry run, ACL inventory, apply end to end); scratch proof not re-run; forward-fix previous definitions not md5-checked against live Production; smoke judge never run on Production data; no >= 237 Production snapshot pinned.
+- Owner decisions: Acceptance soak length, snapshot timing, launch posture (switch open vs closed after checks, section 8 of the runbook), frontend 10% -> 100% promotion.
+
 ## 2026-11-23 - Marketplace plan PR 9: public catalog and product page v2 (code, not applied anywhere hosted)
 
 - Scope: branch `feat/mkt-public-catalog-20261123` off `origin/main` (170c7747). Browse-only first launch: buyers browse, ordering comes later. One migration `20261123150001_marketplace_public_catalog_v2.sql`, code, tests, permission contract. Nothing applied to Acceptance or Production; applied to the local isolated stack (`supabase_db_aladdin_marketview`) only, together with the PR 5/6/7/8 migrations that are still unmerged drafts (their commits are NOT in this PR).
