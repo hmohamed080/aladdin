@@ -21,6 +21,13 @@
 --   * the order row is locked with SKIP LOCKED too: a timer whose order is being changed right now is left for the next run, so the
 --     runner never waits on an order lock (no deadlock with a seller pressing a button).
 --   * an order that already moved on closes the timer 'done' with no side effect.
+--   * a payment complaint that is open or under review PAUSES the buyer's receipt timer (no reminder, no expiry): the buyer must not
+--     lose the order while an admin decides. After the decision the normal rules resume; the 48 h are not restarted (contract 4.4).
+--     ASSUMED pending owner confirmation (open question for the owner: should the buyer get a fresh grace period after a
+--     "payment not received" decision?).
+--   * low / out of stock notifications (contract matrix row 16) already exist since PR 7 (trigger marketplace_stock_notify on the
+--     inventory levels, templates marketplace.stock.low / .out) and fire on the `reserve` an order causes, so the reserved hook
+--     app.marketplace_order_stock_alert stays PR 12's no-op: replacing it would notify twice.
 --   * one reminder per run per timer, however long the runner was down; the next reminder stays on the original schedule.
 --   * every timer is its own sub-transaction: a failure is counted and never blocks the rest. Only counts are returned: no id, no name.
 
@@ -200,6 +207,15 @@ begin
     update public.marketplace_timers set state = 'done', closed_at = p_now, closed_by_action = 'order_moved', next_remind_at = null
      where id = p_timer.id and state = 'active';
     return 'closed';
+  end if;
+
+  -- A payment complaint under review pauses the buyer's receipt clock: the buyer must not lose the order while an admin is still
+  -- deciding. Nothing is sent and nothing expires; when the complaint is decided the normal rules resume (contract 4.4: a
+  -- `payment_not_received` decision does not restart the 48 h, so a timer already past its deadline expires at the next run).
+  -- ASSUMED pending owner confirmation (the contract does not say the clock pauses).
+  if p_timer.kind = 'order_receipt_resubmit' and exists (
+       select 1 from public.marketplace_payment_complaints c where c.order_id = o.id and c.state in ('open', 'under_review')) then
+    return 'skipped';
   end if;
 
   select org.name into v_name from public.organizations org where org.id = o.seller_organization_id;
