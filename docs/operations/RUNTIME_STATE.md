@@ -1,3 +1,8 @@
+## Marketplace checkout and order model, PR 12 (draft PR #267, not deployed) - 2026-11-24
+
+- Migration `20261124120001` exists only on the PR branch; applied nowhere hosted. Checkout v2 (`/market/checkout`, thank-you page) stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. Orders placed through it have `source = 'v2'`; older orders keep their statuses and legacy RPCs.
+- Merges after #258 then #257; PR 13/14/15 build on its schema through the contract (PR #260).
+
 ## Marketplace saved addresses, PR 10 (draft PR, not deployed) - 2026-11-24
 
 - Migration `20261124100001` (buyer addresses) exists only on the PR branch; applied nowhere hosted. Page `/settings/addresses` follows `NEXT_PUBLIC_MARKETPLACE_PREVIEW` and is not linked publicly; ordering stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. `NEXT_PUBLIC_MAPS_PROVIDER` / `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` are unset everywhere (map provider = none). The phone verification authority is unchanged and still OFF.

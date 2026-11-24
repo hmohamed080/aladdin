@@ -5,15 +5,18 @@ import { useI18n } from "@/lib/i18n/context";
 import { Button, Textarea } from "@/components/ui/controls";
 import { EyeIcon, ReceiptIcon, StorefrontIcon, TruckIcon, UserIcon } from "@/components/ui/icons";
 import { formatEgp } from "@/lib/ui/egp-format";
-import { proofImageUrlAction, reviewProofAction, sellerOrderTransitionAction } from "@/server/actions/marketplace-orders";
+import { proofImageUrlAction, reviewProofAction, sellerOrderActionV2, sellerOrderTransitionAction } from "@/server/actions/marketplace-orders";
 import { areaName, governorateName } from "@/features/marketplace-seller/place-label";
 import {
   actionNeedsReason,
   depositSettled,
+  isV2Order,
   orderErrorCode,
   sellerActionsFor,
+  sellerActionsV2For,
   type OrderDocument,
   type SellerAction,
+  type SellerActionV2,
 } from "./contract";
 
 type Message = { ok: boolean; text: string };
@@ -28,7 +31,7 @@ export function SellerOrderView({ initial }: { initial: OrderDocument }) {
   const { t, locale } = useI18n();
   const k = (key: string) => t(`marketplaceSeller.orders.${key}`);
   const [order, setOrder] = useState(initial);
-  const [pending, setPending] = useState<SellerAction | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
@@ -37,18 +40,19 @@ export function SellerOrderView({ initial }: { initial: OrderDocument }) {
   const date = (iso: string) => new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
   const fail = (code: string) => setMessage({ ok: false, text: t(`marketplaceSeller.orderError.${orderErrorCode(code)}`) });
 
-  const run = (action: SellerAction) => {
+  const run = (action: string) => {
     setMessage(null);
-    if (actionNeedsReason(action) && pending !== action) {
+    if (actionNeedsReason(action as SellerAction) && pending !== action) {
       setPending(action);
       return;
     }
-    if (actionNeedsReason(action) && note.trim() === "") {
+    if (actionNeedsReason(action as SellerAction) && note.trim() === "") {
       setMessage({ ok: false, text: k("reasonRequired") });
       return;
     }
     start(async () => {
-      const r = await sellerOrderTransitionAction(order.id, action, note);
+      // v2 orders (placed through checkout v2) have no confirm: the machine starts at "new"; legacy orders keep their old actions
+      const r = isV2Order(order) ? await sellerOrderActionV2(order.id, action as SellerActionV2, note) : await sellerOrderTransitionAction(order.id, action as SellerAction, note);
       if (!r.ok) return fail(r.code);
       setOrder(r.order);
       setPending(null);
@@ -84,7 +88,7 @@ export function SellerOrderView({ initial }: { initial: OrderDocument }) {
       else fail(r.code);
     });
 
-  const actions = sellerActionsFor(order);
+  const actions: string[] = isV2Order(order) ? sellerActionsV2For(order) : sellerActionsFor(order);
   const needsDeposit = order.status === "pending_confirmation" && order.payment_method === "instapay" && !depositSettled(order);
   const place =
     order.fulfilment === "delivery"
@@ -215,7 +219,7 @@ export function SellerOrderView({ initial }: { initial: OrderDocument }) {
           ) : null}
           <div className="mt-md flex flex-col gap-sm">
             {actions.map((a) => (
-              <Button key={a} variant={a === "cancel" || a === "fail" ? "outline" : "accent"} disabled={busy} aria-busy={busy} onClick={() => run(a)}>
+              <Button key={a} variant={a === "cancel" || a === "fail" || a === "mark_delivery_failed" || a === "flag_receipt_not_received" ? "outline" : "accent"} disabled={busy} aria-busy={busy} onClick={() => run(a)}>
                 {k(`action.${a}`)}
               </Button>
             ))}

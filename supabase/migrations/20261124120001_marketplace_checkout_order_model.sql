@@ -1285,7 +1285,7 @@ begin
   v_missing := (v_quote -> '_internal' -> 'missing')
     || case when (v_quote ->> 'receipt_required')::boolean and not v_has_receipt then '["receipt_required"]'::jsonb else '[]'::jsonb end;
   return jsonb_build_object('session_id', s.id, 'expires_at', s.expires_at, 'quote', v_quote - '_internal', 'quote_hash', v_hash,
-    'ready', jsonb_array_length(v_missing) = 0, 'missing', v_missing);
+    'ready', jsonb_array_length(v_missing) = 0, 'missing', v_missing, 'receipts', app.marketplace_checkout_receipts(s.id));
 end;
 $$;
 
