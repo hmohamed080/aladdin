@@ -13,8 +13,9 @@
 #              --backup-label of a FRESH restore-verified snapshot (>= 237 migrations; none is pinned yet) and runs only from origin/main. Before and after the push this script
 #              also runs the read-only marketplace-v2-smoke.sql; after it the owner runs marketplace-v2-smoke.mjs http. See docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md.
 #   marketplace-slug 20261124090001 (seller public slug: 2 functions, 1 trigger, backfill of organizations.slug for approved sellers without one; PR #252), one plain push
-#              244 -> 245, on top of marketplace-v2. No table DDL, only NULL slugs are filled: no backup label required (the pinned forward-fix marketplace-slug is the recovery; the
-#              backfilled slugs are data and stay). Before and after the push this script runs the read-only marketplace-slug-smoke.sql. See docs/operations/MARKETPLACE_SLUG_ACCEPTANCE_PLAN_20261124.md.
+#              + 20261124120001 (stock notifications show the product name in the language of the text; EXPAND-only: one function replaced, 2 template DEFAULT texts), 2 migrations,
+#              244 -> 246, on top of marketplace-v2. No table DDL, only NULL slugs are filled: no backup label required (the pinned forward-fix marketplace-slug is the recovery; the
+#              backfilled slugs are data and stay). Before and after the push this script runs the read-only marketplace-slug-smoke.sql and marketplace-stock-notify-smoke.sql. See docs/operations/MARKETPLACE_SLUG_ACCEPTANCE_PLAN_20261124.md.
 #   marketplace 14 migrations (20261116100001..014), one plain push                          218 -> 232. Creates tables: needs
 #              --backup-label of a FRESH restore-verified snapshot (>= 218 migrations) and runs only from origin/main (merge #190, #192, #200 and the 20261116090001 work first).
 # NOT to be run without the owner's separate explicit GO. Production is refused. Never uses --include-all, repair or reset.
@@ -100,6 +101,8 @@ fi
 if [ "$PLAN" = "marketplace-slug" ]; then
   run "pre: marketplace-slug facts" "$OUT/slug-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-slug-smoke.sql
   run "pre: marketplace-slug smoke" "$OUT/slug-pre.out" -- node scripts/hosted-db/marketplace-slug-smoke.mjs facts pre "$OUT/slug-pre.json" --applied 244 --latest 20261123160002; cat "$OUT/slug-pre.out"
+  run "pre: marketplace-stock-notify facts" "$OUT/stock-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-stock-notify-smoke.sql
+  run "pre: marketplace-stock-notify smoke" "$OUT/stock-pre.out" -- node scripts/hosted-db/marketplace-stock-notify-smoke.mjs facts pre "$OUT/stock-pre.json" --applied 244 --latest 20261123160002; cat "$OUT/stock-pre.out"
 fi
 echo "pre-checks passed. Recovery: $RECOVERY${LABEL:+ (historical snapshot reference $LABEL, not a current recovery point)}"
 
@@ -130,6 +133,8 @@ fi
 if [ "$PLAN" = "marketplace-slug" ]; then
   run "post: marketplace-slug facts" "$OUT/slug-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-slug-smoke.sql
   run "post: marketplace-slug smoke" "$OUT/slug-post.out" -- node scripts/hosted-db/marketplace-slug-smoke.mjs facts post "$OUT/slug-post.json" --applied "$POST_APPLIED" --latest "$LATEST"; cat "$OUT/slug-post.out"
+  run "post: marketplace-stock-notify facts" "$OUT/stock-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-stock-notify-smoke.sql
+  run "post: marketplace-stock-notify smoke" "$OUT/stock-post.out" -- node scripts/hosted-db/marketplace-stock-notify-smoke.mjs facts post "$OUT/stock-post.json" --applied "$POST_APPLIED" --latest "$LATEST"; cat "$OUT/stock-post.out"
 fi
 STEP="done"; PUSHED=0
 echo "PASS: plan $PLAN applied to Acceptance $ACC; history $POST_APPLIED, permissions match $POST_CONTRACT, catalog diff limited to the plan's functions, media/storage counts verified."
