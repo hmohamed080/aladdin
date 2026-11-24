@@ -146,7 +146,7 @@ Existing columns stay exactly as in migration 14 (`id`, `order_number`, `checkou
 | `paid_now_egp` | `numeric(14,2)` | what the buyer had to transfer before confirm (0 for COD) |
 | `balance_due_egp` | `numeric(14,2)` | `total_egp - paid_now_egp` (collected at delivery) |
 | `stock_state` | `text not null default 'none'` | `none` / `pending` / `deducted` / `released` / `restocked`; the single truth about stock, checked by pgTAP against `marketplace_stock_movements` |
-| `source` | `text not null default 'v2'` | `legacy` for rows created by `marketplace_checkout_place` (v1), `v2` otherwise |
+| `source` | `text not null default 'legacy'` | **default is `legacy`** so existing rows and the still-promoted app are untouched; checkout v2 writes `'v2'` explicitly (PR 12 implementation note) |
 
 **Status values** (CHECK widened, legacy kept): `new`, `preparing`, `ready`, `shipped`, `delivered`, `cancelled`, plus the existing `delivery_failed`, `returned`, and the legacy-only `pending_confirmation`, `confirmed`, `processing`, `ready_for_pickup` (never produced by v2).
 
@@ -671,3 +671,14 @@ None of these re-opens a closed decision. Each has a recommendation; the contrac
 11. **New Cloudflare timer service.** The 6-hour reminders and 72-hour cancellations need a small scheduled service. *Recommendation:* approve building it and deploying it first on Acceptance only; until then a manual script does the same job for testing. Nothing is deployed without your approval.
 
 Already closed and **not** asked again: calendar-day delivery with no cut-off; buyer place travels in the URL only; no contact element for the showroom on any page (in-platform messages tied to the order come later); one preset system (PR 5's `marketplace_seller_message_presets`); signed-in cart is last-writer-wins; seller cannot buy from his own showroom; pilot with one selling showroom.
+
+## 12. Implementation notes recorded from PR 12 (2026-11-24)
+
+Deviations the PR 12 agent reported while building; they refine, not replace, the sections above.
+
+- `marketplace_orders.source` defaults to `legacy`; checkout v2 sets `v2` (section 2.2).
+- Extra no-op hooks for PR 14/15: `app.marketplace_order_complaint_id(p_order uuid)` (fills `payment.dispute.complaint_id`, PR 14) and `app.marketplace_order_extra_actions(p_order uuid, p_for text)` (adds `file_complaint`, `request_return`, `request_exchange` to `actions`, PR 14/15). PR 14 and PR 15 replace these bodies instead of rebuilding `app.marketplace_order_actions` / the document.
+- The legacy `app.marketplace_order_document` was patched additively (source, delivery_speed, placed_at, estimate dates, paid_now_egp, balance_due_egp) so old pages keep working.
+- **Correction to section 4.6:** the media functions have hooks only for read and metadata, not for evidence upload or delete. PR 15 therefore redefines `app.marketplace_media_can_upload` and `app.marketplace_media_can_delete` itself (rebuilding PR 12's body and adding its evidence branch); PR 15 must not touch any other media function.
+- The `return_refund_due` timer carries the 5-day reminder offset (as in section 5.2).
+
