@@ -381,6 +381,10 @@ set local request.jwt.claims = '{"role":"service_role"}';
 select public.media_storage_reserve('marketplace', current_setting('t.k1'), 'r2', current_setting('t.buyer')::uuid);
 select pg_temp.as_user(current_setting('t.buyer'));
 select is(public.media_storage_resolve('marketplace', current_setting('t.k1'), 'upload') ->> 'provider', 'r2', 'D9. the buyer may upload to the issued key');
+reset role;
+select is((select organization_id from public.media_storage_locations where namespace = 'marketplace' and object_key = current_setting('t.k1')), null,
+  'D9b. a buyer receipt is not attributed to the showroom: no per-organization rate or quota is charged to the seller');
+select is(app.media_metadata('marketplace', current_setting('t.k1')) ->> 'organization', null, 'D9c. the receipt metadata carries no organization');
 select pg_temp.as_user(current_setting('t.buyer2'));
 select is(public.media_storage_resolve('marketplace', current_setting('t.k1'), 'upload'), null, 'D10. another buyer may not');
 select pg_temp.as_user(current_setting('t.buyer'));
