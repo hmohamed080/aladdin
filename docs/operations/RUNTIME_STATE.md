@@ -1,3 +1,7 @@
+## Marketplace saved addresses, PR 10 (draft PR, not deployed) - 2026-11-24
+
+- Migration `20261124100001` (buyer addresses) exists only on the PR branch; applied nowhere hosted. Page `/settings/addresses` follows `NEXT_PUBLIC_MARKETPLACE_PREVIEW` and is not linked publicly; ordering stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. `NEXT_PUBLIC_MAPS_PROVIDER` / `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` are unset everywhere (map provider = none). The phone verification authority is unchanged and still OFF.
+
 ## Marketplace v2 Acceptance apply plan prepared (draft PR, nothing applied) - 2026-11-23
 - Plan `marketplace-v2` in `scripts/hosted-db/acceptance-gate.mjs`: the seven Marketplace migrations merged to main on 2026-11-23 (`20261123090001`, `100001`, `120001`, `130001`, `150001`, `160001`, `160002`; PRs #238-#241, #246, #249), Acceptance 237 -> 244, permission contract `20261123160002`. Runbook: `docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md`. **Not applied** to Acceptance or Production; the owner runs `acceptance-apply.sh` with an explicit GO.
 - Needs a fresh restore-verified Acceptance snapshot (>= 237 migrations): **none is pinned**, the newest pinned one has 232 and is refused. Forward-fix `forward-fix/marketplace-v2-remove.sql` (guarded, object-level; the enum value and `media_verification_ready` are not undone). Acceptance itself is unchanged: 237, latest `20261122090002`.
