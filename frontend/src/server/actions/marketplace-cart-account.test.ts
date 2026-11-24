@@ -5,7 +5,7 @@ vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({ rpc 
 
 import { syncMarketplaceCartAction } from "./marketplace-cart-account";
 
-const KEY = "5b2f4a52-8d0e-4f0e-9d51-6d3b8e0a1c11";
+const TEST_CART_MERGE_ID = "5b2f4a52-8d0e-4f0e-9d51-6d3b8e0a1c11";
 const line = { slug: "p-a", sku: "A", qty: 2 };
 
 beforeEach(() => {
@@ -42,8 +42,8 @@ describe("syncMarketplaceCartAction", () => {
   it("sends only slug, SKU and quantity to the merge RPC (never a price the browser might add) and returns the account cart", async () => {
     rpc.mockResolvedValue({ data: { replayed: false, merged: 1, skipped: 2, own_showroom: 1, open: true, lines: [{ slug: "p-a", sku: "A", qty: 2 }] }, error: null });
     const withPrice = { ...line, price_egp: 1 } as typeof line;
-    const out = await syncMarketplaceCartAction({ mode: "merge", key: KEY, lines: [withPrice] });
-    expect(rpc).toHaveBeenCalledWith("marketplace_cart_merge", { p_merge_key: KEY, p_lines: [line] });
+    const out = await syncMarketplaceCartAction({ mode: "merge", key: TEST_CART_MERGE_ID, lines: [withPrice] });
+    expect(rpc).toHaveBeenCalledWith("marketplace_cart_merge", { p_merge_key: TEST_CART_MERGE_ID, p_lines: [line] });
     expect(out).toEqual({ ok: true, lines: [line], replayed: false, skipped: 2, ownShowroom: 1 });
   });
 
@@ -52,7 +52,7 @@ describe("syncMarketplaceCartAction", () => {
     fail("mp:own_showroom");
     expect(await syncMarketplaceCartAction({ mode: "replace", lines: [line] })).toEqual({ ok: false, code: "own_showroom" });
     fail("mp:marketplace_closed");
-    expect(await syncMarketplaceCartAction({ mode: "merge", key: KEY, lines: [line] })).toEqual({ ok: false, code: "closed" });
+    expect(await syncMarketplaceCartAction({ mode: "merge", key: TEST_CART_MERGE_ID, lines: [line] })).toEqual({ ok: false, code: "closed" });
     fail("mp:auth_required");
     expect(await syncMarketplaceCartAction({ mode: "pull" })).toEqual({ ok: false, code: "signed_out" });
     fail("boom");

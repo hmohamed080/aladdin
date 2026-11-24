@@ -7872,6 +7872,7 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Cut-off: main (PR 8) has no cut-off column and PR 9's delivery code, copy and tests have no leftover (checked).
 - Not done: a clean RC2 replay for the contract (local containers could not be replayed; the contract is main's 20261123160002 plus the two new functions read from a local database, no drift on other marketplace functions). Nothing applied to Acceptance or Production.
 
+
 ## 2026-11-23 - Acceptance plan marketplace-v2 prepared (draft PR, nothing applied)
 - Branch `feat/acceptance-gate-marketplace-20261123` from `origin/main` `7faec643` (244 migration files verified; the seven after `20261122090002` are exactly the plan). Adds the gate plan `marketplace-v2` (237 -> 244, freshBackup, expected-change list of 80 function names + prefixes MEASURED on a scratch replay: 315 catalog objects), the guarded forward-fix `marketplace-v2-remove.sql` (sha256 pinned), the read-only smoke (`marketplace-v2-smoke.sql` + `.mjs`: seeds 8 templates / 15 presets, `marketplace_open` default open, public reads, publication blockers), the scratch proof `marketplace-v2-scratch-proof.mjs`, apply/preflight support, 286 passing tests, and the runbook `MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md`.
 - Decision: a fresh restore-verified Acceptance snapshot (>= 237 migrations) is MANDATORY (6 tables, constraints re-created, seeded rows, an enum value PostgreSQL cannot drop; the forward-fix never restores rows). None is pinned; the 232 one is refused by the gate. Pin approach as in #222.
