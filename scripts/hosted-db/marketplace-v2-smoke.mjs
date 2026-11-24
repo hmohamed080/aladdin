@@ -3,7 +3,7 @@
  * Read-only smoke test for the Acceptance plan "marketplace-v2" (7 Marketplace migrations, 237 -> 244). Two parts, both read-only:
  *
  *   node marketplace-v2-smoke.mjs facts pre  <facts.json>   judge marketplace-v2-smoke.sql output taken BEFORE the push (acceptance-apply.sh does this)
- *   node marketplace-v2-smoke.mjs facts post <facts.json>   judge it AFTER the push: seeds, defaults, objects, public reads
+ *   node marketplace-v2-smoke.mjs facts post <facts.json> [--applied N --latest V]   judge it AFTER the push (default 244 / 20261123160002; prod-marketplace-v2 passes 245 / 20261124090001): seeds, defaults, objects, public reads
  *   node marketplace-v2-smoke.mjs http                      anonymous Data API reads of the public Marketplace (owner, after the push; needs no database password)
  *
  * http (PowerShell):  $env:SMOKE_URL = "https://nxossqhdfltcqdwvbewi.supabase.co"; $env:SMOKE_PUBLISHABLE_KEY = "<the Acceptance publishable key>"
@@ -46,7 +46,7 @@ export function parseFacts(text) {
 }
 
 /** @returns {{ok: boolean, lines: string[]}} */
-export function judgeFacts(phase, f) {
+export function judgeFacts(phase, f, { applied = 244, latest = "20261123160002" } = {}) {
   const lines = []; let ok = true;
   const out = (pass, text) => { lines.push(`${pass ? "PASS" : "FAIL"}  ${text}`); if (!pass) ok = false; };
   const n = (v) => Number(v);
@@ -60,7 +60,7 @@ export function judgeFacts(phase, f) {
     lines.push(`INFO  existing Marketplace data: ${f.sellers} seller(s), ${f.products} product(s), ${f.published_products} published`);
     return { ok, lines };
   }
-  out(n(f.applied_migrations) === 244 && f.latest_migration === "20261123160002", `history is 244 / 20261123160002 (got ${f.applied_migrations} / ${f.latest_migration})`);
+  out(n(f.applied_migrations) === applied && f.latest_migration === latest, `history is ${applied} / ${latest} (got ${f.applied_migrations} / ${f.latest_migration})`);
   out(NEW_TABLES.every((t) => f.new_tables.includes(t)) && f.new_tables.length === NEW_TABLES.length, `the 6 new tables exist (${f.new_tables.length})`);
   out(n(f.templates) === SEED.templatesAfter && n(f.stock_templates) === 2, `${SEED.templatesAfter} notification templates, the 2 stock templates seeded (got ${f.templates} / ${f.stock_templates})`);
   out(n(f.presets) === SEED.presets && f.preset_actions === SEED.presetActions, `${SEED.presets} owner-message presets seeded (${f.preset_actions})`);
@@ -111,7 +111,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const [mode, a, b] = process.argv.slice(2);
   try {
     if (mode === "facts" && (a === "pre" || a === "post") && b) {
-      const { ok, lines } = judgeFacts(a, parseFacts(readFileSync(b, "utf8")));
+      const opt = (k) => { const i = process.argv.indexOf(k); return i > -1 ? process.argv[i + 1] : undefined; };
+      // --applied/--latest: the history after the push. Default 244 / 20261123160002 (Acceptance plan marketplace-v2); the combined Production plan prod-marketplace-v2 ends at 245 / 20261124090001.
+      const { ok, lines } = judgeFacts(a, parseFacts(readFileSync(b, "utf8")), { applied: opt("--applied") ? Number(opt("--applied")) : undefined, latest: opt("--latest") });
       console.log(lines.join("\n") + `\n\nMARKETPLACE V2 SMOKE (${a}): ${ok ? "OK" : "FAILED"}`);
       process.exit(ok ? 0 : 1);
     } else if (mode === "http") {
