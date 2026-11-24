@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
 import { categoryOrder, landingMarketplaceContent, previewProducts, type CategoryFilter } from "../landing-marketplace/landing-marketplace-content";
 import { CategoryIcon } from "../landing-marketplace/landing-marketplace-icons";
+import { isMarketplaceOrderingEnabled } from "@/lib/env";
 import { CartAddButton } from "../marketplace/live/cart-add-button";
 import { useMarketplaceImageSrc } from "../marketplace/live/image-urls";
 import { fmtEgp, liveCopy } from "../marketplace/live/live-copy";
@@ -37,7 +38,7 @@ function LiveCard({ item }: { item: PublicCard }) {
           <span>{item.from_price_egp === null ? "—" : `${item.variant_count > 1 ? `${t.from} ` : ""}${fmtEgp(Number(item.from_price_egp), "ar")}`}</span>
           <span className={styles.cardSeller}>{t.soldBy(item.seller_name)}</span>
         </div>
-        <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} className={styles.cartAdd} doneClassName={styles.cartAddDone} />
+        {isMarketplaceOrderingEnabled() ? <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} className={styles.cartAdd} doneClassName={styles.cartAddDone} /> : null}
       </div>
     </li>
   );
@@ -91,7 +92,7 @@ export function LandingBrandMarket({ live = [] }: { live?: PublicCard[] } = {}) 
               </div>
               <div className={styles.cardBody}>
                 <div><strong>{copy.title}</strong><span>{nf.format(p.priceEgp)} <small>{t.currency}</small></span></div>
-                <a href="/market" aria-label={cat.addToCart} className={styles.cartBtn}><BrandIcon name="cart" size={18} /></a>
+                {isMarketplaceOrderingEnabled() ? <a href="/market" aria-label={cat.addToCart} className={styles.cartBtn}><BrandIcon name="cart" size={18} /></a> : null}
               </div>
             </li>
           );
