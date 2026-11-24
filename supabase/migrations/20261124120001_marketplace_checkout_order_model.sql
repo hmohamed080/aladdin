@@ -1792,11 +1792,10 @@ as $$
   from public.marketplace_product_images i join public.marketplace_products p on p.id = i.product_id
   where i.object_key = p_key
   union all
-  select jsonb_build_object('owner', pr.created_by, 'organization', coalesce(o.seller_organization_id, cs.seller_organization_id), 'contentType', pr.mime_type,
+  select jsonb_build_object('owner', pr.created_by, 'organization', null, 'contentType', pr.mime_type,
     'state', case pr.upload_state when 'awaiting_upload' then 'pending' when 'confirmed' then 'ready' else 'deleted' end,
     'createdAt', pr.created_at)
-  from public.marketplace_payment_proofs pr left join public.marketplace_orders o on o.id = pr.order_id
-  left join public.marketplace_checkout_sessions cs on cs.id = pr.checkout_session_id
+  from public.marketplace_payment_proofs pr
   where pr.object_key = p_key
   union all
   select app.marketplace_return_evidence_metadata(p_key) where app.marketplace_return_evidence_metadata(p_key) is not null;
@@ -1898,7 +1897,10 @@ as $$
     -- a receipt: the buyer who uploaded it, and (once it is attached to an order) the showroom's order managers
     select 1 from public.marketplace_payment_proofs pr left join public.marketplace_orders o on o.id = pr.order_id
     where pr.object_key = p_key and pr.upload_state = 'confirmed'
-      and (pr.created_by = (select auth.uid()) or (o.id is not null and app.marketplace_can_manage_orders(o.seller_organization_id))))
+      and (pr.created_by = (select auth.uid())
+           -- the showroom's order managers, only while the showroom organization is live (the receipt metadata carries no organization)
+           or (o.id is not null and app.marketplace_can_manage_orders(o.seller_organization_id)
+               and exists (select 1 from public.organizations so where so.id = o.seller_organization_id and so.deleted_at is null))))
   or app.marketplace_complaint_admin_can_read(p_key)
   or app.marketplace_return_evidence_can_read(p_key);
 $$;
@@ -1918,6 +1920,61 @@ as $$
   or exists (
     select 1 from public.marketplace_payment_proofs pr
     where pr.object_key = p_key and pr.upload_state in ('awaiting_upload', 'deleting') and pr.created_by = (select auth.uid()));
+$$;
+
+-- A buyer's receipt is buyer-owned: its metadata carries NO organization, so reserve's per-organization rate/quota is never charged
+-- to the showroom (cross-tenant quota exhaustion). Read access still goes through app.marketplace_media_can_read.
+create or replace function public.organization_media_resolve(p_namespace text,p_key text,p_operation text,p_workspace uuid default null)
+returns jsonb language plpgsql security definer set search_path='' as $$
+declare m jsonb; allowed boolean := false; v_provider text; v_uid uuid := (select auth.uid());
+begin
+  if p_namespace not in ('product','organization','request','verification','marketplace') or v_uid is null
+    or not app.account_is_active(v_uid) then return null; end if;
+  m:=app.media_metadata(p_namespace,p_key);
+  -- A personal purchase request and a buyer's marketplace receipt have no organization (buyer-owned; their limits are per user,
+  -- never charged to the showroom); every other namespace needs a live one.
+  if m is null or (p_namespace<>'request' and not (p_namespace='marketplace' and m->>'organization' is null) and not exists(select 1 from public.organizations
+      where id=(m->>'organization')::uuid and deleted_at is null)) then return null; end if;
+  if p_operation='upload' then
+    allowed:=m->>'state'='pending' and (m->>'createdAt')::timestamptz>now()-interval '24 hours'
+      and case p_namespace when 'product' then app.can_upload_product_image_object(p_key)
+          when 'request' then app.can_upload_request_image_object(p_key)
+          when 'verification' then app.can_upload_bv_object(p_key)
+          when 'marketplace' then app.marketplace_media_can_upload(p_key)
+          else app.can_upload_organization_image_object(p_key) end;
+  elsif p_operation='read' then
+    if p_namespace='product' then
+      allowed:=m->>'state'='ready' and (app.is_org_member((m->>'organization')::uuid)
+        or exists(select 1 from public.product_images i where i.object_key=p_key
+          and app.product_is_public(i.product_id) and app.product_image_viewable(i.product_id,p_workspace)));
+    elsif p_namespace='request' then
+      -- The requester side, or another workspace that may read the request RIGHT NOW (re-checked per use).
+      allowed:=m->>'state'='ready' and exists(select 1 from public.purchase_request_images i
+        where i.object_key=p_key and (app.is_request_owner_side(i.request_id)
+          or (p_workspace is not null and app.request_image_viewable(i.request_id,p_workspace))));
+    elsif p_namespace='verification' then
+      allowed:=m->>'state'='ready' and app.can_read_bv_object(p_key);
+    elsif p_namespace='marketplace' then
+      -- Signed-in reads: the seller's members and media moderators. The public shop uses marketplace_public_image_ref.
+      allowed:=m->>'state'='ready' and app.marketplace_media_can_read(p_key);
+    else
+      allowed:=m->>'state'='ready' and exists(select 1 from public.organization_images i
+        join public.organizations o on o.logo_media_id=i.id where i.object_key=p_key and app.is_org_member(o.id));
+    end if;
+  elsif p_operation='delete' then
+    allowed:=m->>'state'='deleted' and case p_namespace
+      when 'product' then app.can_write_catalog((m->>'organization')::uuid)
+      when 'request' then app.can_delete_request_image_object(p_key)
+      when 'verification' then app.can_delete_bv_object(p_key)
+      when 'marketplace' then app.marketplace_media_can_delete(p_key)
+      else app.has_capability((m->>'organization')::uuid,'org.manage') end;
+  end if;
+  if not coalesce(allowed,false) then return null; end if;
+  select provider into v_provider from public.media_storage_locations where namespace=p_namespace and object_key=p_key;
+  return jsonb_build_object('provider',coalesce(v_provider,'supabase'),'reserved',v_provider is not null,
+    'contentType',m->>'contentType','state',m->>'state',
+    'owner',case when p_operation='upload' or (m->>'owner')::uuid=v_uid then m->>'owner' else null end);
+end;
 $$;
 
 -- ---------------------------------------------------------------------------
