@@ -215,6 +215,9 @@ function HistoryRow({
           <a href={run.github_run_url} target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline" dir="ltr">
             #{run.github_run_id}
           </a>
+        ) : run.github_run_id ? (
+          // The scheduled-run reporter stores the id but never the URL (backup_report_run), so show the id as text.
+          <span className="text-fg-secondary" dir="ltr">#{run.github_run_id}</span>
         ) : (
           <span className="text-label text-fg-muted">{t("backups.history.noRunRecorded")}</span>
         )}
