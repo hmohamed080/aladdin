@@ -208,7 +208,7 @@ function HistoryRow({
         <Badge tone={STATUS_TONE[run.status]}>{t(`backups.history.status.${run.status}`)}</Badge>
         {run.error_code ? <span className="ms-1 text-label text-fg-muted" dir="ltr">{run.error_code}</span> : null}
       </td>
-      <td className="px-3 py-2 text-fg-secondary">{who(run.requested_by)}</td>
+      <td className="px-3 py-2 text-fg-secondary">{run.requested_by ? who(run.requested_by) : run.trigger === "schedule" ? t("backups.history.requestedBySystem") : "—"}</td>
       <td className="max-w-[22rem] px-3 py-2 text-fg-secondary"><span dir="auto">{run.reason}</span></td>
       <td className="px-3 py-2">
         {run.github_run_url && run.github_run_id ? (
@@ -216,7 +216,7 @@ function HistoryRow({
             #{run.github_run_id}
           </a>
         ) : (
-          <span className="text-fg-muted">—</span>
+          <span className="text-label text-fg-muted">{t("backups.history.noRunRecorded")}</span>
         )}
       </td>
     </tr>
