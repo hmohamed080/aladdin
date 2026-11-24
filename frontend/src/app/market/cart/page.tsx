@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { LiveCartPage } from "@/features/marketplace/live/live-cart-page";
 import { MarketplaceShell } from "@/features/marketplace/marketplace-shell";
-import { isMarketplacePreviewEnabled } from "@/lib/env";
+import { isMarketplaceOrderingEnabled, isMarketplacePreviewEnabled } from "@/lib/env";
 import { LOCALE_COOKIE, directionFor, resolveLocale } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/provider";
 import { loadPublicCatalogPage } from "@/server/queries/marketplace-public";
@@ -27,6 +27,8 @@ export const metadata: Metadata = {
 export default async function MarketplaceCartRoute() {
   // Closed Marketplace: every deep link lands on the "coming soon" page.
   if (!isMarketplacePreviewEnabled()) redirect("/market");
+  // Browse-only launch: no cart until ordering is switched on (NEXT_PUBLIC_MARKETPLACE_ORDERING = "true").
+  if (!isMarketplaceOrderingEnabled()) redirect("/market");
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   // a few newest published products for the "you may also like" shelf (already-in-cart ones are hidden client-side)

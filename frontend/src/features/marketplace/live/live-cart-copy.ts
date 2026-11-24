@@ -31,6 +31,18 @@ type LiveCartCopy = {
   inCart: string;
   addedToCart: string;
   viewCart: string;
+  /** PR 11: continue to checkout, sign-in modal, blocking lines, merge notice */
+  continueToCheckout: string;
+  checkoutOpensSoon: string;
+  blockedLines: string;
+  signInTitle: string;
+  signInText: string;
+  signIn: string;
+  signUp: string;
+  continueBrowsing: string;
+  closeDialog: string;
+  mergeNote: (skipped: number, own: number) => string;
+  dismiss: string;
 };
 
 export const liveCartCopy = {
@@ -65,6 +77,20 @@ export const liveCartCopy = {
     inCart: "في السلة",
     addedToCart: "تمت الإضافة إلى السلة",
     viewCart: "عرض السلة",
+    continueToCheckout: "متابعة إلى إتمام الطلب",
+    checkoutOpensSoon: "إتمام الطلب سيتوفر قريبًا. سلتك محفوظة في حسابك.",
+    blockedLines: "أزل المنتجات المعلّمة (غير المتوفرة) لتتمكن من المتابعة.",
+    signInTitle: "سجّل الدخول لمتابعة طلبك",
+    signInText: "سلتك محفوظة على جهازك وستنتقل معك إلى حسابك بعد تسجيل الدخول، وتعود إلى هذه الصفحة نفسها.",
+    signIn: "تسجيل الدخول",
+    signUp: "إنشاء حساب",
+    continueBrowsing: "العودة إلى السلة",
+    closeDialog: "إغلاق",
+    mergeNote: (skipped, own) =>
+      own > 0
+        ? `لم تُضف بعض المنتجات إلى حسابك لأنها من معرضك أو لم تعد متاحة (${skipped}). لا يمكنك الشراء من معرضك.`
+        : `لم تُضف ${skipped} من المنتجات إلى حسابك لأنها لم تعد متاحة.`,
+    dismiss: "تم",
   },
   en: {
     subtitle: "Review your products before placing the order",
@@ -97,5 +123,19 @@ export const liveCartCopy = {
     inCart: "In cart",
     addedToCart: "Added to cart",
     viewCart: "View cart",
+    continueToCheckout: "Continue to checkout",
+    checkoutOpensSoon: "Checkout opens soon. Your cart is saved in your account.",
+    blockedLines: "Remove the marked (unavailable) items to continue.",
+    signInTitle: "Sign in to continue your order",
+    signInText: "Your cart is saved on this device. It moves into your account when you sign in, and you come back to this same page.",
+    signIn: "Sign in",
+    signUp: "Create account",
+    continueBrowsing: "Back to the cart",
+    closeDialog: "Close",
+    mergeNote: (skipped, own) =>
+      own > 0
+        ? `Some items were not added to your account because they belong to your own showroom or are no longer available (${skipped}). You cannot buy from your own showroom.`
+        : `${skipped} item(s) were not added to your account because they are no longer available.`,
+    dismiss: "OK",
   },
 } satisfies Record<Locale, LiveCartCopy>;

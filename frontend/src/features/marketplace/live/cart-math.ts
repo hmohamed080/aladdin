@@ -42,6 +42,11 @@ export type CartTotals = {
   lines: PricedLine[];
   /** lines the showroom no longer sells (unpublished, archived, suspended …) */
   unavailable: Extract<CartQuoteLine, { status: "unavailable" }>[];
+  /**
+   * Lines that block checkout: a product that sold out or was withdrawn is shown marked and stays in the cart,
+   * but the order cannot go on until the buyer removes it.
+   */
+  blockingLines: number;
   productsEgp: number;
   /** null until every showroom has a price; 0 when picked up */
   deliveryEgp: number | null;
@@ -130,5 +135,6 @@ export function priceCart(quote: CartQuote, stored: readonly StoredCartLine[], m
     }
   }
 
-  return { lines, unavailable, productsEgp, deliveryEgp, totalEgp: cents(productsEgp + (deliveryEgp ?? 0)), state, blockedBy, perSeller };
+  const blockingLines = unavailable.length + lines.filter((l) => l.outOfStock).length;
+  return { lines, unavailable, blockingLines, productsEgp, deliveryEgp, totalEgp: cents(productsEgp + (deliveryEgp ?? 0)), state, blockedBy, perSeller };
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CheckIcon, ShoppingBagIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
+import { useIsOwnShowroom } from "./viewer-context";
 import { liveCartCopy } from "./live-cart-copy";
 import { useLiveCart } from "./live-cart-store";
 import { liveCopy } from "./live-copy";
@@ -18,18 +19,22 @@ export function CartAddButton({
   slug,
   sku,
   inStock,
+  sellerSlug,
   className,
   doneClassName,
 }: {
   slug: string;
   sku: string | null | undefined;
   inStock: boolean;
+  /** public slug of the showroom that sells it; the button is hidden when the signed-in viewer works for that showroom (the database refuses it too) */
+  sellerSlug?: string | null;
   className?: string;
   doneClassName?: string;
 }) {
   const { locale } = useI18n();
   const c = liveCartCopy[locale];
   const cart = useLiveCart();
+  const own = useIsOwnShowroom(sellerSlug);
   const [flash, setFlash] = useState<"added" | "cart_full" | null>(null);
   useEffect(() => {
     if (!flash) return;
@@ -37,6 +42,7 @@ export function CartAddButton({
     return () => window.clearTimeout(id);
   }, [flash]);
 
+  if (own) return null;
   if (!inStock) {
     return (
       <button type="button" className={className} disabled aria-disabled="true">

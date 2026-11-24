@@ -11190,6 +11190,10 @@ export type Database = {
         Args: { p_content_type: string; p_order_id: string }
         Returns: Json
       }
+      marketplace_cart_get: { Args: never; Returns: Json }
+      marketplace_cart_merge: { Args: { p_lines: Json; p_merge_key: string }; Returns: Json }
+      marketplace_cart_own_sellers: { Args: never; Returns: Json }
+      marketplace_cart_replace: { Args: { p_lines: Json }; Returns: Json }
       marketplace_checkout_place: {
         Args: {
           p_contact: Json

@@ -5,6 +5,7 @@ import { I18nProvider } from "@/lib/i18n/provider";
 import type { CartQuote, CartQuoteLine, CartSeller, PublicCard } from "./public-contract";
 import { LIVE_CART_KEY, useLiveCart } from "./live-cart-store";
 import { LiveCartPage } from "./live-cart-page";
+import { ViewerContext } from "./viewer-context";
 
 const quoteAction = vi.fn<(refs: { slug: string; sku: string }[], gov: string | null, area: string | null) => Promise<CartQuote | null>>();
 vi.mock("@/server/actions/marketplace-cart", () => ({
@@ -150,15 +151,48 @@ describe("live cart page", () => {
     expect(JSON.parse(window.localStorage.getItem(LIVE_CART_KEY)!)).toEqual([{ slug: "p-a", sku: "A", qty: 1 }]);
   });
 
-  it("opens checkout only once every showroom can serve the chosen area, carrying the place along", async () => {
+  it("lets a guest continue only once every showroom can serve the chosen area, and then asks them to sign in on the same cart", async () => {
     store([{ slug: "p-a", sku: "A", qty: 1 }]);
     quoteAction.mockImplementation(answer([ok("A", 1, 100, 9)], [showroom(1, "Decore Store", { cairo: 0 })]));
     render(wrap(<LiveCartPage suggestions={suggestions} />));
     await screen.findByText("Product A");
-    expect(screen.getByRole("button", { name: /Place order/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Continue to checkout/ })).toBeDisabled();
     choose("mp-gov", "cairo");
-    const link = await screen.findByRole("link", { name: /Place order/ });
-    expect(link.getAttribute("href")).toBe("/market/checkout?method=delivery&gov=cairo");
+    await waitFor(() => expect(screen.getByRole("button", { name: /Continue to checkout/ })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: /Continue to checkout/ }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("link", { name: "Sign in" }).getAttribute("href")).toBe("/auth/sign-in?next=%2Fmarket%2Fcart");
+    expect(within(dialog).getByRole("link", { name: "Create account" }).getAttribute("href")).toBe("/auth/sign-up?next=%2Fmarket%2Fcart");
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    // the cart is still there for the guest
+    expect(JSON.parse(window.localStorage.getItem(LIVE_CART_KEY)!)).toEqual([{ slug: "p-a", sku: "A", qty: 1 }]);
+  });
+
+  it("keeps the next step a disabled stub for a signed-in buyer until checkout opens", async () => {
+    store([{ slug: "p-a", sku: "A", qty: 1 }]);
+    quoteAction.mockImplementation(answer([ok("A", 1, 100, 9)], [showroom(1, "Decore Store", { cairo: 0 })]));
+    render(
+      <ViewerContext.Provider value={{ signedIn: true, ownSellers: [] }}>{wrap(<LiveCartPage suggestions={suggestions} />)}</ViewerContext.Provider>,
+    );
+    await screen.findByText("Product A");
+    choose("mp-gov", "cairo");
+    expect(await screen.findByText(/Checkout opens soon/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Continue to checkout/ })).toBeDisabled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("marks a sold-out or withdrawn item and blocks the next step until it is removed", async () => {
+    store([{ slug: "p-a", sku: "A", qty: 1 }, { slug: "p-b", sku: "B", qty: 1 }]);
+    quoteAction.mockImplementation(answer([ok("A", 1, 100, 9), ok("B", 1, 50, 0)], [showroom(1, "Decore Store", { cairo: 0 })]));
+    render(wrap(<LiveCartPage suggestions={suggestions} />));
+    await screen.findByText("Product B");
+    choose("mp-gov", "cairo");
+    expect(await screen.findByText("Currently out of stock")).toBeInTheDocument();
+    expect(await screen.findByText(/Remove the marked/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Continue to checkout/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Product B from cart" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Continue to checkout/ })).toBeEnabled());
   });
 
   it("says so, and offers a retry, when prices cannot be loaded", async () => {
