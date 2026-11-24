@@ -36,7 +36,7 @@ export function LandingLiveProductCard({ item }: { item: PublicCard }) {
             {item.from_price_egp === null ? "—" : `${item.variant_count > 1 ? `${t.from} ` : ""}${fmtEgp(Number(item.from_price_egp), locale)}`}
           </span>
         </div>
-        {isMarketplaceOrderingEnabled() ? <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} className={styles.addToCart} doneClassName={styles.addToCartDone} /> : null}
+        {isMarketplaceOrderingEnabled() ? <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} sellerSlug={item.seller_slug} className={styles.addToCart} doneClassName={styles.addToCartDone} /> : null}
       </div>
     </article>
   );

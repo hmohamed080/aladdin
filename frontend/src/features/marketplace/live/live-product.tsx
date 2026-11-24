@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { DeliveryBlock } from "./delivery-block";
 import { deliveryCopy } from "./live-delivery-copy";
 import { OfficialBadge } from "./product-card";
+import { useIsOwnShowroom } from "./viewer-context";
 import { liveCartCopy } from "./live-cart-copy";
 import { useLiveCart } from "./live-cart-store";
 import { useMarketplaceImageSrc } from "./image-urls";
@@ -26,6 +27,8 @@ export function LiveProduct({ product, terms = null, place = null }: { product: 
   const Sep = locale === "ar" ? ChevronLeftIcon : ChevronRightIcon;
   const c = liveCartCopy[locale];
   const cart = useLiveCart();
+  // a showroom's own people cannot buy from it: no add-to-cart on its products (the database refuses it too)
+  const ownShowroom = useIsOwnShowroom(product.seller_slug);
   const [added, setAdded] = useState<"added" | "cart_full" | null>(null);
   const [sku, setSku] = useState(product.variants[0]?.sku ?? "");
   const variant = product.variants.find((v) => v.sku === sku) ?? product.variants[0];
@@ -61,7 +64,7 @@ export function LiveProduct({ product, terms = null, place = null }: { product: 
 
       <div className={styles.detailGrid}>
         <div className={styles.gallery}>
-          <div className={v2.galleryRow}>
+          <div className={images.length > 1 ? v2.galleryRow : `${v2.galleryRow} ${v2.galleryRowSingle}`} data-gallery={images.length > 1 ? "strip" : "single"}>
             {images.length > 1 ? (
               <ul className={v2.thumbCol} aria-label={t.back}>
                 {images.map((img, i) => (
@@ -130,7 +133,7 @@ export function LiveProduct({ product, terms = null, place = null }: { product: 
                 {t.sku}: <bdi dir="ltr">{variant.sku}</bdi>
               </p>
               {variant.stock_left ? <p className={v2.lowStockPage}>{d.onlyLeft(fmtNum(variant.stock_left, locale))}</p> : null}
-              {isMarketplaceOrderingEnabled() ? (
+              {isMarketplaceOrderingEnabled() && !ownShowroom ? (
                 <>
               <button
                 type="button"

@@ -1,5 +1,5 @@
 import { createRef, useState, Fragment } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { LabeledField, Select } from "./controls";
 
@@ -29,6 +29,23 @@ const trigger = (name: string) => screen.getByRole("button", { name: new RegExp(
 /** The VISIBLE value (the hidden "City: " name prefix is not part of what the person sees). */
 const valueSpan = (name: string) => trigger(name).querySelector("span:not(.sr-only)")!;
 const shown = (name: string) => valueSpan(name).textContent;
+
+describe("Select — a label click never opens the browser's own picker", () => {
+  it("cancels the click a <label for> sends to the hidden native select and focuses the visible button instead", () => {
+    const { container } = render(
+      <LabeledField label="City" htmlFor="city">
+        <Select id="city" name="city" defaultValue="giza">
+          {cities}
+        </Select>
+      </LabeledField>,
+    );
+    const native = nativeOf(container);
+    const click = createEvent.click(native);
+    fireEvent(native, click);
+    expect(click.defaultPrevented).toBe(true); // the browser's own (unthemed, unreadable) option list is not opened
+    expect(document.activeElement).toBe(trigger("City"));
+  });
+});
 
 describe("Select — what the person sees and operates", () => {
   it("is a button that names itself from the <label for>, announces a listbox, and shows the chosen label", () => {

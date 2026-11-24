@@ -13,6 +13,8 @@ import { useI18n } from "@/lib/i18n/context";
 import { CITIES_BY_GOVERNORATE, GOVERNORATE_OPTIONS } from "@/lib/installer/location-data";
 import { quoteMarketplaceCartAction } from "@/server/actions/marketplace-cart";
 import { cartCopy } from "../marketplace-cart-copy";
+import { CartSignInModal } from "./cart-signin-modal";
+import { dismissCartNotice, useCartNotice, useCartViewer } from "./viewer-context";
 import type { Locale } from "../marketplace-types";
 import { priceCart, type PricedLine, type ReceivingMethod } from "./cart-math";
 import { liveCartCopy } from "./live-cart-copy";
@@ -159,6 +161,9 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
   const l = liveCartCopy[locale];
   const cart = useLiveCart();
   const { setQty, remove } = cart;
+  const viewer = useCartViewer();
+  const notice = useCartNotice();
+  const [signInOpen, setSignInOpen] = useState(false);
 
   const [method, setMethod] = useState<ReceivingMethod>("delivery");
   const [gov, setGov] = useState("");
@@ -212,9 +217,10 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
   const names = (list: { name: string }[]) => list.map((s) => s.name).join(locale === "ar" ? "، " : ", ");
   const itemCount = totals ? totals.lines.length + totals.unavailable.length : cart.lines.length;
   const pricesUnknown = method === "delivery" && totals?.deliveryEgp === null;
-  // Checkout opens once every showroom can serve the chosen way of receiving and something is in stock.
-  const canCheckout = Boolean(totals && totals.state === "ok" && totals.lines.some((x) => !x.outOfStock));
-  const checkoutHref = `/market/checkout?${new URLSearchParams({ method, ...(gov ? { gov } : {}), ...(area ? { area } : {}) }).toString()}`;
+  // A sold-out or withdrawn item stays in the cart, marked, and blocks the order until the buyer removes it.
+  const blocked = (totals?.blockingLines ?? 0) > 0;
+  // The next step is possible once every showroom can serve the chosen way of receiving, something is in stock and nothing is blocked.
+  const canContinue = Boolean(totals && totals.state === "ok" && totals.lines.some((x) => !x.outOfStock) && !blocked);
 
   return (
     <div className={styles.page}>
@@ -235,6 +241,13 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
           <p>{l.subtitle}</p>
         </div>
       </header>
+
+      {notice ? (
+        <p className={styles.notice} role="status">
+          <span>{l.mergeNote(notice.skipped, notice.ownShowroom)}</span>
+          <button type="button" className={styles.linkButton} onClick={dismissCartNotice}>{l.dismiss}</button>
+        </p>
+      ) : null}
 
       {empty ? (
         <>
@@ -389,16 +402,18 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
             </section>
 
             <div className={styles.actions}>
-              {canCheckout ? (
-                <Link href={checkoutHref} className={styles.checkout}>
-                  <ShieldIcon size={18} aria-hidden="true" />{l.checkoutSoon}
-                </Link>
+              {/* Guest: the button opens the sign-in dialog. Signed in: checkout is not open yet (Marketplace PR 12), so the step is a disabled stub. */}
+              {canContinue && !viewer.signedIn ? (
+                <button type="button" className={styles.checkout} onClick={() => setSignInOpen(true)}>
+                  <ShieldIcon size={18} aria-hidden="true" />{l.continueToCheckout}
+                </button>
               ) : (
                 <button type="button" className={styles.checkout} disabled aria-disabled="true">
-                  <ShieldIcon size={18} aria-hidden="true" />{l.checkoutSoon}
+                  <ShieldIcon size={18} aria-hidden="true" />{l.continueToCheckout}
                 </button>
               )}
-              <p className={styles.hint}>{l.checkoutNote}</p>
+              {blocked ? <p className={styles.warn} role="status">{l.blockedLines}</p> : null}
+              {canContinue && viewer.signedIn ? <p className={styles.hint}>{l.checkoutOpensSoon}</p> : null}
               <Link href="/market" className={styles.secondary}>
                 {dir === "rtl" ? <ChevronRightIcon size={18} aria-hidden="true" /> : <ChevronLeftIcon size={18} aria-hidden="true" />}
                 {t.continueShopping}
@@ -410,6 +425,7 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
           </aside>
         </div>
       ) : null}
+      {signInOpen && !viewer.signedIn ? <CartSignInModal onClose={() => setSignInOpen(false)} /> : null}
     </div>
   );
 }

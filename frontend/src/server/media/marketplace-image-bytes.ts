@@ -2,7 +2,18 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { storedObjectCeiling } from "@/server/media/limits";
+import { readBoundedBody } from "@/server/storage/validation";
 import { mediaProvider, privilegedStorageClient, requireR2ForRead, resolveMedia } from "@/server/storage/media";
+
+/**
+ * The STORED (verified, re-encoded) original, not the upload. `readObject` returns the pending upload, which
+ * confirmation re-encodes (sRGB, bounded edge, no personal metadata) before it is stored, so its size and hash
+ * never equal the recorded ones. Moderation validates what the shop would serve: the stored object.
+ */
+async function readStoredBytes(provider: Awaited<ReturnType<typeof mediaProvider>>, key: string): Promise<Uint8Array> {
+  const url = await provider.getReadAccess(key, 30);
+  return readBoundedBody(await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(30_000) }), storedObjectCeiling("image"));
+}
 
 /**
  * The bytes of one Marketplace image, read through the central media system (R2).
@@ -13,7 +24,7 @@ export async function readMarketplaceImageBytes(client: SupabaseClient, key: str
   const media = await resolveMedia(client, "marketplace", key, "read");
   requireR2ForRead("marketplace", media.provider);
   const provider = await mediaProvider(client, "marketplace", "r2", key);
-  return provider.readObject(key, storedObjectCeiling("image"));
+  return readStoredBytes(provider, key);
 }
 
 /**
@@ -23,7 +34,7 @@ export async function readMarketplaceImageBytes(client: SupabaseClient, key: str
  */
 export async function readPublishedMarketplaceImageBytes(key: string): Promise<Uint8Array> {
   const provider = await mediaProvider(privilegedStorageClient(), "marketplace", "r2", key);
-  return provider.readObject(key, storedObjectCeiling("image"));
+  return readStoredBytes(provider, key);
 }
 
 export type PublicMarketplaceImage = { bytes: ArrayBuffer; mimeType: string; sha256: string | null };
