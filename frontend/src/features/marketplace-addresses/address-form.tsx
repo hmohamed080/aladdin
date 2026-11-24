@@ -70,10 +70,7 @@ export function AddressForm({
 
   // Google predictions: debounced, three characters or more, and only when a provider is configured.
   useEffect(() => {
-    if (mapsConfig.provider !== "google" || query.trim().length < 3) {
-      setGoogle([]);
-      return;
-    }
+    if (mapsConfig.provider !== "google" || query.trim().length < 3) return;
     let cancelled = false;
     const timer = setTimeout(() => {
       loadGoogleMaps(mapsConfig, locale)
@@ -98,7 +95,7 @@ export function AddressForm({
         setQuery("");
       },
     })),
-    ...google.map((p) => ({
+    ...(query.trim().length >= 3 ? google : []).map((p) => ({
       key: `g-${p.id}`,
       label: p.text,
       apply: () => {
@@ -169,7 +166,7 @@ export function AddressForm({
           <ul className="flex flex-col rounded-md border" data-testid="place-suggestions">
             {suggestions.map((s) => (
               <li key={s.key}>
-                <button type="button" className="w-full px-md py-sm text-start text-body text-fg hover:bg-surface-raised" onClick={s.apply}>
+                <button type="button" className="w-full px-md py-sm text-start text-body text-fg hover:bg-surface-2" onClick={s.apply}>
                   {s.label}
                 </button>
               </li>

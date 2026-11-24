@@ -79,7 +79,9 @@ function GoogleMapPin({
   const { t } = useI18n();
   const host = useRef<HTMLDivElement | null>(null);
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
 
   useEffect(() => {
     let cancelled = false;
