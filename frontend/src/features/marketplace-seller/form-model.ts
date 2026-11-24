@@ -61,6 +61,8 @@ export type ProductDraft = {
   brand: string;
   externalRef: string;
   slug: string;
+  /** Units at or below which the owner is notified (per product); the empty string keeps the stored value. */
+  lowStockThreshold: string;
   attributes: Record<string, AttrValue>;
   variants: VariantDraft[];
 };
@@ -121,7 +123,9 @@ export function toSavePayload(draft: ProductDraft, schema: ProductTypeSchema | u
   const productFields = fieldsAt(schema, "product");
   const variantFields = fieldsAt(schema, "variant");
   return {
-    ...(draft.id ? { id: draft.id } : { organization_id: draft.organizationId, product_type_key: draft.typeKey }),
+    // The type is always sent: it can be changed on an existing product and the category follows it.
+    ...(draft.id ? { id: draft.id, product_type_key: draft.typeKey } : { organization_id: draft.organizationId, product_type_key: draft.typeKey }),
+    ...(draft.lowStockThreshold.trim() !== "" ? { low_stock_threshold: draft.lowStockThreshold.trim() } : {}),
     name_ar: draft.nameAr.trim(),
     name_en: draft.nameEn.trim(),
     description_ar: draft.descriptionAr.trim(),
@@ -161,4 +165,51 @@ export function fromStoredValue(field: AttributeField | undefined, v: unknown): 
   if (field?.dataType === "boolean") return v === true;
   if (field?.dataType === "multi_option") return Array.isArray(v) ? v.map(String) : [String(v)];
   return String(v);
+}
+
+/** What the page knows beyond the draft when it validates. */
+export type FormContext = {
+  /** An active variant already holds sellable units (saved products). */
+  storedStock: boolean;
+  /** At least one image is chosen (queued on a new product, confirmed on a saved one). */
+  hasImage: boolean;
+};
+
+/**
+ * EVERY required field of the product page, as the ids the form highlights in red. Pure and shared by Save,
+ * Save as draft and Publish: the same list drives what is red and what blocks a save. Specification fields come
+ * from the type (the database decides which are required); the rest are the conditions publication needs
+ * (name, SKU, unit, price, stock, a main image) so a seller never meets a separate "readiness" list.
+ */
+export function requiredIssues(draft: ProductDraft, schema: ProductTypeSchema | undefined, ctx: FormContext): Set<string> {
+  const issues = new Set<string>();
+  if (!draft.typeKey) issues.add("type");
+  if (!draft.nameAr.trim()) issues.add("nameAr");
+  if (!draft.nameEn.trim()) issues.add("nameEn");
+  const active = draft.variants.filter((v) => v.status === "active");
+  if (active.length === 0) issues.add("variants");
+  for (const f of fieldsAt(schema, "product")) if (f.required && isEmptyValue(draft.attributes[f.key])) issues.add(`attr:${f.key}`);
+  let newStock = false;
+  for (const v of draft.variants) {
+    if (v.status !== "active") continue;
+    if (!v.sku.trim()) issues.add(`v:${v.uid}:sku`);
+    if (!v.sellingUnit) issues.add(`v:${v.uid}:unit`);
+    const price = Number(v.price.trim());
+    if (!v.price.trim() || !Number.isFinite(price) || price <= 0) issues.add(`v:${v.uid}:price`);
+    for (const f of fieldsAt(schema, "variant")) if (f.required && isEmptyValue(v.attributes[f.key])) issues.add(`v:${v.uid}:${f.key}`);
+    if (!v.id && Number.parseInt(v.initialQty, 10) > 0) newStock = true;
+  }
+  if (!ctx.storedStock && !newStock) issues.add("stock");
+  if (!ctx.hasImage) issues.add("images");
+  const thr = draft.lowStockThreshold.trim();
+  if (thr !== "" && !/^[0-9]{1,6}$/.test(thr)) issues.add("lowStock");
+  return issues;
+}
+
+/** The seller-level publish conditions the product page shows as required rows (they are set on the store pages). */
+export type StoreSetup = { paymentReady: boolean; deliveryReady: boolean };
+
+/** True when Publish can be offered: approved by the review, the server says nothing blocks it, and the status allows it. */
+export function canOfferPublish(state: { status: string; canPublish: boolean } | null): boolean {
+  return Boolean(state && state.canPublish && (state.status === "draft" || state.status === "unpublished"));
 }

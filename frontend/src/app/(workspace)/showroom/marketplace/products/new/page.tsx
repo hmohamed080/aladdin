@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/ui/workspace-layout";
 import { StorefrontIcon } from "@/components/ui/icons";
 import { requireApprovedSeller } from "@/features/marketplace-seller/seller-gate";
 import { ProductForm } from "@/features/marketplace-seller/product-form";
-import { loadProductTypeSchemas } from "@/server/queries/marketplace-seller-catalog";
+import { loadProductTypeSchemas, loadStoreSetup } from "@/server/queries/marketplace-seller-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -11,11 +11,11 @@ export const dynamic = "force-dynamic";
 export default async function NewMarketplaceProductPage() {
   const { supabase, org, locale } = await requireApprovedSeller();
   const t = getMessages(locale).marketplaceSeller;
-  const schemas = await loadProductTypeSchemas(supabase);
+  const [schemas, storeSetup] = await Promise.all([loadProductTypeSchemas(supabase), loadStoreSetup(supabase, org.organizationId)]);
   return (
     <div className="flex flex-col gap-lg">
       <PageHeader locale={locale} Icon={StorefrontIcon} title={t.newTitle} subtitle={t.newSubtitle} />
-      <ProductForm organizationId={org.organizationId} schemas={schemas} />
+      <ProductForm organizationId={org.organizationId} schemas={schemas} storeSetup={storeSetup} />
     </div>
   );
 }

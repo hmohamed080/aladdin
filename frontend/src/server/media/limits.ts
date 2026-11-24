@@ -6,7 +6,7 @@ import {
   MEDIA_LIMIT_CEILING, parseLimitRows, resolveLimit, type MediaKind, type MediaLimitRow,
 } from "@/lib/media/limits";
 import type { MediaNamespace } from "@/lib/storage/provider-types";
-import type { VideoScope } from "@/lib/media/video-policy";
+import { videoLimitPlace, type VideoScope } from "@/lib/media/video-policy";
 
 /**
  * The stored upload limits, read on the server (service role, read-only RPC `media_limits_get`) and
@@ -48,7 +48,7 @@ export async function imageMaxBytes(namespace: MediaNamespace): Promise<number> 
 
 /** The video limit in force for a scope. */
 export async function videoMaxBytes(scope: VideoScope): Promise<number> {
-  return resolveLimit(await loadMediaLimits(), "video", scope);
+  return resolveLimit(await loadMediaLimits(), "video", videoLimitPlace(scope));
 }
 
 /**

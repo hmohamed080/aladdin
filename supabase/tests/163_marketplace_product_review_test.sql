@@ -189,7 +189,10 @@ select throws_like($$ select public.admin_marketplace_product_review_approve(cur
 select is((select count(*)::int from jsonb_array_elements(public.admin_marketplace_product_review_queue('approved', 50, 0) -> 'items') i
            where i ->> 'id' = current_setting('t.p')), 1, 'C7. the product moved to the approved tab');
 select pg_temp.back();
--- publish it so a rejection has a shelf to leave
+-- publish it so a rejection has a shelf to leave (PR 7: publishing also needs the seller's payment method and delivery)
+insert into public.marketplace_seller_payment_settings (seller_organization_id, cod_enabled) values (current_setting('t.a')::uuid, true);
+insert into public.marketplace_delivery_rates (seller_organization_id, governorate_key, fee_egp, duration_min_days, duration_max_days) values (current_setting('t.a')::uuid, 'cairo', 50, 1, 2);
+insert into public.marketplace_seller_delivery_settings (seller_organization_id, preparation_days) values (current_setting('t.a')::uuid, 1);
 select pg_temp.act_as('70000001-0000-4000-8000-000000000001');
 select public.marketplace_product_publish(current_setting('t.p')::uuid);
 select pg_temp.back();

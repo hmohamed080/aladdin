@@ -18,6 +18,8 @@ const product: PublicProduct = {
   images: [],
 };
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }), usePathname: () => "/market/products/demo-corner-trim-1" }));
+
 afterEach(() => vi.restoreAllMocks());
 
 describe("LiveProduct specifications", () => {
@@ -35,3 +37,38 @@ describe("LiveProduct specifications", () => {
     expect(duplicateKey).toEqual([]);
   });
 });
+
+describe("LiveProduct v2 header", () => {
+  const official: PublicProduct = {
+    ...product, seller_slug: "nile", seller_official: true, stock_left: 2,
+    variants: [{ sku: "T-1", selling_unit: "piece", price_egp: 100, purchasable: true, stock_left: 2, attributes: [] }],
+    images: [
+      { image_id: "i1", is_primary: true, alt_text_ar: null, alt_text_en: null, variant_sku: null },
+      { image_id: "i2", is_primary: false, alt_text_ar: null, alt_text_en: null, variant_sku: null },
+    ],
+  };
+
+  it("links the showroom above the name, marks the Official Store, and shows 'Only N left'", () => {
+    render(
+      <I18nProvider locale="en" dir="ltr">
+        <LiveProduct product={official} />
+      </I18nProvider>,
+    );
+    const links = screen.getAllByRole("link", { name: /Nile Interiors|Official Store/ });
+    expect(links.every((l) => l.getAttribute("href") === "/market/sellers/nile")).toBe(true);
+    expect(screen.getByText("Official Store")).toBeInTheDocument();
+    expect(screen.getByText("Only 2 left in stock – order soon")).toBeInTheDocument();
+    expect(screen.queryByText(/call|whatsapp|contact/i)).toBeNull();
+  });
+
+  it("shows a thumbnail strip beside the large image when there are several images", () => {
+    render(
+      <I18nProvider locale="en" dir="ltr">
+        <LiveProduct product={official} />
+      </I18nProvider>,
+    );
+    expect(screen.getByRole("button", { name: "1 / 2" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "2 / 2" })).toBeInTheDocument();
+  });
+});
+

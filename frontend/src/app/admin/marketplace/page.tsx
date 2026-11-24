@@ -4,6 +4,7 @@ import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { AdminHeader } from "@/features/admin/parts";
 import { StatePanel } from "@/components/ui/primitives";
+import { PlatformSwitch, type PlatformStatus } from "@/features/admin-marketplace/platform-switch";
 import { SellersTable, type SellerRow } from "@/features/admin-marketplace/sellers-table";
 import type { PresetRow } from "@/features/admin-marketplace/seller-model";
 import { requireAdminRoute } from "@/server/authorization/admin";
@@ -23,9 +24,10 @@ export default async function AdminMarketplaceSellersPage() {
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const m = getMessages(locale).adminMarketplace;
-  const [{ data, error }, presetResult] = await Promise.all([
+  const [{ data, error }, presetResult, { data: platform }] = await Promise.all([
     supabase.rpc("admin_marketplace_seller_overview_v2"),
     supabase.rpc("admin_marketplace_seller_presets"),
+    supabase.rpc("admin_marketplace_platform_status"),
   ]);
 
   if (error) {
@@ -55,6 +57,21 @@ export default async function AdminMarketplaceSellersPage() {
     productsDraft: Number(r.products_draft),
   }));
 
+  const raw = (platform ?? null) as {
+    open: boolean;
+    can_manage: boolean;
+    last_change: { action: string; at: string; reason: string | null; actor_name: string | null } | null;
+  } | null;
+  const status: PlatformStatus | null = raw
+    ? {
+        open: raw.open,
+        canManage: raw.can_manage,
+        lastChange: raw.last_change
+          ? { action: raw.last_change.action, at: raw.last_change.at, reason: raw.last_change.reason, actorName: raw.last_change.actor_name }
+          : null,
+      }
+    : null;
+
   const presets: PresetRow[] = (presetResult.data ?? []).map((p) => ({
     id: p.id,
     action: p.action,
@@ -69,6 +86,7 @@ export default async function AdminMarketplaceSellersPage() {
   return (
     <div className="flex flex-col gap-lg">
       <AdminHeader locale={locale} title={m.sellers.title} subtitle={m.sellers.subtitle} count={rows.length} />
+      {status ? <PlatformSwitch status={status} /> : null}
       {rows.length === 0 ? <StatePanel title={m.sellers.empty} /> : <SellersTable rows={rows} presets={presets} />}
     </div>
   );

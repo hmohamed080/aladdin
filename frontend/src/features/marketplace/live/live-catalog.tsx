@@ -1,18 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { FilterIcon, PackageIcon } from "@/components/ui/icons";
-import type { Facets, PublicCard, PublicPage, PublicSort } from "./public-contract";
+import type { BuyerPlace, Facets, PublicPage, PublicSort } from "./public-contract";
 import { PUBLIC_PAGE_SIZE } from "./public-contract";
 import type { Locale } from "../marketplace-types";
-import { fmtEgp, fmtNum, liveCopy } from "./live-copy";
+import { fmtNum, liveCopy } from "./live-copy";
 import { ALL_PRODUCTS_TYPES, HERO_TYPES, typeCover } from "./type-covers";
-import { useMarketplaceImageSrc, useMarketplaceImageSrcSet } from "./image-urls";
-import { CartAddButton } from "./cart-add-button";
+import { deliveryCopy } from "./live-delivery-copy";
+import { PlacePicker } from "./place-picker";
+import { ProductCard } from "./product-card";
 import styles from "../marketplace.module.css";
+import v2 from "../marketplace-v2.module.css";
 import store from "../marketplace-store.module.css";
 
 export type CatalogParams = {
@@ -23,7 +24,12 @@ export type CatalogParams = {
   page: number;
   priceMin: number | null;
   priceMax: number | null;
-  inStock: boolean;
+  /** only products that ship free */
+  freeShipping: boolean;
+  /** only products whose estimate starts within this many days */
+  maxDays: number | null;
+  /** the buyer's place for the delivery estimate */
+  place: BuyerPlace | null;
   /** attribute key → option keys */
   attrs: Record<string, string[]>;
 };
@@ -37,7 +43,12 @@ export function catalogHref(p: CatalogParams, patch: Partial<CatalogParams> = {}
   if (n.sort !== "newest") sp.set("sort", n.sort);
   if (n.priceMin !== null) sp.set("pmin", String(n.priceMin));
   if (n.priceMax !== null) sp.set("pmax", String(n.priceMax));
-  if (n.inStock) sp.set("stock", "1");
+  if (n.freeShipping) sp.set("free", "1");
+  if (n.maxDays !== null) sp.set("days", String(n.maxDays));
+  if (n.place) {
+    sp.set("gov", n.place.gov);
+    if (n.place.area) sp.set("area", n.place.area);
+  }
   for (const [k, v] of Object.entries(n.attrs)) if (v.length) sp.set(`f.${k}`, v.join(","));
   if (n.page > 1) sp.set("page", String(n.page));
   const s = sp.toString();
@@ -58,49 +69,6 @@ function Section({ title, open, count, children }: { title: string; open: boolea
   );
 }
 
-function Card({ item, locale }: { item: PublicCard; locale: Locale }) {
-  const t = liveCopy[locale];
-  const title = name(item, locale);
-  const imageSrc = useMarketplaceImageSrc();
-  const imageSrcSet = useMarketplaceImageSrcSet();
-  return (
-    <article className={styles.card} data-product-type={item.product_type_key}>
-      <Link href={`/market/products/${item.slug}`} className={styles.cardMedia} aria-label={title}>
-        {item.image_id ? (
-          // eslint-disable-next-line @next/next/no-img-element -- media Worker / no-store proxy; next/image would re-cache it
-          <img src={imageSrc(item.image_id, "card")} srcSet={imageSrcSet(item.image_id)} sizes="(max-width: 640px) 50vw, 330px" alt="" loading="lazy" decoding="async" className={styles.cardImage} style={{ width: "100%", height: "100%" }} />
-        ) : (
-          <span className="grid h-full place-items-center px-3 text-center text-[.8125rem] text-[var(--stone)]">{t.noImage}</span>
-        )}
-      </Link>
-      <div className={styles.cardBody}>
-        <h3 className={styles.cardTitle}>
-          <Link href={`/market/products/${item.slug}`}>{title}</Link>
-        </h3>
-        <p className={styles.cardMeta}>
-          {name({ name_ar: item.product_type_name_ar, name_en: item.product_type_name_en }, locale)}
-          {item.variant_count > 1 ? ` · ${t.variants(fmtNum(item.variant_count, locale))}` : ""}
-        </p>
-        {item.colors?.length ? (
-          <ul className={styles.dots} aria-hidden="true">
-            {item.colors.slice(0, 8).map((hex) => (
-              <li key={hex} className={styles.dot} style={{ background: hex }} />
-            ))}
-          </ul>
-        ) : null}
-        {item.from_price_egp !== null ? (
-          <p className={styles.cardPrice}>
-            <span className={styles.from}>{item.variant_count > 1 ? `${t.from} ` : ""}</span>
-            <strong>{fmtEgp(Number(item.from_price_egp), locale)}</strong>
-          </p>
-        ) : null}
-        <p className={`${styles.stock} ${item.in_stock ? styles.stockIn : styles.stockOut}`}>{item.in_stock ? t.inStock : t.outOfStock}</p>
-        <CartAddButton slug={item.slug} sku={item.cart_sku} inStock={item.in_stock} className={styles.cardCart} doneClassName={styles.cardCartDone} />
-      </div>
-    </article>
-  );
-}
-
 /**
  * The storefront in the approved layout (hero, type strip, side filters,
  * grid/list) driven ONLY by database results: every filter is a URL parameter
@@ -110,6 +78,7 @@ function Card({ item, locale }: { item: PublicCard; locale: Locale }) {
  */
 export function LiveCatalog({ locale, dir, params, page, facets }: { locale: Locale; dir: "rtl" | "ltr"; params: CatalogParams; page: PublicPage | null; facets: Facets }) {
   const t = liveCopy[locale];
+  const d = deliveryCopy[locale];
   const router = useRouter();
   const pathname = usePathname();
   const [panelOpen, setPanelOpen] = useState(false);
@@ -133,7 +102,7 @@ export function LiveCatalog({ locale, dir, params, page, facets }: { locale: Loc
   const activeType = types.find((ty) => ty.key === params.type);
   const anyPublished = facets.categories.some((c) => c.count > 0);
   const filtered = Boolean(
-    params.type || params.category || params.q || params.inStock || params.priceMin !== null || params.priceMax !== null || Object.values(params.attrs).some((v) => v.length),
+    params.type || params.category || params.q || params.freeShipping || params.maxDays !== null || params.place !== null || params.priceMin !== null || params.priceMax !== null || Object.values(params.attrs).some((v) => v.length),
   );
   const num = (v: string) => (v.trim() === "" || Number.isNaN(Number(v)) ? null : Math.max(0, Number(v)));
   const applyPrice = () => {
@@ -156,7 +125,8 @@ export function LiveCatalog({ locale, dir, params, page, facets }: { locale: Loc
   if (params.priceMin !== null || params.priceMax !== null) {
     chips.push({ id: "price", label: `${t.price}: ${params.priceMin ?? "…"}–${params.priceMax ?? "…"}`, patch: { priceMin: null, priceMax: null } });
   }
-  if (params.inStock) chips.push({ id: "stock", label: t.inStockOnly, patch: { inStock: false } });
+  if (params.freeShipping) chips.push({ id: "free", label: d.freeShippingFilter, patch: { freeShipping: false } });
+  if (params.maxDays !== null) chips.push({ id: "days", label: `${d.speedTitle}: ${d.withinDays(fmtNum(params.maxDays, locale))}`, patch: { maxDays: null } });
   if (params.q) chips.push({ id: "q", label: `“${params.q}”`, patch: { q: "" } });
 
   const heroArt = HERO_TYPES.map(typeCover).filter((x): x is string => Boolean(x));
@@ -328,9 +298,24 @@ export function LiveCatalog({ locale, dir, params, page, facets }: { locale: Loc
               );
             })}
 
+            <Section title={d.deliverToFilter} open count={params.place ? 1 : 0}>
+              <PlacePicker locale={locale} place={params.place} idPrefix="mp-place" onChange={(place) => go({ place })} />
+            </Section>
+
+            <Section title={d.speedTitle} open count={params.maxDays !== null ? 1 : 0}>
+              <div className={store.typeList} role="radiogroup" aria-label={d.speedTitle}>
+                {[null, 2, 3, 5, 7].map((n) => (
+                  <label key={n ?? "any"} className={styles.checkRow}>
+                    <input type="radio" name="mp-speed" checked={params.maxDays === n} onChange={() => go({ maxDays: n })} />
+                    <span>{n === null ? d.anySpeed : d.withinDays(fmtNum(n, locale))}</span>
+                  </label>
+                ))}
+              </div>
+            </Section>
+
             <label className={`${styles.checkRow} ${store.stockRow}`}>
-              <input type="checkbox" checked={params.inStock} onChange={() => go({ inStock: !params.inStock })} />
-              <span>{t.inStockOnly}</span>
+              <input type="checkbox" checked={params.freeShipping} onChange={() => go({ freeShipping: !params.freeShipping })} />
+              <span>{d.freeShippingFilter}</span>
             </label>
 
             <div className={store.sideActions}>
@@ -369,10 +354,10 @@ export function LiveCatalog({ locale, dir, params, page, facets }: { locale: Loc
               <p>{filtered || anyPublished ? t.noMatchBody : t.emptyBody}</p>
             </div>
           ) : (
-            <ul className={styles.grid}>
+            <ul className={v2.grid}>
               {page.items.map((item) => (
                 <li key={item.slug}>
-                  <Card item={item} locale={locale} />
+                  <ProductCard item={item} locale={locale} place={params.place} />
                 </li>
               ))}
             </ul>

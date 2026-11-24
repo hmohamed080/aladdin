@@ -7,8 +7,12 @@
  * reserved) across its active variants at active stock locations.
  */
 
-/** Below this many sellable units a product counts as low on stock. */
-export const LOW_STOCK_THRESHOLD = 10;
+/** Default units at or below which a product counts as low on stock; each product carries its own threshold. */
+export const LOW_STOCK_THRESHOLD = 5;
+
+/** What the review says about a product's media, shown beside the price. */
+export const REVIEW_STATES = ["approved", "pending_review", "rejected", "no_image"] as const;
+export type ReviewState = (typeof REVIEW_STATES)[number];
 
 /** Rows per page. */
 export const SELLER_PRODUCTS_PAGE_SIZE = 20;
@@ -39,6 +43,10 @@ export type SellerProductRow = {
   skus: string[];
   fromPrice: number | null;
   quantity: number;
+  /** Per-product threshold set by the seller. */
+  lowStockThreshold: number;
+  /** Approved / pending review / rejected / no image. */
+  reviewState: ReviewState;
   /**
    * Where an inline − / + may act: exactly one active variant held at most at one
    * active location. Anything with more variants or locations is edited on the
@@ -115,19 +123,21 @@ export function toRow(p: RawProduct): SellerProductRow {
     skus: active.map((v) => v.sku),
     fromPrice: prices.length ? Math.min(...prices) : null,
     quantity,
+    lowStockThreshold: LOW_STOCK_THRESHOLD,
+    reviewState: "no_image",
     inlineStock,
     primaryImageKey: primary?.object_key ?? null,
   };
 }
 
-export function stockState(quantity: number): StockState {
+export function stockState(quantity: number, threshold: number = LOW_STOCK_THRESHOLD): StockState {
   if (quantity <= 0) return "out";
-  if (quantity < LOW_STOCK_THRESHOLD) return "low";
+  if (quantity <= threshold) return "low";
   return "in";
 }
 
 export function displayState(row: SellerProductRow): DisplayState {
-  const s = stockState(row.quantity);
+  const s = stockState(row.quantity, row.lowStockThreshold);
   // A draft or archived product is not on sale, so its stock is not the headline.
   if (row.status === "published" && s !== "in") return s;
   return row.status;
@@ -142,7 +152,7 @@ export function productStats(rows: readonly SellerProductRow[]): SellerProductSt
     published: rows.filter((r) => r.status === "published").length,
     draft: rows.filter((r) => r.status === "draft").length,
     // Low, not out: the tile links to the `stock=low` filter, so it counts exactly what that shows.
-    lowStock: rows.filter((r) => r.status !== "archived" && stockState(r.quantity) === "low").length,
+    lowStock: rows.filter((r) => r.status !== "archived" && stockState(r.quantity, r.lowStockThreshold) === "low").length,
   };
 }
 
@@ -167,7 +177,7 @@ export function applyFilters(rows: readonly SellerProductRow[], f: SellerProduct
   return rows.filter((r) => {
     if (f.type && r.typeKey !== f.type) return false;
     if (f.status && r.status !== f.status) return false;
-    if (f.stock && stockState(r.quantity) !== f.stock) return false;
+    if (f.stock && stockState(r.quantity, r.lowStockThreshold) !== f.stock) return false;
     if (needle) {
       const hay = [r.nameAr, r.nameEn, ...r.skus].map((s) => s.toLocaleLowerCase());
       if (!hay.some((s) => s.includes(needle))) return false;
@@ -192,6 +202,8 @@ export type PagedProduct = {
   description_ar: string | null;
   description_en: string | null;
   status: string;
+  review_state?: string | null;
+  low_stock_threshold?: number | null;
   type_key: string | null;
   type_name_ar: string | null;
   type_name_en: string | null;
@@ -227,6 +239,8 @@ export function fromPaged(p: PagedProduct): SellerProductRow & { variantCount: n
     variantCount: Number(p.variant_count ?? 0),
     fromPrice: p.from_price === null ? null : Number(p.from_price),
     quantity: Number(p.quantity ?? 0),
+    lowStockThreshold: Number(p.low_stock_threshold ?? LOW_STOCK_THRESHOLD),
+    reviewState: (REVIEW_STATES as readonly string[]).includes(p.review_state ?? "") ? (p.review_state as ReviewState) : "no_image",
     inlineStock: s
       ? { variantId: s.variant_id, locationId: s.location_id, onHand: Number(s.on_hand), reserved: Number(s.reserved), available: Number(s.available) }
       : null,

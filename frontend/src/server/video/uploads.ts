@@ -31,7 +31,7 @@ export class VideoUploadError extends Error {
 
 const UUID = z.string().uuid();
 export const beginSchema = z.object({
-  scope: z.enum(["portfolio", "product"]),
+  scope: z.enum(["portfolio", "product", "marketplace"]),
   productId: UUID.optional(),
   /** A portfolio project to put the video in (at most 6 photos and videos each). */
   projectId: UUID.optional(),
@@ -40,7 +40,7 @@ export const beginSchema = z.object({
   // Site-wide per-file cap (100 MB).
   // Shape only: the platform ceiling. The limit of the place (stored, admin-configurable) is checked in beginVideoUpload.
   bytes: z.number().int().positive().max(MEDIA_LIMIT_CEILING.video),
-}).refine((v) => (v.scope === "product") === (v.productId !== undefined), { message: "productId belongs to product scope" })
+}).refine((v) => (v.scope !== "portfolio") === (v.productId !== undefined), { message: "productId belongs to product and marketplace scope" })
   .refine((v) => v.projectId === undefined || v.scope === "portfolio", { message: "projectId belongs to portfolio scope" });
 export const partsSchema = z.object({ parts: z.array(z.number().int().min(1)).min(1).max(VIDEO_PARTS_PER_REQUEST) });
 
