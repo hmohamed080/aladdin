@@ -443,7 +443,8 @@ begin
                      when 'return_seller_response' then interval '72 hours' when 'return_refund_due' then interval '7 days' end,
          case p_kind when 'order_seller_start' then interval '6 hours' end,
          case p_kind when 'order_receipt_resubmit' then array[interval '24 hours']
-                     when 'return_seller_response' then array[interval '24 hours', interval '48 hours'] end
+                     when 'return_seller_response' then array[interval '24 hours', interval '48 hours']
+                     when 'return_refund_due' then array[interval '5 days'] end
     into v_exp, v_every, v_offsets;
   if v_exp is null then
     raise exception 'unknown timer kind' using errcode = '22023';
@@ -1791,10 +1792,11 @@ as $$
   from public.marketplace_product_images i join public.marketplace_products p on p.id = i.product_id
   where i.object_key = p_key
   union all
-  select jsonb_build_object('owner', pr.created_by, 'organization', o.seller_organization_id, 'contentType', pr.mime_type,
+  select jsonb_build_object('owner', pr.created_by, 'organization', coalesce(o.seller_organization_id, cs.seller_organization_id), 'contentType', pr.mime_type,
     'state', case pr.upload_state when 'awaiting_upload' then 'pending' when 'confirmed' then 'ready' else 'deleted' end,
     'createdAt', pr.created_at)
   from public.marketplace_payment_proofs pr left join public.marketplace_orders o on o.id = pr.order_id
+  left join public.marketplace_checkout_sessions cs on cs.id = pr.checkout_session_id
   where pr.object_key = p_key
   union all
   select app.marketplace_return_evidence_metadata(p_key) where app.marketplace_return_evidence_metadata(p_key) is not null;
