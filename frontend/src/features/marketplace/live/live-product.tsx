@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon, PackageIcon } from "@/components/ui/icons";
+import { isMarketplaceOrderingEnabled } from "@/lib/env";
 import { useI18n } from "@/lib/i18n/context";
 import { DeliveryBlock } from "./delivery-block";
 import { deliveryCopy } from "./live-delivery-copy";
@@ -87,12 +88,10 @@ export function LiveProduct({ product, terms = null, place = null }: { product: 
         </div>
 
         <div className={styles.buy}>
-          {product.seller_slug ? (
-            <p className={v2.sellerBar}>
-              <Link href={`/market/sellers/${product.seller_slug}`} className={v2.sellerLink}>{product.seller_name}</Link>
-              {product.seller_official ? <OfficialBadge locale={locale} href={`/market/sellers/${product.seller_slug}`} /> : null}
-            </p>
-          ) : null}
+          <p className={v2.sellerBar}>
+            {product.seller_slug ? <Link href={`/market/sellers/${product.seller_slug}`} className={v2.sellerLink}>{product.seller_name}</Link> : <span>{product.seller_name}</span>}
+            {product.seller_official ? <OfficialBadge locale={locale} href={product.seller_slug ? `/market/sellers/${product.seller_slug}` : undefined} /> : null}
+          </p>
           <h1 className={styles.detailTitle}>{title}</h1>
           {description ? <p className={styles.detailDesc}>{description}</p> : null}
 
@@ -131,6 +130,8 @@ export function LiveProduct({ product, terms = null, place = null }: { product: 
                 {t.sku}: <bdi dir="ltr">{variant.sku}</bdi>
               </p>
               {variant.stock_left ? <p className={v2.lowStockPage}>{d.onlyLeft(fmtNum(variant.stock_left, locale))}</p> : null}
+              {isMarketplaceOrderingEnabled() ? (
+                <>
               <button
                 type="button"
                 className={styles.addToCart}
@@ -145,6 +146,9 @@ export function LiveProduct({ product, terms = null, place = null }: { product: 
                   {c.addedToCart} · <Link href="/market/cart">{c.viewCart}</Link>
                 </p>
               ) : null}
+                </>
+              ) : null}
+              {!isMarketplaceOrderingEnabled() && !variant.purchasable ? <p className={styles.sku}>{t.outOfStock}</p> : null}
             </div>
           ) : null}
 

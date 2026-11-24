@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BoltIcon, ShoppingBagIcon, StarIcon } from "@/components/ui/icons";
+import { isMarketplaceOrderingEnabled } from "@/lib/env";
 import { useI18n } from "@/lib/i18n/context";
 import { landingMarketplaceContent, type LandingProduct } from "./landing-marketplace-content";
 import styles from "./landing-marketplace.module.css";
@@ -73,11 +74,13 @@ export function LandingMarketplaceProductCard({ product }: { product: LandingPro
           {was ? <del className={styles.was} aria-label={`${t.was}: ${was}`}>{was}</del> : null}
         </div>
         <p className={styles.unitNote}>{t.units[product.unit]}</p>
-        {/* No cart yet: the button opens /market, which says the Marketplace is coming soon. */}
-        <Link href="/market" className={styles.addToCart}>
-          <ShoppingBagIcon size={18} />
-          {t.addToCart}
-        </Link>
+        {/* Browse-only first launch: no add-to-cart until NEXT_PUBLIC_MARKETPLACE_ORDERING is "true". */}
+        {isMarketplaceOrderingEnabled() ? (
+          <Link href="/market" className={styles.addToCart}>
+            <ShoppingBagIcon size={18} />
+            {t.addToCart}
+          </Link>
+        ) : null}
       </div>
     </article>
   );

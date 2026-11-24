@@ -1,4 +1,4 @@
-import { MARKETPLACE_SELL_ENTITLEMENT } from "@/lib/nav/modules";
+import { MARKETPLACE_REQUEST_ENTITLEMENT, MARKETPLACE_SELL_ENTITLEMENT } from "@/lib/nav/modules";
 import { SHOWROOM_PENDING_MARKER } from "./navigation";
 import { describe, expect, it } from "vitest";
 import { activeShowroomItem, canNavigate, showroomNavigation, SHOWROOM_GROUPS, SHOWROOM_ROOT } from "./navigation";
@@ -11,7 +11,7 @@ describe("showroom phase 1 navigation", () => {
   const items = SHOWROOM_GROUPS.flatMap((group) => group.items);
   it("has the agreed group order, directional commerce and no institutions", () => {
     expect(SHOWROOM_GROUPS.map((group) => group.label.ar)).toEqual(["", "المشتريات", "المبيعات", "المنتجات", "الماركت", "الشبكة", "الفريق", "إدارة النشاط"]);
-    expect(items.map((item) => item.id)).toEqual(["home", "purchase-requests", "pricing-requests-sent", "quotes-received", "purchase-orders", "customer-rfqs", "customer-quotes", "customers", "leads", "follow-ups", "catalog", "offers", "saved", "my-products", "my-offers", "marketplace-products", "marketplace-orders", "marketplace-areas", "marketplace-delivery", "marketplace-payments", "suppliers", "craftsmen", "jobs", "sales-team", "projects", "reports", "activity", "points", "verification", "settings"]);
+    expect(items.map((item) => item.id)).toEqual(["home", "purchase-requests", "pricing-requests-sent", "quotes-received", "purchase-orders", "customer-rfqs", "customer-quotes", "customers", "leads", "follow-ups", "catalog", "offers", "saved", "my-products", "my-offers", "marketplace-approval", "marketplace-products", "marketplace-orders", "marketplace-areas", "marketplace-delivery", "marketplace-payments", "suppliers", "craftsmen", "jobs", "sales-team", "projects", "reports", "activity", "points", "verification", "settings"]);
     // Suite pages live under the suite root; finished modules keep their existing routes inside the same shell.
     for (const item of items) expect(item.href.startsWith(`${SHOWROOM_ROOT}/`) || item.href.startsWith("/b2b/")).toBe(true);
   });
@@ -117,6 +117,7 @@ describe("Marketplace group in the showroom account", () => {
     const group = SHOWROOM_GROUPS.find((g) => g.label.en === "Marketplace")!;
     expect(group.label.ar).toBe("الماركت");
     expect(group.items.map((i) => [i.id, i.href, i.label.ar, i.label.en])).toEqual([
+      ["marketplace-approval", "/showroom/marketplace", "اعتماد المتجر", "Marketplace approval"],
       ["marketplace-products", "/showroom/marketplace/products", "منتجات الماركت", "Marketplace products"],
       ["marketplace-orders", "/showroom/marketplace/orders", "طلبات الماركت", "Marketplace orders"],
       ["marketplace-areas", "/showroom/marketplace/areas", "المناطق", "Delivery areas"],
@@ -130,6 +131,18 @@ describe("Marketplace group in the showroom account", () => {
     for (const id of MARKETPLACE) expect(ids(["org.manage", MARKETPLACE_SELL_ENTITLEMENT])).toContain(id);
     expect(showroomNavigation(["org.manage"]).map((g) => g.label.en)).not.toContain("Marketplace");
     expect(showroomNavigation(["org.manage", MARKETPLACE_SELL_ENTITLEMENT]).map((g) => g.label.en)).toContain("Marketplace");
+  });
+
+  it("an unapproved owner reaches the approval request from the sidebar and the search model (request entitlement only)", () => {
+    expect(ids(["org.manage", MARKETPLACE_REQUEST_ENTITLEMENT])).toContain("marketplace-approval");
+    for (const id of MARKETPLACE) expect(ids(["org.manage", MARKETPLACE_REQUEST_ENTITLEMENT])).not.toContain(id);
+    expect(showroomNavigation(["org.manage", MARKETPLACE_REQUEST_ENTITLEMENT]).map((g) => g.label.en)).toContain("Marketplace");
+  });
+
+  it("the approval item is not unlocked by org.manage alone, is gone for an approved seller, and never offered to a pending showroom", () => {
+    expect(ids(["org.manage"])).not.toContain("marketplace-approval");
+    expect(ids(["org.manage", MARKETPLACE_SELL_ENTITLEMENT])).not.toContain("marketplace-approval");
+    expect(ids(["org.manage", MARKETPLACE_REQUEST_ENTITLEMENT, SHOWROOM_PENDING_MARKER])).not.toContain("marketplace-approval");
   });
 
   it("is never offered to a pending (not yet approved) showroom", () => {

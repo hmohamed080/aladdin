@@ -63,11 +63,21 @@ describe("LandingMarketplaceSection", () => {
     }
   });
 
-  it("sends Add to cart to /market (coming soon) without a cart", () => {
+  it("is browse-only: no Add to cart button on the home page cards", () => {
     renderSection("ar");
-    const links = screen.getAllByRole("link", { name: /أضف للسلة/ });
-    expect(links.length).toBeGreaterThan(0);
-    for (const link of links) expect(link).toHaveAttribute("href", "/market");
+    expect(screen.queryAllByRole("link", { name: /أضف للسلة/ })).toHaveLength(0);
+  });
+
+  it("shows Add to cart again when the ordering flag is on", () => {
+    vi.stubEnv("NEXT_PUBLIC_MARKETPLACE_ORDERING", "true");
+    try {
+      renderSection("ar");
+      const links = screen.getAllByRole("link", { name: /أضف للسلة/ });
+      expect(links.length).toBeGreaterThan(0);
+      for (const link of links) expect(link).toHaveAttribute("href", "/market");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("shows prices as tax-exclusive with the sale unit", () => {

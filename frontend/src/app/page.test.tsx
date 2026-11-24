@@ -2,9 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import RootPage from "./page";
 
-const state = vi.hoisted(() => ({ users: 1200 as number | null, open: false, items: [] as unknown[] }));
+const state = vi.hoisted(() => ({ users: 1200 as number | null, open: false, ordering: false, items: [] as unknown[] }));
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/env", () => ({ isMarketplacePreviewEnabled: () => state.open }));
+vi.mock("@/lib/env", () => ({ isMarketplacePreviewEnabled: () => state.open, isMarketplaceOrderingEnabled: () => state.ordering }));
 vi.mock("@/server/queries/marketplace-public", () => ({ loadPublicCatalogPage: async () => ({ items: state.items }) }));
 vi.mock("@/server/media/marketplace-public-images", () => ({ marketplacePublicImageUrls: async () => ({}) }));
 vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({}) }));
@@ -45,14 +45,26 @@ describe("homepage: one canonical Landing", () => {
     expect(container.querySelector('a[href="/marketplace"]')).toBeNull();
   });
 
-  it("Marketplace open: the header shows the cart and real products replace the samples", async () => {
+  it("Marketplace open but browse-only: real products, no cart link", async () => {
     state.open = true;
+    state.items = [{ slug: "oak-panel", name_ar: "لوح بلوط", name_en: "Oak panel", seller_name: "معرض النيل", image_id: null, from_price_egp: "1200", variant_count: 1, in_stock: true, cart_sku: "OAK-1", product_type_key: "panels" }];
+    const { container } = render(await RootPage());
+    expect(container.querySelector('a[href="/market/cart"]')).toBeNull();
+    expect(container.querySelector('a[href="/market/products/oak-panel"]')).not.toBeNull();
+    state.open = false;
+    state.items = [];
+  });
+
+  it("Marketplace open with ordering on: the header shows the cart and real products replace the samples", async () => {
+    state.open = true;
+    state.ordering = true;
     state.items = [{ slug: "oak-panel", name_ar: "لوح بلوط", name_en: "Oak panel", seller_name: "معرض النيل", image_id: null, from_price_egp: "1200", variant_count: 1, in_stock: true, cart_sku: "OAK-1", product_type_key: "panels" }];
     const { container } = render(await RootPage());
     expect(container.querySelector('a[href="/market/cart"]')).not.toBeNull();
     expect(container.querySelector('a[href="/market/products/oak-panel"]')).not.toBeNull();
     expect(container.textContent).toContain("لوح بلوط");
     state.open = false;
+    state.ordering = false;
     state.items = [];
   });
 });

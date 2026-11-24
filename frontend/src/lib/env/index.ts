@@ -127,6 +127,15 @@ export function isMarketplacePreviewEnabled(): boolean {
   return process.env.NEXT_PUBLIC_MARKETPLACE_PREVIEW === "true";
 }
 
+/**
+ * Ordering flag of the public Marketplace. The first launch is browse-only: buyers see products, delivery details and
+ * showrooms, but no add-to-cart / cart entry point. Only the exact value "true" shows them (the ordering PR turns it on).
+ * Like `isMarketplacePreviewEnabled` it reads only this NEXT_PUBLIC_ value and never throws.
+ */
+export function isMarketplaceOrderingEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_MARKETPLACE_ORDERING === "true";
+}
+
 export function readPublicEnv(): PublicEnv {
   return parsePublicEnv({
     NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
