@@ -2881,6 +2881,8 @@ export const ar: Messages = {
       filed_by: "مقدّم الشكوى",
       reason: "سبب الشكوى",
       outcome: "نتيجة الشكوى",
+      product_name_ar: "اسم المنتج بالعربية",
+      product_name_en: "اسم المنتج بالإنجليزية",
     },
     fields: { titleAr: "العنوان بالعربية", bodyAr: "النص بالعربية", titleEn: "العنوان بالإنجليزية", bodyEn: "النص بالإنجليزية", reason: "السبب" },
     reasonHint: "سبب التعديل (من 3 إلى 500 حرف). يُحفظ في السجل باسمك.",
