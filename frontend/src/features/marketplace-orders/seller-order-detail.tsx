@@ -13,6 +13,7 @@ import { dateTime, money, OrderLineRow, PaymentBadge, StatusBadge, Timeline, Tot
 import { ReasonPanel, type ReasonValue } from "./reason-panel";
 import { orderError, ordersCopy } from "./orders-copy";
 import { FileComplaintSlot } from "./order-slots";
+import { CancelRefund } from "./cancel-refund";
 
 type Msg = { ok: boolean; text: string } | null;
 type Panel = SellerOrderActionName | "shipment_edit" | null;
@@ -146,6 +147,7 @@ export function SellerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
       <Button variant="outline" onClick={() => { setMsg(null); setOpen("flag_receipt_not_received"); }}>{label("flag_receipt_not_received")}</Button>
     );
   registry.file_complaint = () => <FileComplaintSlot orderId={order.id} />;
+  registry.record_cancel_refund = () => <CancelRefund order={order} mode="record" onDone={setOrder} />;
   const buttons = knownActions(order.actions, registry);
 
   return (

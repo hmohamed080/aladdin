@@ -2948,6 +2948,8 @@ export const en = {
           payment_complaint_filed: "New payment complaint (to the authorised admins)",
           payment_complaint_resolved: "Payment complaint decided (to the buyer and the showroom)",
           refund_check: "Cancelled order with an unconfirmed receipt (to the authorised admins)",
+          refund_sent: "Refund of a cancelled order recorded (to the buyer)",
+          refund_confirmed: "Refund of a cancelled order confirmed (to the showroom)",
           placed: "New order",
           preparing: "Order is being prepared",
           ready_pickup: "Order ready for pickup",

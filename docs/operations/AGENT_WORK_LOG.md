@@ -7956,3 +7956,7 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - NOT verified: Worker video flags on Production, the order flow (ordering is off), dark mode / mobile of the public pages, the seller public page on Production. Unfixed: the misleading "stock changed" message on quantity edit in the product list; the notification template editor has no label for the `quantity` variable.
 - Follow-ups: sync/resolve conflicts of #257, #258, #267, #268 (migration numbering vs main); plans for any further migration; clean up Acceptance test data (org `ffff`, product "Draft without image").
 
+## 2026-11-25 - Refund of a cancelled order (migration 20261125140001, owner decision, nothing applied)
+- The showroom records that it paid back a `refund_due` cancelled order, the buyer confirms, then the order is `refunded`. No money moves through the platform. Notifications `marketplace.order.refund_sent` / `refund_confirmed`.
+- Also: the flaky seller order page test waits for the reasons to load.
+- Not verified: browser pass (ordering is off); applied nowhere. Main carries the 13 unapplied migrations 20261125090001 .. 140001 and needs a new apply plan.
