@@ -11198,6 +11198,30 @@ export type Database = {
         Args: { p_limit?: number; p_offset?: number }
         Returns: Json
       }
+      marketplace_buyer_order_get_v2: { Args: { p_order_id: string }; Returns: Json }
+      marketplace_buyer_orders_v2: {
+        Args: { p_limit?: number; p_offset?: number; p_period?: string; p_search?: string; p_status?: string }
+        Returns: Json
+      }
+      marketplace_seller_order_get_v2: { Args: { p_order_id: string }; Returns: Json }
+      marketplace_seller_orders_page_v2: {
+        Args: {
+          p_from?: string
+          p_limit?: number
+          p_offset?: number
+          p_organization_id: string
+          p_search?: string
+          p_tab?: string
+          p_to?: string
+        }
+        Returns: Json
+      }
+      marketplace_seller_order_shipment_update: {
+        Args: { p_carrier_name?: string; p_order_id: string; p_tracking_number?: string }
+        Returns: Json
+      }
+      marketplace_order_invoice_get: { Args: { p_order_id: string }; Returns: Json }
+      marketplace_order_waybill_get: { Args: { p_order_id: string }; Returns: Json }
       marketplace_buyer_phone_status: { Args: never; Returns: Json }
       marketplace_buyer_proof_confirm: {
         Args: { p_proof_id: string }
