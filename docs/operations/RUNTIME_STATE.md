@@ -1,3 +1,7 @@
+## Marketplace returns and exchanges, PR 15 (draft PR, not deployed) - 2026-11-25
+
+Migrations 20261124150001-150003 exist only in the branch. Nothing applied to Acceptance or Production. New permission `marketplace_returns.review` (grantable). Buyer pages stay behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`.
+
 ## Marketplace checkout and order model, PR 12 (draft PR #267, not deployed) - 2026-11-24
 
 - Migration `20261124120001` exists only on the PR branch; applied nowhere hosted. Checkout v2 (`/market/checkout`, thank-you page) stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. Orders placed through it have `source = 'v2'`; older orders keep their statuses and legacy RPCs.
