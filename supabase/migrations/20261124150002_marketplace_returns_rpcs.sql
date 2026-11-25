@@ -316,7 +316,7 @@ begin
     'in_admin_queue', r.in_admin_queue, 'escalated_reason', r.escalated_reason,
     'decision', case when r.decided_by_role is not null then jsonb_build_object('by', r.decided_by_role,
       'message_ar', r.decision_message_ar, 'message_en', r.decision_message_en,
-      'internal_note', case when v_seller then r.decision_internal_note end) end,
+      'internal_note', case when p_for = 'admin' or (p_for = 'seller' and r.decided_by_role = 'seller') then r.decision_internal_note end) end,
     'timestamps', jsonb_build_object('created_at', r.created_at, 'seller_due_at', r.seller_due_at, 'shipped_at', r.shipped_at,
       'received_at', r.received_at, 'refund_due_at', r.refund_due_at, 'closed_at', r.closed_at, 'escalated_at', r.escalated_at),
     'items', coalesce((select jsonb_agg(jsonb_build_object('item_id', i.id, 'name_ar', i.name_ar, 'name_en', i.name_en, 'sku', i.sku,
@@ -839,8 +839,9 @@ begin
     if p_note is null or char_length(btrim(p_note)) not between 3 and 500 then
       raise exception 'mp:reason_required' using errcode = '22023';
     end if;
-    v_ar := coalesce(v_ar, btrim(p_note));
-    v_en := coalesce(v_en, btrim(p_note));
+    -- the admin note is INTERNAL: never copied into the public message, the event log or a notification
+    v_ar := coalesce(v_ar, 'قرار من فريق المنصة');
+    v_en := coalesce(v_en, 'Decision by the platform team');
   end if;
   update public.marketplace_return_requests set status = v_to, decided_by_role = p_role, decision_message_ar = v_ar,
     decision_message_en = v_en, decision_internal_note = left(nullif(btrim(p_note), ''), 500),
@@ -849,7 +850,7 @@ begin
    where id = r.id;
   perform app.marketplace_timer_close('return', r.id, 'return_seller_response', 'decided_by_' || p_role);
   perform app.marketplace_return_event(r.id, case p_decision when 'reject' then 'rejected' else 'approved' end, r.status, v_to, p_role,
-    coalesce(p_note, v_en));
+    v_en);
   perform app.marketplace_return_notify(r.id, case when p_role = 'admin' then 'admin_decided' when p_decision = 'reject' then 'rejected' else 'approved' end,
     'buyer', v_ar, v_en);
   if p_role = 'admin' then

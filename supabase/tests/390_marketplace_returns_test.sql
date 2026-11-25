@@ -637,6 +637,15 @@ select is((select count(*)::int from public.notifications where event_type = 'ma
   'H18. buyer and showroom are both told');
 select throws_like(format($$ select public.admin_marketplace_return_decide(%L::uuid, 'reject', 'changed my mind again') $$, current_setting('t.rid6')), 'mp:invalid_transition%',
   'H19. an approved return cannot be rejected by the admin afterwards');
+-- the admin note is internal: neither the buyer nor the showroom document (events, decision, message) ever carries it
+select pg_temp.as_user(current_setting('t.buyer'));
+select is(position('did not answer' in public.marketplace_buyer_return_get(current_setting('t.rid6')::uuid)::text), 0, 'H19a. the buyer document never contains the internal admin note');
+select pg_temp.as_user(current_setting('t.seller'));
+select is(position('did not answer' in public.marketplace_seller_return_get(current_setting('t.rid6')::uuid)::text), 0, 'H19b. nor does the showroom document');
+select pg_temp.as_user(current_setting('t.super'));
+select is(public.admin_marketplace_return_get(current_setting('t.rid6')::uuid) -> 'decision' ->> 'internal_note', 'Showroom did not answer in time', 'H19c. the admin sees the internal note');
+select is((select count(*)::int from public.marketplace_return_events where note like '%did not answer%'), 0, 'H19d. no event row carries it');
+select is((select count(*)::int from public.notifications where subject_id = current_setting('t.rid6')::uuid and (coalesce(content::text,'') || params::text) like '%did not answer%'), 0, 'H19e. no notification carries it');
 
 -- a complaint escalates a rejected return; the admin reads the evidence of an escalated return only
 select pg_temp.as_user(current_setting('t.buyer'));
