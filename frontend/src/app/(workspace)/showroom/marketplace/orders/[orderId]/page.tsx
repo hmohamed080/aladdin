@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
-import { getMessages } from "@/lib/i18n/translate";
 import { PageHeader } from "@/components/ui/workspace-layout";
 import { ButtonLink } from "@/components/ui/controls";
 import { ChevronLeftIcon, ChevronRightIcon, ReceiptIcon } from "@/components/ui/icons";
 import { requireApprovedSeller } from "@/features/marketplace-seller/seller-gate";
-import { SellerOrderView } from "@/features/marketplace-orders/seller-order-view";
-import type { OrderDocument } from "@/features/marketplace-orders/contract";
+import { SellerOrderDetail } from "@/features/marketplace-orders/seller-order-detail";
+import { ordersCopy } from "@/features/marketplace-orders/orders-copy";
+import { loadSellerOrder } from "@/server/queries/marketplace-orders-v2";
 
 export const dynamic = "force-dynamic";
 
@@ -16,25 +16,24 @@ export default async function MarketplaceOrderPage({ params }: { params: Promise
   const { orderId } = await params;
   if (!UUID.test(orderId)) notFound();
   const { supabase, locale } = await requireApprovedSeller();
-  const t = getMessages(locale).marketplaceSeller.orders;
-  const { data, error } = await supabase.rpc("marketplace_seller_order_get", { p_order_id: orderId });
-  if (error || !data) notFound();
-  const order = data as unknown as OrderDocument;
+  const t = ordersCopy[locale];
+  const order = await loadSellerOrder(supabase, orderId);
+  if (!order) notFound();
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
         locale={locale}
         Icon={ReceiptIcon}
-        title={`${t.col.number} ${order.order_number}`}
-        subtitle={`${order.buyer_name} · ${t.status[order.status]}`}
+        title={t.seller.orderTitle(order.order_number)}
+        subtitle={`${order.recipient.name} · ${t.status[order.status]}`}
         toolbar={
           <ButtonLink href="/showroom/marketplace/orders" variant="outline">
             {locale === "ar" ? <ChevronRightIcon size={16} /> : <ChevronLeftIcon size={16} />}
-            {t.back}
+            {t.seller.backToOrders}
           </ButtonLink>
         }
       />
-      <SellerOrderView initial={order} />
+      <SellerOrderDetail initial={order} />
     </div>
   );
 }
