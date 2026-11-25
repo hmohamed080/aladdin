@@ -11170,6 +11170,17 @@ export type Database = {
         Returns: undefined
       }
       mark_notification_read: { Args: { p_id: string }; Returns: undefined }
+      marketplace_buyer_address_delete: { Args: { p_id: string }; Returns: boolean }
+      marketplace_buyer_address_save: { Args: { p_address: Json }; Returns: Json }
+      marketplace_buyer_address_set_default: {
+        Args: { p_id: string }
+        Returns: boolean
+      }
+      marketplace_buyer_addresses: { Args: never; Returns: Json }
+      marketplace_buyer_checkout_readiness: {
+        Args: { p_address_id?: string }
+        Returns: Json
+      }
       marketplace_buyer_order_cancel: {
         Args: { p_order_id: string; p_reason?: string }
         Returns: Json
@@ -11182,6 +11193,7 @@ export type Database = {
         Args: { p_limit?: number; p_offset?: number }
         Returns: Json
       }
+      marketplace_buyer_phone_status: { Args: never; Returns: Json }
       marketplace_buyer_proof_confirm: {
         Args: { p_proof_id: string }
         Returns: Json
