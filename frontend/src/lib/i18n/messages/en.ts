@@ -2922,6 +2922,18 @@ export const en = {
           revoked: "Showroom approval revoked",
         },
         product: { rejected: "Product rejected" },
+        return: {
+          requested: "Return requested",
+          seller_reminder: "Return awaiting your reply",
+          approved: "Return approved",
+          rejected: "Return rejected",
+          received: "Return received",
+          refund_sent: "Refund sent",
+          refund_confirmed: "Refund confirmed",
+          escalated: "Return escalated to the platform",
+          admin_reminder: "Platform reminder about a return",
+          admin_decided: "Platform decided a return",
+        },
         stock: { low: "Product stock running low", out: "Product out of stock" },
         order: {
           placed: "New order",
