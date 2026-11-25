@@ -11,6 +11,8 @@
 --   * public.marketplace_buyer_cancel_refund_confirm(order): the buyer confirms receiving it; only then it is `refunded`.
 --   * Order actions `record_cancel_refund` (showroom) and `confirm_cancel_refund` (buyer) through the PR 12 hook.
 --   * Order events cancel_refund_sent / cancel_refund_confirmed and two in-app notifications.
+--   * While a payment complaint on the order is open or under review, neither step is offered or accepted: the admin rules first
+--     (otherwise the order would leave `refund_due` and the ruling could no longer be recorded).
 -- MONEY IS NEVER MOVED HERE: the platform only records what the two sides say.
 -- NOTHING IS DROPPED. EXPAND only. SECURITY DEFINER, search_path = '', every caller re-checked, no table grant.
 -- ===========================================================================
@@ -77,7 +79,8 @@ declare
   v_sent boolean;
 begin
   if exists (select 1 from public.marketplace_orders o
-              where o.id = p_order and o.source = 'v2' and o.status = 'cancelled' and o.payment_status = 'refund_due') then
+              where o.id = p_order and o.source = 'v2' and o.status = 'cancelled' and o.payment_status = 'refund_due')
+     and not exists (select 1 from public.marketplace_payment_complaints c where c.order_id = p_order and c.state in ('open', 'under_review')) then
     v_sent := exists (select 1 from public.marketplace_order_events e where e.order_id = p_order and e.action = 'cancel_refund_sent');
     if p_for = 'seller' and not v_sent then
       v_out := v_out || array['record_cancel_refund'];
@@ -120,6 +123,9 @@ begin
   if exists (select 1 from public.marketplace_order_events e where e.order_id = o.id and e.action = 'cancel_refund_sent') then
     return app.marketplace_order_document_v2(o.id, 'seller');          -- replay
   end if;
+  if exists (select 1 from public.marketplace_payment_complaints c where c.order_id = o.id and c.state in ('open', 'under_review')) then
+    raise exception 'mp:invalid_transition' using errcode = '23514';   -- the admin rules on the complaint first
+  end if;
   v_amount := coalesce(o.paid_now_egp, o.total_egp);
   insert into public.marketplace_order_events (order_id, action, from_status, to_status, from_payment, to_payment, actor_user_id, actor_role, note)
   values (o.id, 'cancel_refund_sent', o.status, o.status, o.payment_status, o.payment_status, v_uid, 'seller', v_note);
@@ -155,7 +161,8 @@ begin
     return app.marketplace_order_document_v2(o.id, 'buyer');           -- replay
   end if;
   if o.source <> 'v2' or o.status <> 'cancelled' or o.payment_status <> 'refund_due'
-     or not exists (select 1 from public.marketplace_order_events e where e.order_id = o.id and e.action = 'cancel_refund_sent') then
+     or not exists (select 1 from public.marketplace_order_events e where e.order_id = o.id and e.action = 'cancel_refund_sent')
+     or exists (select 1 from public.marketplace_payment_complaints c where c.order_id = o.id and c.state in ('open', 'under_review')) then
     raise exception 'mp:invalid_transition' using errcode = '23514';
   end if;
   v_amount := coalesce(o.paid_now_egp, o.total_egp);

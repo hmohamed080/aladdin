@@ -485,7 +485,7 @@ select pg_temp.as_user(current_setting('t.buyer'));
 select is(public.marketplace_buyer_order_cancel_v2(current_setting('t.g3')::uuid, null, null) ->> 'status', 'cancelled', 'G11. the buyer cancels after uploading a receipt');
 select is((select payment_status from public.marketplace_orders where id = current_setting('t.g3')::uuid), 'refund_due', 'G12. the unchecked transfer is owed back');
 select is(pg_temp.notes(current_setting('t.g3'), 'marketplace.order.refund_check') >= 1, true, 'G13. the authorised admins are told');
-select is(app.marketplace_order_extra_actions(current_setting('t.g3')::uuid, 'seller'), array['file_complaint'], 'G14. the showroom may file a complaint');
+select is(app.marketplace_order_extra_actions(current_setting('t.g3')::uuid, 'seller'), array['file_complaint', 'record_cancel_refund'], 'G14. the showroom may complain or record the refund');
 
 -- G (continued): rejecting the receipt and then cancelling does not keep the money
 reset role;
@@ -524,6 +524,13 @@ select throws_ok(format($q$select public.marketplace_seller_cancel_refund_record
   'H14. an order where the money never arrived owes nothing');
 select is(has_function_privilege('anon', 'public.marketplace_buyer_cancel_refund_confirm(uuid)', 'execute')
           or has_function_privilege('anon', 'public.marketplace_seller_cancel_refund_record(uuid, text)', 'execute'), false, 'H15. never anonymous');
+
+select pg_temp.as_user(current_setting('t.buyer'));
+select set_config('t.kg3', (public.marketplace_payment_complaint_file(current_setting('t.g3')::uuid, 'transfer_made', null) ->> 'complaint_id'), true);
+select is(app.marketplace_order_extra_actions(current_setting('t.g3')::uuid, 'seller'), '{}'::text[], 'H16. no refund step while a complaint is open');
+select pg_temp.as_user(current_setting('t.seller'));
+select throws_ok(format($q$select public.marketplace_seller_cancel_refund_record(%L, null)$q$, current_setting('t.g3')), '23514', 'mp:invalid_transition',
+  'H17. and the database refuses it until the admin rules');
 
 select * from finish();
 rollback;
