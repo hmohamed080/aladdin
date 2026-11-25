@@ -28,9 +28,17 @@ export function isMarketplaceProofKey(value: unknown): value is string {
   return typeof value === "string" && PROOF_SHAPE.test(value);
 }
 
-/** Any key of the `marketplace` media namespace: a product photo or a payment receipt. */
+/** `returns/<order>/<evidence>.<ext>` — a photo the buyer attaches to a return request (PR 15). */
+const RETURN_SHAPE =
+  /^returns\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/;
+
+export function isMarketplaceReturnKey(value: unknown): value is string {
+  return typeof value === "string" && RETURN_SHAPE.test(value);
+}
+
+/** Any key of the `marketplace` media namespace: a product photo, a payment receipt or return evidence. */
 export function isMarketplaceMediaKey(value: unknown): value is string {
-  return isMarketplaceImageKey(value) || isMarketplaceProofKey(value);
+  return isMarketplaceImageKey(value) || isMarketplaceProofKey(value) || isMarketplaceReturnKey(value);
 }
 
 /**

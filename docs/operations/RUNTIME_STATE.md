@@ -1,3 +1,7 @@
+## Marketplace returns and exchanges, PR 15 (draft PR, not deployed) - 2026-11-25
+
+Migrations 20261125130001-150003 exist only in the branch. Nothing applied to Acceptance or Production. New permission `marketplace_returns.review` (grantable). Buyer pages stay behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`.
+
 ## Marketplace timers and payment complaints, PR 14 (draft PR, not deployed) - 2026-11-24
 
 - Migrations `20261125120001-3` exist only on the PR branch; applied nowhere hosted. The timers Worker `edge/marketplace-timers-worker` is not deployed and no secret or variable is set; `scripts/marketplace-timers.mjs` is the manual alternative. Ordering stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. Admin queue `/admin/marketplace/payment-complaints` needs the grantable permission `marketplace_payment_complaints.review`.

@@ -2860,6 +2860,18 @@ export const ar: Messages = {
           revoked: "سحب اعتماد المعرض",
         },
         product: { rejected: "رفض منتج" },
+        return: {
+          requested: "طلب إرجاع جديد",
+          seller_reminder: "طلب إرجاع بانتظار ردك",
+          approved: "تمت الموافقة على الإرجاع",
+          rejected: "تم رفض الإرجاع",
+          received: "تم استلام المرتجع",
+          refund_sent: "تم إرسال المبلغ المسترد",
+          refund_confirmed: "تم تأكيد استلام المبلغ",
+          escalated: "تم تصعيد طلب الإرجاع للمنصة",
+          admin_reminder: "تذكير من المنصة بخصوص إرجاع",
+          admin_decided: "قرار المنصة في طلب إرجاع",
+        },
         stock: { low: "مخزون المنتج على وشك النفاد", out: "نفاد مخزون المنتج" },
         order: {
           reminder_seller_start: "طلب ينتظر بدء التجهيز (تذكير للمعرض)",
