@@ -54,6 +54,7 @@ The five files above are **persistent project memory and part of the core archit
 - [`product/BACKLOG.md`](product/BACKLOG.md) — prioritized backlog (MoSCoW)
 - [`product/client-brief.md`](product/client-brief.md) — client brief
 - [`product/design-idea.md`](product/design-idea.md) — original founder brief (Arabic)
+- [`product/marketplace-order-model-contract-20261124.md`](product/marketplace-order-model-contract-20261124.md) — Marketplace order model contract for PRs 12-15 (entities, state machine, RPCs, timers, notifications, migration blocks)
 
 ## Architecture
 
