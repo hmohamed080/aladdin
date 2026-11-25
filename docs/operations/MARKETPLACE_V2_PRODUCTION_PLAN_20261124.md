@@ -2,7 +2,7 @@
 
 Status: **PLAN, prepared and NOT applied.** Nothing in this document or in the PR that carries it connected to Production (`kkpkgjrweysgvhvkhzun`) or Acceptance (`nxossqhdfltcqdwvbewi`). The owner runs `production-apply.sh` themself, each step on an explicit GO. Production twin of [`MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md`](MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md); read that document first for what each migration does.
 
-Plan name: **`prod-marketplace-v2`** (`scripts/hosted-db/acceptance-gate.mjs`, target `production`). Production **237 -> 245**, EIGHT migrations, one plain push, never `--include-all`.
+Plan name: **`prod-marketplace-v2`** (`scripts/hosted-db/acceptance-gate.mjs`, target `production`). Production **237 -> 246**, NINE migrations (the seven marketplace-v2 ones, the slug one, and the stock-notification fix `20261124120001`), one plain push, never `--include-all`.
 
 > **Amended 2026-11-24 (owner decision, final): the COMBINED plan.** The plan was written for seven migrations (237 -> 244). PR #252 then merged migration `20261124090001_marketplace_seller_public_slug.sql` to `main`, so the drift guard refused the seven-migration plan (`not in the plan: 20261124090001`). Decision: Production gets all **eight** in ONE plan, **237 (`20261122090002`) -> 245 (`20261124090001`)**; permission contract after = `20261124090001`. Acceptance (already at 244) gets its own small plan `marketplace-slug` (244 -> 245) **first**: [`MARKETPLACE_SLUG_ACCEPTANCE_PLAN_20261124.md`](MARKETPLACE_SLUG_ACCEPTANCE_PLAN_20261124.md). Wherever the text below says seven / 244 / `20261123160002` for the Production end state, read **eight / 245 / `20261124090001`**; the sections that matter are rewritten here:
 > - Pending, in order: the seven above, then `20261124090001` (2 functions `app.marketplace_assign_org_slug` / `app.marketplace_seller_slug_trigger`, trigger `marketplace_seller_slug_assign` on `marketplace_seller_accounts`, backfill of `organizations.slug` for approved sellers that have none, revokes). Drift command: `matches this checkout (8 pending, none unplanned)`.
@@ -12,6 +12,12 @@ Plan name: **`prod-marketplace-v2`** (`scripts/hosted-db/acceptance-gate.mjs`, t
 > - Smoke: `production-apply.sh` runs `marketplace-v2-smoke.sql` AND `marketplace-slug-smoke.sql` before and after the push (post expects 245 / `20261124090001`; every approved seller has a slug).
 > - Acceptance-success gate (section 5): Acceptance `marketplace-v2` (done, 244) **and** `marketplace-slug` (245) must both have passed.
 > - Snapshot: unchanged requirement (restore-verified Production snapshot taken at >= 237; `aladdin-production-20261124T133628Z` is pinned in PR #263, merge `main` after it lands). The plan adds no table, so no larger backup is needed for the slug part.
+
+> **Amended again 2026-11-24 (owner approved): the stock notification fix.** The Acceptance test showed the stock notification as "<Arabic product name> has only 5 left". The NEW migration `20261124120001_marketplace_stock_notify_localized.sql` (EXPAND-only: `CREATE OR REPLACE` of `app.marketplace_stock_notify()` with the same signature, DEFAULT texts and `variables` of the 2 stock templates; admin overrides, version and updated_by never written; no new permission) is the 9th and last pending migration: **237 -> 246**, post contract `20261124120001.json`.
+> - Catalog diff: the same list (the replaced function is already in the marketplace-v2 list because that plan adds it): base 237 -> 246 still exactly 318 entries, measured by `marketplace-slug-scratch-proof.mjs`.
+> - Recovery: THREE pinned forward-fixes, in THIS order: `forward-fix/marketplace-stock-notify-restore-previous.sql` (restores the previous function and default texts; RAISEs if an admin edit uses `{product_name_ar}` / `{product_name_en}`), then `marketplace-slug-remove.sql`, then `marketplace-v2-remove.sql`. Proven: all three in order return the 237 catalog except the enum value.
+> - Smoke: `production-apply.sh` also runs the read-only `marketplace-stock-notify-smoke.sql` / `.mjs` before (`--no-templates`: the stock templates do not exist on Production before the plan) and after the push. Drift command: `matches this checkout (9 pending, none unplanned)`.
+> - Stacked PR: the code PR targets `main` after #264 merged; apply from `origin/main` only.
 
 ## 0. Correction to the starting premise
 
@@ -23,9 +29,9 @@ Consequence of the order: `prod-catchup` can no longer be run from current `main
 
 | | Production before | Production after |
 |---|---|---|
-| Applied migrations | 237 | **245** |
-| Latest version | `20261122090002` | **`20261124090001`** |
-| Function ACL contract (`supabase/permissions/`) | `20261122090002.json` | **`20261124090001.json`** |
+| Applied migrations | 237 | **246** |
+| Latest version | `20261122090002` | **`20261124120001`** |
+| Function ACL contract (`supabase/permissions/`) | `20261122090002.json` | **`20261124120001.json`** |
 
 Pending, in order: `20261123090001`, `100001`, `120001`, `130001`, `150001`, `160001`, `160002`, **`20261124090001`** (verified against `supabase/migrations` on current main; the `drift` command prints `matches this checkout (8 pending, none unplanned)`). `production-apply.sh` compares Production's live function-ACL inventory with both contracts (pre and post) through `verify-permissions-readonly.mjs`; any mismatch stops the run.
 
@@ -43,7 +49,7 @@ Pending, in order: `20261123090001`, `100001`, `120001`, `130001`, `150001`, `16
 
 ## 4. Recovery pieces
 
-- Forward-fix (combined, order: `marketplace-slug-remove.sql` FIRST, then `marketplace-v2-remove.sql`, both sha256 pinned in `FORWARD_FIX`; proven in `marketplace-slug-scratch-proof.mjs`: base 237 -> 245 -> both fixes = the 237 catalog except the enum value). The marketplace-v2 part: **reuse** `forward-fix/marketplace-v2-remove.sql`. No Production-specific one is needed: Production after `prod-catchup` is the same 237 catalog the scratch proof starts from (the `prod-catchup` proof reproduced Production's catalog from its pre-state plus the 27 migrations; this plan's proof replays the same migrations on a clean base). **Unverified:** the previous function definitions inside the forward-fix come from the scratch replay, not md5 values read from live Production (see section 11).
+- Forward-fix (combined, order: `marketplace-stock-notify-restore-previous.sql` FIRST, then `marketplace-slug-remove.sql`, then `marketplace-v2-remove.sql`, both sha256 pinned in `FORWARD_FIX`; proven in `marketplace-slug-scratch-proof.mjs`: base 237 -> 245 -> both fixes = the 237 catalog except the enum value). The marketplace-v2 part: **reuse** `forward-fix/marketplace-v2-remove.sql`. No Production-specific one is needed: Production after `prod-catchup` is the same 237 catalog the scratch proof starts from (the `prod-catchup` proof reproduced Production's catalog from its pre-state plus the 27 migrations; this plan's proof replays the same migrations on a clean base). **Unverified:** the previous function definitions inside the forward-fix come from the scratch replay, not md5 values read from live Production (see section 11).
 - Restores objects and drops what was added; guards refuse when user-written rows exist; never deletes user data; not undone: enum value `marketplace`, `media_verification_ready = true` (previous value is in the "before" facts), run-time side effects.
 - Run through the Supabase migration path as a NEW migration, never the SQL Editor, on the owner's GO.
 
@@ -51,7 +57,7 @@ Pending, in order: `20261123090001`, `100001`, `120001`, `130001`, `150001`, `16
 
 Production is applied only after Acceptance has succeeded. Concretely, all of the following must exist and be recorded (RUNTIME_STATE / work log) before the Production GO:
 
-1. Acceptance `acceptance-apply.sh --plan marketplace-v2` finished with `PASS` (done 2026-11-24: 244 / `20261123160002`), **and** `acceptance-apply.sh --plan marketplace-slug` finished with `PASS`: history 245 / `20261124090001`, permissions match `20261124090001`, catalog diff exactly 3 objects, `MARKETPLACE SLUG SMOKE (post): OK`.
+1. Acceptance `acceptance-apply.sh --plan marketplace-v2` finished with `PASS` (done 2026-11-24: 244 / `20261123160002`), **and** `acceptance-apply.sh --plan marketplace-slug` finished with `PASS`: history 246 / `20261124120001`, permissions match `20261124120001`, catalog diff exactly 4 objects, `MARKETPLACE SLUG SMOKE (post): OK`.
 2. `node scripts/hosted-db/marketplace-v2-smoke.mjs http` on Acceptance: `MARKETPLACE V2 HTTP SMOKE: OK`.
 3. The frontend of the **same commit** is deployed to the Acceptance preview Worker and `/api/health`, `/`, `/auth/sign-in`, `/legal/terms` answer 200.
 4. The by-hand browser pass on Acceptance (Acceptance plan section 4, step 8: seller transitions and presets, product review, delivery and payment settings, open/close card, public catalog) and the Worker video flags checked (`VIDEO_ENABLED` not `"true"`, `VIDEO_ROUTES` off). Neither is automated nor verifiable from this repo.
@@ -105,7 +111,7 @@ PowerShell, from a clone fast-forwarded to `origin/main` (the script needs `.git
 
 ### What the post-apply smoke checks (read-only)
 
-Same as the Acceptance plan (`marketplace-v2-smoke.sql` + `marketplace-v2-smoke.mjs facts pre|post`): history 237 -> 245 (the slug part is judged by `marketplace-slug-smoke.sql` / `.mjs facts pre|post --applied N --latest V`: 2 functions + trigger exist and are enabled, not executable by API roles, every approved seller has a slug); the 6 new tables; 8 notification templates; 15 owner-message presets by action; `marketplace_open` column default `true` and value `true`; `media_verification_ready` true; enum has `marketplace`; permission `marketplace_platform.manage` locked to Super Admin only; no marketplace video rows; 17 key functions; the public reads answer; blockers answer for an unknown product. The SQL is SELECT only. The `facts` judge was written for Acceptance and has never been run on Production's data: if a count differs because of real Production content it fails closed and the owner reads the INFO lines (a failed "post" smoke after the push means: stop, do not continue to the frontend).
+Same as the Acceptance plan (`marketplace-v2-smoke.sql` + `marketplace-v2-smoke.mjs facts pre|post`; plus `marketplace-stock-notify-smoke.sql` / `.mjs facts pre|post`: function passes both names, defaults localized and declared, no client execute): history 237 -> 246 (the slug part is judged by `marketplace-slug-smoke.sql` / `.mjs facts pre|post --applied N --latest V`: 2 functions + trigger exist and are enabled, not executable by API roles, every approved seller has a slug); the 6 new tables; 8 notification templates; 15 owner-message presets by action; `marketplace_open` column default `true` and value `true`; `media_verification_ready` true; enum has `marketplace`; permission `marketplace_platform.manage` locked to Super Admin only; no marketplace video rows; 17 key functions; the public reads answer; blockers answer for an unknown product. The SQL is SELECT only. The `facts` judge was written for Acceptance and has never been run on Production's data: if a count differs because of real Production content it fails closed and the owner reads the INFO lines (a failed "post" smoke after the push means: stop, do not continue to the frontend).
 
 ## 8. Marketplace launch decisions for the owner (flagged, none assumed)
 
@@ -154,3 +160,6 @@ NOT verified, stated plainly:
 ## 12. Update 2026-11-24 (combined plan): what was verified and what was not
 - Verified locally (never hosted): `node --test scripts/hosted-db/*.test.mjs` green (327 tests); `bash -n` on the four changed scripts; `node scripts/hosted-db/acceptance-gate.mjs drift prod-marketplace-v2 supabase/migrations` -> `matches this checkout (8 pending, none unplanned)`; scratch proof `node scripts/hosted-db/marketplace-slug-scratch-proof.mjs` (throwaway database in a local container): base 237 -> 245 diff equals the plan's list exactly (318 entries), the data effect on 4 seeded organizations, forward-fix refusal cases, forward-fix on the 244 state equals the 244 catalog, re-apply idempotent, combined undo order slug -> marketplace-v2 returns to 237 except the enum value.
 - NOT verified: anything against hosted Production or Acceptance (real history, dry run, ACL inventory vs `20261124090001.json`, live fingerprint, `production-apply.sh` end to end); the forward-fix guards were proven against synthetic dependents only, not Production's real catalog; the number of Production approved sellers that the backfill will touch is unknown until the "before" smoke runs; the contract `20261124090001.json` was not re-read live.
+
+### Addendum: stock-notify verification (2026-11-24)
+`node --test scripts/hosted-db/*.test.mjs` green; `acceptance-gate.mjs drift prod-marketplace-v2 supabase/migrations` -> matches (9 pending); `marketplace-slug-scratch-proof.mjs` OK (data effect of the stock migration: default texts and `variables` of the two templates only, an admin-edited template with its version untouched; forward-fix refusal with an edit using `{product_name_en}`; forward-fix equals the previous catalog and defaults; re-apply restores 246; combined undo order stock-notify, slug, marketplace-v2 = the 237 catalog except the enum value). pgTAP `223_marketplace_stock_notify_localized_test.sql` 15/15 on a scratch copy at 244 + the migration. Not verified: anything on Production or Acceptance.
