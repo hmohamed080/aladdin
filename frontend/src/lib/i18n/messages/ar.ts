@@ -7571,6 +7571,7 @@ export const ar: Messages = {
       },
       reason: "السبب",
       reasonRequired: "اكتب سبب الإلغاء.",
+      confirmBeforeShipping: "أكّد استلام تحويل InstaPay عشان تقدر تشحن الطلب أو تسلّمه.",
       confirmNeedsDeposit: "راجع إيصال إنستاباي واقبله قبل تأكيد الطلب.",
       done: "تم تحديث الطلب.",
       receiptView: "عرض الإيصال",
