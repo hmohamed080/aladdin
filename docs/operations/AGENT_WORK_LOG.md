@@ -1,3 +1,12 @@
+## 2026-11-24 - Marketplace order model contract for PRs 12-15 (docs only)
+
+- Scope: branch `docs/mkt-order-model-contract-20261124` off `origin/main`. One document, `docs/product/marketplace-order-model-contract-20261124.md`, plus the docs index link. No code, no migration, nothing hosted.
+- What it fixes: closed owner decisions with walkthrough citations; entity model (reused / altered / new tables, expand-contract, release N+1 drop list); the order state machine (statuses new, preparing, ready, shipped, delivered, cancelled; transitions, actors, stock effects: PENDING at arrival, deducted at mark_ready, released or restocked on cancel; idempotency); every RPC with one owning PR; timers (6 h reminder, 72 h auto-cancel; 24 h reminder, 48 h auto-cancel) run by a service-role RPC plus a Cloudflare cron Worker (existing repo pattern, no pg_cron); notification matrix and template keys; the two grantable admin permissions; migration versions 20261124120001/130001/140001/150001 and pgTAP 300/330/360/390 blocks; frontend route ownership; the flag.
+- Decision worth knowing: PR 12 owns ALL state-machine writes (`app.marketplace_order_apply` and `marketplace_seller_order_action`); PR 13 owns reads, invoice, waybill and shipment correction. Shared objects (event-type CHECK, preset actions, media functions) are redefined once by PR 12 and extended through hook functions afterwards.
+- Validation: `python scripts/check_doc_links.py` (see PR description for the result).
+- Not verified: nothing is implemented; the contract was written from migrations on `main`, PR 10 (#258) and PR 11 (#257) branches as fetched on 2026-11-24. The three product papers it cites are not on `main` yet.
+- Owner decisions needed: eleven plain-language questions in section 11 of the contract (each with a recommendation); lawyer review of the Terms remains open.
+
 ## 2026-11-24 - Marketplace v2: gated PRODUCTION plan `prod-marketplace-v2` (prepared, NOT applied)
 
 - Scope: branch `feat/production-gate-marketplace-20261124` off `origin/main` (2ee54124). Plan, scripts, tests and runbook `docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md`. No hosted connection, no secret.
