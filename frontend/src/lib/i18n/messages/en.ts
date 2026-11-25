@@ -2941,6 +2941,8 @@ export const en = {
       showroom_name: "Showroom name",
       message: "Admin message to the owner",
       product_name: "Product name",
+      product_name_ar: "Product name (Arabic)",
+      product_name_en: "Product name (English)",
     },
     fields: { titleAr: "Arabic title", bodyAr: "Arabic text", titleEn: "English title", bodyEn: "English text", reason: "Reason" },
     reasonHint: "Why you are changing it (3 to 500 characters). Saved in the history under your name.",
