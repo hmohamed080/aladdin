@@ -54,7 +54,7 @@ export function AddressForm({
   const [lng, setLng] = useState(initial?.longitude != null ? String(initial.longitude) : "");
   const [source, setSource] = useState<LocationSource>(initial?.location_source ?? "manual");
   const [phone, setPhone] = useState<CanonicalPhone | null>(null);
-  const [phoneInvalid, setPhoneInvalid] = useState(false);
+  const [phoneTouched, setPhoneTouched] = useState(false);
   const [claim, setClaim] = useState(true);
   const [makeDefault, setMakeDefault] = useState(initial?.is_default ?? isFirst);
   const [query, setQuery] = useState("");
@@ -122,7 +122,9 @@ export function AddressForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (pending) return;
-    const e164 = phone?.e164 ?? (phoneInvalid ? "" : (initial?.recipient_phone_e164 ?? accountPhone ?? ""));
+    // An untouched field keeps the saved (or account) number; once edited, what is in the field wins - an emptied or
+    // invalid number is refused, never silently replaced by the old one.
+    const e164 = phoneTouched ? (phone?.e164 ?? "") : (initial?.recipient_phone_e164 ?? accountPhone ?? "");
     const draft = {
       id, kind, nickname, governorate_key: gov, area_key: area, street, building, floor, apartment, landmark,
       latitude: lat || null, longitude: lng || null, location_source: lat && lng ? (source === "device" ? "device" : "map") : source === "catalogue" ? "catalogue" : "manual",
@@ -238,8 +240,7 @@ export function AddressForm({
             id="addr-phone-national"
             defaultCountryIso2={startPhone?.countryIso2 ?? null}
             defaultNational={startPhone?.national ?? null}
-            onChange={setPhone}
-            onInvalidChange={setPhoneInvalid}
+            onChange={(value) => { setPhoneTouched(true); setPhone(value); }}
           />
         </LabeledField>
         {showClaim ? (
