@@ -687,3 +687,10 @@ Deviations the PR 12 agent reported while building; they refine, not replace, th
 - `marketplace_checkout_prepare` additionally returns `receipts`: the session's confirmed receipts `[ {id, status, created_at} ]` (additive; no signature change), so the page can show attached receipts after a reload.
 - **Renumbering:** `main` already owns `20261124120001` (stock notify), so PR 12's first migration is `20261125100001_marketplace_checkout_order_model.sql` and its permission snapshot is `supabase/permissions/20261125100001.json`. PR 10 = `20261125090001`, PR 11 = `20261125090002`, PR 13 = `20261125110001`-`3`, PR 14 = `20261125120001`-`3`, PR 15 = `20261125130001`-`3` (all renumbered on 2026-11-25).
 
+## 13. Owner decisions of 2026-11-25 (they override any earlier text above)
+
+- All the recommendations of section 11 are accepted. The tax e-invoice (question 9) is **not** needed in this version: the printed document is an order invoice.
+- **Unchecked receipt on a cancelled order** (overrides rows 10-12 of section 3.2): when an InstaPay order (full or deposit) is cancelled by the buyer, by the showroom or by the 72 h timeout while the receipt is `receipt_submitted`, the payment becomes `refund_due`, not `not_collected`. Admins holding `marketplace_payment_complaints.review` are notified (`marketplace.order.refund_check`) and the buyer or the showroom may file one payment complaint on the cancelled order: `payment_valid` keeps `refund_due`, `payment_not_received` sets `not_collected`. Cash on delivery and the 48 h disputed-receipt timeout are unchanged.
+- **`payment_not_received` on a disputed receipt** (overrides section 4.4): the receipt timer ends no sooner than 24 hours after the ruling.
+- **Delivery fee in refunds** (PR 15): refunded only when one return takes back the whole order for a showroom fault (the reason makes the showroom pay the return shipping). Partial returns and changes of mind never include it.
+- Not covered: no step yet records that a `refund_due` amount of a cancelled order was paid back.
