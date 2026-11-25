@@ -178,7 +178,9 @@ export async function cancelBuyerOrderV2Action(orderId: string, note: string): P
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("marketplace_buyer_order_cancel_v2", {
     p_order_id: orderId,
-    p_note: note.trim().slice(0, 300) || undefined,
+    // no SQL defaults on this function: both optional values are sent as null
+    p_preset_id: null as unknown as string,
+    p_note: (note.trim().slice(0, 300) || null) as unknown as string,
   });
   if (error || !data) return { ok: false, ...fail(error) };
   revalidatePath(BUYER_ORDERS);

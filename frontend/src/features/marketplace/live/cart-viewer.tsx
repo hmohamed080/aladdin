@@ -68,6 +68,14 @@ function AccountCartSync({ ownerTag }: { ownerTag: string | null }) {
   return null;
 }
 
+/** Rendered where sign-out lands: a cart that mirrored an account is dropped, so the next person never sees it. */
+export function ForgetAccountCart() {
+  useEffect(() => {
+    void syncAccountCart(null, deps()).catch(() => undefined);
+  }, []);
+  return null;
+}
+
 export function CartViewerProvider({ ownerTag, ownSellers, children }: { ownerTag: string | null; ownSellers: string[]; children: ReactNode }) {
   return (
     <ViewerContext.Provider value={{ signedIn: ownerTag !== null, ownSellers }}>

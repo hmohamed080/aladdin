@@ -237,6 +237,8 @@ begin
   if not app.account_is_active(v_uid) then
     raise exception 'mp:account_inactive' using errcode = '42501';
   end if;
+  -- one cart mutation per buyer at a time: the 50-line limit and "replace" hold across concurrent requests
+  perform pg_advisory_xact_lock(hashtextextended('marketplace_cart:' || v_uid::text, 0));
   if p_merge_key is null or p_lines is null or jsonb_typeof(p_lines) <> 'array' then
     raise exception 'mp:invalid_lines' using errcode = '22023';
   end if;
@@ -326,6 +328,8 @@ begin
   if not app.account_is_active(v_uid) then
     raise exception 'mp:account_inactive' using errcode = '42501';
   end if;
+  -- one cart mutation per buyer at a time: the 50-line limit and "replace" hold across concurrent requests
+  perform pg_advisory_xact_lock(hashtextextended('marketplace_cart:' || v_uid::text, 0));
   if p_lines is null or jsonb_typeof(p_lines) <> 'array' then
     raise exception 'mp:invalid_lines' using errcode = '22023';
   end if;
