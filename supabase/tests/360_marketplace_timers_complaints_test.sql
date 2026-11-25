@@ -440,5 +440,21 @@ select throws_ok($q$insert into public.marketplace_payment_complaints (order_id,
 select is((select count(*)::int from public.notifications n where n.event_type = 'marketplace.order.payment_complaint_filed'
             and n.recipient_user_id not in (current_setting('t.admin')::uuid, current_setting('t.sales')::uuid)), 0, 'E5. no notification of a filing reaches a user without the permission (both holders are admins granted it)');
 
+-- F. "money not received" gives the buyer at least 24 h from the ruling, even when the 48 h ran out while the complaint paused the clock
+select set_config('t.c9', pg_temp.mk_order('instapay_full', 'preparing', 'receipt_disputed', now() - interval '1 hour', 'order_receipt_resubmit'), true);
+select pg_temp.as_user(current_setting('t.buyer'));
+select set_config('t.k9', (public.marketplace_payment_complaint_file(current_setting('t.c9')::uuid, 'transfer_made', null) ->> 'complaint_id'), true);
+update public.marketplace_timers set started_at = now() - interval '60 hours', expires_at = now() - interval '12 hours'
+ where subject_id = current_setting('t.c9')::uuid and kind = 'order_receipt_resubmit';
+select pg_temp.as_user(current_setting('t.admin'));
+select is((public.admin_marketplace_payment_complaint_decide(current_setting('t.k9')::uuid, 'payment_not_received', 'No credit on the statement') ->> 'state'),
+  'resolved', 'F1. the late complaint is decided');
+select is((select expires_at = now() + interval '24 hours' from public.marketplace_timers where subject_id = current_setting('t.c9')::uuid and state = 'active'), true,
+  'F2. the expired deadline is moved to 24 hours after the ruling');
+select lives_ok($q$select pg_temp.run(now() + interval '23 hours')$q$, 'F3. the runner runs inside the 24 hours');
+select is((select status from public.marketplace_orders where id = current_setting('t.c9')::uuid), 'preparing', 'F4. the order survives inside the 24 hours');
+select lives_ok($q$select pg_temp.run(now() + interval '25 hours')$q$, 'F5. the runner runs after the 24 hours');
+select is((select status from public.marketplace_orders where id = current_setting('t.c9')::uuid), 'cancelled', 'F6. without a new receipt the order is cancelled');
+
 select * from finish();
 rollback;

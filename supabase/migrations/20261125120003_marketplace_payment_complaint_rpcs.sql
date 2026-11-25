@@ -13,7 +13,7 @@
 -- DECISIONS (contract section 4.4 + owner questions 2 and 3, ASSUMED pending owner confirmation)
 --   * decision payment_valid     -> app.marketplace_order_apply(accept_receipt, actor_role 'admin'): the payment counts as received,
 --                                   the dispute timer closes, the seller carries on. The complaint becomes 'resolved'.
---   * decision payment_not_received -> the order does not change and the buyer's 48 h clock keeps running (the timer is untouched).
+--   * decision payment_not_received -> the order does not change; the buyer's receipt timer ends no sooner than 24 h after the ruling.
 --   * decision dismissed         -> no action on the order; the complaint becomes 'dismissed'.
 --   * an admin never moves money; every decision keeps a written note (3-500 characters).
 --   * a complaint pauses the buyer's 48 h only if it is filed BEFORE the deadline (mp:complaint_not_allowed afterwards), so it cannot be used to dodge the cancellation.
@@ -271,6 +271,14 @@ begin
   if p_decision = 'payment_valid' then
     -- the machine re-checks the order under its lock; a cancelled or moved order raises mp:invalid_transition and nothing is saved
     perform app.marketplace_order_apply(c.order_id, 'accept_receipt', 'admin', v_uid, '{}'::jsonb);
+  end if;
+
+  -- Owner decision 2026-11-25: after "money not received" the buyer gets at least 24 hours from the ruling to send a new receipt, even
+  -- when the 48 hours ran out while the complaint paused the clock. A later deadline is never shortened.
+  if p_decision = 'payment_not_received' then
+    update public.marketplace_timers
+       set expires_at = greatest(expires_at, now() + interval '24 hours')
+     where subject_type = 'order' and subject_id = c.order_id and kind = 'order_receipt_resubmit' and state = 'active';
   end if;
 
   v_state := case p_decision when 'dismissed' then 'dismissed' else 'resolved' end;

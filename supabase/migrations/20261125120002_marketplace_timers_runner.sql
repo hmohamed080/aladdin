@@ -22,7 +22,7 @@
 --     runner never waits on an order lock (no deadlock with a seller pressing a button).
 --   * an order that already moved on closes the timer 'done' with no side effect.
 --   * a payment complaint that is open or under review PAUSES the buyer's receipt timer (no reminder, no expiry): the buyer must not
---     lose the order while an admin decides. After the decision the normal rules resume; the 48 h are not restarted (contract 4.4).
+--     lose the order while an admin decides. After the decision the normal rules resume; "money not received" gives the buyer at least 24 h more (20261125120003).
 --     ASSUMED pending owner confirmation (open question for the owner: should the buyer get a fresh grace period after a
 --     "payment not received" decision?).
 --   * low / out of stock notifications (contract matrix row 16) already exist since PR 7 (trigger marketplace_stock_notify on the
