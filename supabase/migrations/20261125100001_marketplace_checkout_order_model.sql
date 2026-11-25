@@ -152,10 +152,11 @@ update public.marketplace_orders set
   stock_state = case status when 'pending_confirmation' then 'pending'
                   when 'cancelled' then case when confirmed_at is null then 'released' else 'restocked' end
                   when 'returned' then 'restocked' else 'deducted' end,
+  -- cleared in the SAME update: a row that becomes instapay_full may not keep deposit fields (ck_mp_orders_deposit)
+  deposit_percent = case when payment_method = 'instapay' and deposit_percent = 100 then null else deposit_percent end,
+  deposit_egp = case when payment_method = 'instapay' and deposit_percent = 100 then null else deposit_egp end,
   placed_at = created_at
 where true;
-update public.marketplace_orders set deposit_percent = null, deposit_egp = null
- where payment_method = 'instapay_full' and deposit_percent is not null;
 update public.marketplace_orders set
   paid_now_egp = case payment_method when 'cod' then 0 when 'instapay_full' then total_egp else deposit_egp end,
   balance_due_egp = total_egp - case payment_method when 'cod' then 0 when 'instapay_full' then total_egp else deposit_egp end

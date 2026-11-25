@@ -111,4 +111,15 @@ describe("account cart sync", () => {
     expect(t.local()).toEqual([line("A", 2)]);
     expect(t.calls).toEqual([]);
   });
+
+  it("keeps what the buyer changed while a push was in flight, and leaves it marked", async () => {
+    t = setup([line("A", 1)], { [ACCOUNT]: "me", [DIRTY]: "1" });
+    t.respond.mockImplementationOnce(() => {
+      t.deps.write([line("A", 2), line("C")]);
+      return { ok: true, lines: [line("A", 1)] };
+    });
+    expect(await syncAccountCart("me", t.deps)).toEqual({ kind: "pushed" });
+    expect(t.local()).toEqual([line("A", 2), line("C")]);
+    expect(t.mem.get(DIRTY)).toBe("1");
+  });
 });
