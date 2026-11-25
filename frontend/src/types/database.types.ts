@@ -11170,6 +11170,29 @@ export type Database = {
         Returns: undefined
       }
       mark_notification_read: { Args: { p_id: string }; Returns: undefined }
+      admin_marketplace_return_decide: { Args: { p_decision: string; p_message_ar?: string; p_message_en?: string; p_note: string; p_return_id: string }; Returns: Json }
+      admin_marketplace_return_get: { Args: { p_return_id: string }; Returns: Json }
+      admin_marketplace_return_remind_seller: { Args: { p_return_id: string }; Returns: Json }
+      admin_marketplace_returns: { Args: { p_limit?: number; p_offset?: number; p_queue?: string; p_state?: string }; Returns: Json }
+      marketplace_buyer_refund_confirm: { Args: { p_return_id: string }; Returns: Json }
+      marketplace_buyer_return_cancel: { Args: { p_return_id: string }; Returns: Json }
+      marketplace_buyer_return_create: { Args: { p_evidence_ids: string[]; p_idempotency_key: string; p_kind: string; p_lines: Json; p_note: string; p_order_id: string; p_reason_preset_id: string; p_remedy: string }; Returns: Json }
+      marketplace_buyer_return_eligibility: { Args: { p_order_id: string }; Returns: Json }
+      marketplace_buyer_return_evidence_confirm: { Args: { p_evidence_id: string }; Returns: Json }
+      marketplace_buyer_return_get: { Args: { p_return_id: string }; Returns: Json }
+      marketplace_buyer_return_mark_shipped: { Args: { p_return_id: string; p_tracking?: string }; Returns: Json }
+      marketplace_buyer_return_request_upload: { Args: { p_content_type: string; p_order_id: string }; Returns: Json }
+      marketplace_buyer_returns: { Args: { p_limit?: number; p_offset?: number }; Returns: Json }
+      marketplace_return_complaint_file: { Args: { p_note: string; p_return_id: string }; Returns: Json }
+      marketplace_seller_product_returnability_set: { Args: { p_non_returnable: boolean; p_organization_id: string; p_product_id: string }; Returns: boolean }
+      marketplace_seller_return_decide: { Args: { p_decision: string; p_message_ar?: string; p_message_en?: string; p_partial_refund_egp?: number; p_preset_id?: string; p_return_id: string }; Returns: Json }
+      marketplace_seller_return_get: { Args: { p_return_id: string }; Returns: Json }
+      marketplace_seller_return_receive: { Args: { p_return_id: string; p_sellable?: Json }; Returns: Json }
+      marketplace_seller_return_settings_get: { Args: { p_organization_id: string }; Returns: Json }
+      marketplace_seller_return_settings_save: { Args: { p_organization_id: string; p_settings: Json }; Returns: Json }
+      marketplace_seller_returns_page: { Args: { p_limit?: number; p_offset?: number; p_organization_id: string; p_state?: string }; Returns: Json }
+      marketplace_seller_exchange_fulfil: { Args: { p_note?: string; p_return_id: string }; Returns: Json }
+      marketplace_seller_refund_record: { Args: { p_amount_egp: number; p_reference_note?: string; p_return_id: string }; Returns: Json }
       marketplace_buyer_address_delete: { Args: { p_id: string }; Returns: boolean }
       marketplace_buyer_address_save: { Args: { p_address: Json }; Returns: Json }
       marketplace_buyer_address_set_default: {

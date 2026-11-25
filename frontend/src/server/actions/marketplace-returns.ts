@@ -104,7 +104,7 @@ export async function createReturnAction(input: CreateReturnInput): Promise<Retu
     p_kind: input.kind,
     p_lines: input.lines.map((l) => ({ item_id: String(l.item_id), quantity: Math.round(Number(l.quantity)) })) as unknown as Json,
     p_reason_preset_id: input.reasonPresetId,
-    p_note: input.note.trim().slice(0, 500) || undefined,
+    p_note: input.note.trim().slice(0, 500),
     p_evidence_ids: input.evidenceIds,
     p_remedy: input.kind === "return" ? "refund" : "exchange",
     p_idempotency_key: input.idempotencyKey,
