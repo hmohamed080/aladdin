@@ -13,6 +13,7 @@ import { buyerCancelOrderPageAction, confirmResubmitAction, reasonPresetsAction,
 import { syncMarketplaceCartAction } from "@/server/actions/marketplace-cart-account";
 import { areaName, governorateName } from "@/features/marketplace-seller/place-label";
 import styles from "@/features/marketplace/marketplace-cart.module.css";
+import { FileComplaintSlot } from "./order-slots";
 import { formatEstimate, hoursLeft, isInstapay, isLegacy, isReadyForPickup, knownActions, reorderLines } from "./order-model";
 import type { OrderDocumentV2, ReasonPreset } from "./order-types";
 import { dateTime, OrderLineRow, PaymentBadge, ProgressBar, StatusBadge, Timeline, Totals } from "./order-parts";
@@ -160,6 +161,7 @@ export function BuyerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
       </section>
     ),
   };
+  registry.file_complaint = () => <FileComplaintSlot key="file_complaint" orderId={order.id} />;
   const buttons = knownActions(order.actions, registry);
 
   return (
