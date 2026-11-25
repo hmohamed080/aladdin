@@ -7819,6 +7819,7 @@ export const en = {
       },
       reason: "Reason",
       reasonRequired: "Write the reason for cancelling.",
+      confirmBeforeShipping: "Confirm the InstaPay transfer before you can ship or hand over this order.",
       confirmNeedsDeposit: "Review and accept the InstaPay receipt before confirming this order.",
       done: "Order updated.",
       receiptView: "View receipt",
