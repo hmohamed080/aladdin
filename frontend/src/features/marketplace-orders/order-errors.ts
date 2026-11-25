@@ -11,6 +11,7 @@ export const ORDER_PAGE_ERROR_CODES = new Set([
   "invalid_payload",
   "invalid_action",
   "invalid_transition",
+  "payment_not_confirmed",
   "order_not_cancellable",
   "payment_dispute_open",
   "reason_required",
