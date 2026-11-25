@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { fmtEgp } from "@/features/marketplace/live/live-copy";
 import { areaName, governorateName } from "@/features/marketplace-seller/place-label";
 import styles from "@/features/marketplace/marketplace-cart.module.css";
-import type { OrderDocument } from "@/features/marketplace-orders/contract";
+import type { OrderDocumentV2 } from "@/features/marketplace-orders/order-types";
 import { checkoutCopy } from "./checkout-copy";
 
 /** Index (0-3) of the progress step an order is on. Pure, so the thank-you page and its test agree. */
@@ -23,18 +23,19 @@ export function firstName(full: string | null | undefined): string {
 }
 
 /** The thank-you page (Marketplace PR 12): greets the buyer, shows the order number, progress, address, payment and summary. */
-export function ConfirmedView({ order }: { order: OrderDocument }) {
+export function ConfirmedView({ order }: { order: OrderDocumentV2 }) {
   const { locale } = useI18n();
   const c = checkoutCopy[locale];
   const money = (n: number | null) => (n === null ? "—" : fmtEgp(Number(n), locale));
   const step = progressStep(order.status);
-  const place = order.governorate_key
-    ? [governorateName(order.governorate_key, locale), order.area_key ? areaName(order.governorate_key, order.area_key, locale) : ""].filter(Boolean).join(" — ")
+  const gov = order.place.governorate_key;
+  const place = gov
+    ? [governorateName(gov, locale), order.place.area_key ? areaName(gov, order.place.area_key, locale) : ""].filter(Boolean).join(" — ")
     : "";
   return (
     <div className={styles.page}>
       <section className={styles.empty} role="status">
-        <h1 data-plain>{c.thanksTitle(firstName(order.buyer_name))}</h1>
+        <h1 data-plain>{c.thanksTitle(firstName(order.recipient.name))}</h1>
         <p>{c.thanksText}</p>
         <p><strong>{c.orderNumber}: </strong><span dir="ltr">{order.order_number}</span></p>
       </section>
@@ -52,7 +53,7 @@ export function ConfirmedView({ order }: { order: OrderDocument }) {
 
       <section className={styles.card} aria-labelledby="ty-where">
         <h2 id="ty-where" className={styles.cardTitle} data-plain><StorefrontIcon size={20} aria-hidden="true" />{order.fulfilment === "pickup" ? c.pickupAt : c.deliveryTo}</h2>
-        <p>{order.fulfilment === "pickup" ? (order.pickup_address ?? order.seller_name) : [place, order.address_text].filter(Boolean).join(" — ")}</p>
+        <p>{order.fulfilment === "pickup" ? (order.pickup?.address ?? order.seller.name) : [place, order.place.address_text].filter(Boolean).join(" — ")}</p>
       </section>
 
       <section className={styles.card} aria-labelledby="ty-sum">
@@ -66,9 +67,9 @@ export function ConfirmedView({ order }: { order: OrderDocument }) {
           ))}
         </ul>
         <dl className={styles.totals}>
-          <div><dt>{c.products}</dt><dd>{money(order.subtotal_egp)}</dd></div>
-          <div><dt>{c.deliveryFee}</dt><dd>{order.delivery_fee_egp === 0 ? c.free : money(order.delivery_fee_egp)}</dd></div>
-          <div><dt><strong>{c.total}</strong></dt><dd><strong>{money(order.total_egp)}</strong></dd></div>
+          <div><dt>{c.products}</dt><dd>{money(order.totals.subtotal_egp)}</dd></div>
+          <div><dt>{c.deliveryFee}</dt><dd>{Number(order.totals.delivery_fee_egp) === 0 ? c.free : money(order.totals.delivery_fee_egp)}</dd></div>
+          <div><dt><strong>{c.total}</strong></dt><dd><strong>{money(order.totals.total_egp)}</strong></dd></div>
           <div><dt>{locale === "ar" ? "طريقة الدفع" : "Payment"}</dt><dd>{c.paymentMethod[order.payment_method] ?? order.payment_method}</dd></div>
         </dl>
       </section>

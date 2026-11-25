@@ -1,18 +1,20 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/controls";
 import { ArrowUpRightIcon, GlobeIcon, MenuIcon, ShoppingBagIcon, XIcon } from "@/components/ui/icons";
 import { LanguageSwitch } from "@/components/layout/switchers";
 import { useI18n } from "@/lib/i18n/context";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
+import { useCartViewer } from "@/features/marketplace/live/viewer-context";
 import { useLiveCart } from "@/features/marketplace/live/live-cart-store";
 import styles from "./landing-header.module.css";
 
 const content = {
   ar: {
-    navigation: "التنقل الرئيسي", menu: "القائمة", signIn: "تسجيل الدخول", register: "إنشاء حساب", registerTitle: "اختر نوع حسابك", soon: "قريبًا", cart: "السلة", marketplace: "السوق",
+    navigation: "التنقل الرئيسي", menu: "القائمة", signIn: "تسجيل الدخول", myOrders: "طلباتي", account: "حسابي", register: "إنشاء حساب", registerTitle: "اختر نوع حسابك", soon: "قريبًا", cart: "السلة", marketplace: "السوق",
     links: [["الرئيسية", "#landing-top"], ["عن المنصة", "#how-it-works"], ["المميزات", "#audience"], ["الشركاء", "#brands"], ["فيديوهات ومنتجات", "#platform"]],
     faq: "الأسئلة الشائعة", contact: "تواصل معنا",
     answers: [
@@ -22,7 +24,7 @@ const content = {
     ],
   },
   en: {
-    navigation: "Primary navigation", menu: "Menu", signIn: "Sign in", register: "Create account", registerTitle: "Choose your account type", soon: "Coming soon", cart: "Cart", marketplace: "Marketplace",
+    navigation: "Primary navigation", menu: "Menu", signIn: "Sign in", myOrders: "My orders", account: "My account", register: "Create account", registerTitle: "Choose your account type", soon: "Coming soon", cart: "Cart", marketplace: "Marketplace",
     links: [["Home", "#landing-top"], ["About", "#how-it-works"], ["Features", "#audience"], ["Partners", "#brands"], ["Videos & products", "#platform"]],
     faq: "FAQ", contact: "Contact us",
     answers: [
@@ -42,6 +44,8 @@ export function LandingHeader({ anchorBase = "", showCart = false, cartCount = 0
   const t = content[locale];
   // The browser cart (same store the Marketplace pages write), so "Add to cart" anywhere updates this at once.
   const liveCart = useLiveCart();
+  // A signed-in buyer (known to the /market layout) sees his orders and account instead of the sign-in and sign-up buttons.
+  const { signedIn } = useCartViewer();
   const count = showCart ? Math.max(cartCount, liveCart.count) : 0;
   const lastCount = useRef<number | null>(null);
   const [bump, setBump] = useState(false);
@@ -108,6 +112,13 @@ export function LandingHeader({ anchorBase = "", showCart = false, cartCount = 0
           </a>
         ) : null}
         <span className={styles.language}><LanguageSwitch /><GlobeIcon size={14} aria-hidden="true" /></span>
+        {signedIn ? (
+          <>
+            <Link className={styles.signIn} href="/market/orders" dir={dir}>{t.myOrders}</Link>
+            <a className={styles.signIn} href="/home" dir={dir}>{t.account}</a>
+          </>
+        ) : (
+          <>
         <a className={styles.signIn} href="/auth/sign-in" dir={dir}>{t.signIn}</a>
         <div className={styles.registerWrap} ref={signup}>
           <Button ref={registerButton} variant="accent" className={styles.register} aria-haspopup="true" aria-expanded={signupOpen} aria-controls="register-menu" onClick={() => setSignupOpen(!signupOpen)}>
@@ -142,6 +153,8 @@ export function LandingHeader({ anchorBase = "", showCart = false, cartCount = 0
             </div>
           ) : null}
         </div>
+          </>
+        )}
       </div>
     </header>
   );

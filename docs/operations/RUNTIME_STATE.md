@@ -1,3 +1,7 @@
+## Marketplace order pages, PR 13 (draft PR, not deployed) - 2026-11-25
+
+Migrations 20261125110001-130003 and pgTAP 330 exist only on the PR branch (stacked on PR 12). Nothing applied to Acceptance or Production. Ordering stays behind NEXT_PUBLIC_MARKETPLACE_ORDERING.
+
 ## Marketplace checkout and order model, PR 12 (draft PR #267, not deployed) - 2026-11-24
 
 - Migration `20261125100001` exists only on the PR branch; applied nowhere hosted. Checkout v2 (`/market/checkout`, thank-you page) stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. Orders placed through it have `source = 'v2'`; older orders keep their statuses and legacy RPCs.
