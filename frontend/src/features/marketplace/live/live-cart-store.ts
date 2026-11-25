@@ -15,10 +15,24 @@ import { CART_MAX_LINES, CART_MAX_QTY, type StoredCartLine } from "./public-cont
  */
 export const LIVE_CART_KEY = "aladdin.marketplace.live-cart.v1";
 
+/** Owner tag of the account the stored cart mirrors (set after the guest cart was merged; absent = still a guest cart). */
+export const LIVE_CART_ACCOUNT_KEY = "aladdin.marketplace.live-cart.account.v1";
+/** Set when the stored cart was changed on this device after it was last sent to the account. */
+export const LIVE_CART_DIRTY_KEY = "aladdin.marketplace.live-cart.dirty.v1";
+
 const SERVER_LINES: readonly StoredCartLine[] = Object.freeze([]);
 let lines: readonly StoredCartLine[] = SERVER_LINES;
 let loaded = false;
 const listeners = new Set<() => void>();
+/** Called only for a change the buyer made on this device (not when an account cart is written into the store). */
+const mutationListeners = new Set<() => void>();
+
+export function onCartMutation(listener: () => void): () => void {
+  mutationListeners.add(listener);
+  return () => {
+    mutationListeners.delete(listener);
+  };
+}
 
 function emit() {
   for (const l of listeners) l();
@@ -38,15 +52,28 @@ function ensureLoaded() {
   lines = read();
 }
 
-function commit(next: readonly StoredCartLine[]) {
+function commit(next: readonly StoredCartLine[], fromAccount = false) {
   ensureLoaded();
   lines = next;
   try {
     window.localStorage.setItem(LIVE_CART_KEY, JSON.stringify(lines));
+    if (!fromAccount && window.localStorage.getItem(LIVE_CART_ACCOUNT_KEY)) window.localStorage.setItem(LIVE_CART_DIRTY_KEY, "1");
   } catch {
     /* private mode / blocked storage: the cart then lives for this visit only */
   }
   emit();
+  if (!fromAccount) for (const l of mutationListeners) l();
+}
+
+/** The stored cart as it is now (for the account sync). */
+export function readCartLines(): StoredCartLine[] {
+  ensureLoaded();
+  return [...lines];
+}
+
+/** Puts the account cart into the store without marking it as a local change. */
+export function writeAccountCartLines(next: readonly StoredCartLine[]) {
+  commit(next.slice(0, CART_MAX_LINES), true);
 }
 
 function onStorage(e: StorageEvent) {

@@ -79,6 +79,16 @@ describe("pricing the cart", () => {
     expect(t.deliveryEgp).toBe(40);
   });
 
+  it("counts a sold-out and a withdrawn line as blocking checkout; a healthy cart blocks nothing", () => {
+    const quote: CartQuote = {
+      lines: [line("A", 1, 100, 5), line("B", 1, 50, 0), { status: "unavailable", slug: "p-C", sku: "C" }],
+      sellers: [seller(1, 40)],
+    };
+    expect(priceCart(quote, stored(["A", 1], ["B", 1], ["C", 1]), "delivery").blockingLines).toBe(2);
+    expect(priceCart(quote, stored(["A", 1], ["B", 1]), "delivery").blockingLines).toBe(1);
+    expect(priceCart(quote, stored(["A", 1]), "delivery").blockingLines).toBe(0);
+  });
+
   it("rounds money to piastres", () => {
     const quote: CartQuote = { lines: [line("A", 1, 33.33)], sellers: [seller(1, 10.1)] };
     const t = priceCart(quote, stored(["A", 3]), "delivery");
