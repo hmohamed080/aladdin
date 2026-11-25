@@ -721,5 +721,28 @@ select is((select count(*)::int from public.marketplace_stock_movements where re
 select is((select count(*)::int from public.marketplace_return_requests where status = 'approved' and decided_by_role is null), 0, 'I12. no return is ever approved without a decision');
 select is((select count(*)::int from public.marketplace_order_items where quantity_returned > quantity), 0, 'I13. quantity_returned never exceeds the ordered quantity');
 
+-- ===========================================================================
+-- J. The delivery fee: refunded only when one return takes back the whole order for a showroom fault
+-- ===========================================================================
+select set_config('t.o9', pg_temp.deliver(jsonb_build_array(jsonb_build_object('slug', current_setting('t.s1'), 'sku', 'RT-1', 'qty', 1))::text, 'rt-key-0090')::text, true);
+select set_config('t.o10', pg_temp.deliver(jsonb_build_array(jsonb_build_object('slug', current_setting('t.s1'), 'sku', 'RT-1', 'qty', 1))::text, 'rt-key-0091')::text, true);
+select set_config('t.ev9', pg_temp.evidence(current_setting('t.o9'))::text, true);
+select set_config('t.r9', public.marketplace_buyer_return_create(current_setting('t.o9')::uuid, 'return',
+  jsonb_build_array(jsonb_build_object('item_id', pg_temp.item(current_setting('t.o9'), 'RT-1'), 'quantity', 1)),
+  pg_temp.reason('The product is defective'), 'broken', array[current_setting('t.ev9')::uuid], null, 'rt-ret-0090')::text, true);
+select set_config('t.r10', public.marketplace_buyer_return_create(current_setting('t.o10')::uuid, 'return',
+  jsonb_build_array(jsonb_build_object('item_id', pg_temp.item(current_setting('t.o10'), 'RT-1'), 'quantity', 1)),
+  pg_temp.reason('I changed my mind'), null, '{}', null, 'rt-ret-0091')::text, true);
+reset role;
+select ok((select delivery_fee_egp > 0 from public.marketplace_orders where id = current_setting('t.o9')::uuid), 'J1. the order carries a delivery fee');
+select is(app.marketplace_return_value((current_setting('t.r9')::jsonb ->> 'id')::uuid),
+  (select total_egp from public.marketplace_orders where id = current_setting('t.o9')::uuid),
+  'J2. the whole order returned for a defect refunds the items and the delivery fee');
+select is(app.marketplace_return_value((current_setting('t.r10')::jsonb ->> 'id')::uuid),
+  (select subtotal_egp from public.marketplace_orders where id = current_setting('t.o10')::uuid),
+  'J3. a change of mind never includes the delivery fee');
+select is(app.marketplace_return_value((current_setting('t.r2')::jsonb ->> 'id')::uuid), 80::numeric,
+  'J4. a partial return for a defect does not include the delivery fee');
+
 select * from finish();
 rollback;

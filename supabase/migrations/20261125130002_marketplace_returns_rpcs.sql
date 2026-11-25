@@ -98,7 +98,9 @@ begin
 end;
 $$;
 
--- What a return is worth: the price of the returned units (delivery fee excluded), capped by a partial proposal.
+-- What a return is worth: the price of the returned units, capped by a partial proposal. Owner decision 2026-11-25: the delivery fee is
+-- added only when ONE return takes back the WHOLE order for a fault of the showroom (the reason makes the showroom pay the return
+-- shipping: defect, wrong item, transit damage). A partial return, or a change of mind, never includes it.
 create or replace function app.marketplace_return_value(p_return uuid)
 returns numeric
 language sql
@@ -106,9 +108,17 @@ stable
 security definer
 set search_path = ''
 as $$
-  select coalesce(sum(i.unit_price_egp * ri.quantity), 0)
-    from public.marketplace_return_items ri join public.marketplace_order_items i on i.id = ri.order_item_id
-   where ri.return_id = p_return;
+  select coalesce((select sum(i.unit_price_egp * ri.quantity)
+                     from public.marketplace_return_items ri join public.marketplace_order_items i on i.id = ri.order_item_id
+                    where ri.return_id = p_return), 0)
+       + coalesce((select o.delivery_fee_egp
+                     from public.marketplace_return_requests r join public.marketplace_orders o on o.id = r.order_id
+                    where r.id = p_return and r.return_shipping_payer = 'seller'
+                      and not exists (
+                        select 1 from public.marketplace_order_items oi
+                         where oi.order_id = o.id
+                           and oi.quantity > coalesce((select x.quantity from public.marketplace_return_items x
+                                                        where x.return_id = r.id and x.order_item_id = oi.id), 0))), 0);
 $$;
 
 create or replace function app.marketplace_return_refund_cap(p_return uuid)
