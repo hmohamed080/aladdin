@@ -1,3 +1,5 @@
+-- migration-policy: destructive-reviewed - drops only the internal no-op hook app.marketplace_return_timer_tick to change its
+-- return type; no client or promoted application calls it, and it is created by an earlier migration of the same release.
 -- ===========================================================================
 -- Marketplace PR 15 - Migration 150002: returns and exchanges, rules, RPCs, hooks, templates
 -- ===========================================================================
@@ -91,7 +93,7 @@ begin
     return false;
   end if;
   w := app.marketplace_return_window_json(o.id);
-  return now() <= (w ->> 'defect_ends_at')::timestamptz
+  return now() <= greatest((w ->> 'general_ends_at')::timestamptz, (w ->> 'defect_ends_at')::timestamptz)
     and not exists (select 1 from public.marketplace_return_requests r where r.order_id = o.id
                      and r.status in ('requested', 'approved', 'in_transit', 'received'))
     and exists (select 1 from public.marketplace_order_items i where i.order_id = o.id and i.quantity_returned < i.quantity);
@@ -285,7 +287,10 @@ begin
     if v_complain then v_out := array_append(v_out, 'file_complaint'); end if;
   elsif p_for = 'admin' and r.in_admin_queue then
     if r.status in ('requested', 'approved', 'in_transit', 'received') then v_out := array_append(v_out, 'remind_seller'); end if;
-    if r.status in ('requested', 'rejected') then v_out := v_out || array['approve', 'reject']; end if;
+    if r.status in ('requested', 'rejected')
+       or (r.status = 'approved' and r.partial_refund_egp is not null and r.escalated_reason = 'complaint') then
+      v_out := v_out || array['approve', 'reject'];
+    end if;
   end if;
   return v_out;
 end;
@@ -822,17 +827,21 @@ declare
   v_to text;
   v_ar text;
   v_en text;
+  v_partial_appeal boolean;
 begin
   select * into r from public.marketplace_return_requests where id = p_return for update;
   if p_decision not in ('approve', 'reject', 'propose_partial') then
     raise exception 'mp:invalid_payload' using errcode = '22023';
   end if;
-  v_to := case p_decision when 'reject' then 'rejected' else 'approved' end;
+  -- a complaint about a partial proposal: "approve" grants the full value, "reject" upholds the proposed amount
+  v_partial_appeal := p_role = 'admin' and r.status = 'approved' and r.partial_refund_egp is not null and r.in_admin_queue
+    and r.escalated_reason = 'complaint';
+  v_to := case when p_decision = 'reject' and not v_partial_appeal then 'rejected' else 'approved' end;
   -- replay: the same decision already took effect
   if r.status = v_to and r.decided_by_role = p_role and (p_decision <> 'propose_partial' or r.partial_refund_egp = p_partial) then
     return;
   end if;
-  if not (r.status = 'requested' or (p_role = 'admin' and r.status = 'rejected')) then
+  if not (r.status = 'requested' or (p_role = 'admin' and r.status = 'rejected') or v_partial_appeal) then
     raise exception 'mp:invalid_transition' using errcode = '23514';
   end if;
   if p_decision = 'propose_partial' then
@@ -855,11 +864,12 @@ begin
   end if;
   update public.marketplace_return_requests set status = v_to, decided_by_role = p_role, decision_message_ar = v_ar,
     decision_message_en = v_en, decision_internal_note = left(nullif(btrim(p_note), ''), 500),
-    partial_refund_egp = case when p_decision = 'propose_partial' then p_partial else null end,
+    partial_refund_egp = case when p_decision = 'propose_partial' then p_partial
+                              when v_partial_appeal and p_decision = 'reject' then r.partial_refund_egp else null end,
     in_admin_queue = false
    where id = r.id;
   perform app.marketplace_timer_close('return', r.id, 'return_seller_response', 'decided_by_' || p_role);
-  perform app.marketplace_return_event(r.id, case p_decision when 'reject' then 'rejected' else 'approved' end, r.status, v_to, p_role,
+  perform app.marketplace_return_event(r.id, v_to, r.status, v_to, p_role,
     v_en);
   perform app.marketplace_return_notify(r.id, case when p_role = 'admin' then 'admin_decided' when p_decision = 'reject' then 'rejected' else 'approved' end,
     'buyer', v_ar, v_en);
@@ -1298,6 +1308,9 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 10. Timer hook (PR 14's runner calls it; no auto-approval, ever)
 -- ---------------------------------------------------------------------------
+-- PR 14 installed this hook as a no-op that returns void; PostgreSQL cannot change a return type in place. Only the timer runner
+-- calls it (with PERFORM), no client holds it, and PR 14 has been applied nowhere without this migration following it.
+drop function if exists app.marketplace_return_timer_tick(public.marketplace_timers, timestamptz);
 create or replace function app.marketplace_return_timer_tick(p_timer public.marketplace_timers, p_now timestamptz)
 returns text
 language plpgsql
@@ -1604,3 +1617,5 @@ grant execute on function
   public.admin_marketplace_return_remind_seller(uuid),
   public.admin_marketplace_return_decide(uuid, text, text, text, text)
   to authenticated;
+
+revoke all on function app.marketplace_return_timer_tick(public.marketplace_timers, timestamptz) from public, anon, authenticated, service_role;

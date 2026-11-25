@@ -36,6 +36,9 @@ export const RETURN_COPY = {
   note: { ar: "ملاحظة", en: "Note" },
   noteInternal: { ar: "ملاحظة داخلية (لا تظهر للمشتري ولا للمعرض)", en: "Internal note (never shown to the buyer or the showroom)" },
   amount: { ar: "المبلغ (جنيه)", en: "Amount (EGP)" },
+  sellable: { ar: "سليم ويرجع للمخزون", en: "In good condition: return to stock" },
+  sellableHint: { ar: "حدّد القطع السليمة فقط. غير المحدد لا يعود للبيع.", en: "Tick only the items in good condition. Unticked items do not go back on sale." },
+  partialAppeal: { ar: "شكوى على استرداد جزئي: «قبول» يمنح القيمة كاملة، و«رفض» يُبقي المبلغ المقترح.", en: "Complaint about a partial refund: approving grants the full value, rejecting keeps the proposed amount." },
   failed: { ar: "تعذر تنفيذ الإجراء.", en: "The action could not be completed." },
   events: { ar: "سجل الطلب", en: "Request history" },
 } satisfies Record<string, L>;

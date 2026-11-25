@@ -123,8 +123,12 @@ async function buyerCall(fn: "marketplace_buyer_return_cancel" | "marketplace_bu
   revalidatePath(BUYER_RETURNS);
   return { ok: true, return: data as unknown as ReturnDocument };
 }
-export const cancelReturnAction = (id: string) => buyerCall("marketplace_buyer_return_cancel", id);
-export const confirmRefundAction = (id: string) => buyerCall("marketplace_buyer_refund_confirm", id);
+export async function cancelReturnAction(id: string) {
+  return buyerCall("marketplace_buyer_return_cancel", id);
+}
+export async function confirmRefundAction(id: string) {
+  return buyerCall("marketplace_buyer_refund_confirm", id);
+}
 
 export async function markReturnShippedAction(id: string, tracking: string): Promise<ReturnResult<Doc>> {
   if (!UUID.test(id)) return { ok: false, code: "not_found" };

@@ -13,7 +13,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export default async function AdminReturnRoute({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!UUID.test(id)) notFound();
-  await requireAdminRoute(`/admin/marketplace/returns/${id}`);
+  await requireAdminRoute("/admin/marketplace/returns");
   const supabase = await getServerSupabase();
   const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
   const { data } = await supabase.rpc("admin_marketplace_return_get", { p_return_id: id });

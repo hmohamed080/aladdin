@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Button, Checkbox, Input, Textarea } from "@/components/ui/controls";
 import {
   adminDecideReturnAction,
   adminRemindSellerAction,
@@ -29,6 +30,8 @@ export function ReturnActions({ doc, role, locale }: { doc: ReturnDocument; role
   const [text, setText] = useState("");
   const [amount, setAmount] = useState("");
   const [failed, setFailed] = useState(false);
+  // nothing goes back into sellable stock unless the showroom says it is in good condition
+  const [good, setGood] = useState<Record<string, boolean>>({});
 
   const run = (fn: () => Promise<Res>) =>
     start(async () => {
@@ -49,7 +52,7 @@ export function ReturnActions({ doc, role, locale }: { doc: ReturnDocument; role
     approve: () => (role === "admin" ? adminDecideReturnAction(doc.id, "approve", text, "", "") : decideReturnAction(doc.id, { decision: "approve", ...msg })),
     reject: () => (role === "admin" ? adminDecideReturnAction(doc.id, "reject", text, "", "") : decideReturnAction(doc.id, { decision: "reject", ...msg })),
     propose_partial: () => decideReturnAction(doc.id, { decision: "propose_partial", ...msg, partialRefundEgp: Number(amount) }),
-    receive: () => receiveReturnAction(doc.id, doc.items.map((i) => ({ item_id: i.item_id, sellable: true }))),
+    receive: () => receiveReturnAction(doc.id, doc.items.map((i) => ({ item_id: i.item_id, sellable: good[i.item_id] === true }))),
     record_refund: () => recordRefundAction(doc.id, Number(amount), text),
     fulfil_exchange: () => fulfilExchangeAction(doc.id, text),
     remind_seller: () => adminRemindSellerAction(doc.id),
@@ -64,26 +67,33 @@ export function ReturnActions({ doc, role, locale }: { doc: ReturnDocument; role
       {needsText ? (
         <label className="flex flex-col gap-1 text-label">
           {(role === "admin" ? RETURN_COPY.noteInternal : RETURN_COPY.note)[locale]}
-          <textarea className="rounded-sm border bg-surface p-sm text-body" maxLength={500} value={text} onChange={(e) => setText(e.target.value)} />
+          <Textarea maxLength={500} value={text} onChange={(e) => setText(e.target.value)} />
         </label>
       ) : null}
       {needsAmount ? (
         <label className="flex flex-col gap-1 text-label">
           {RETURN_COPY.amount[locale]}
-          <input inputMode="decimal" dir="ltr" className="rounded-sm border bg-surface p-sm text-body" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <Input inputMode="decimal" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </label>
+      ) : null}
+      {doc.actions.includes("receive") ? (
+        <fieldset className="flex flex-col gap-1">
+          <legend className="text-label text-fg-secondary">{RETURN_COPY.sellableHint[locale]}</legend>
+          {doc.items.map((i) => (
+            <Checkbox key={i.item_id} id={`sellable-${i.item_id}`} name="sellable" checked={good[i.item_id] === true} onChange={(v) => setGood((g) => ({ ...g, [i.item_id]: v }))}>
+              {(locale === "ar" ? i.name_ar : i.name_en) + " × " + i.quantity + " — " + RETURN_COPY.sellable[locale]}
+            </Checkbox>
+          ))}
+        </fieldset>
+      ) : null}
+      {role === "admin" && doc.partial_refund_egp !== null && doc.actions.includes("approve") ? (
+        <p className="text-label text-fg-secondary">{RETURN_COPY.partialAppeal[locale]}</p>
       ) : null}
       <div className="flex flex-wrap gap-sm">
         {doc.actions.map((a) => (
-          <button
-            key={a}
-            type="button"
-            disabled={pending}
-            onClick={() => run(handlers[a])}
-            className="rounded-sm border px-md py-sm text-label font-semibold hover:bg-accent/10 disabled:opacity-50"
-          >
+          <Button key={a} variant="outline" size="sm" disabled={pending} onClick={() => run(handlers[a])}>
             {RETURN_ACTION_LABEL[a][locale]}
-          </button>
+          </Button>
         ))}
       </div>
       {failed ? (
