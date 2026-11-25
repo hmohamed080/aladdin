@@ -152,6 +152,9 @@ export function SellerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
         {msg ? <p role={msg.ok ? "status" : "alert"} className={`rounded-sm border p-sm text-label ${msg.ok ? "border-success/40 bg-success/10" : "border-danger/40 bg-danger/10"}`}>{msg.text}</p> : null}
         {legacy ? <p className="rounded-sm border bg-surface-2 p-sm text-label text-fg-secondary">{t.legacyNote}</p> : null}
         {order.status === "new" && startLeft !== null ? <p role="status" className="rounded-sm border border-warning/40 bg-warning/10 p-sm text-label">{t.startWaiting(startLeft)}</p> : null}
+        {isInstapay(order.payment_method) && order.payment_status === "receipt_submitted" && ["preparing", "ready"].includes(order.status) ? (
+          <p role="status" className="rounded-sm border border-warning/40 bg-warning/10 p-sm text-label">{t.confirmBeforeShipping}</p>
+        ) : null}
         {disputed ? (
           <p role="status" className="rounded-sm border border-warning/40 bg-warning/10 p-sm text-label">
             {t.holdWarning} {t.disputeSent} {disputeLeft !== null ? t.disputeWaiting(disputeLeft) : ""}

@@ -150,6 +150,7 @@ const en = {
   },
   // seller list ------------------------------------------------------------
   seller: {
+    confirmBeforeShipping: "Confirm the InstaPay transfer before you can ship or hand over this order.",
     title: "Marketplace orders",
     subtitle: "Prepare, ship and follow the orders buyers placed with your showroom.",
     tabs: { all: "All", new: "New", in_preparation: "Preparing", shipped: "Shipped", delivered: "Delivered", cancelled: "Cancelled" },
@@ -460,6 +461,7 @@ const ar: Copy = {
     actionUnknown: "",
   },
   seller: {
+    confirmBeforeShipping: "أكّد استلام تحويل InstaPay عشان تقدر تشحن الطلب أو تسلّمه.",
     title: "طلبات السوق",
     subtitle: "جهّز الطلبات التي أرسلها المشترون إلى معرضك واشحنها وتابعها.",
     tabs: { all: "الكل", new: "جديد", in_preparation: "قيد التجهيز", shipped: "تم الشحن", delivered: "تم التسليم", cancelled: "ملغي" },
