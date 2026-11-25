@@ -479,5 +479,13 @@ select is((select payment_status from public.marketplace_orders where id = curre
 select is((select payment_status from public.marketplace_orders where id = current_setting('t.g2')::uuid), 'not_collected', 'G9. money that never arrived ends the claim');
 select is(app.marketplace_order_extra_actions(current_setting('t.g1')::uuid, 'buyer'), '{}'::text[], 'G10. no second complaint is offered');
 
+-- G (continued): the same rule when the buyer cancels himself
+select set_config('t.g3', pg_temp.mk_order('instapay_deposit', 'new', 'receipt_submitted', now() - interval '1 hour', 'order_seller_start'), true);
+select pg_temp.as_user(current_setting('t.buyer'));
+select is(public.marketplace_buyer_order_cancel_v2(current_setting('t.g3')::uuid, null, null) ->> 'status', 'cancelled', 'G11. the buyer cancels after uploading a receipt');
+select is((select payment_status from public.marketplace_orders where id = current_setting('t.g3')::uuid), 'refund_due', 'G12. the unchecked transfer is owed back');
+select is(pg_temp.notes(current_setting('t.g3'), 'marketplace.order.refund_check') >= 1, true, 'G13. the authorised admins are told');
+select is(app.marketplace_order_extra_actions(current_setting('t.g3')::uuid, 'seller'), array['file_complaint'], 'G14. the showroom may file a complaint');
+
 select * from finish();
 rollback;

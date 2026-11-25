@@ -8333,7 +8333,7 @@ export const en = {
         dismissed: "Dismiss the complaint",
       },
       hints: {
-        payment_valid: "The order counts as paid and the showroom carries on. The buyer's receipt timer is closed. On an order cancelled for no answer, the amount stays owed back to the buyer.",
+        payment_valid: "The order counts as paid and the showroom carries on. The buyer's receipt timer is closed. On an order cancelled before the receipt was checked, the amount stays owed back to the buyer.",
         payment_not_received: "Nothing changes on the order. The buyer gets at least 24 hours from this decision to send a new receipt.",
         dismissed: "No action on the order.",
       },

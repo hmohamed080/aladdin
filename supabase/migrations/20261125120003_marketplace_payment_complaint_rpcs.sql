@@ -46,7 +46,8 @@ as $$
   select case when p_for in ('buyer', 'seller') and (exists (
       select 1 from public.marketplace_orders o
        where o.id = p_order and o.source = 'v2' and o.status = 'cancelled' and o.payment_status = 'refund_due'
-         and exists (select 1 from public.marketplace_order_cancellations x where x.order_id = o.id and x.reason_code = 'timeout_seller_start')
+         and exists (select 1 from public.marketplace_order_events x where x.order_id = o.id and x.to_status = 'cancelled'
+                     and x.from_payment = 'receipt_submitted')
          and not exists (select 1 from public.marketplace_payment_complaints c where c.order_id = o.id)
     ) or exists (
       select 1 from public.marketplace_orders o
@@ -117,9 +118,10 @@ begin
                  when app.marketplace_can_manage_orders(o.seller_organization_id) then 'seller' end;
   if v_role is null then raise exception 'mp:not_found' using errcode = '42501'; end if;
   if o.source <> 'v2' then raise exception 'mp:legacy_order' using errcode = '23514'; end if;
-  -- also open to an order cancelled because the showroom never answered an uploaded receipt (owner decision 2026-11-25)
+  -- also open to an order cancelled while its uploaded receipt was unchecked (owner decision 2026-11-25)
   v_unanswered := o.status = 'cancelled' and o.payment_status = 'refund_due'
-         and exists (select 1 from public.marketplace_order_cancellations x where x.order_id = o.id and x.reason_code = 'timeout_seller_start');
+         and exists (select 1 from public.marketplace_order_events x where x.order_id = o.id and x.to_status = 'cancelled'
+                     and x.from_payment = 'receipt_submitted');
   if not v_unanswered and (o.payment_status <> 'receipt_disputed' or o.status not in ('preparing', 'ready')) then
     raise exception 'mp:complaint_not_allowed' using errcode = '23514';
   end if;
@@ -281,7 +283,8 @@ begin
 
   select * into o from public.marketplace_orders where id = c.order_id for update;
   v_unanswered := o.status = 'cancelled' and o.payment_status = 'refund_due'
-         and exists (select 1 from public.marketplace_order_cancellations x where x.order_id = o.id and x.reason_code = 'timeout_seller_start');
+         and exists (select 1 from public.marketplace_order_events x where x.order_id = o.id and x.to_status = 'cancelled'
+                     and x.from_payment = 'receipt_submitted');
 
   if p_decision = 'payment_valid' and not v_unanswered then
     -- the machine re-checks the order under its lock; a cancelled or moved order raises mp:invalid_transition and nothing is saved

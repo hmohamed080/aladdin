@@ -117,10 +117,10 @@ insert into public.notification_templates
    'Order {order_number} was cancelled automatically because the showroom did not start preparing it within 72 hours. The stock was released. If you had transferred money, open the order to follow your refund.'),
   ('marketplace.order.refund_check', 'marketplace.order.refund_check',
    array['order_number'],
-   'طلب ملغي بإيصال لم يراجعه المعرض',
-   'أُلغي الطلب {order_number} تلقائيًا ولم يراجع المعرض إيصال التحويل. المبلغ مسجّل كمستحق الاسترداد؛ تابِعه مع الطرفين.',
+   'طلب ملغي بإيصال لم يُراجَع',
+   'أُلغي الطلب {order_number} قبل مراجعة إيصال التحويل. المبلغ مسجّل كمستحق الاسترداد؛ تابِعه مع الطرفين.',
    'A cancelled order has an unchecked receipt',
-   'Order {order_number} was cancelled automatically and the showroom never checked the transfer receipt. The amount is recorded as owed back; follow up with both sides.'),
+   'Order {order_number} was cancelled before the transfer receipt was checked. The amount is recorded as owed back; follow up with both sides.'),
   ('marketplace.order.reminder_receipt_resubmit', 'marketplace.order.reminder_receipt_resubmit',
    array['order_number', 'showroom_name', 'hours_left'],
    'تذكير: أعد رفع إيصال التحويل',
@@ -134,6 +134,29 @@ insert into public.notification_templates
    'The order was cancelled automatically',
    'Order {order_number} was cancelled automatically because the transfer receipt was not uploaded again within 48 hours.')
 on conflict (key) do nothing;
+
+-- An order cancelled by anyone while its uploaded receipt was still unchecked: the money may have been sent, so the admins
+-- who handle payment complaints are told (owner decision 2026-11-25).
+create or replace function app.marketplace_unchecked_receipt_cancelled()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform app.marketplace_notify_admins('marketplace_payment_complaints.review', 'marketplace.order.refund_check',
+    'marketplace_order', new.order_id, '/admin/marketplace/payment-complaints',
+    jsonb_build_object('order_number', (select o.order_number from public.marketplace_orders o where o.id = new.order_id)));
+  return null;
+end;
+$$;
+revoke all on function app.marketplace_unchecked_receipt_cancelled() from public, anon, authenticated, service_role;
+
+create or replace trigger marketplace_unchecked_receipt_cancelled
+  after insert on public.marketplace_order_events
+  for each row when (new.to_status = 'cancelled' and new.from_status is distinct from 'cancelled'
+                     and new.from_payment = 'receipt_submitted' and new.to_payment = 'refund_due')
+  execute function app.marketplace_unchecked_receipt_cancelled();
 
 -- ---------------------------------------------------------------------------
 -- 5. Handlers
@@ -241,11 +264,6 @@ begin
     perform app.marketplace_notify_order_managers(o.id, 'marketplace.order.cancelled_timeout_' ||
       case p_timer.kind when 'order_seller_start' then 'seller' else 'receipt' end,
       jsonb_build_object('order_number', o.order_number, 'showroom_name', v_name), null, null);
-    -- an uploaded receipt nobody checked: the money may have been sent, so the admins who handle payment complaints are told
-    if p_timer.kind = 'order_seller_start' and o.payment_status = 'receipt_submitted' then
-      perform app.marketplace_notify_admins('marketplace_payment_complaints.review', 'marketplace.order.refund_check',
-        'marketplace_order', o.id, '/admin/marketplace/payment-complaints', jsonb_build_object('order_number', o.order_number));
-    end if;
     return 'cancelled';
   end if;
 
