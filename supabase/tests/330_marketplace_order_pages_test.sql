@@ -1,5 +1,5 @@
 -- pgTAP: Marketplace PR 13 — order pages: reads, invoice, waybill, shipment correction
--- (20261124130001_marketplace_order_invoices.sql, 130002_marketplace_order_reads_v2.sql, 130003_marketplace_order_document_invoice.sql)
+-- (20261125110001_marketplace_order_invoices.sql, 130002_marketplace_order_reads_v2.sql, 130003_marketplace_order_document_invoice.sql)
 -- Contract: docs/product/marketplace-order-model-contract-20261124.md section 4.3
 --
 --   A. SHAPE       RPC-only tables and sequence, function privileges, RLS on.

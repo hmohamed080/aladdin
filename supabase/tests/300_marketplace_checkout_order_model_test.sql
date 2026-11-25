@@ -1,4 +1,4 @@
--- pgTAP: Marketplace PR 12 — new checkout and order model (20261124120002_marketplace_checkout_order_model.sql)
+-- pgTAP: Marketplace PR 12 — new checkout and order model (20261125100001_marketplace_checkout_order_model.sql)
 -- Contract: docs/product/marketplace-order-model-contract-20261124.md
 --
 --   A. SHAPE        RPC-only tables, function privileges, hooks, the state guard.
@@ -701,7 +701,8 @@ select is(app.marketplace_order_document_v2(current_setting('t.o4')::uuid, 'buye
 select ok(app.marketplace_order_document_v2(current_setting('t.o6')::uuid, 'buyer') ? 'invoice' and app.marketplace_order_document_v2(current_setting('t.o6')::uuid, 'buyer') ? 'returns'
           and app.marketplace_order_document_v2(current_setting('t.o6')::uuid, 'buyer') ? 'return_window', 'I8. the keys later PRs fill exist already');
 select is(app.marketplace_order_document_v2(current_setting('t.o4')::uuid, 'seller') -> 'events' @> '[{"action":"receipt_disputed"}]'::jsonb, true, 'I9. the seller timeline carries the dispute');
-select is(app.marketplace_order_actions(current_setting('t.o6')::uuid, 'buyer'), '{}'::text[], 'I10. a delivered order offers the buyer nothing in this PR');
+select is(app.marketplace_order_actions(current_setting('t.o6')::uuid, 'buyer') && array['cancel', 'resubmit_receipt'], false,
+  'I10. a delivered order offers the buyer none of this PR''s actions (later PRs may add return actions)');
 -- a receipt attached to an order: the showroom's order managers read it only while the showroom organization is live
 reset role;
 select set_config('t.rk', (select pr.object_key from public.marketplace_payment_proofs pr join public.marketplace_orders o on o.id = pr.order_id

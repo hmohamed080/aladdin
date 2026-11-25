@@ -1,7 +1,7 @@
 -- ===========================================================================
 -- Marketplace PR 13 (1/3) — order invoices
 -- ===========================================================================
--- Contract: docs/product/marketplace-order-model-contract-20261124.md section 2.9 and 4.3. PR 13 block 20261124130001-139999.
+-- Contract: docs/product/marketplace-order-model-contract-20261124.md section 2.9 and 4.3. PR 13 block 20261125110001-139999.
 -- ADDS: sequence marketplace_invoice_number_seq, table marketplace_order_invoices, and the internal issuer
 --       app.marketplace_order_invoice_issue (idempotent). NEEDS: PR 12 (marketplace_orders v2 columns, order events).
 -- DROPS: nothing. EXPAND ONLY.

@@ -4,7 +4,7 @@ Status: implemented on branch `feat/mkt-addresses-phone-20261124` (draft PR). Lo
 
 ## 1. What it is
 
-Saved buyer addresses (Home / Work / Other, recipient first and last name, recipient mobile, governorate + area, optional map pin) in `public.marketplace_buyer_addresses` (migration `20261124100001`), with the page `/settings/addresses`. The page follows the Marketplace release flag (`NEXT_PUBLIC_MARKETPLACE_PREVIEW`), is not linked from anywhere public and offers no ordering: cart and checkout stay behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`.
+Saved buyer addresses (Home / Work / Other, recipient first and last name, recipient mobile, governorate + area, optional map pin) in `public.marketplace_buyer_addresses` (migration `20261125090001`), with the page `/settings/addresses`. The page follows the Marketplace release flag (`NEXT_PUBLIC_MARKETPLACE_PREVIEW`), is not linked from anywhere public and offers no ordering: cart and checkout stay behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`.
 
 ## 2. Phone verification: one authority, no second one
 
