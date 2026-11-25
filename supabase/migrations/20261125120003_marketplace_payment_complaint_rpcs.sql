@@ -43,7 +43,12 @@ stable
 security definer
 set search_path = ''
 as $$
-  select case when p_for in ('buyer', 'seller') and exists (
+  select case when p_for in ('buyer', 'seller') and (exists (
+      select 1 from public.marketplace_orders o
+       where o.id = p_order and o.source = 'v2' and o.status = 'cancelled' and o.payment_status = 'refund_due'
+         and exists (select 1 from public.marketplace_order_cancellations x where x.order_id = o.id and x.reason_code = 'timeout_seller_start')
+         and not exists (select 1 from public.marketplace_payment_complaints c where c.order_id = o.id)
+    ) or exists (
       select 1 from public.marketplace_orders o
        where o.id = p_order and o.source = 'v2' and o.payment_status = 'receipt_disputed' and o.status in ('preparing', 'ready')
          and not exists (select 1 from public.marketplace_timers t where t.subject_type = 'order' and t.subject_id = o.id
@@ -53,7 +58,7 @@ as $$
             where c.order_id = o.id
               and (c.state in ('open', 'under_review')
                    or c.created_at >= coalesce((select max(e.created_at) from public.marketplace_order_events e
-                                                 where e.order_id = o.id and e.action = 'receipt_disputed'), 'infinity'::timestamptz))))
+                                                 where e.order_id = o.id and e.action = 'receipt_disputed'), 'infinity'::timestamptz)))))
     then array['file_complaint'] else '{}'::text[] end;
 $$;
 revoke all on function app.marketplace_order_complaint_id(uuid), app.marketplace_order_extra_actions(uuid, text)
@@ -95,6 +100,7 @@ declare
   v_id     uuid;
   v_label  jsonb;
   v_flagged timestamptz;
+  v_unanswered boolean;
 begin
   if v_uid is null then raise exception 'mp:auth_required' using errcode = '42501'; end if;
   if p_reason is null or p_reason not in ('transfer_made', 'amount_mismatch', 'receipt_unreadable', 'other') then
@@ -111,7 +117,10 @@ begin
                  when app.marketplace_can_manage_orders(o.seller_organization_id) then 'seller' end;
   if v_role is null then raise exception 'mp:not_found' using errcode = '42501'; end if;
   if o.source <> 'v2' then raise exception 'mp:legacy_order' using errcode = '23514'; end if;
-  if o.payment_status <> 'receipt_disputed' or o.status not in ('preparing', 'ready') then
+  -- also open to an order cancelled because the showroom never answered an uploaded receipt (owner decision 2026-11-25)
+  v_unanswered := o.status = 'cancelled' and o.payment_status = 'refund_due'
+         and exists (select 1 from public.marketplace_order_cancellations x where x.order_id = o.id and x.reason_code = 'timeout_seller_start');
+  if not v_unanswered and (o.payment_status <> 'receipt_disputed' or o.status not in ('preparing', 'ready')) then
     raise exception 'mp:complaint_not_allowed' using errcode = '23514';
   end if;
 
@@ -124,7 +133,8 @@ begin
 
   select max(e.created_at) into v_flagged from public.marketplace_order_events e where e.order_id = o.id and e.action = 'receipt_disputed';
   if exists (select 1 from public.marketplace_payment_complaints c
-              where c.order_id = o.id and (c.state in ('open', 'under_review') or c.created_at >= coalesce(v_flagged, 'infinity'::timestamptz))) then
+              where c.order_id = o.id and (v_unanswered or c.state in ('open', 'under_review')
+                                            or c.created_at >= coalesce(v_flagged, 'infinity'::timestamptz))) then
     raise exception 'mp:complaint_exists' using errcode = '23505';
   end if;
 
@@ -251,6 +261,7 @@ declare
   v_out_ar text;
   v_out_en text;
   v_vars jsonb;
+  v_unanswered boolean;
 begin
   if p_decision is null or p_decision not in ('payment_valid', 'payment_not_received', 'dismissed') then
     raise exception 'mp:invalid_payload' using errcode = '22023';
@@ -268,7 +279,11 @@ begin
     raise exception 'mp:invalid_transition' using errcode = '23514';       -- another admin took it
   end if;
 
-  if p_decision = 'payment_valid' then
+  select * into o from public.marketplace_orders where id = c.order_id for update;
+  v_unanswered := o.status = 'cancelled' and o.payment_status = 'refund_due'
+         and exists (select 1 from public.marketplace_order_cancellations x where x.order_id = o.id and x.reason_code = 'timeout_seller_start');
+
+  if p_decision = 'payment_valid' and not v_unanswered then
     -- the machine re-checks the order under its lock; a cancelled or moved order raises mp:invalid_transition and nothing is saved
     perform app.marketplace_order_apply(c.order_id, 'accept_receipt', 'admin', v_uid, '{}'::jsonb);
   end if;
@@ -279,6 +294,12 @@ begin
     update public.marketplace_timers
        set expires_at = greatest(expires_at, now() + interval '24 hours')
      where subject_type = 'order' and subject_id = c.order_id and kind = 'order_receipt_resubmit' and state = 'active';
+  end if;
+  -- cancelled order: "money not received" ends the refund claim; "payment valid" leaves it owed back (nothing to change)
+  if p_decision = 'payment_not_received' and v_unanswered then
+    perform set_config('app.marketplace_order_apply', 'on', true);
+    update public.marketplace_orders set payment_status = 'not_collected' where id = c.order_id;
+    perform set_config('app.marketplace_order_apply', 'off', true);
   end if;
 
   v_state := case p_decision when 'dismissed' then 'dismissed' else 'resolved' end;
@@ -294,9 +315,9 @@ begin
   values (o.id, 'complaint_resolved', o.status, o.status, o.payment_status, o.payment_status, v_uid, 'admin',
           jsonb_build_object('complaint_id', c.id, 'decision', p_decision));
 
-  v_out_ar := case p_decision when 'payment_valid' then 'تم اعتماد الدفع'
+  v_out_ar := case p_decision when 'payment_valid' then case when v_unanswered then 'تأكد وصول المبلغ وهو مستحق الاسترداد' else 'تم اعتماد الدفع' end
                               when 'payment_not_received' then 'لم يتأكد وصول المبلغ' else 'تم إغلاق الشكوى بدون إجراء' end;
-  v_out_en := case p_decision when 'payment_valid' then 'the payment was confirmed'
+  v_out_en := case p_decision when 'payment_valid' then case when v_unanswered then 'the transfer was confirmed and is owed back' else 'the payment was confirmed' end
                               when 'payment_not_received' then 'the transfer could not be confirmed' else 'the complaint was closed without action' end;
   v_vars := jsonb_build_object('order_number', o.order_number,
     'showroom_name', (select org.name from public.organizations org where org.id = o.seller_organization_id));

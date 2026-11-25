@@ -456,5 +456,28 @@ select is((select status from public.marketplace_orders where id = current_setti
 select lives_ok($q$select pg_temp.run(now() + interval '25 hours')$q$, 'F5. the runner runs after the 24 hours');
 select is((select status from public.marketplace_orders where id = current_setting('t.c9')::uuid), 'cancelled', 'F6. without a new receipt the order is cancelled');
 
+-- G. an uploaded receipt the showroom never answers: cancelled after 72 h, owed back, admins told, either side may complain
+reset role;
+select set_config('t.g1', pg_temp.mk_order('instapay_full', 'new', 'receipt_submitted', now() - interval '73 hours', 'order_seller_start'), true);
+select set_config('t.g2', pg_temp.mk_order('instapay_full', 'new', 'receipt_submitted', now() - interval '73 hours', 'order_seller_start'), true);
+select lives_ok($q$select pg_temp.run(now())$q$, 'G1. the runner runs');
+select is((select string_agg(status || '|' || payment_status, ',') from public.marketplace_orders
+            where id in (current_setting('t.g1')::uuid, current_setting('t.g2')::uuid)), 'cancelled|refund_due,cancelled|refund_due',
+  'G2. both are cancelled and the money is owed back');
+select is(pg_temp.notes(current_setting('t.g1'), 'marketplace.order.refund_check') >= 1, true, 'G3. the authorised admins are told');
+select is(app.marketplace_order_extra_actions(current_setting('t.g1')::uuid, 'buyer'), array['file_complaint'], 'G4. the buyer may file a complaint');
+select pg_temp.as_user(current_setting('t.buyer'));
+select set_config('t.kg1', (public.marketplace_payment_complaint_file(current_setting('t.g1')::uuid, 'transfer_made', null) ->> 'complaint_id'), true);
+select set_config('t.kg2', (public.marketplace_payment_complaint_file(current_setting('t.g2')::uuid, 'transfer_made', null) ->> 'complaint_id'), true);
+select throws_ok(format($q$select public.marketplace_payment_complaint_file(%L, 'transfer_made', null)$q$, current_setting('t.g1')), '23505', 'mp:complaint_exists',
+  'G5. one complaint for such an order');
+select pg_temp.as_user(current_setting('t.admin'));
+select is((public.admin_marketplace_payment_complaint_decide(current_setting('t.kg1')::uuid, 'payment_valid', 'Statement shows the credit') ->> 'state'), 'resolved', 'G6. payment_valid is decided');
+select is((public.admin_marketplace_payment_complaint_decide(current_setting('t.kg2')::uuid, 'payment_not_received', 'No credit on the statement') ->> 'state'), 'resolved', 'G7. payment_not_received is decided');
+reset role;
+select is((select payment_status from public.marketplace_orders where id = current_setting('t.g1')::uuid), 'refund_due', 'G8. a confirmed transfer stays owed back');
+select is((select payment_status from public.marketplace_orders where id = current_setting('t.g2')::uuid), 'not_collected', 'G9. money that never arrived ends the claim');
+select is(app.marketplace_order_extra_actions(current_setting('t.g1')::uuid, 'buyer'), '{}'::text[], 'G10. no second complaint is offered');
+
 select * from finish();
 rollback;

@@ -112,9 +112,15 @@ insert into public.notification_templates
   ('marketplace.order.cancelled_timeout_seller', 'marketplace.order.cancelled_timeout_seller',
    array['order_number', 'showroom_name'],
    'تم إلغاء الطلب تلقائيًا',
-   'تم إلغاء الطلب {order_number} تلقائيًا لأن المعرض لم يبدأ التجهيز خلال 72 ساعة. أُعيدت الكمية إلى المخزون.',
+   'تم إلغاء الطلب {order_number} تلقائيًا لأن المعرض لم يبدأ التجهيز خلال 72 ساعة. أُعيدت الكمية إلى المخزون. إن كنت حوّلت مبلغًا فافتح الطلب لمتابعة استرداده.',
    'The order was cancelled automatically',
-   'Order {order_number} was cancelled automatically because the showroom did not start preparing it within 72 hours. The stock was released.'),
+   'Order {order_number} was cancelled automatically because the showroom did not start preparing it within 72 hours. The stock was released. If you had transferred money, open the order to follow your refund.'),
+  ('marketplace.order.refund_check', 'marketplace.order.refund_check',
+   array['order_number'],
+   'طلب ملغي بإيصال لم يراجعه المعرض',
+   'أُلغي الطلب {order_number} تلقائيًا ولم يراجع المعرض إيصال التحويل. المبلغ مسجّل كمستحق الاسترداد؛ تابِعه مع الطرفين.',
+   'A cancelled order has an unchecked receipt',
+   'Order {order_number} was cancelled automatically and the showroom never checked the transfer receipt. The amount is recorded as owed back; follow up with both sides.'),
   ('marketplace.order.reminder_receipt_resubmit', 'marketplace.order.reminder_receipt_resubmit',
    array['order_number', 'showroom_name', 'hours_left'],
    'تذكير: أعد رفع إيصال التحويل',
@@ -235,6 +241,11 @@ begin
     perform app.marketplace_notify_order_managers(o.id, 'marketplace.order.cancelled_timeout_' ||
       case p_timer.kind when 'order_seller_start' then 'seller' else 'receipt' end,
       jsonb_build_object('order_number', o.order_number, 'showroom_name', v_name), null, null);
+    -- an uploaded receipt nobody checked: the money may have been sent, so the admins who handle payment complaints are told
+    if p_timer.kind = 'order_seller_start' and o.payment_status = 'receipt_submitted' then
+      perform app.marketplace_notify_admins('marketplace_payment_complaints.review', 'marketplace.order.refund_check',
+        'marketplace_order', o.id, '/admin/marketplace/payment-complaints', jsonb_build_object('order_number', o.order_number));
+    end if;
     return 'cancelled';
   end if;
 

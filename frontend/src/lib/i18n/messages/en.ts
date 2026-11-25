@@ -2935,6 +2935,7 @@ export const en = {
           cancelled_timeout_receipt: "Order cancelled automatically: receipt not uploaded again",
           payment_complaint_filed: "New payment complaint (to the authorised admins)",
           payment_complaint_resolved: "Payment complaint decided (to the buyer and the showroom)",
+          refund_check: "Cancelled order with an unchecked receipt (to the authorised admins)",
           placed: "New order",
           preparing: "Order is being prepared",
           ready_pickup: "Order ready for pickup",
@@ -8332,7 +8333,7 @@ export const en = {
         dismissed: "Dismiss the complaint",
       },
       hints: {
-        payment_valid: "The order counts as paid and the showroom carries on. The buyer's receipt timer is closed.",
+        payment_valid: "The order counts as paid and the showroom carries on. The buyer's receipt timer is closed. On an order cancelled for no answer, the amount stays owed back to the buyer.",
         payment_not_received: "Nothing changes on the order. The buyer gets at least 24 hours from this decision to send a new receipt.",
         dismissed: "No action on the order.",
       },
