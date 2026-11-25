@@ -2863,6 +2863,8 @@ export const ar: Messages = {
       showroom_name: "اسم المعرض",
       message: "رسالة الإدارة لصاحب المعرض",
       product_name: "اسم المنتج",
+      product_name_ar: "اسم المنتج بالعربية",
+      product_name_en: "اسم المنتج بالإنجليزية",
     },
     fields: { titleAr: "العنوان بالعربية", bodyAr: "النص بالعربية", titleEn: "العنوان بالإنجليزية", bodyEn: "النص بالإنجليزية", reason: "السبب" },
     reasonHint: "سبب التعديل (من 3 إلى 500 حرف). يُحفظ في السجل باسمك.",
