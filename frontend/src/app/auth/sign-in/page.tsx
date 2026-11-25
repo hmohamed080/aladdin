@@ -1,4 +1,5 @@
 import { PasswordSignInForm } from "@/features/auth-password-preview/sign-in-form";
+import { ForgetAccountCart } from "@/features/marketplace/live/cart-viewer";
 import { oauthAvailability } from "@/server/auth/entry-oauth";
 import { sanitizeNext } from "@/server/auth/next";
 import { signInPrefillIdentifier } from "@/server/actions/auth-password-preview";
@@ -15,11 +16,14 @@ export default async function SignInPage({
   // Carried from the sign-up "account already exists" warning (httpOnly cookie, never the URL).
   const prefill = await signInPrefillIdentifier();
   return (
-    <PasswordSignInForm
-      next={sanitizeNext(next)}
-      providers={providers}
-      oauthError={typeof error === "string" ? error : undefined}
-      defaultIdentifier={prefill ?? undefined}
-    />
+    <>
+      <ForgetAccountCart />
+      <PasswordSignInForm
+        next={sanitizeNext(next)}
+        providers={providers}
+        oauthError={typeof error === "string" ? error : undefined}
+        defaultIdentifier={prefill ?? undefined}
+      />
+    </>
   );
 }
