@@ -4,7 +4,7 @@ A Cloudflare Worker whose only job is its cron trigger (every 5 minutes). It cal
 
 | Call | Does |
 |---|---|
-| `marketplace_timers_run(p_limit)` | Seller reminder every 6 h and automatic cancellation at 72 h (stock released); buyer receipt-resubmit reminder at 24 h and cancellation at 48 h. All logic, locks and idempotency are in the database (`supabase/migrations/20261124140002_marketplace_timers_runner.sql`). |
+| `marketplace_timers_run(p_limit)` | Seller reminder every 6 h and automatic cancellation at 72 h (stock released); buyer receipt-resubmit reminder at 24 h and cancellation at 48 h. All logic, locks and idempotency are in the database (`supabase/migrations/20261125120002_marketplace_timers_runner.sql`). |
 | `marketplace_checkout_sessions_purge(p_limit)` | Expires old checkout sessions (PR 12). |
 
 There is no `pg_cron` in this repo; the existing pattern (media cleanup, the transcode Worker) is "logic in Postgres, a scheduler outside only calls it". A double fire is safe (`SKIP LOCKED`, the order machine re-checks the order).

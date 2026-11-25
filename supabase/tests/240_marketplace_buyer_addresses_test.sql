@@ -1,4 +1,4 @@
--- pgTAP: Marketplace PR 10 — saved buyer addresses (20261124100001_marketplace_buyer_addresses.sql).
+-- pgTAP: Marketplace PR 10 — saved buyer addresses (20261125090001_marketplace_buyer_addresses.sql).
 --
 --   A. SHAPE     — RLS, no client write grant, owner-only select, function privileges.
 --   B. SAVE      — create, validation (place catalogue keys, pin, phone, control characters), idempotent retry.

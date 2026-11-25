@@ -1,5 +1,5 @@
 -- pgTAP: Marketplace PR 14 - order timers, notifications and payment complaints
--- (20261124140001/2/3; contract docs/product/marketplace-order-model-contract-20261124.md sections 4.4, 5, 6, 7)
+-- (20261125120001/2/3; contract docs/product/marketplace-order-model-contract-20261124.md sections 4.4, 5, 6, 7)
 --
 --   A. SHAPE       RPC-only tables, function privileges (runner: service role only), the permission row.
 --   B. SELLER      reminder every 6 h, catch-up gives ONE reminder, expiry at 72 h releases stock, replay and overlap no-ops,
