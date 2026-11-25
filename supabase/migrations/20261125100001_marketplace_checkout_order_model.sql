@@ -892,6 +892,8 @@ begin
                       -- Owner decision 2026-11-25: an uploaded receipt nobody checked (buyer cancel, showroom cancel or the 72 h silence)
                       -- may well be paid money, so it is owed back until someone shows it never arrived (PR 14: either side may complain).
                       when o.payment_status in ('receipt_submitted', 'receipt_accepted', 'collected') then 'refund_due'
+                      -- Owner decision 2026-11-25: rejecting a receipt and then cancelling must not be a way to keep the money.
+                      when p_action = 'cancel_by_seller' and o.payment_status = 'receipt_disputed' then 'refund_due'
                       else 'not_collected' end;
         v_event := case p_action when 'cancel_by_buyer' then 'cancelled_by_buyer' when 'cancel_by_seller' then 'cancelled_by_seller'
                                  when 'cancel_timeout_seller' then 'cancelled_timeout_seller' else 'cancelled_timeout_receipt' end;
