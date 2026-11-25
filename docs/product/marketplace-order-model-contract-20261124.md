@@ -618,12 +618,14 @@ Versions are 14-digit timestamps; a PR may use any version inside its block, in 
 
 | PR | Migration block | pgTAP block | Concurrency scripts (`supabase/tests/`) | Last permission snapshot |
 |---|---|---|---|---|
-| 12 | `20261124120002` - `20261124129999` (`120001` is taken on `main`) | `300` - `329` | `marketplace_checkout_concurrency_test.sh` | named after its last migration |
-| 13 | `20261124130001` - `20261124139999` | `330` - `359` | none | same rule |
-| 14 | `20261124140001` - `20261124149999` | `360` - `389` | `marketplace_timers_concurrency_test.sh` | same rule |
-| 15 | `20261124150001` - `20261124159999` | `390` - `419` | `marketplace_returns_concurrency_test.sh` | same rule |
+| 10 | `20261125090001` (renumbered from `20261124100001`) | `240` | none | named after its last migration |
+| 11 | `20261125090002` (renumbered from `20261124110001`) | `260` | none | same rule |
+| 12 | `20261125100001` - `20261125109999` (`20261124120001` is on `main`, applied) | `300` - `329` | `marketplace_checkout_concurrency_test.sh` | named after its last migration |
+| 13 | `20261125110001` - `20261125119999` | `330` - `359` | none | same rule |
+| 14 | `20261125120001` - `20261125129999` | `360` - `389` | `marketplace_timers_concurrency_test.sh` | same rule |
+| 15 | `20261125130001` - `20261125139999` | `390` - `419` | `marketplace_returns_concurrency_test.sh` | same rule |
 
-Existing numbers for orientation: PR 8 `203`, PR 9 `220`-`222`, PR 10 `240`, PR 11 `260`. File naming follows `<number>_marketplace_<topic>_test.sql`. PR 12's first migration is `20261124120002_marketplace_checkout_order_model.sql` (renumbered: `main` already owns `20261124120001`, a stock notification migration).
+Existing numbers for orientation: PR 8 `203`, PR 9 `220`-`222`, PR 10 `240`, PR 11 `260`. File naming follows `<number>_marketplace_<topic>_test.sql`. PR 12's first migration is `20261125100001_marketplace_checkout_order_model.sql` (renumbered on 2026-11-25: `main` applied `20261124090001` and `20261124120001` to Acceptance and Production, so every PR 10-15 migration moved after them).
 
 Suggested internal split (not binding on the version digits):
 
@@ -683,5 +685,5 @@ Deviations the PR 12 agent reported while building; they refine, not replace, th
 - The `return_refund_due` timer carries the 5-day reminder offset (as in section 5.2).
 - **Media rules PR 15 must keep when it rebuilds `can_upload` / `can_delete` (and any later media change):** (1) `app.marketplace_media_metadata` returns `organization = null` for buyer receipts, so the per-organization upload rate and quota in `media_storage_reserve` is never charged to the seller organization; (2) `public.organization_media_resolve` is redefined by PR 12: a marketplace key whose metadata has no organization skips the organization liveness check; (3) `app.marketplace_media_can_read`: the order-manager branch requires the seller organization to be live (`deleted_at is null`), so members of a soft-deleted showroom cannot read receipts; the buyer branch is unchanged. PR 12's pgTAP 300 asserts these (D9b, D9c, I10a-d).
 - `marketplace_checkout_prepare` additionally returns `receipts`: the session's confirmed receipts `[ {id, status, created_at} ]` (additive; no signature change), so the page can show attached receipts after a reload.
-- **Renumbering:** `main` already owns `20261124120001` (stock notify), so PR 12's first migration is `20261124120002_marketplace_checkout_order_model.sql` and its permission snapshot is `supabase/permissions/20261124120002.json`. PR 13-15 blocks are unchanged.
+- **Renumbering:** `main` already owns `20261124120001` (stock notify), so PR 12's first migration is `20261125100001_marketplace_checkout_order_model.sql` and its permission snapshot is `supabase/permissions/20261125100001.json`. PR 10 = `20261125090001`, PR 11 = `20261125090002`, PR 13 = `20261125110001`-`3`, PR 14 = `20261125120001`-`3`, PR 15 = `20261125130001`-`3` (all renumbered on 2026-11-25).
 
