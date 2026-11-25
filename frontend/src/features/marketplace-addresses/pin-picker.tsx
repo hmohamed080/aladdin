@@ -108,6 +108,7 @@ function GoogleMapPin({
           if (!e.latLng) return;
           const p = { lat: e.latLng.lat(), lng: e.latLng.lng() };
           marker.setPosition(p);
+          marker.setVisible(true);   // a new address starts with a hidden marker
           set(p);
         });
         marker.addListener("dragend", () => {

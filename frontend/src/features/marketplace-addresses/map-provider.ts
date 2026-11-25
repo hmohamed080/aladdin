@@ -33,7 +33,7 @@ export function googleScriptUrl(apiKey: string, locale: "ar" | "en"): string {
 export type GoogleMapsApi = {
   maps: {
     Map: new (el: HTMLElement, opts: Record<string, unknown>) => { setCenter(p: LatLng): void; addListener(ev: string, fn: (e: { latLng?: { lat(): number; lng(): number } }) => void): void };
-    Marker: new (opts: Record<string, unknown>) => { setPosition(p: LatLng): void; getPosition(): { lat(): number; lng(): number } | null; addListener(ev: string, fn: () => void): void };
+    Marker: new (opts: Record<string, unknown>) => { setPosition(p: LatLng): void; setVisible(v: boolean): void; getPosition(): { lat(): number; lng(): number } | null; addListener(ev: string, fn: () => void): void };
     places: {
       AutocompleteService: new () => {
         getPlacePredictions(
