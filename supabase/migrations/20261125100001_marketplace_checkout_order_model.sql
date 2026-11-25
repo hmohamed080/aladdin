@@ -613,6 +613,7 @@ declare
   o public.marketplace_orders;
   v_ip boolean;
   v_dispute boolean;
+  v_unconfirmed boolean;
   v_out text[] := '{}';
 begin
   select * into o from public.marketplace_orders where id = p_order;
@@ -621,6 +622,7 @@ begin
   end if;
   v_ip := o.payment_method in ('instapay_full', 'instapay_deposit');
   v_dispute := o.payment_status = 'receipt_disputed';
+  v_unconfirmed := v_ip and o.payment_status not in ('receipt_accepted', 'collected');   -- blocks shipping and hand-over
   if p_for = 'buyer' then
     if o.status = 'new' then v_out := array_append(v_out, 'cancel'); end if;
     if v_ip and v_dispute and o.status in ('preparing', 'ready') then v_out := array_append(v_out, 'resubmit_receipt'); end if;
@@ -630,11 +632,11 @@ begin
       if not v_dispute then v_out := array_append(v_out, 'mark_ready'); end if;
       v_out := array_append(v_out, 'cancel');
     elsif o.status = 'ready' then
-      if not v_dispute then v_out := array_append(v_out, case when o.fulfilment = 'delivery' then 'mark_shipped' else 'mark_delivered' end); end if;
+      if not v_dispute and not v_unconfirmed then v_out := array_append(v_out, case when o.fulfilment = 'delivery' then 'mark_shipped' else 'mark_delivered' end); end if;
       v_out := array_append(v_out, 'cancel');
       if o.fulfilment = 'pickup' then v_out := array_append(v_out, 'mark_delivery_failed'); end if;
     elsif o.status = 'shipped' then
-      if not v_dispute then v_out := array_append(v_out, 'mark_delivered'); end if;
+      if not v_dispute and not v_unconfirmed then v_out := array_append(v_out, 'mark_delivered'); end if;
       v_out := array_append(v_out, 'mark_delivery_failed');
     elsif o.status = 'delivered' then
       if (o.payment_method = 'cod' and o.payment_status = 'pending')
@@ -803,6 +805,10 @@ begin
       if o.status = 'shipped' then v_replay := true;
       elsif o.status = 'ready' and o.fulfilment = 'delivery' then
         if o.payment_status = 'receipt_disputed' then raise exception 'mp:payment_dispute_open' using errcode = '23514'; end if;
+        -- Owner decision 2026-11-25: goods never leave before the showroom has confirmed the InstaPay transfer.
+        if o.payment_method in ('instapay_full', 'instapay_deposit') and o.payment_status not in ('receipt_accepted', 'collected') then
+          raise exception 'mp:payment_not_confirmed' using errcode = '23514';
+        end if;
         v_carrier := nullif(btrim(v_payload ->> 'carrier_name'), '');
         v_track := nullif(btrim(v_payload ->> 'tracking_number'), '');
         if (v_carrier is not null and char_length(v_carrier) not between 2 and 80)
@@ -816,6 +822,10 @@ begin
       if o.status = 'delivered' then v_replay := true;
       elsif (o.status = 'shipped' and o.fulfilment = 'delivery') or (o.status = 'ready' and o.fulfilment = 'pickup') then
         if o.payment_status = 'receipt_disputed' then raise exception 'mp:payment_dispute_open' using errcode = '23514'; end if;
+        -- Owner decision 2026-11-25: goods never leave before the showroom has confirmed the InstaPay transfer.
+        if o.payment_method in ('instapay_full', 'instapay_deposit') and o.payment_status not in ('receipt_accepted', 'collected') then
+          raise exception 'mp:payment_not_confirmed' using errcode = '23514';
+        end if;
         v_status := 'delivered'; v_event := 'delivered'; v_notify := 'delivered';
       else raise exception 'mp:invalid_transition' using errcode = '23514'; end if;
 
