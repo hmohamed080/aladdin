@@ -197,7 +197,7 @@ select pg_temp.act_as(:'nobody');
 select throws_ok($$select * from public.admin_marketplace_seller_presets()$$, '42501', null, 'E1 a plain user cannot list presets');
 select pg_temp.back();
 select pg_temp.act_as(:'adm');
-select is((select count(*)::int from public.admin_marketplace_seller_presets() where is_active and action <> 'image_reject'), 10, 'E2 an Administrator sees the ten seeded seller-transition presets (image rejection presets come with PR 6)');
+select is((select count(*)::int from public.admin_marketplace_seller_presets() where is_active and action not in ('image_reject', 'order_cancel_seller', 'order_cancel_buyer', 'payment_issue', 'return_reason', 'return_reject')), 10, 'E2 an Administrator sees the ten seeded seller-transition presets (image rejection presets come with PR 6)');
 select throws_ok($$select public.admin_marketplace_seller_preset_save(null, 'reject', 'ل', 'L', 'ن', 'T', true, 5, 'adding one')$$,
   '42501', null, 'E3 an Administrator cannot edit presets');
 select is((select count(*)::int from public.admin_marketplace_seller_presets() where action = 'reject' and is_active), 4,

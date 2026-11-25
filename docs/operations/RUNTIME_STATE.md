@@ -1,3 +1,12 @@
+## Marketplace checkout and order model, PR 12 (draft PR #267, not deployed) - 2026-11-24
+
+- Migration `20261125100001` exists only on the PR branch; applied nowhere hosted. Checkout v2 (`/market/checkout`, thank-you page) stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. Orders placed through it have `source = 'v2'`; older orders keep their statuses and legacy RPCs.
+- Merges after #258 then #257; PR 13/14/15 build on its schema through the contract (PR #260).
+
+## Marketplace saved addresses, PR 10 (draft PR, not deployed) - 2026-11-24
+
+- Migration `20261125090001` (buyer addresses) exists only on the PR branch; applied nowhere hosted. Page `/settings/addresses` follows `NEXT_PUBLIC_MARKETPLACE_PREVIEW` and is not linked publicly; ordering stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. `NEXT_PUBLIC_MAPS_PROVIDER` / `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` are unset everywhere (map provider = none). The phone verification authority is unchanged and still OFF.
+
 ## Marketplace cart and sign-in, PR 11 (draft PR, not deployed) - 2026-11-24
 - Branch `feat/mkt-cart-signin-20261124`: migration `20261125090002` (account cart, guest-cart merge, own-showroom rule on the cart and on `marketplace_orders`) is NOT applied to Acceptance or Production (rolled-back transactions on the local isolated stack only). Everything is behind `NEXT_PUBLIC_MARKETPLACE_ORDERING` = "true" (default off) and the Marketplace preview flag; the cart ends at a disabled "continue to checkout" until PR 12. Acceptance remains at 237 migrations, latest `20261122090002`; main's latest migration is `20261123160002`.
 
@@ -11,6 +20,8 @@
 - **Production frontend**: `aladdin-frontend-production` version `1babd2c0-ded2-4e44-a73e-982e62179485` (built from `main` `d33afa66`, `frontend-upload` with `media_mode=match-live`, media flags verified equal to the live version) promoted by the owner to 10% and then 100% on 2026-11-25. HTTP smoke (`marketplace-v2-smoke.mjs http`, `SMOKE_TARGET=production`) OK; the live `/api/health`, `/`, `/market` and `/auth/sign-in` answer 200.
 - Not verified from the repo: the Worker video flags (`VIDEO_ENABLED` not `"true"`, `VIDEO_ROUTES` off) are an owner check in Cloudflare. Ordering/checkout stays off (browse-only). Known cosmetic bug: editing the quantity in the product list shows "stock changed since you opened the page, try again" although the change is saved.
 - Recovery on Production: forward-fixes in order `marketplace-stock-notify-restore-previous.sql`, `marketplace-slug-remove.sql`, `marketplace-v2-remove.sql` (guards refuse after user-written Marketplace rows exist); rows written after the push are recoverable only from the backup.
+- Open drafts that will hit the drift guard when merged: #257 (`20261125090002`), #258 (`20261125090001`), plus #267-#269 (order model); each needs its own plan update.
+
 - Open drafts that will hit the drift guard when merged: #257 (`20261125090002`), #258 (`20261124100001`), plus #267-#269 (order model); each needs its own plan update.
 
 - Open drafts that will hit the drift guard when merged: #257 (`20261124110001`), #258 (`20261125090001`), plus #267-#269 (order model); each needs its own plan update.

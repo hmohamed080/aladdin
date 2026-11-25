@@ -371,7 +371,7 @@ select set_config('request.jwt.claims', '', true);
 select pg_temp.act_as('55555555-5555-4555-8555-555555555555');
 select is((select count(*)::int from public.admin_marketplace_seller_presets() where action = 'image_reject' and is_active), 5,
   'G1. a moderator reads the five seeded image rejection presets (PR 5 system, action image_reject)');
-select is((select count(*)::int from public.admin_marketplace_seller_presets() where action <> 'image_reject' and is_active), 10,
+select is((select count(*)::int from public.admin_marketplace_seller_presets() where action not in ('image_reject', 'order_cancel_seller', 'order_cancel_buyer', 'payment_issue', 'return_reason', 'return_reject') and is_active), 10,
   'G2. the same list carries the ten seller-transition presets for an admin who may read sellers (one list, one system)');
 select throws_like($$ select public.admin_marketplace_seller_preset_save(null, 'image_reject', 'تسمية', 'Label', 'رسالة المالك', 'Owner message', true, 60, 'new wording') $$,
   '%notification_templates.manage%', 'G3. a moderator cannot create a preset: that needs notification_templates.manage');

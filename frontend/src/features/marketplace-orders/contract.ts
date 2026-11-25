@@ -5,6 +5,11 @@
  */
 
 export const ORDER_STATUSES = [
+  // v2 (Marketplace PR 12): an order arrives as "new" and nobody confirms it
+  "new",
+  "preparing",
+  "ready",
+  // legacy values: orders placed before PR 12 keep them (expand / contract)
   "pending_confirmation",
   "confirmed",
   "processing",
@@ -17,16 +22,20 @@ export const ORDER_STATUSES = [
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
-export type PaymentMethod = "cod" | "instapay";
+export type PaymentMethod = "cod" | "instapay" | "instapay_full" | "instapay_deposit";
 export type PaymentStatus =
   | "pending"
   | "awaiting_deposit"
   | "deposit_submitted"
   | "deposit_accepted"
   | "deposit_rejected"
+  | "receipt_submitted"
+  | "receipt_accepted"
+  | "receipt_disputed"
   | "collected"
   | "not_collected"
-  | "refund_due";
+  | "refund_due"
+  | "refunded";
 export type Fulfilment = "delivery" | "pickup";
 
 export type OrderSummary = {
@@ -74,6 +83,8 @@ export type OrderProof = {
 
 export type OrderDocument = {
   id: string;
+  /** "v2" for orders placed through checkout v2; absent on older databases. */
+  source?: "legacy" | "v2";
   order_number: string;
   checkout_id: string;
   status: OrderStatus;
@@ -130,6 +141,68 @@ export type PlacedCheckout = { checkout_id: string; replayed: boolean; orders: P
 export const SELLER_ACTIONS = ["confirm", "process", "ship", "ready", "deliver", "collect", "fail", "return", "cancel"] as const;
 export type SellerAction = (typeof SELLER_ACTIONS)[number];
 
+/** The v2 state machine's actions (`marketplace_seller_order_action`). There is no confirm and no reject. */
+export const SELLER_ACTIONS_V2 = [
+  "start_preparing",
+  "mark_ready",
+  "mark_shipped",
+  "mark_delivered",
+  "collect_payment",
+  "accept_receipt",
+  "flag_receipt_not_received",
+  "cancel",
+  "mark_delivery_failed",
+  "mark_returned_to_stock",
+] as const;
+export type SellerActionV2 = (typeof SELLER_ACTIONS_V2)[number];
+
+export const V2_STATUSES: readonly string[] = ["new", "preparing", "ready", "shipped", "delivered", "delivery_failed", "cancelled", "returned"];
+/** A v2 order: placed through checkout v2 (it arrives as "new"); legacy orders keep their old statuses. */
+export function isV2Order(o: Pick<OrderDocument, "status"> & { source?: string }): boolean {
+  return o.source === "v2" || o.status === "new" || o.status === "preparing" || o.status === "ready";
+}
+
+/** Mirrors `app.marketplace_order_actions(order, 'seller')`; the database re-checks every press. */
+export function sellerActionsV2For(
+  o: Pick<OrderDocument, "status" | "fulfilment" | "payment_method" | "payment_status"> & { balance_due_egp?: number | null },
+): SellerActionV2[] {
+  const ip = o.payment_method === "instapay_full" || o.payment_method === "instapay_deposit";
+  const dispute = o.payment_status === "receipt_disputed";
+  // goods never leave before the showroom has confirmed an InstaPay transfer
+  const unconfirmed = ip && !["receipt_accepted", "collected"].includes(o.payment_status);
+  const out: SellerActionV2[] = [];
+  switch (o.status) {
+    case "new":
+      out.push("start_preparing", "cancel");
+      break;
+    case "preparing":
+      if (!dispute) out.push("mark_ready");
+      out.push("cancel");
+      break;
+    case "ready":
+      if (!dispute && !unconfirmed) out.push(o.fulfilment === "delivery" ? "mark_shipped" : "mark_delivered");
+      out.push("cancel");
+      if (o.fulfilment === "pickup") out.push("mark_delivery_failed");
+      break;
+    case "shipped":
+      if (!dispute && !unconfirmed) out.push("mark_delivered");
+      out.push("mark_delivery_failed");
+      break;
+    case "delivered":
+      if ((o.payment_method === "cod" && o.payment_status === "pending") ||
+          (o.payment_method === "instapay_deposit" && o.payment_status === "receipt_accepted" && Number(o.balance_due_egp ?? 0) > 0)) out.push("collect_payment");
+      break;
+    case "delivery_failed":
+      out.push("mark_returned_to_stock");
+      break;
+    default:
+      break;
+  }
+  if (ip && ["new", "preparing", "ready"].includes(o.status) && ["receipt_submitted", "receipt_disputed"].includes(o.payment_status)) out.push("accept_receipt");
+  if (ip && ["preparing", "ready"].includes(o.status) && o.payment_status === "receipt_submitted") out.push("flag_receipt_not_received");
+  return out;
+}
+
 /** The InstaPay deposit has been accepted (or the whole amount was paid). */
 export function depositSettled(o: Pick<OrderDocument, "payment_method" | "payment_status">): boolean {
   return o.payment_method === "instapay" && (o.payment_status === "deposit_accepted" || o.payment_status === "collected");
@@ -161,13 +234,16 @@ export function actionNeedsReason(action: SellerAction): boolean {
   return action === "cancel";
 }
 
-/** A buyer may cancel only before the showroom confirms. */
+/** A buyer may cancel a legacy order before the showroom confirms it, and a v2 order while it is still "new" (preparation not started). */
 export function buyerCanCancel(o: Pick<OrderDocument, "status">): boolean {
-  return o.status === "pending_confirmation";
+  return o.status === "pending_confirmation" || o.status === "new";
 }
 
 /** The buyer is expected to (re)send an InstaPay receipt. */
 export function buyerMaySendProof(o: Pick<OrderDocument, "status" | "payment_method" | "payment_status">): boolean {
+  if (o.payment_method === "instapay_full" || o.payment_method === "instapay_deposit") {
+    return o.payment_status === "receipt_disputed" && (o.status === "preparing" || o.status === "ready");
+  }
   return (
     o.payment_method === "instapay" &&
     o.status === "pending_confirmation" &&
@@ -224,6 +300,21 @@ export const ORDER_ERROR_CODES = new Set([
   "instapay_name_required",
   "deposit_percent_invalid",
   "seller_not_enabled",
+  "session_not_found",
+  "session_expired",
+  "quote_changed",
+  "receipt_required",
+  "receipt_limit",
+  "own_showroom",
+  "marketplace_closed",
+  "multi_seller_unsupported",
+  "seller_not_ready",
+  "idempotency_conflict",
+  "payment_dispute_open",
+  "payment_not_confirmed",
+  "invalid_action",
+  "preset_invalid",
+  "legacy_order",
 ]);
 
 export function orderErrorCode(code: string): string {
