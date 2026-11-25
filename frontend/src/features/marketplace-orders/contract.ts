@@ -168,6 +168,8 @@ export function sellerActionsV2For(
 ): SellerActionV2[] {
   const ip = o.payment_method === "instapay_full" || o.payment_method === "instapay_deposit";
   const dispute = o.payment_status === "receipt_disputed";
+  // goods never leave before the showroom has confirmed an InstaPay transfer
+  const unconfirmed = ip && !["receipt_accepted", "collected"].includes(o.payment_status);
   const out: SellerActionV2[] = [];
   switch (o.status) {
     case "new":
@@ -178,12 +180,12 @@ export function sellerActionsV2For(
       out.push("cancel");
       break;
     case "ready":
-      if (!dispute) out.push(o.fulfilment === "delivery" ? "mark_shipped" : "mark_delivered");
+      if (!dispute && !unconfirmed) out.push(o.fulfilment === "delivery" ? "mark_shipped" : "mark_delivered");
       out.push("cancel");
       if (o.fulfilment === "pickup") out.push("mark_delivery_failed");
       break;
     case "shipped":
-      if (!dispute) out.push("mark_delivered");
+      if (!dispute && !unconfirmed) out.push("mark_delivered");
       out.push("mark_delivery_failed");
       break;
     case "delivered":
@@ -309,6 +311,7 @@ export const ORDER_ERROR_CODES = new Set([
   "seller_not_ready",
   "idempotency_conflict",
   "payment_dispute_open",
+  "payment_not_confirmed",
   "invalid_action",
   "preset_invalid",
   "legacy_order",

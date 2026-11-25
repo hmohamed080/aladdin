@@ -610,6 +610,10 @@ select is(public.marketplace_buyer_receipt_resubmit_confirm(current_setting('t.p
 select throws_like(format($$ select public.marketplace_buyer_receipt_resubmit_request_upload(%L::uuid, 'image/png') $$, current_setting('t.o4')), 'mp:proof_not_expected%',
   'G17. no new upload ticket unless the receipt is disputed');
 select pg_temp.as_user(current_setting('t.seller'));
+select is(public.marketplace_seller_order_action(current_setting('t.o4')::uuid, 'mark_ready', '{}'::jsonb) ->> 'status', 'ready', 'G17a. preparation may finish before the money is confirmed');
+select is(app.marketplace_order_actions(current_setting('t.o4')::uuid, 'seller') @> array['mark_shipped'], false, 'G17b. shipping is not offered while the transfer is unconfirmed');
+select throws_like(format($$ select public.marketplace_seller_order_action(%L::uuid, 'mark_shipped', '{}'::jsonb) $$, current_setting('t.o4')), 'mp:payment_not_confirmed%',
+  'G17c. and the database refuses it');
 select is(public.marketplace_seller_order_action(current_setting('t.o4')::uuid, 'accept_receipt', '{}'::jsonb) -> 'payment' ->> 'status', 'collected', 'G18. accepting the receipt of a full InstaPay order settles it');
 select is((select status from public.marketplace_payment_proofs where order_id = current_setting('t.o4')::uuid and upload_state = 'confirmed' and status <> 'superseded'), 'accepted', 'G19. the receipt is marked accepted');
 select is(public.marketplace_seller_order_action(current_setting('t.o4')::uuid, 'accept_receipt', '{}'::jsonb) ->> 'replayed', 'true', 'G20. accepting twice is a no-op');

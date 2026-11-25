@@ -32,6 +32,13 @@ describe("v2 seller actions (no confirm, no reject)", () => {
     expect(sellerActionsV2For({ ...o, status: "new" })).toEqual(["start_preparing", "cancel", "accept_receipt"]);
   });
 
+  it("never ships or hands over an InstaPay order before the transfer is confirmed", () => {
+    const o = { fulfilment: "delivery", payment_method: "instapay_full", payment_status: "receipt_submitted" } as const;
+    expect(sellerActionsV2For({ ...o, status: "ready" })).not.toContain("mark_shipped");
+    expect(sellerActionsV2For({ ...o, status: "ready", fulfilment: "pickup" })).not.toContain("mark_delivered");
+    expect(sellerActionsV2For({ ...o, status: "ready", payment_status: "collected" })).toContain("mark_shipped");
+  });
+
   it("collects the balance of an accepted deposit once delivered", () => {
     const o = { fulfilment: "delivery", payment_method: "instapay_deposit", payment_status: "receipt_accepted", balance_due_egp: 182 } as const;
     expect(sellerActionsV2For({ ...o, status: "delivered" })).toEqual(["collect_payment"]);
