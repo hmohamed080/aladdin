@@ -1,4 +1,4 @@
--- pgTAP: Marketplace PR 12 — new checkout and order model (20261124120001_marketplace_checkout_order_model.sql)
+-- pgTAP: Marketplace PR 12 — new checkout and order model (20261124120002_marketplace_checkout_order_model.sql)
 -- Contract: docs/product/marketplace-order-model-contract-20261124.md
 --
 --   A. SHAPE        RPC-only tables, function privileges, hooks, the state guard.
@@ -360,6 +360,7 @@ reset role;
 select pg_temp.as_user(current_setting('t.buyer'));
 select set_config('t.r4', pg_temp.prep(current_setting('t.line1'), 'delivery', current_setting('t.addr'), 'standard', 'instapay_deposit')::text, true);
 select set_config('t.sess2', current_setting('t.r4')::jsonb ->> 'session_id', true);
+select is(jsonb_array_length(current_setting('t.r4')::jsonb -> 'receipts'), 0, 'D0. prepare lists the session''s receipts (none yet)');
 select is(current_setting('t.r4')::jsonb ->> 'missing', '["receipt_required"]', 'D1. an InstaPay deposit checkout is not ready without a receipt');
 select is((current_setting('t.r4')::jsonb -> 'quote' -> 'payment' ->> 'pay_now_egp')::numeric, 78.00, 'D2. the deposit is 30 percent of 260 (200 + 60 fee)');
 select is(current_setting('t.r4')::jsonb -> 'quote' -> 'payment' -> 'instapay', '{"address":"decore@instapay","account_name":"Decore Store"}'::jsonb,

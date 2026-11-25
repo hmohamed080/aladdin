@@ -11211,6 +11211,23 @@ export type Database = {
       marketplace_cart_merge: { Args: { p_lines: Json; p_merge_key: string }; Returns: Json }
       marketplace_cart_own_sellers: { Args: never; Returns: Json }
       marketplace_cart_replace: { Args: { p_lines: Json }; Returns: Json }
+      marketplace_buyer_order_cancel_v2: { Args: { p_note?: string; p_order_id: string; p_preset_id?: string }; Returns: Json }
+      marketplace_buyer_receipt_resubmit_confirm: { Args: { p_proof_id: string }; Returns: Json }
+      marketplace_buyer_receipt_resubmit_request_upload: { Args: { p_content_type: string; p_order_id: string }; Returns: Json }
+      marketplace_checkout_confirm: {
+        Args: { p_buyer_note?: string; p_idempotency_key: string; p_quote_hash: string; p_session_id: string }
+        Returns: Json
+      }
+      marketplace_checkout_prepare: {
+        Args: { p_address_id?: string; p_delivery_speed: string; p_fulfilment: string; p_lines: Json; p_payment_method: string; p_session_id?: string }
+        Returns: Json
+      }
+      marketplace_checkout_receipt_confirm: { Args: { p_proof_id: string }; Returns: Json }
+      marketplace_checkout_receipt_remove: { Args: { p_proof_id: string }; Returns: Json }
+      marketplace_checkout_receipt_request_upload: { Args: { p_content_type: string; p_session_id: string }; Returns: Json }
+      marketplace_checkout_sessions_purge: { Args: { p_limit?: number; p_retention?: string }; Returns: number }
+      marketplace_order_reason_presets: { Args: { p_action: string }; Returns: Json }
+      marketplace_seller_order_action: { Args: { p_action: string; p_order_id: string; p_payload?: Json }; Returns: Json }
       marketplace_checkout_place: {
         Args: {
           p_contact: Json

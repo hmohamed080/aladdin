@@ -6,12 +6,20 @@ import { ReceiptIcon, StorefrontIcon, TruckIcon, UploadIcon } from "@/components
 import { useI18n } from "@/lib/i18n/context";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { MARKETPLACE_IMAGE_ALLOWED_TYPES, MARKETPLACE_IMAGE_MAX_BYTES } from "@/lib/storage/marketplace-images";
-import { cancelBuyerOrderAction, confirmProofAction, proofImageUrlAction, requestProofUploadAction } from "@/server/actions/marketplace-orders";
+import {
+  cancelBuyerOrderAction,
+  cancelBuyerOrderV2Action,
+  confirmProofAction,
+  confirmResubmitAction,
+  proofImageUrlAction,
+  requestProofUploadAction,
+  requestResubmitUploadAction,
+} from "@/server/actions/marketplace-orders";
 import { fmtEgp } from "@/features/marketplace/live/live-copy";
 import { areaName, governorateName } from "@/features/marketplace-seller/place-label";
 import styles from "@/features/marketplace/marketplace-cart.module.css";
 import { buyerCopy, buyerError } from "./buyer-copy";
-import { buyerCanCancel, buyerMaySendProof, type OrderDocument } from "./contract";
+import { buyerCanCancel, buyerMaySendProof, isV2Order, type OrderDocument } from "./contract";
 
 /** One order as its buyer sees it: items, receiving, payment, the InstaPay step and the history. */
 export function BuyerOrderView({ initial }: { initial: OrderDocument }) {
@@ -37,7 +45,7 @@ export function BuyerOrderView({ initial }: { initial: OrderDocument }) {
   const cancel = async () => {
     setBusy("cancel");
     setMessage(null);
-    const r = await cancelBuyerOrderAction(order.id, reason);
+    const r = isV2Order(order) ? await cancelBuyerOrderV2Action(order.id, reason) : await cancelBuyerOrderAction(order.id, reason);
     setBusy(null);
     if (!r.ok) return setMessage({ ok: false, text: buyerError(locale, r.code) });
     setOrder(r.order);
@@ -52,14 +60,15 @@ export function BuyerOrderView({ initial }: { initial: OrderDocument }) {
     if (f.size > MARKETPLACE_IMAGE_MAX_BYTES) return setMessage({ ok: false, text: buyerError(locale, "file_too_large") });
     setBusy("upload");
     try {
-      const ticket = await requestProofUploadAction(order.id, f.type, f.size);
+      const v2 = isV2Order(order);
+      const ticket = v2 ? await requestResubmitUploadAction(order.id, f.type, f.size) : await requestProofUploadAction(order.id, f.type, f.size);
       if (!ticket.ok) return setMessage({ ok: false, text: buyerError(locale, ticket.code) });
       try {
         await uploadWithGrant(ticket.grant, f);
       } catch {
         return setMessage({ ok: false, text: buyerError(locale, "upload_failed") });
       }
-      const done = await confirmProofAction(ticket.proofId, ticket.objectKey);
+      const done = v2 ? await confirmResubmitAction(ticket.proofId, ticket.objectKey) : await confirmProofAction(ticket.proofId, ticket.objectKey);
       if (!done.ok) return setMessage({ ok: false, text: buyerError(locale, done.code) });
       setOrder(done.order);
       setMessage({ ok: true, text: c.receiptSent });

@@ -5,10 +5,11 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { parseSellerError, type SellerActionError } from "@/features/marketplace-seller/errors";
 import {
   SELLER_ACTIONS,
+  SELLER_ACTIONS_V2,
   type OrderDocument,
   type PaymentSettings,
-  type PlacedCheckout,
   type SellerAction,
+  type SellerActionV2,
 } from "@/features/marketplace-orders/contract";
 import { isMarketplaceProofKey, MARKETPLACE_IMAGE_ALLOWED_TYPES } from "@/lib/storage/marketplace-images";
 import type { UploadGrant } from "@/lib/storage/provider-types";
@@ -30,45 +31,6 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 const SELLER_ORDERS = "/showroom/marketplace/orders";
 const BUYER_ORDERS = "/market/orders";
-
-// ---------------------------------------------------------------------------
-// Checkout
-// ---------------------------------------------------------------------------
-export type CheckoutLine = { slug: string; sku: string; qty: number };
-export type CheckoutContact = { name: string; phone: string; note: string; governorate: string; area: string; address: string };
-export type CheckoutSellerChoice = { index: number; fulfilment: "delivery" | "pickup"; payment: "cod" | "instapay" };
-
-export async function placeCheckoutAction(
-  lines: CheckoutLine[],
-  contact: CheckoutContact,
-  sellers: CheckoutSellerChoice[],
-  idempotencyKey: string,
-): Promise<OrderResult<{ checkout: PlacedCheckout }>> {
-  if (!Array.isArray(lines) || lines.length === 0 || lines.length > 50) return { ok: false, code: "invalid_lines" };
-  if (!Array.isArray(sellers) || typeof idempotencyKey !== "string" || !UUID.test(idempotencyKey)) {
-    return { ok: false, code: "invalid_payload" };
-  }
-  const cleanLines = lines.map((l) => ({ slug: String(l.slug), sku: String(l.sku), qty: Math.round(Number(l.qty)) }));
-  const cleanSellers = sellers.map((s) => ({ index: Number(s.index), fulfilment: s.fulfilment, payment: s.payment }));
-  const cleanContact = {
-    name: String(contact?.name ?? "").slice(0, 100),
-    phone: String(contact?.phone ?? "").slice(0, 30),
-    note: String(contact?.note ?? "").slice(0, 500),
-    governorate: String(contact?.governorate ?? "").slice(0, 40),
-    area: String(contact?.area ?? "").slice(0, 40),
-    address: String(contact?.address ?? "").slice(0, 300),
-  };
-  const supabase = await getServerSupabase();
-  const { data, error } = await supabase.rpc("marketplace_checkout_place", {
-    p_lines: cleanLines as unknown as Json,
-    p_contact: cleanContact as unknown as Json,
-    p_sellers: cleanSellers as unknown as Json,
-    p_idempotency_key: idempotencyKey,
-  });
-  if (error || !data) return { ok: false, ...fail(error) };
-  revalidatePath(BUYER_ORDERS);
-  return { ok: true, checkout: data as unknown as PlacedCheckout };
-}
 
 // ---------------------------------------------------------------------------
 // Buyer
@@ -184,6 +146,82 @@ export async function sellerOrderTransitionAction(
   });
   if (error || !data) return { ok: false, ...fail(error) };
   revalidatePath(SELLER_ORDERS);
+  return { ok: true, order: data as unknown as OrderDocument };
+}
+
+/**
+ * The v2 state machine's single seller entry point (`marketplace_seller_order_action`). There is no confirm and no reject:
+ * the order arrives as "new", the showroom starts preparing it. The database decides which action is legal now.
+ */
+export async function sellerOrderActionV2(
+  orderId: string,
+  action: SellerActionV2,
+  message: string,
+): Promise<OrderResult<{ order: OrderDocument }>> {
+  if (!UUID.test(orderId)) return { ok: false, code: "not_found" };
+  if (!(SELLER_ACTIONS_V2 as readonly string[]).includes(action)) return { ok: false, code: "invalid_action" };
+  const supabase = await getServerSupabase();
+  const text = message.trim().slice(0, 300);
+  const { data, error } = await supabase.rpc("marketplace_seller_order_action", {
+    p_order_id: orderId,
+    p_action: action,
+    p_payload: (text ? { message: text } : {}) as unknown as Json,
+  });
+  if (error || !data) return { ok: false, ...fail(error) };
+  revalidatePath(SELLER_ORDERS);
+  return { ok: true, order: data as unknown as OrderDocument };
+}
+
+/** A buyer cancels a v2 order that is still "new" (preparation not started). */
+export async function cancelBuyerOrderV2Action(orderId: string, note: string): Promise<OrderResult<{ order: OrderDocument }>> {
+  if (!UUID.test(orderId)) return { ok: false, code: "not_found" };
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_buyer_order_cancel_v2", {
+    p_order_id: orderId,
+    p_note: note.trim().slice(0, 300) || undefined,
+  });
+  if (error || !data) return { ok: false, ...fail(error) };
+  revalidatePath(BUYER_ORDERS);
+  return { ok: true, order: data as unknown as OrderDocument };
+}
+
+/** v2: the buyer re-sends a receipt after the showroom flagged «لم تصلني الفلوس». Same ticket shape as the checkout receipt. */
+export async function requestResubmitUploadAction(
+  orderId: string,
+  contentType: string,
+  expectedBytes: number,
+): Promise<OrderResult<{ proofId: string; objectKey: string; grant: UploadGrant }>> {
+  if (!UUID.test(orderId)) return { ok: false, code: "not_found" };
+  if (!(MARKETPLACE_IMAGE_ALLOWED_TYPES as readonly string[]).includes(contentType)) return { ok: false, code: "image_type_invalid" };
+  if (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > (await imageMaxBytes("marketplace"))) {
+    return { ok: false, code: "file_too_large" };
+  }
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_buyer_receipt_resubmit_request_upload", {
+    p_order_id: orderId,
+    p_content_type: contentType,
+  });
+  if (error || !data) return { ok: false, ...fail(error) };
+  const r = data as { proof_id: string; object_key: string };
+  if (!isMarketplaceProofKey(r.object_key)) return { ok: false, code: "unexpected" };
+  try {
+    return { ok: true, proofId: r.proof_id, objectKey: r.object_key, grant: await authorizeMediaUpload(supabase, "marketplace", r.object_key, expectedBytes) };
+  } catch {
+    return { ok: false, code: "upload_failed" };
+  }
+}
+
+export async function confirmResubmitAction(proofId: string, objectKey: string): Promise<OrderResult<{ order: OrderDocument }>> {
+  if (!UUID.test(proofId) || !isMarketplaceProofKey(objectKey) || !objectKey.includes(`/${proofId}.`)) return { ok: false, code: "upload_not_found" };
+  const supabase = await getServerSupabase();
+  try {
+    await verifyPendingMedia(supabase, "marketplace", objectKey);
+  } catch {
+    return { ok: false, code: "image_content_invalid" };
+  }
+  const { data, error } = await supabase.rpc("marketplace_buyer_receipt_resubmit_confirm", { p_proof_id: proofId });
+  if (error || !data) return { ok: false, ...fail(error) };
+  revalidatePath(BUYER_ORDERS);
   return { ok: true, order: data as unknown as OrderDocument };
 }
 
