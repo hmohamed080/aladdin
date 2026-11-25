@@ -461,7 +461,7 @@ const ar: Copy = {
     actionUnknown: "",
   },
   seller: {
-    confirmBeforeShipping: "أكّد استلام تحويل InstaPay عشان تقدر تشحن الطلب أو تسلّمه.",
+    confirmBeforeShipping: "أكّد استلام تحويل إنستاباي عشان تقدر تشحن الطلب أو تسلّمه.",
     title: "طلبات السوق",
     subtitle: "جهّز الطلبات التي أرسلها المشترون إلى معرضك واشحنها وتابعها.",
     tabs: { all: "الكل", new: "جديد", in_preparation: "قيد التجهيز", shipped: "تم الشحن", delivered: "تم التسليم", cancelled: "ملغي" },
@@ -607,7 +607,7 @@ const ar: Copy = {
     invalid_payload: "راجع البيانات وحاول مرة أخرى.",
     invalid_action: "هذا الإجراء غير متاح.",
     invalid_transition: "تغيّر الطلب في هذه الأثناء. حدّث الصفحة وحاول مرة أخرى.",
-    payment_not_confirmed: "أكّد استلام تحويل InstaPay أولًا، ثم اشحن الطلب أو سلّمه.",
+    payment_not_confirmed: "أكّد استلام تحويل إنستاباي أولًا، ثم اشحن الطلب أو سلّمه.",
     order_not_cancellable: "لم يعد بالإمكان إلغاء هذا الطلب.",
     payment_dispute_open: "لا يتقدم الطلب ما دام الإيصال محل تدقيق.",
     reason_required: "اختر سببًا أو اكتب واحدًا (من 3 إلى 300 حرف).",
