@@ -1,3 +1,7 @@
+## Marketplace timers and payment complaints, PR 14 (draft PR, not deployed) - 2026-11-24
+
+- Migrations `20261125120001-3` exist only on the PR branch; applied nowhere hosted. The timers Worker `edge/marketplace-timers-worker` is not deployed and no secret or variable is set; `scripts/marketplace-timers.mjs` is the manual alternative. Ordering stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. Admin queue `/admin/marketplace/payment-complaints` needs the grantable permission `marketplace_payment_complaints.review`.
+
 ## Marketplace order pages, PR 13 (draft PR, not deployed) - 2026-11-25
 
 Migrations 20261125110001-130003 and pgTAP 330 exist only on the PR branch (stacked on PR 12). Nothing applied to Acceptance or Production. Ordering stays behind NEXT_PUBLIC_MARKETPLACE_ORDERING.

@@ -12,6 +12,7 @@ import type { OrderDocumentV2 } from "./order-types";
 import { dateTime, money, OrderLineRow, PaymentBadge, StatusBadge, Timeline, Totals } from "./order-parts";
 import { ReasonPanel, type ReasonValue } from "./reason-panel";
 import { orderError, ordersCopy } from "./orders-copy";
+import { FileComplaintSlot } from "./order-slots";
 
 type Msg = { ok: boolean; text: string } | null;
 type Panel = SellerOrderActionName | "shipment_edit" | null;
@@ -144,6 +145,7 @@ export function SellerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
     ) : (
       <Button variant="outline" onClick={() => { setMsg(null); setOpen("flag_receipt_not_received"); }}>{label("flag_receipt_not_received")}</Button>
     );
+  registry.file_complaint = () => <FileComplaintSlot orderId={order.id} />;
   const buttons = knownActions(order.actions, registry);
 
   return (

@@ -1,0 +1,16 @@
+{
+  "$schema": "../../frontend/node_modules/wrangler/config-schema.json",
+  "name": "aladdin-marketplace-timers-acceptance",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [],
+  "observability": { "enabled": true },
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "vars": {
+    "APP_ENV": "acceptance",
+    "TIMERS_BATCH_LIMIT": "200",
+    "SESSIONS_PURGE_LIMIT": "200"
+  }
+}

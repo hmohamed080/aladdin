@@ -9835,6 +9835,11 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_marketplace_payment_complaint_decide: { Args: { p_complaint_id: string; p_decision: string; p_note: string }; Returns: Json }
+      admin_marketplace_payment_complaint_get: { Args: { p_complaint_id: string }; Returns: Json }
+      admin_marketplace_payment_complaint_take: { Args: { p_complaint_id: string }; Returns: Json }
+      admin_marketplace_payment_complaints: { Args: { p_limit?: number; p_offset?: number; p_state?: string }; Returns: Json }
+      marketplace_payment_complaint_file: { Args: { p_note?: string; p_order_id: string; p_reason: string }; Returns: Json }
       admin_marketplace_product_review_summary: { Args: never; Returns: Json }
       admin_marketplace_product_videos: {
         Args: { p_product_id: string }
