@@ -117,10 +117,10 @@ insert into public.notification_templates
    'Order {order_number} was cancelled automatically because the showroom did not start preparing it within 72 hours. The stock was released. If you had transferred money, open the order to follow your refund.'),
   ('marketplace.order.refund_check', 'marketplace.order.refund_check',
    array['order_number'],
-   'طلب ملغي بإيصال لم يُراجَع',
-   'أُلغي الطلب {order_number} قبل مراجعة إيصال التحويل. المبلغ مسجّل كمستحق الاسترداد؛ تابِعه مع الطرفين.',
-   'A cancelled order has an unchecked receipt',
-   'Order {order_number} was cancelled before the transfer receipt was checked. The amount is recorded as owed back; follow up with both sides.'),
+   'طلب ملغي بإيصال غير مؤكد',
+   'أُلغي الطلب {order_number} ولم يتأكد إيصال التحويل. المبلغ مسجّل كمستحق الاسترداد؛ تابِعه مع الطرفين.',
+   'A cancelled order has an unconfirmed receipt',
+   'Order {order_number} was cancelled while its transfer receipt was not confirmed. The amount is recorded as owed back; follow up with both sides.'),
   ('marketplace.order.reminder_receipt_resubmit', 'marketplace.order.reminder_receipt_resubmit',
    array['order_number', 'showroom_name', 'hours_left'],
    'تذكير: أعد رفع إيصال التحويل',
@@ -135,8 +135,8 @@ insert into public.notification_templates
    'Order {order_number} was cancelled automatically because the transfer receipt was not uploaded again within 48 hours.')
 on conflict (key) do nothing;
 
--- An order cancelled by anyone while its uploaded receipt was still unchecked: the money may have been sent, so the admins
--- who handle payment complaints are told (owner decision 2026-11-25).
+-- An order cancelled while its receipt was unchecked, or by the showroom after it rejected the receipt: the money may have
+-- been sent, so the admins who handle payment complaints are told (owner decision 2026-11-25).
 create or replace function app.marketplace_unchecked_receipt_cancelled()
 returns trigger
 language plpgsql
@@ -155,7 +155,7 @@ revoke all on function app.marketplace_unchecked_receipt_cancelled() from public
 create or replace trigger marketplace_unchecked_receipt_cancelled
   after insert on public.marketplace_order_events
   for each row when (new.to_status = 'cancelled' and new.from_status is distinct from 'cancelled'
-                     and new.from_payment = 'receipt_submitted' and new.to_payment = 'refund_due')
+                     and new.from_payment in ('receipt_submitted', 'receipt_disputed') and new.to_payment = 'refund_due')
   execute function app.marketplace_unchecked_receipt_cancelled();
 
 -- ---------------------------------------------------------------------------

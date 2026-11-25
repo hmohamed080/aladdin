@@ -47,8 +47,12 @@ as $$
       select 1 from public.marketplace_orders o
        where o.id = p_order and o.source = 'v2' and o.status = 'cancelled' and o.payment_status = 'refund_due'
          and exists (select 1 from public.marketplace_order_events x where x.order_id = o.id and x.to_status = 'cancelled'
-                     and x.from_payment = 'receipt_submitted')
-         and not exists (select 1 from public.marketplace_payment_complaints c where c.order_id = o.id)
+                     and x.from_payment in ('receipt_submitted', 'receipt_disputed'))
+         and not exists (select 1 from public.marketplace_payment_complaints c
+                          where c.order_id = o.id
+                            and (c.state in ('open', 'under_review')
+                                 or c.created_at >= (select max(e.created_at) from public.marketplace_order_events e
+                                                      where e.order_id = o.id and e.to_status = 'cancelled' and e.from_status <> 'cancelled')))
     ) or exists (
       select 1 from public.marketplace_orders o
        where o.id = p_order and o.source = 'v2' and o.payment_status = 'receipt_disputed' and o.status in ('preparing', 'ready')
@@ -118,10 +122,10 @@ begin
                  when app.marketplace_can_manage_orders(o.seller_organization_id) then 'seller' end;
   if v_role is null then raise exception 'mp:not_found' using errcode = '42501'; end if;
   if o.source <> 'v2' then raise exception 'mp:legacy_order' using errcode = '23514'; end if;
-  -- also open to an order cancelled while its uploaded receipt was unchecked (owner decision 2026-11-25)
+  -- also open to a cancelled order whose receipt was never confirmed and is recorded as owed back (owner decision 2026-11-25)
   v_unanswered := o.status = 'cancelled' and o.payment_status = 'refund_due'
          and exists (select 1 from public.marketplace_order_events x where x.order_id = o.id and x.to_status = 'cancelled'
-                     and x.from_payment = 'receipt_submitted');
+                     and x.from_payment in ('receipt_submitted', 'receipt_disputed'));
   if not v_unanswered and (o.payment_status <> 'receipt_disputed' or o.status not in ('preparing', 'ready')) then
     raise exception 'mp:complaint_not_allowed' using errcode = '23514';
   end if;
@@ -133,9 +137,11 @@ begin
     raise exception 'mp:complaint_not_allowed' using errcode = '23514';
   end if;
 
-  select max(e.created_at) into v_flagged from public.marketplace_order_events e where e.order_id = o.id and e.action = 'receipt_disputed';
+  select max(e.created_at) into v_flagged from public.marketplace_order_events e
+   where e.order_id = o.id
+     and case when v_unanswered then e.to_status = 'cancelled' and e.from_status <> 'cancelled' else e.action = 'receipt_disputed' end;
   if exists (select 1 from public.marketplace_payment_complaints c
-              where c.order_id = o.id and (v_unanswered or c.state in ('open', 'under_review')
+              where c.order_id = o.id and (c.state in ('open', 'under_review')
                                             or c.created_at >= coalesce(v_flagged, 'infinity'::timestamptz))) then
     raise exception 'mp:complaint_exists' using errcode = '23505';
   end if;
@@ -284,7 +290,7 @@ begin
   select * into o from public.marketplace_orders where id = c.order_id for update;
   v_unanswered := o.status = 'cancelled' and o.payment_status = 'refund_due'
          and exists (select 1 from public.marketplace_order_events x where x.order_id = o.id and x.to_status = 'cancelled'
-                     and x.from_payment = 'receipt_submitted');
+                     and x.from_payment in ('receipt_submitted', 'receipt_disputed'));
 
   if p_decision = 'payment_valid' and not v_unanswered then
     -- the machine re-checks the order under its lock; a cancelled or moved order raises mp:invalid_transition and nothing is saved

@@ -487,5 +487,15 @@ select is((select payment_status from public.marketplace_orders where id = curre
 select is(pg_temp.notes(current_setting('t.g3'), 'marketplace.order.refund_check') >= 1, true, 'G13. the authorised admins are told');
 select is(app.marketplace_order_extra_actions(current_setting('t.g3')::uuid, 'seller'), array['file_complaint'], 'G14. the showroom may file a complaint');
 
+-- G (continued): rejecting the receipt and then cancelling does not keep the money
+reset role;
+select set_config('t.g4', pg_temp.mk_order('instapay_full', 'preparing', 'receipt_disputed', now() - interval '1 hour', 'order_receipt_resubmit'), true);
+select pg_temp.as_user(current_setting('t.seller'));
+select is(public.marketplace_seller_order_action(current_setting('t.g4')::uuid, 'cancel', '{"message":"transfer not received"}'::jsonb) ->> 'status', 'cancelled',
+  'G15. the showroom cancels after rejecting the receipt');
+select is((select payment_status from public.marketplace_orders where id = current_setting('t.g4')::uuid), 'refund_due', 'G16. the amount is owed back');
+select is(pg_temp.notes(current_setting('t.g4'), 'marketplace.order.refund_check') >= 1, true, 'G17. the authorised admins are told');
+select is(app.marketplace_order_extra_actions(current_setting('t.g4')::uuid, 'buyer'), array['file_complaint'], 'G18. the buyer may file a complaint');
+
 select * from finish();
 rollback;
