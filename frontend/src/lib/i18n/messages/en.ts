@@ -7855,6 +7855,7 @@ export const en = {
       not_permitted: "You do not have permission to do this.",
       not_found: "Order not found.",
       invalid_transition: "This order cannot move to that step now. Refresh the page.",
+      payment_not_confirmed: "Confirm the InstaPay transfer first, then ship or hand over the order.",
       deposit_not_accepted: "Accept the InstaPay receipt before confirming.",
       reason_required: "Write a reason.",
       proof_not_reviewable: "This receipt was already reviewed.",

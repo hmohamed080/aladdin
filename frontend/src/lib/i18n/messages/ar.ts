@@ -7619,6 +7619,7 @@ export const ar: Messages = {
       not_permitted: "ليست لديك صلاحية لهذا الإجراء.",
       not_found: "الطلب غير موجود.",
       invalid_transition: "لا يمكن نقل الطلب إلى هذه الخطوة الآن. حدّث الصفحة.",
+      payment_not_confirmed: "أكّد استلام تحويل InstaPay أولًا، ثم اشحن الطلب أو سلّمه.",
       deposit_not_accepted: "اقبل إيصال إنستاباي أولًا قبل التأكيد.",
       reason_required: "اكتب السبب.",
       proof_not_reviewable: "تمت مراجعة هذا الإيصال بالفعل.",
