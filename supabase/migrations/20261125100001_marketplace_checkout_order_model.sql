@@ -338,7 +338,7 @@ select pg_temp.extend_in_check('public.notifications'::regclass, 'ck_notificatio
   'marketplace.order.cancelled_timeout_seller', 'marketplace.order.cancelled_timeout_receipt',
   'marketplace.order.reminder_seller_start', 'marketplace.order.reminder_receipt_resubmit',
   'marketplace.order.receipt_disputed', 'marketplace.order.receipt_resubmitted',
-  'marketplace.order.payment_complaint_filed', 'marketplace.order.payment_complaint_resolved',
+  'marketplace.order.payment_complaint_filed', 'marketplace.order.payment_complaint_resolved', 'marketplace.order.refund_check',
   'marketplace.return.requested', 'marketplace.return.approved', 'marketplace.return.rejected',
   'marketplace.return.received', 'marketplace.return.refund_sent', 'marketplace.return.refund_confirmed',
   'marketplace.return.seller_reminder', 'marketplace.return.escalated', 'marketplace.return.admin_reminder',
@@ -889,6 +889,9 @@ begin
         v_stock := case o.stock_state when 'pending' then 'release' when 'deducted' then 'replenish' end;
         v_pay := case when o.payment_method = 'cod' then 'not_collected'
                       when p_action = 'cancel_timeout_receipt' then 'not_collected'
+                      -- Owner decision 2026-11-25: the showroom never answered an uploaded receipt, so the buyer may well have paid:
+                      -- the money is owed back until someone shows it never arrived (PR 14 lets either side file a complaint).
+                      when p_action = 'cancel_timeout_seller' and o.payment_status = 'receipt_submitted' then 'refund_due'
                       when o.payment_status in ('receipt_accepted', 'collected') then 'refund_due'
                       else 'not_collected' end;
         v_event := case p_action when 'cancel_by_buyer' then 'cancelled_by_buyer' when 'cancel_by_seller' then 'cancelled_by_seller'
