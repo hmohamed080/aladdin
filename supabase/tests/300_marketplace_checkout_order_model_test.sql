@@ -531,8 +531,8 @@ select is((public.marketplace_buyer_order_cancel_v2(current_setting('t.o2')::uui
   (select id from public.marketplace_seller_message_presets where action = 'order_cancel_buyer' order by sort_order limit 1), null) ->> 'status'), 'cancelled',
   'F6. the buyer cancels a new order with a preset reason');
 select is(pg_temp.stock('CHK-1'), '7/2', 'F7. the held units are released');
-select is((select stock_state || '/' || payment_status from public.marketplace_orders where id = current_setting('t.o2')::uuid), 'released/not_collected',
-  'F8. stock released; the unreviewed receipt is not_collected (contract row 11 rule)');
+select is((select stock_state || '/' || payment_status from public.marketplace_orders where id = current_setting('t.o2')::uuid), 'released/refund_due',
+  'F8. stock released; the unchecked receipt is owed back (owner decision 2026-11-25)');
 select is((select cancelled_by_role || '/' || reason_code || '/' || stock_effect from public.marketplace_order_cancellations where order_id = current_setting('t.o2')::uuid),
   'buyer/preset/released', 'F9. the structured cancellation record');
 select is(public.marketplace_buyer_order_cancel_v2(current_setting('t.o2')::uuid, null, null) ->> 'replayed', 'true', 'F10. cancelling twice is a no-op');
@@ -548,7 +548,7 @@ select throws_like(format($$ select public.marketplace_seller_order_action(%L::u
 select is(public.marketplace_seller_order_action(current_setting('t.o3')::uuid, 'cancel', jsonb_build_object(
   'preset_id', (select id from public.marketplace_seller_message_presets where action = 'order_cancel_seller' order by sort_order limit 1),
   'internal_note', 'supplier delay'))  -> 'cancellation' ->> 'internal_note', 'supplier delay', 'F17. the showroom cancels with a preset; its internal note is visible to the showroom');
-select is((select payment_status from public.marketplace_orders where id = current_setting('t.o3')::uuid), 'not_collected', 'F18. an unreviewed InstaPay receipt on a cancelled order');
+select is((select payment_status from public.marketplace_orders where id = current_setting('t.o3')::uuid), 'refund_due', 'F18. an unchecked InstaPay receipt on a cancelled order is owed back');
 select is(pg_temp.stock('CHK-1'), '7/0', 'F19. the held units are released');
 select pg_temp.as_user(current_setting('t.buyer2'));
 select is(public.marketplace_buyer_order_get(current_setting('t.o3')::uuid) ->> 'status', 'cancelled', 'F20. the buyer sees the cancellation');
