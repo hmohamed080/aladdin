@@ -744,5 +744,46 @@ select is(app.marketplace_return_value((current_setting('t.r10')::jsonb ->> 'id'
 select is(app.marketplace_return_value((current_setting('t.r2')::jsonb ->> 'id')::uuid), 80::numeric,
   'J4. a partial return for a defect does not include the delivery fee');
 
+-- ===========================================================================
+-- K. A complaint about a partial refund: the admin upholds the proposal (reject) or grants the full value (approve)
+-- ===========================================================================
+select set_config('t.o11', pg_temp.deliver(jsonb_build_array(jsonb_build_object('slug', current_setting('t.s1'), 'sku', 'RT-1', 'qty', 1))::text, 'rt-key-0092')::text, true);
+select pg_temp.as_user(current_setting('t.buyer'));
+select set_config('t.r11', public.marketplace_buyer_return_create(current_setting('t.o11')::uuid, 'return',
+  jsonb_build_array(jsonb_build_object('item_id', pg_temp.item(current_setting('t.o11'), 'RT-1'), 'quantity', 1)),
+  pg_temp.reason('I changed my mind'), null, '{}', null, 'rt-ret-0092') ->> 'id', true);
+select pg_temp.as_user(current_setting('t.seller'));
+select public.marketplace_seller_return_decide(current_setting('t.r11')::uuid, 'propose_partial', null, 'Small scratch', 'Small scratch', 40);
+select pg_temp.as_user(current_setting('t.buyer'));
+select public.marketplace_return_complaint_file(current_setting('t.r11')::uuid, 'The scratch was there on delivery');
+select set_config('t.o12', pg_temp.deliver(jsonb_build_array(jsonb_build_object('slug', current_setting('t.s1'), 'sku', 'RT-1', 'qty', 1))::text, 'rt-key-0093')::text, true);
+select pg_temp.as_user(current_setting('t.buyer'));
+select set_config('t.r12', public.marketplace_buyer_return_create(current_setting('t.o12')::uuid, 'return',
+  jsonb_build_array(jsonb_build_object('item_id', pg_temp.item(current_setting('t.o12'), 'RT-1'), 'quantity', 1)),
+  pg_temp.reason('I changed my mind'), null, '{}', null, 'rt-ret-0093') ->> 'id', true);
+select pg_temp.as_user(current_setting('t.seller'));
+select public.marketplace_seller_return_decide(current_setting('t.r12')::uuid, 'propose_partial', null, 'Small scratch', 'Small scratch', 40);
+select pg_temp.as_user(current_setting('t.buyer'));
+select public.marketplace_return_complaint_file(current_setting('t.r12')::uuid, 'The scratch was there on delivery');
+select pg_temp.as_user(current_setting('t.super'));
+select is(public.admin_marketplace_return_get(current_setting('t.r11')::uuid) -> 'actions', '["remind_seller", "approve", "reject"]'::jsonb,
+  'K1. the admin may rule on a disputed partial proposal');
+select throws_like(format($$ select public.admin_marketplace_return_decide(%L::uuid, 'reject', 'x') $$, current_setting('t.r11')), 'mp:reason_required%',
+  'K2. the ruling needs a written note');
+select is(public.admin_marketplace_return_decide(current_setting('t.r11')::uuid, 'reject', 'The photos support the proposed amount') ->> 'status', 'approved',
+  'K3. upholding the proposal keeps the return approved');
+select public.admin_marketplace_return_decide(current_setting('t.r12')::uuid, 'approve', 'The damage was not caused by the buyer');
+select throws_like(format($$ select public.admin_marketplace_return_decide(%L::uuid, 'reject', 'changed my mind') $$, current_setting('t.r11')), 'mp:invalid_transition%',
+  'K4. a ruled complaint cannot be ruled again');
+reset role;
+select is((select partial_refund_egp from public.marketplace_return_requests where id = current_setting('t.r11')::uuid), 40::numeric, 'K5. upheld: the proposed amount stays');
+select is(app.marketplace_return_refund_cap(current_setting('t.r11')::uuid), 40::numeric, 'K6. upheld: the refund is capped at the proposal');
+select is((select partial_refund_egp from public.marketplace_return_requests where id = current_setting('t.r12')::uuid), null::numeric, 'K7. granted: the cap is removed');
+select is(app.marketplace_return_refund_cap(current_setting('t.r12')::uuid), 100::numeric, 'K8. granted: the full value of the returned unit (no delivery fee for a change of mind)');
+select is((select count(*)::int from public.marketplace_return_requests where id in (current_setting('t.r11')::uuid, current_setting('t.r12')::uuid)
+            and status = 'approved' and decided_by_role = 'admin' and not in_admin_queue), 2, 'K9. both are admin decisions and out of the queue');
+select is((select count(*)::int from public.notifications where event_type = 'marketplace.return.admin_decided' and subject_id = current_setting('t.r11')::uuid), 2,
+  'K10. buyer and showroom are told');
+
 select * from finish();
 rollback;
