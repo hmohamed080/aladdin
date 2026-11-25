@@ -1,5 +1,5 @@
 -- pgTAP: Marketplace PR 11 — the account cart, the guest-cart merge and the own-showroom rule
--- (20261124110001_marketplace_account_cart.sql).
+-- (20261125090002_marketplace_account_cart.sql).
 --
 --   A. SHAPE       RPC-only cart tables, owner-only SELECT, authenticated-only RPCs.
 --   B. OWN SHOWROOM  a member of a showroom cannot merge / replace / insert its products, nor place an order with it.
