@@ -4,7 +4,7 @@ import type { BuyerPlace } from "@/features/marketplace/live/public-contract";
 
 /**
  * Pure model of a saved buyer address (Marketplace PR 10). The database is the authority (see
- * 20261124100001_marketplace_buyer_addresses.sql); this file mirrors its limits so the form can refuse early and word the
+ * 20261125090001_marketplace_buyer_addresses.sql); this file mirrors its limits so the form can refuse early and word the
  * result, and maps a saved address onto the place the delivery estimate already understands.
  *
  * Personal data: nothing here logs, and no value of an address is ever placed in a URL.

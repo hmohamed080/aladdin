@@ -1,5 +1,5 @@
 -- pgTAP: Marketplace PR 15 - returns and exchanges
--- (20261124150001_marketplace_returns_tables.sql, 150002 rpcs, 150003 order hooks)
+-- (20261125130001_marketplace_returns_tables.sql, 150002 rpcs, 150003 order hooks)
 -- Contract: docs/product/marketplace-order-model-contract-20261124.md, section 4.5
 --
 --   A. SHAPE        RPC-only tables, function privileges, the permission, seeded reasons, hooks installed.

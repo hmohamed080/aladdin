@@ -1,6 +1,6 @@
 /**
  * Marketplace returns and exchanges (PR 15): the shapes the return RPCs answer
- * (20261124150002_marketplace_returns_rpcs.sql) and the pure rules the screens derive from them.
+ * (20261125130002_marketplace_returns_rpcs.sql) and the pure rules the screens derive from them.
  *
  * The database is the authority for every transition and every window: these helpers only decide which
  * buttons to show and how to word a deadline. The window functions mirror

@@ -13,7 +13,7 @@ import type { Json } from "@/types/database.types";
 
 /**
  * Marketplace returns and exchanges (PR 15). Thin wrappers over the SECURITY DEFINER RPCs of migration
- * 20261124150002, run under the caller's OWN session: who may request, decide, receive, refund or review is
+ * 20261125130002, run under the caller's OWN session: who may request, decide, receive, refund or review is
  * decided in the database (the UI is never the gate). Evidence photos are private; their keys and bytes are never logged.
  * No money moves here: a refund is a record the showroom makes and the buyer confirms.
  */
