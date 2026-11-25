@@ -2,8 +2,8 @@
 # APPLIES the pending migrations of ONE named plan to PRODUCTION (kkpkgjrweysgvhvkhzun) ONLY, with every gate before and after.
 # Plan: prod-catchup = ALL 27 pending migrations 20261114090001 .. 20261122090002 (plus PC_LATER in acceptance-gate.mjs), 210 -> 237, in ONE plain push (a push always sends every unapplied local migration).
 # Plan: prod-marketplace-v2 = the COMBINED plan (owner decision 2026-11-24): the seven Marketplace migrations 20261123090001 .. 20261123160002 plus the seller public slug migration
-# 20261124090001, 237 -> 245, one plain push, on top of Production at 237 (prod-catchup already applied). Recovery: the pinned forward-fixes marketplace-slug-remove.sql THEN
-# marketplace-v2-remove.sql; needs a restore-verified PRODUCTION snapshot taken at >= 237 migrations; runs the read-only marketplace-v2-smoke.sql and marketplace-slug-smoke.sql before and after the push.
+# 20261124090001 and the stock-notify migration 20261124120001, 237 -> 246, one plain push, on top of Production at 237 (prod-catchup already applied). Recovery: the pinned forward-fixes marketplace-stock-notify-restore-previous.sql, marketplace-slug-remove.sql THEN
+# marketplace-v2-remove.sql; needs a restore-verified PRODUCTION snapshot taken at >= 237 migrations; runs the read-only marketplace-v2-smoke.sql, marketplace-slug-smoke.sql and marketplace-stock-notify-smoke.sql before and after the push.
 # See docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md and docs/operations/PRODUCTION_CATCHUP_PLAN_20261123.md and acceptance-gate.mjs (the plan is marked target "production").
 # NOT to be run without the owner's separate explicit GO for Production. Acceptance is refused. Never uses --include-all, repair or reset.
 #   bash scripts/hosted-db/production-apply.sh --plan prod-catchup|prod-marketplace-v2 --sha <full 40-char origin/main sha> --backup-label <aladdin-production-YYYYMMDDTHHMMSSZ>
@@ -80,6 +80,8 @@ if [ "$PLAN" = "prod-marketplace-v2" ]; then
   run "pre: marketplace-v2 smoke" "$OUT/mv2-pre.out" -- node scripts/hosted-db/marketplace-v2-smoke.mjs facts pre "$OUT/mv2-pre.json"; cat "$OUT/mv2-pre.out"
   run "pre: marketplace-slug facts" "$OUT/slug-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-slug-smoke.sql
   run "pre: marketplace-slug smoke" "$OUT/slug-pre.out" -- node scripts/hosted-db/marketplace-slug-smoke.mjs facts pre "$OUT/slug-pre.json" --applied 237 --latest 20261122090002; cat "$OUT/slug-pre.out"
+  run "pre: marketplace-stock-notify facts" "$OUT/stock-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-stock-notify-smoke.sql
+  run "pre: marketplace-stock-notify smoke" "$OUT/stock-pre.out" -- node scripts/hosted-db/marketplace-stock-notify-smoke.mjs facts pre "$OUT/stock-pre.json" --applied 237 --latest 20261122090002 --no-templates; cat "$OUT/stock-pre.out"
 fi
 echo "pre-checks passed. Recovery: $RECOVERY${LABEL:+ (restore-verified Production snapshot $LABEL)}"
 
@@ -107,6 +109,8 @@ if [ "$PLAN" = "prod-marketplace-v2" ]; then
   run "post: marketplace-v2 smoke" "$OUT/mv2-post.out" -- node scripts/hosted-db/marketplace-v2-smoke.mjs facts post "$OUT/mv2-post.json" --applied "$POST_APPLIED" --latest "$LATEST"; cat "$OUT/mv2-post.out"
   run "post: marketplace-slug facts" "$OUT/slug-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-slug-smoke.sql
   run "post: marketplace-slug smoke" "$OUT/slug-post.out" -- node scripts/hosted-db/marketplace-slug-smoke.mjs facts post "$OUT/slug-post.json" --applied "$POST_APPLIED" --latest "$LATEST"; cat "$OUT/slug-post.out"
+  run "post: marketplace-stock-notify facts" "$OUT/stock-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-stock-notify-smoke.sql
+  run "post: marketplace-stock-notify smoke" "$OUT/stock-post.out" -- node scripts/hosted-db/marketplace-stock-notify-smoke.mjs facts post "$OUT/stock-post.json" --applied "$POST_APPLIED" --latest "$LATEST"; cat "$OUT/stock-post.out"
   echo "NEXT (owner): deploy the matching frontend to aladdin-frontend-production (upload-only, 10% then 100% by hand), then: SMOKE_TARGET=production node scripts/hosted-db/marketplace-v2-smoke.mjs http  (docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md)"
 fi
 STEP="done"; PUSHED=0

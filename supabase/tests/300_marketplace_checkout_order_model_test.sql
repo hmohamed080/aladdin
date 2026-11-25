@@ -1,4 +1,4 @@
--- pgTAP: Marketplace PR 12 — new checkout and order model (20261124120001_marketplace_checkout_order_model.sql)
+-- pgTAP: Marketplace PR 12 — new checkout and order model (20261124120002_marketplace_checkout_order_model.sql)
 -- Contract: docs/product/marketplace-order-model-contract-20261124.md
 --
 --   A. SHAPE        RPC-only tables, function privileges, hooks, the state guard.
