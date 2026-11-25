@@ -48,6 +48,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* A printable document (order invoice, courier sheet) prints alone: everything that is neither the sheet, inside it, nor one of
+   its ancestors is left out, so no header, sidebar or footer of the surrounding shell reaches the paper. */
+@media print {
+  body:has([data-print-sheet]) :not([data-print-sheet], [data-print-sheet] *, :has([data-print-sheet])) {
+    display: none !important;
+  }
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;

@@ -31,7 +31,7 @@ export function InvoiceView({ invoice, backHref }: { invoice: OrderInvoice; back
   return (
     <div className="grid gap-md py-md">
       <PrintBar backHref={backHref} backLabel={t.back} printLabel={t.print} />
-      <article className={sheet} aria-labelledby="inv-title">
+      <article data-print-sheet className={sheet} aria-labelledby="inv-title">
         <header className="flex flex-wrap items-start justify-between gap-md border-b pb-sm">
           <div>
             <h1 id="inv-title" className="text-headline text-fg" data-plain>{t.title}</h1>
@@ -103,7 +103,7 @@ export function WaybillView({ waybill, backHref }: { waybill: OrderWaybill; back
   return (
     <div className="grid gap-md py-md">
       <PrintBar backHref={backHref} backLabel={ordersCopy[locale].seller.backToOrders} printLabel={w.print} />
-      <article className={sheet} aria-labelledby="wb-title">
+      <article data-print-sheet className={sheet} aria-labelledby="wb-title">
         <header className="flex flex-wrap items-start justify-between gap-md border-b pb-sm">
           <h1 id="wb-title" className="text-headline text-fg" data-plain>{w.title}</h1>
           <p className="text-title"><span className="text-fg-secondary">{w.order} </span><bdi dir="ltr" className="font-semibold">{waybill.order_number}</bdi></p>

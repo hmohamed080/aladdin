@@ -13,6 +13,7 @@ import { buyerCancelOrderPageAction, confirmResubmitAction, reasonPresetsAction,
 import { syncMarketplaceCartAction } from "@/server/actions/marketplace-cart-account";
 import { areaName, governorateName } from "@/features/marketplace-seller/place-label";
 import styles from "@/features/marketplace/marketplace-cart.module.css";
+import { writeAccountCartLines } from "@/features/marketplace/live/live-cart-store";
 import { FileComplaintSlot } from "./order-slots";
 import { formatEstimate, hoursLeft, isInstapay, isLegacy, isReadyForPickup, knownActions, reorderLines } from "./order-model";
 import type { OrderDocumentV2, ReasonPreset } from "./order-types";
@@ -76,6 +77,8 @@ export function BuyerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
     const r = await syncMarketplaceCartAction({ mode: "merge", key: crypto.randomUUID(), lines });
     setBusy(null);
     if (!r.ok) return setMsg({ ok: false, text: r.code === "own_showroom" ? b.reorderOwn : orderError(locale, r.code === "closed" ? "marketplace_closed" : "unexpected") });
+    // the cart page renders the browser cart: adopt the merged account cart before going there
+    writeAccountCartLines(r.lines);
     setMsg({ ok: true, text: b.reorderDone });
     router.push("/market/cart");
   };
