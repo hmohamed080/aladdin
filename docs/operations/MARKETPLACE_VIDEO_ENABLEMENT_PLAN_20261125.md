@@ -19,12 +19,14 @@
 4. **App env** on the frontend Worker: `MEDIA_EDGE_DELIVERY_ENABLED=true` plus `MEDIA_EDGE_ORIGIN`, `MEDIA_EDGE_TICKET_KID`, `MEDIA_EDGE_TICKET_SECRET` (Worker secrets), then `VIDEO_ENABLED=true`. The env schema refuses `VIDEO_ENABLED` unless `R2_STORAGE_ENABLED` and `MEDIA_EDGE_DELIVERY_ENABLED` are on.
 5. **Marketplace gating**: product video upload is allowed only to a seller's managers for an enabled seller; videos start `pending` and play only after an Admin approves them at `/admin/marketplace/videos`. The public Marketplace itself is still "coming soon" on Production (`NEXT_PUBLIC_MARKETPLACE_PREVIEW` is not set there), so a Production video could only be exercised by sellers and Admins, not by the public, until the Marketplace is opened.
 
+6. **Buyer (public) playback is NOT implemented.** `public.media_edge_video` (`20261123160002_marketplace_product_video.sql`) lets a Marketplace video play only for the seller's video managers and for `marketplace_media.moderate` reviewers; anonymous playback exists only for public portfolio videos, and an approved review grants buyers nothing. Showing product videos to buyers needs a separate change first (new migration for the authorization, public page UI, tests, security review). Without it, this plan can only deliver seller and Admin playback.
+
 ## 3. Proposed order
 
 **Stage A: Acceptance (nothing on Production).**
 1. Provision the transcode host for Acceptance and the Acceptance media Worker (`aladdin-media-edge-preview`) with `VIDEO_ROUTES="on"`.
 2. Set the Acceptance preview frontend variables (section 2, item 4) in the dashboard / a reviewed config change.
-3. Test end to end with a throwaway seller: upload in parts, transcode, Admin approve and reject, owner playback, public playback after approval, revocation (unpublish and suspend deny the next segment request), CORS from the preview origin, behaviour when the transcode host is down.
+3. Test end to end with a throwaway seller: upload in parts, transcode, Admin approve and reject, owner and reviewer playback (public playback is out of scope until item 6 of section 2 is built), confirmation that an anonymous or buyer request is refused, revocation (unpublish and suspend deny the next segment request), CORS from the preview origin, behaviour when the transcode host is down.
 4. Record the measured cost and quota effects (Workers requests: about 80 per 5-minute view, ADR-0020 "Load note").
 
 **Stage B: Production (only after Stage A passes and the owner says GO for each step).**
@@ -35,6 +37,7 @@
 
 ## 4. Decisions the owner must make
 
+- Is buyer playback wanted? If yes, it is a prerequisite development task (section 2, item 6) before any public video.
 - Transcode host: Cloudflare Containers (evaluated, not built) or another host?
 - Per-file video limits and the 3-videos-per-product rule (already in the schema) stay as built?
 - Is Production video wanted before the public Marketplace opens (it would be usable only by sellers and Admins)?
