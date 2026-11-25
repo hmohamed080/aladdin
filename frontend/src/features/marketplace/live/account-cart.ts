@@ -34,6 +34,21 @@ export type SyncOutcome =
   | { kind: "pulled" }
   | { kind: "failed"; code: string };
 
+const lineKey = (l: StoredCartLine) => `${l.slug}\n${l.sku}`;
+
+/** What the buyer changed between `before` and `now`, applied on top of the server's answer. */
+function rebase(before: StoredCartLine[], now: StoredCartLine[], server: StoredCartLine[]): { lines: StoredCartLine[]; changed: boolean } {
+  const was = new Map(before.map((l) => [lineKey(l), l.qty]));
+  const is = new Map(now.map((l) => [lineKey(l), l]));
+  const removed = [...was.keys()].filter((k) => !is.has(k));
+  const edited = now.filter((l) => was.get(lineKey(l)) !== l.qty);
+  if (removed.length === 0 && edited.length === 0) return { lines: server, changed: false };
+  const out = new Map(server.map((l) => [lineKey(l), l]));
+  for (const k of removed) out.delete(k);
+  for (const l of edited) out.set(lineKey(l), l);
+  return { lines: [...out.values()], changed: true };
+}
+
 function safe<T>(fn: () => T, fallback: T): T {
   try {
     return fn();
@@ -63,10 +78,13 @@ export async function syncAccountCart(ownerTag: string | null, d: SyncDeps): Pro
   }
   const mirror = stored === ownerTag;
 
-  const adopt = (lines: StoredCartLine[]) => {
-    d.write(lines);
+  // `before` is the cart as it was when the request left: anything changed since then stays, and stays marked for the next push.
+  const adopt = (before: StoredCartLine[], lines: StoredCartLine[]) => {
+    const merged = rebase(before, d.read(), lines);
+    d.write(merged.lines);
     safe(() => d.storage.setItem(d.accountKey, ownerTag), undefined);
-    safe(() => d.storage.removeItem(d.dirtyKey), undefined);
+    if (merged.changed) safe(() => d.storage.setItem(d.dirtyKey, "1"), undefined);
+    else safe(() => d.storage.removeItem(d.dirtyKey), undefined);
   };
 
   if (!mirror) {
@@ -75,25 +93,28 @@ export async function syncAccountCart(ownerTag: string | null, d: SyncDeps): Pro
       key = d.newKey();
       safe(() => d.storage.setItem(MERGE_KEY_STORAGE, key as string), undefined);
     }
-    const res = await d.action({ mode: "merge", key, lines: d.read() });
+    const before = d.read();
+    const res = await d.action({ mode: "merge", key, lines: before });
     if (!res.ok) return { kind: "failed", code: res.code };
-    adopt(res.lines);
+    adopt(before, res.lines);
     safe(() => d.storage.removeItem(MERGE_KEY_STORAGE), undefined);
     return { kind: "merged", skipped: res.skipped ?? 0, ownShowroom: res.ownShowroom ?? 0 };
   }
 
   const dirty = safe(() => d.storage.getItem(d.dirtyKey), null) === "1";
   if (dirty) {
-    const res = await d.action({ mode: "replace", lines: d.read() });
+    const before = d.read();
+    const res = await d.action({ mode: "replace", lines: before });
     if (res.ok) {
-      adopt(res.lines);
+      adopt(before, res.lines);
       return { kind: "pushed" };
     }
     if (res.code !== "own_showroom" && res.code !== "invalid") return { kind: "failed", code: res.code };
     // the server refused this cart (a line of the buyer's own showroom, or malformed): the account cart wins
   }
+  const before = d.read();
   const res = await d.action({ mode: "pull" });
   if (!res.ok) return { kind: "failed", code: res.code };
-  adopt(res.lines);
+  adopt(before, res.lines);
   return { kind: "pulled" };
 }

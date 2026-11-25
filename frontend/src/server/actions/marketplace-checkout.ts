@@ -19,6 +19,8 @@ export type CheckoutResult<T> = ({ ok: true } & T) | ({ ok: false } & SellerActi
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const fail = (error: { message?: string } | null): SellerActionError => parseSellerError(error?.message);
+/** These parameters have no SQL default: an omitted key would leave PostgREST unable to find the function, so null is sent. */
+const orNull = (value: string | null | undefined) => (value || null) as unknown as string;
 
 export async function prepareCheckoutAction(input: CheckoutPrepareInput): Promise<CheckoutResult<{ prepared: CheckoutPrepared }>> {
   const lines = Array.isArray(input?.lines) ? input.lines : [];
@@ -31,10 +33,10 @@ export async function prepareCheckoutAction(input: CheckoutPrepareInput): Promis
   const { data, error } = await supabase.rpc("marketplace_checkout_prepare", {
     p_lines: lines.map((l) => ({ slug: String(l.slug), sku: String(l.sku), qty: Math.round(Number(l.qty)) })) as unknown as Json,
     p_fulfilment: input.fulfilment,
-    p_address_id: input.fulfilment === "delivery" && input.addressId ? input.addressId : undefined,
+    p_address_id: orNull(input.fulfilment === "delivery" ? input.addressId : null),
     p_delivery_speed: input.speed === "next_day" ? "next_day" : "standard",
     p_payment_method: input.payment,
-    p_session_id: input.sessionId ?? undefined,
+    p_session_id: orNull(input.sessionId),
   });
   if (error || !data) return { ok: false, ...fail(error) };
   return { ok: true, prepared: data as unknown as CheckoutPrepared };
@@ -54,7 +56,7 @@ export async function confirmCheckoutAction(
     p_session_id: sessionId,
     p_quote_hash: quoteHash,
     p_idempotency_key: idempotencyKey,
-    p_buyer_note: note.trim().slice(0, 500) || undefined,
+    p_buyer_note: orNull(note.trim().slice(0, 500)),
   });
   if (error || !data) return { ok: false, ...fail(error) };
   revalidatePath("/market/orders");

@@ -161,9 +161,9 @@
 .linkButton { padding: 0; border: 0; background: none; color: var(--lumen-ink); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 
 /* sign-in dialog (PR 11) and the merge notice */
-.modalBackdrop { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--shell-deep) 60%, transparent); }
-.modal { display: grid; gap: 12px; width: min(440px, 100%); padding: 24px; border: 1px solid var(--quartz-line); border-radius: 16px; background: var(--quartz-raised); }
+.modalBackdrop { position: fixed; inset: 0; z-index: var(--z-modal); display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--shell-deep) 60%, transparent); }
+.modal { display: grid; gap: 16px; width: min(440px, 100%); padding: 24px; border: 1px solid var(--quartz-line); border-radius: 14px; background: var(--quartz-raised); }
 .modal h2 { margin: 0; font-size: 1.25rem; color: var(--shell-deep); }
 .modal p { margin: 0; color: var(--stone); }
-.modalActions { display: grid; gap: 10px; margin-block-start: 6px; }
-.notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border: 1px solid var(--lumen); border-radius: 12px; background: color-mix(in srgb, var(--sand) 35%, var(--plaster)); font-size: .875rem; font-weight: 600; color: var(--ink); }
+.modalActions { display: grid; gap: 8px; margin-block-start: 8px; }
+.notice { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 16px; border: 1px solid var(--lumen); border-radius: 12px; background: color-mix(in srgb, var(--sand) 35%, var(--plaster)); font-size: .875rem; font-weight: 600; color: var(--ink); }
