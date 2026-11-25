@@ -18,6 +18,7 @@ import { RED_FIELD } from "./red-field";
 import {
   SELLING_UNITS,
   canOfferPublish,
+  draftBlockingIssues,
   emptyVariant,
   fromStoredValue,
   fieldsAt,
@@ -182,7 +183,9 @@ export function ProductForm({
     setAttempted(true);
     setError(null);
     setOk(null);
-    if (issues.size > 0) {
+    // A draft needs the product fields only; stock and a main image are conditions of publishing (owner decision, 2026-11-24).
+    const blocking = mode === "draft" ? draftBlockingIssues(issues) : issues;
+    if (blocking.size > 0) {
       setError(t("marketplaceSeller.form.fixRed"));
       requestAnimationFrame(() => document.querySelector("[data-invalid='true']")?.scrollIntoView({ behavior: "smooth", block: "center" }));
       return;

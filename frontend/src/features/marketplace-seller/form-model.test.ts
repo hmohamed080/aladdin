@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canOfferPublish, fromStoredValue, missingRequired, requiredIssues, toSavePayload, type ProductDraft, type ProductTypeSchema } from "./form-model";
+import { canOfferPublish, draftBlockingIssues, fromStoredValue, missingRequired, requiredIssues, toSavePayload, type ProductDraft, type ProductTypeSchema } from "./form-model";
 
 const schema: ProductTypeSchema = {
   key: "wallpaper",
@@ -88,6 +88,21 @@ describe("fromStoredValue", () => {
     expect(fromStoredValue(schema.fields[1], true)).toBe(true);
     expect(fromStoredValue(schema.fields[3], 53)).toBe("53");
     expect(fromStoredValue(undefined, null)).toBeNull();
+  });
+});
+
+describe("draftBlockingIssues (owner decision 2026-11-24: a draft needs the product fields only)", () => {
+  it("does not block a draft on missing stock or a missing main image", () => {
+    const issues = requiredIssues(draft(), schema, { storedStock: false, hasImage: false });
+    // the full list still reports both, so the page keeps them red as hints and Publish still requires them
+    expect(issues.has("stock") || issues.has("images")).toBe(true);
+    expect([...draftBlockingIssues(issues)]).toEqual([]);
+  });
+  it("still blocks a draft on every missing product field", () => {
+    const base = draft().variants[0]!;
+    const d = draft({ typeKey: "", nameAr: " ", nameEn: "", attributes: {}, lowStockThreshold: "x", variants: [{ ...base, uid: "u9", sku: "", sellingUnit: "", price: "0", initialQty: "", attributes: {} }] });
+    const blocking = draftBlockingIssues(requiredIssues(d, schema, { storedStock: false, hasImage: false }));
+    expect([...blocking].sort()).toEqual(["attr:material_wallpaper", "lowStock", "nameAr", "nameEn", "type", "v:u9:color", "v:u9:price", "v:u9:roll_width", "v:u9:sku", "v:u9:unit"].sort());
   });
 });
 

@@ -33,4 +33,11 @@ describe("notification template names", () => {
     const missing = keys.filter((k) => typeof label(messages, k) !== "string" || (label(messages, k) as string).trim() === "");
     expect(missing).toEqual([]);
   });
+
+  it.each(["en", "ar"] as const)("the per-language product name variables of the stock templates have a label in %s", (locale) => {
+    const variable = (getMessages(locale) as unknown as { notificationTemplates: { variable: Record<string, unknown> } }).notificationTemplates.variable;
+    for (const name of ["product_name", "product_name_ar", "product_name_en"]) {
+      expect(typeof variable[name] === "string" && (variable[name] as string).trim() !== "").toBe(true);
+    }
+  });
 });

@@ -41,6 +41,8 @@ a.official:hover { text-decoration: underline; }
 
 /* gallery: large preview with a vertical strip of thumbnails beside it (under it on small screens) */
 .galleryRow { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; align-items: start; }
+/* a product with one image (or none) has no thumbnail strip: without this the preview fell into the 76px strip column */
+.galleryRowSingle { grid-template-columns: minmax(0, 1fr); }
 .thumbCol { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; max-height: 520px; overflow-y: auto; scrollbar-width: thin; }
 .thumbCol button { display: block; width: 100%; padding: 0; border: 2px solid var(--quartz-line); border-radius: 8px; overflow: hidden; background: var(--quartz-raised); cursor: pointer; }
 .thumbCol button:focus-visible { outline: 2px solid var(--shell-deep); outline-offset: 2px; }
