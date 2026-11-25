@@ -12,7 +12,9 @@ const STATE_TONE: Record<ComplaintState, "warning" | "info" | "success" | "neutr
 };
 
 /** The payment-complaint queue: state tabs with counts, then one row per complaint linking to its detail page. Server-rendered. */
-export function ComplaintsQueue({ list, active, locale, t, basePath }: { list: ComplaintList; active: ComplaintState; locale: Locale; t: T; basePath: string }) {
+export function ComplaintsQueue({ list, active, locale, t, basePath, page = 1, pageSize = 50 }: { list: ComplaintList; active: ComplaintState; locale: Locale; t: T; basePath: string; page?: number; pageSize?: number }) {
+  const pageLink = (n: number) => `${basePath}?state=${active}&page=${n}`;
+  const linkClass = "text-label text-accent underline-offset-2 hover:underline";
   return (
     <div className="flex flex-col gap-md" data-testid="complaints-queue">
       <nav className="flex flex-wrap gap-sm" aria-label={t("marketplaceComplaints.title")}>
@@ -58,6 +60,12 @@ export function ComplaintsQueue({ list, active, locale, t, basePath }: { list: C
               </tbody>
         </TableScroll>
       )}
+      {page > 1 || page * pageSize < list.total ? (
+        <nav className="flex justify-between gap-sm" aria-label={t("marketplaceComplaints.pages.label")}>
+          {page > 1 ? <Link className={linkClass} href={pageLink(page - 1)}>{t("marketplaceComplaints.pages.previous")}</Link> : <span />}
+          {page * pageSize < list.total ? <Link className={linkClass} href={pageLink(page + 1)}>{t("marketplaceComplaints.pages.next")}</Link> : <span />}
+        </nav>
+      ) : null}
     </div>
   );
 }

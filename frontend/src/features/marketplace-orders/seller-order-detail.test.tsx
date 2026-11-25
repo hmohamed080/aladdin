@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n } from "@/test/render";
+import { createTranslator } from "@/lib/i18n/translate";
 import { SellerOrderDetail } from "./seller-order-detail";
 import { orderDoc } from "./order-fixtures";
 
@@ -13,7 +14,10 @@ vi.mock("@/server/actions/marketplace-order-pages", () => ({
   reasonPresetsAction: (...a: unknown[]) => presets(...a),
 }));
 vi.mock("@/server/actions/marketplace-orders", () => ({ proofImageUrlAction: vi.fn() }));
+vi.mock("@/server/actions/marketplace-complaints", () => ({ fileComplaintAction: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
 
+const COMPLAINT = createTranslator("en")("marketplaceComplaints.file.open");
 const seller = (over = {}) => orderDoc({ viewer: "seller", ...over });
 beforeEach(() => {
   action.mockReset();
@@ -27,7 +31,9 @@ describe("seller order page", () => {
     renderWithI18n(<SellerOrderDetail initial={seller({ actions: ["start_preparing", "cancel", "file_complaint", "request_return"] })} />, "en");
     expect(screen.getByRole("button", { name: "Start preparing" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel order" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /complaint|return/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /return/i })).toBeNull();
+    // the complaint form of PR 14 opens from the listed action
+    expect(screen.getByRole("button", { name: COMPLAINT })).toBeInTheDocument();
     // the removed confirm step is gone
     expect(screen.queryByText(/Confirm order|Awaiting confirmation/i)).toBeNull();
   });

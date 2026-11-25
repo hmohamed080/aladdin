@@ -8074,6 +8074,7 @@ export const ar: Messages = {
     subtitle: "شكاوى حول إيصال تحويل أبلغ المعرض أن المبلغ لم يصله. اتخذ قرارًا لكل شكوى مع ملاحظة مكتوبة.",
     tabs: { open: "مفتوحة", under_review: "قيد المراجعة", resolved: "تم البتّ", dismissed: "مغلقة بدون إجراء" },
     empty: "لا توجد شكاوى في هذه القائمة.",
+    pages: { label: "صفحات الشكاوى", previous: "السابق", next: "التالي" },
     columns: { order: "الطلب", seller: "المعرض", buyer: "المشتري", total: "الإجمالي", paid: "المحوَّل", filed: "تاريخ التقديم", reason: "السبب", filedBy: "قدّمها", receipts: "الإيصالات" },
     reasons: { transfer_made: "تم التحويل", amount_mismatch: "المبلغ غير مطابق", receipt_unreadable: "الإيصال غير واضح", other: "سبب آخر" },
     filedBy: { buyer: "المشتري", seller: "المعرض" },

@@ -8310,6 +8310,7 @@ export const en = {
     subtitle: "Complaints about a transfer receipt the showroom marked as not received. Decide each one with a written note.",
     tabs: { open: "Open", under_review: "Under review", resolved: "Decided", dismissed: "Dismissed" },
     empty: "No complaints in this list.",
+    pages: { label: "Complaint pages", previous: "Previous", next: "Next" },
     columns: { order: "Order", seller: "Showroom", buyer: "Buyer", total: "Total", paid: "Transferred", filed: "Filed", reason: "Reason", filedBy: "Filed by", receipts: "Receipts" },
     reasons: { transfer_made: "The transfer was made", amount_mismatch: "The amount does not match", receipt_unreadable: "The receipt is not readable", other: "Another reason" },
     filedBy: { buyer: "Buyer", seller: "Showroom" },

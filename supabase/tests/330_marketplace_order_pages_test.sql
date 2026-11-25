@@ -227,7 +227,7 @@ select pg_temp.as_user(current_setting('t.seller'));
 select is(public.marketplace_seller_order_get_v2(current_setting('t.o_new')::uuid) ->> 'viewer', 'seller', 'E1 seller document');
 select is(public.marketplace_seller_order_get_v2(current_setting('t.o_new')::uuid) -> 'actions', '["start_preparing", "cancel"]'::jsonb, 'E2 a new order: start preparing or cancel (no confirm step)');
 select is(public.marketplace_seller_order_get_v2(current_setting('t.o_prep')::uuid) -> 'actions', '["mark_ready", "cancel", "accept_receipt", "flag_receipt_not_received"]'::jsonb, 'E3 preparing with a receipt: ready, cancel, review the receipt');
-select is(public.marketplace_seller_order_get_v2(current_setting('t.o_disp')::uuid) -> 'actions', '["cancel", "accept_receipt"]'::jsonb, 'E4 a disputed receipt freezes progress');
+select is(public.marketplace_seller_order_get_v2(current_setting('t.o_disp')::uuid) -> 'actions', '["cancel", "accept_receipt", "file_complaint"]'::jsonb, 'E4 a disputed receipt freezes progress and may be taken to the admins');
 select is(public.marketplace_seller_order_get_v2(current_setting('t.o_canc')::uuid) #>> '{cancellation,internal_note}', 'supplier delayed', 'E5 the seller reads the internal note');
 select is(public.marketplace_seller_order_get_v2(current_setting('t.o_new')::uuid) #>> '{recipient,phone}', '+201999000009', 'E6 the seller reads the recipient phone (the delivery needs it)');
 select is(jsonb_path_exists(public.marketplace_seller_order_get_v2(current_setting('t.o_new')::uuid), '$.events[*] ? (@.action == "reminder_seller_start")'), true, 'E7 the seller sees internal events');

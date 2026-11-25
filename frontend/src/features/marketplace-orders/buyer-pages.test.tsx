@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n } from "@/test/render";
+import { createTranslator } from "@/lib/i18n/translate";
 import { BuyerOrderDetail } from "./buyer-order-detail";
 import { BuyerOrdersList } from "./buyer-orders-list";
 import { InvoiceView, WaybillView } from "./print-views";
@@ -10,6 +11,7 @@ import { parseBuyerOrdersQuery } from "./order-model";
 const cancel = vi.fn();
 const presets = vi.fn();
 const sync = vi.fn();
+vi.mock("@/server/actions/marketplace-complaints", () => ({ fileComplaintAction: vi.fn() }));
 vi.mock("@/server/actions/marketplace-order-pages", () => ({
   buyerCancelOrderPageAction: (...a: unknown[]) => cancel(...a),
   reasonPresetsAction: (...a: unknown[]) => presets(...a),
@@ -98,9 +100,10 @@ describe("buyer order page", () => {
     expect(await screen.findByText("You cancelled this order.")).toBeInTheDocument();
   });
 
-  it("ignores buttons of later PRs it does not know", () => {
+  it("opens the payment complaint from its action and ignores buttons it does not know", () => {
     renderWithI18n(<BuyerOrderDetail initial={orderDoc({ actions: ["file_complaint", "request_return"] })} />, "en");
-    expect(screen.queryByRole("button", { name: /complaint|return/i })).toBeNull();
+    expect(screen.getByRole("button", { name: createTranslator("en")("marketplaceComplaints.file.open") })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /return/i })).toBeNull();
   });
 
   it("reorders through the cart merge with slug, SKU and quantity only", async () => {
