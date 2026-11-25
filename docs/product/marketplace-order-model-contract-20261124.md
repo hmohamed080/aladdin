@@ -618,16 +618,16 @@ Versions are 14-digit timestamps; a PR may use any version inside its block, in 
 
 | PR | Migration block | pgTAP block | Concurrency scripts (`supabase/tests/`) | Last permission snapshot |
 |---|---|---|---|---|
-| 12 | `20261124120001` - `20261124129999` | `300` - `329` | `marketplace_checkout_concurrency_test.sh` | named after its last migration |
+| 12 | `20261124120002` - `20261124129999` (`120001` is taken on `main`) | `300` - `329` | `marketplace_checkout_concurrency_test.sh` | named after its last migration |
 | 13 | `20261124130001` - `20261124139999` | `330` - `359` | none | same rule |
 | 14 | `20261124140001` - `20261124149999` | `360` - `389` | `marketplace_timers_concurrency_test.sh` | same rule |
 | 15 | `20261124150001` - `20261124159999` | `390` - `419` | `marketplace_returns_concurrency_test.sh` | same rule |
 
-Existing numbers for orientation: PR 8 `203`, PR 9 `220`-`222`, PR 10 `240`, PR 11 `260`. File naming follows `<number>_marketplace_<topic>_test.sql`. PR 12's first migration is `20261124120001_marketplace_checkout_order_model.sql` (its agent's choice, accepted).
+Existing numbers for orientation: PR 8 `203`, PR 9 `220`-`222`, PR 10 `240`, PR 11 `260`. File naming follows `<number>_marketplace_<topic>_test.sql`. PR 12's first migration is `20261124120002_marketplace_checkout_order_model.sql` (renumbered: `main` already owns `20261124120001`, a stock notification migration).
 
 Suggested internal split (not binding on the version digits):
 
-- **PR 12** `120001` orders/items/events/proofs/products alters + CHECK widening + backfill + new tables; further files for shared vocabularies (notification event types, preset actions + admin preset functions + seeds for `order_cancel_seller`, `order_cancel_buyer`, `payment_issue`, media function rebuild, templates 1-9), the state machine/document/actions/notify helpers, the checkout RPCs, the wrappers, grants and the purge function.
+- **PR 12** `120002` orders/items/events/proofs/products alters + CHECK widening + backfill + new tables; further files for shared vocabularies (notification event types, preset actions + admin preset functions + seeds for `order_cancel_seller`, `order_cancel_buyer`, `payment_issue`, media function rebuild, templates 1-9), the state machine/document/actions/notify helpers, the checkout RPCs, the wrappers, grants and the purge function.
 - **PR 13** `130001` invoices + sequence; `130002` read RPCs v2, waybill, shipment update; document rebuild.
 - **PR 14** `140001` permission + complaints tables; `140002` timer runner, handlers, stock alert hook body, notify rebuild; `140003` complaint and admin RPCs, templates 10-16; document/actions rebuild.
 - **PR 15** `150001` permission + returns tables + return settings; `150002` return RPCs, hooks, templates 17-22, `return_reason`/`return_reject` seed rows; `150003` order document/actions/notify rebuild.
@@ -683,4 +683,5 @@ Deviations the PR 12 agent reported while building; they refine, not replace, th
 - The `return_refund_due` timer carries the 5-day reminder offset (as in section 5.2).
 - **Media rules PR 15 must keep when it rebuilds `can_upload` / `can_delete` (and any later media change):** (1) `app.marketplace_media_metadata` returns `organization = null` for buyer receipts, so the per-organization upload rate and quota in `media_storage_reserve` is never charged to the seller organization; (2) `public.organization_media_resolve` is redefined by PR 12: a marketplace key whose metadata has no organization skips the organization liveness check; (3) `app.marketplace_media_can_read`: the order-manager branch requires the seller organization to be live (`deleted_at is null`), so members of a soft-deleted showroom cannot read receipts; the buyer branch is unchanged. PR 12's pgTAP 300 asserts these (D9b, D9c, I10a-d).
 - `marketplace_checkout_prepare` additionally returns `receipts`: the session's confirmed receipts `[ {id, status, created_at} ]` (additive; no signature change), so the page can show attached receipts after a reload.
+- **Renumbering:** `main` already owns `20261124120001` (stock notify), so PR 12's first migration is `20261124120002_marketplace_checkout_order_model.sql` and its permission snapshot is `supabase/permissions/20261124120002.json`. PR 13-15 blocks are unchanged.
 
