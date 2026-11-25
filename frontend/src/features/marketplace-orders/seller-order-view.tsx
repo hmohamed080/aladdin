@@ -217,6 +217,9 @@ export function SellerOrderView({ initial }: { initial: OrderDocument }) {
               <Textarea rows={2} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} />
             </label>
           ) : null}
+          {isV2Order(order) && ["instapay_full", "instapay_deposit"].includes(order.payment_method) && order.payment_status === "receipt_submitted" && ["preparing", "ready"].includes(order.status) ? (
+            <p role="status" className="mt-md rounded-sm border border-warning/40 bg-warning/10 p-sm text-label">{k("confirmBeforeShipping")}</p>
+          ) : null}
           <div className="mt-md flex flex-col gap-sm">
             {actions.map((a) => (
               <Button key={a} variant={a === "cancel" || a === "fail" || a === "mark_delivery_failed" || a === "flag_receipt_not_received" ? "outline" : "accent"} disabled={busy} aria-busy={busy} onClick={() => run(a)}>
