@@ -1,6 +1,6 @@
 {
- "version": "20261124100001",
- "source": "Exact function permission contract after 20261124100001_marketplace_buyer_addresses.sql: main contract 20261124090001 plus the PR 10 buyer-address functions. No existing function changed.",
+ "version": "20261125090001",
+ "source": "Exact function permission contract after 20261125090001_marketplace_buyer_addresses.sql: main contract 20261124120001 plus the PR 10 buyer-address functions. No existing function changed.",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.marketplace_public_browse(text,text,text,text,integer,integer,numeric,numeric,jsonb,boolean,integer,text,text,text)",

@@ -384,7 +384,7 @@ test("prod-catchup: a push of only part of the pending list or one with an extra
 });
 test("prod-catchup: needs a restore-verified PRODUCTION snapshot; only the pinned one counts (fail closed) and an Acceptance snapshot never counts", () => {
   assert.equal(PC().freshBackup, true);
-  assert.deepEqual(PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS, { "aladdin-production-20261123T142725Z": { backupRun: "45194259216", restoreRun: "45199513364", tables: 172, rows: 32355, migrations: 210 } });
+  assert.deepEqual(PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS, { "aladdin-production-20261123T142725Z": { backupRun: "45194259216", restoreRun: "45199513364", tables: 172, rows: 32355, migrations: 210 }, "aladdin-production-20261124T133628Z": { backupRun: "45405013111", restoreRun: "45406400001", tables: 207, rows: 33001, migrations: 237 } });
   assert.ok(Object.keys(PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS).every((k) => k.startsWith("aladdin-production-")));
   assert.deepEqual(checkRecovery({ plan: "prod-catchup", label: "aladdin-production-20261123T142725Z", forwardFixSha256: allShas() }), []);
   const shas = allShas();
@@ -469,6 +469,8 @@ test("production scripts: Production only, plan prod-catchup only, hidden passwo
 // ---------------------------------------------------------------------------------------------------------------------
 // plan "marketplace-v2": 20261123090001, 100001, 120001, 130001, 150001, 160001, 160002 on top of Acceptance at 237 / 20261122090002
 // ---------------------------------------------------------------------------------------------------------------------
+const SLUG_VERSION = "20261124090001";
+const STOCK_VERSION = "20261124120001";
 const MV2 = () => PLANS["marketplace-v2"];
 const MV2_VERSIONS = ["20261123090001", "20261123100001", "20261123120001", "20261123130001", "20261123150001", "20261123160001", "20261123160002"];
 const mv2Files = () => readdirSync(here("../../supabase/migrations")).filter((f) => f.endsWith(".sql")).map((f) => f.slice(0, 14)).sort();
@@ -538,7 +540,7 @@ test("marketplace-v2 forward-fix: one transaction, every guard before the first 
 });
 test("marketplace-v2: the apply script knows the plan and runs the smoke before the push and after it; the preflight accepts the plan", () => {
   const apply = readFileSync(here("./acceptance-apply.sh"), "utf8"), pre = readFileSync(here("./acceptance-preflight.sh"), "utf8");
-  assert.match(apply, /marketplace-v2\)\$ \]\]/); assert.match(pre, /marketplace-v2\)\$ \]\]/);
+  assert.match(apply, /marketplace-v2\|marketplace-slug\)\$ \]\]/); assert.match(pre, /marketplace-v2\|marketplace-slug\)\$ \]\]/);
   const push = apply.indexOf('STEP="push"');
   assert.ok(apply.indexOf("marketplace-v2-smoke.mjs facts pre") > -1 && apply.indexOf("marketplace-v2-smoke.mjs facts pre") < push);
   assert.ok(apply.indexOf("marketplace-v2-smoke.mjs facts post") > push);
@@ -548,14 +550,14 @@ test("marketplace-v2: the apply script knows the plan and runs the smoke before 
 // plan "prod-marketplace-v2": PRODUCTION twin of marketplace-v2, 237 -> 244 on top of Production at 237 / 20261122090002 (prod-catchup applied 2026-11-23)
 // ---------------------------------------------------------------------------------------------------------------------
 const PMV2 = () => PLANS["prod-marketplace-v2"];
-test("prod-marketplace-v2: targets production, same seven versions, same measured catalog diff and recovery as marketplace-v2, pinned 237 / 20261122090002 -> 244 / 20261123160002", () => {
+test("prod-marketplace-v2 (COMBINED, owner decision 2026-11-24): targets production, the seven marketplace-v2 versions plus the slug and stock-notify migrations, 237 / 20261122090002 -> 246 / 20261124120001", () => {
   const P = PMV2(), A = MV2();
   assert.equal(P.target, "production");
-  assert.deepEqual(P.pending, MV2_VERSIONS);
+  assert.deepEqual(P.pending, [...MV2_VERSIONS, SLUG_VERSION, STOCK_VERSION]);
   assert.equal(P.applied, 237); assert.equal(P.latest, "20261122090002"); assert.equal(P.preContract, "20261122090002");
-  assert.equal(P.applied + P.pending.length, 244); assert.equal(P.postContract, "20261123160002");
-  assert.deepEqual(P.changed, A.changed, "the measured expected diff is shared, never re-typed");
-  assert.deepEqual(P.fixes, ["marketplace-v2"]); assert.equal(P.recovery, "forward-fix"); assert.equal(P.freshBackup, true);
+  assert.equal(P.applied + P.pending.length, 246); assert.equal(P.postContract, STOCK_VERSION);
+  assert.deepEqual([...P.changed].sort(), [...new Set([...A.changed, ...PLANS["marketplace-slug"].changed])].sort(), "the measured expected diffs are shared, never re-typed (app.marketplace_stock_notify is in both)");
+  assert.deepEqual(P.fixes, ["marketplace-stock-notify", "marketplace-slug", "marketplace-v2"], "recovery order: stock-notify first, then slug, then marketplace-v2"); assert.equal(P.recovery, "forward-fix"); assert.equal(P.freshBackup, true);
   assert.equal(PLANS["prod-catchup"].postContract, P.preContract, "chained: prod-catchup ends where this plan starts");
 });
 test("prod-marketplace-v2: the Acceptance gate refuses it, the Production gate refuses marketplace-v2, and a push of anything but the seven is refused", () => {
@@ -567,13 +569,14 @@ test("prod-marketplace-v2: the Acceptance gate refuses it, the Production gate r
   const at210 = { migrations: [...hist(209), { local: "20261112090001", remote: "20261112090001" }, ...PLANS["prod-catchup"].pending.map((v) => ({ local: v, remote: null })), ...P.pending.map((v) => ({ local: v, remote: null }))] };
   has(checkAcceptance({ target: "production", plan: "prod-marketplace-v2", list: at210, dry: dry([...PLANS["prod-catchup"].pending, ...P.pending]), localVersions: mv2Files() }), /applied migrations, expected 237/);
 });
-test("prod-marketplace-v2: needs a restore-verified PRODUCTION snapshot at >= 237 migrations; the pinned 210 one and every Acceptance label are refused; a future 237+ pin passes", () => {
+test("prod-marketplace-v2: needs a restore-verified PRODUCTION snapshot at >= 237 migrations; the pinned 210 one and every Acceptance label are refused; the pinned 237 snapshot (20261124T133628Z) passes", () => {
   const shas = allShas();
   has(checkRecovery({ plan: "prod-marketplace-v2", label: "", forwardFixSha256: shas }), /needs --backup-label of a fresh restore-verified snapshot \(migrations >= 237\)/);
   has(checkRecovery({ plan: "prod-marketplace-v2", label: "aladdin-production-20261123T142725Z", forwardFixSha256: shas }), /has 210 migrations; plan prod-marketplace-v2 needs one taken at 237 or later/);
   has(checkRecovery({ plan: "prod-marketplace-v2", label: "aladdin-acceptance-20261122T100424Z", forwardFixSha256: shas }), /not a pinned restore-verified PRODUCTION snapshot/);
   has(checkRecovery({ plan: "prod-marketplace-v2", label: "aladdin-production-20261123T162323Z", forwardFixSha256: shas }), /not a pinned restore-verified PRODUCTION snapshot/);
-  assert.ok(Object.values(PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS).every((s) => s.migrations < 237), "no 237+ Production snapshot is pinned in this PR: its restore test must report PASS first");
+  // 2026-11-24: the owner took and restore-tested the fresh Production snapshot (237, RESULT PASS) and it is pinned; the gate accepts exactly that label for this plan.
+  assert.deepEqual(checkRecovery({ plan: "prod-marketplace-v2", label: "aladdin-production-20261124T133628Z", forwardFixSha256: shas }), []);
   PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS["aladdin-production-20261124T000000Z"] = { backupRun: "x", restoreRun: "y", tables: 1, rows: 1, migrations: 237 };
   try { assert.deepEqual(checkRecovery({ plan: "prod-marketplace-v2", label: "aladdin-production-20261124T000000Z", forwardFixSha256: shas }), []); }
   finally { delete PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS["aladdin-production-20261124T000000Z"]; }
@@ -581,7 +584,7 @@ test("prod-marketplace-v2: needs a restore-verified PRODUCTION snapshot at >= 23
 });
 test("prod-marketplace-v2: pending set equals the migration files after 20261122090002 on this checkout (drift check passes today); both permission contracts exist", () => {
   assert.deepEqual(pendingDrift({ plan: "prod-marketplace-v2", localVersions: mv2Files().filter((v) => v <= PMV2().postContract) }), { unplanned: [], missing: [] });
-  assert.deepEqual(pendingDrift({ plan: "prod-marketplace-v2", localVersions: [...mv2Files(), "20261125090001"] }).unplanned, ["20261125090001"]);
+  assert.deepEqual(pendingDrift({ plan: "prod-marketplace-v2", localVersions: [...mv2Files().filter((v) => v <= PMV2().postContract), "20261125090001"] }).unplanned, ["20261125090001"]);
   for (const c of [PMV2().preContract, PMV2().postContract]) assert.ok(readdirSync(here("../../supabase/permissions")).includes(`${c}.json`), c);
 });
 test("production scripts: prod-marketplace-v2 runs the marketplace-v2 smoke before the push and after it; the Acceptance scripts do not know the plan", () => {
@@ -591,4 +594,127 @@ test("production scripts: prod-marketplace-v2 runs the marketplace-v2 smoke befo
   assert.ok(pre > -1 && pre < push && post > push);
   assert.ok(apply.includes('"$PLAN" = "prod-marketplace-v2"'));
   assert.ok(!/(sb|supabase)[^\n"]*--include-all|migration repair|db reset/.test(apply.replace(/^#.*$/gm, "")));
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// plan "marketplace-slug": 20261124090001 (PR #252, seller public slug) on top of Acceptance at 244 / 20261123160002; also the 8th migration of prod-marketplace-v2
+// ---------------------------------------------------------------------------------------------------------------------
+const SLUGP = () => PLANS["marketplace-slug"];
+const migDir = () => here("../../supabase/migrations");
+const slugSql = () => readFileSync(`${migDir()}/${readdirSync(migDir()).find((f) => f.startsWith(SLUG_VERSION))}`, "utf8").replace(/--.*$/gm, "");
+test("marketplace-slug: two pending (slug + stock-notify), 244 -> 246, chained after marketplace-v2, function/trigger-only so no fresh backup is required", () => {
+  const P = SLUGP();
+  assert.deepEqual(P.pending, [SLUG_VERSION, STOCK_VERSION]);
+  assert.equal(P.applied, 244); assert.equal(P.latest, MV2().postContract); assert.equal(P.preContract, MV2().postContract);
+  assert.equal(P.applied + P.pending.length, 246); assert.equal(P.postContract, STOCK_VERSION);
+  assert.equal(P.applied, MV2().applied + MV2().pending.length, "Acceptance is at the marketplace-v2 end state");
+  assert.equal(P.target, undefined, "an Acceptance plan"); assert.notEqual(P.freshBackup, true);
+  assert.deepEqual(P.fixes, ["marketplace-stock-notify", "marketplace-slug"]); assert.equal(P.recovery, "forward-fix");
+  assert.deepEqual(checkAcceptance({ plan: "marketplace-slug", list: list("marketplace-slug"), dry: dry(P.pending), localVersions: mv2Files() }), []);
+  assert.deepEqual(checkAcceptancePost({ plan: "marketplace-slug", list: { migrations: [...appliedFor(P), ...P.pending.map((v) => ({ local: v, remote: v }))] } }), []);
+  for (const v of [P.preContract, P.postContract]) assert.ok(readdirSync(here("../../supabase/permissions")).includes(`${v}.json`), v);
+});
+test("marketplace-slug: refuses the 237 state (marketplace-v2 not applied), the 245 state (already applied), the Production gate and any other pending set", () => {
+  const P = SLUGP();
+  const at237 = { migrations: [...hist(236), { local: "20261122090002", remote: "20261122090002" }, ...[...MV2().pending, SLUG_VERSION, STOCK_VERSION].map((v) => ({ local: v, remote: null }))] };
+  has(checkAcceptance({ plan: "marketplace-slug", list: at237, dry: dry([...MV2().pending, SLUG_VERSION, STOCK_VERSION]), localVersions: mv2Files() }), /applied migrations, expected 244/);
+  has(checkAcceptance({ plan: "marketplace-slug", list: { migrations: [...appliedFor(P), { local: SLUG_VERSION, remote: SLUG_VERSION }, { local: STOCK_VERSION, remote: STOCK_VERSION }] }, dry: dry([]), localVersions: mv2Files() }), /applied migrations, expected 244/);
+  has(checkAcceptance({ target: "production", plan: "marketplace-slug", list: list("marketplace-slug"), dry: dry(P.pending), localVersions: mv2Files() }), /targets acceptance, but this gate was run for production/);
+  has(checkAcceptance({ plan: "marketplace-slug", list: list("marketplace-slug", [{ local: "20261125090001", remote: null }]), dry: dry([...P.pending, "20261125090001"]), localVersions: mv2Files() }), /pending is/);
+});
+test("marketplace-slug: the expected-change list is exactly what the migration creates (2 functions, 1 trigger), derived from the SQL; the Production list is marketplace-v2 + slug", () => {
+  const P = SLUGP(), sql = slugSql();
+  const fns = [...sql.matchAll(/create\s+(?:or\s+replace\s+)?function\s+((?:public|app)\.[a-z_0-9]+)\s*\(/gi)].map((m) => m[1].toLowerCase()).sort();
+  const trg = [...sql.matchAll(/create\s+(?:or\s+replace\s+)?trigger\s+([a-z_0-9]+)\s+[\s\S]*?\son\s+(public\.[a-z_0-9]+)/gi)].map((m) => `${m[2]}.${m[1]}`.toLowerCase());
+  assert.deepEqual([...P.changed].filter((e) => e !== "app.marketplace_stock_notify").sort(), [...fns, ...trg].sort());
+  assert.deepEqual([...P.changed].sort(), [...fns, ...trg, "app.marketplace_stock_notify"].sort(), "the stock-notify migration adds exactly one changed function (replaced, same signature)");
+  assert.equal(fns.length, 2); assert.equal(trg.length, 1);
+  assert.doesNotMatch(sql, /\b(create|alter|drop)\s+(table|index|type|policy)\b|\bdrop\s+function\b/i, "no table, index, policy or enum; nothing is dropped");
+  assert.equal(new Set(PMV2().changed).size, PMV2().changed.length, "no duplicate entries in the combined list");
+  for (const e of P.changed) assert.ok(PMV2().changed.includes(e), e);
+});
+test("marketplace-slug forward-fix: pinned, one transaction, every guard RAISEs before the first drop, only IF EXISTS drops, never touches rows, documents that slugs stay and the combined order", () => {
+  const sql = readFileSync(here(FORWARD_FIX["marketplace-slug"].file), "utf8");
+  const code = sql.split("\n").filter((l) => !l.startsWith("--")).join("\n"), low = code.toLowerCase();
+  assert.match(code, /^begin;/m); assert.match(code, /commit;\s*$/);
+  assert.ok(low.lastIndexOf("raise exception") > -1 && low.lastIndexOf("raise exception") < low.indexOf("drop trigger"), "all guards precede the first drop");
+  assert.equal((code.match(/raise exception/gi) ?? []).length, 5);
+  assert.doesNotMatch(code, /drop (trigger|function)(?! if exists)/i);
+  assert.doesNotMatch(code, /\b(delete|update|insert|truncate)\b|cascade/i, "no row is touched and nothing cascades");
+  assert.deepEqual([...code.matchAll(/^drop (?:trigger|function) if exists ([a-z_.]+)/gim)].map((m) => m[1]), ["marketplace_seller_slug_assign", "app.marketplace_seller_slug_trigger", "app.marketplace_assign_org_slug"]);
+  assert.match(sql, /NOT undone, because it is data: the slugs/); assert.match(sql, /FIRST \(marketplace-slug\), THEN marketplace-v2-remove\.sql/);
+  assert.equal(createHash("sha256").update(readFileSync(here(FORWARD_FIX["marketplace-slug"].file))).digest("hex"), FORWARD_FIX["marketplace-slug"].sha256);
+});
+const stockSql = () => readFileSync(`${migDir()}/${readdirSync(migDir()).find((f) => f.startsWith(STOCK_VERSION))}`, "utf8").replace(/--.*$/gm, "");
+test("marketplace-stock-notify migration: EXPAND-only (same-signature CREATE OR REPLACE of one function, default texts only, admin columns untouched), no new permission", () => {
+  const sql = stockSql();
+  assert.deepEqual([...sql.matchAll(/create\s+or\s+replace\s+function\s+((?:public|app)\.[a-z_0-9]+)\s*\(/gi)].map((m) => m[1]), ["app.marketplace_stock_notify"]);
+  assert.doesNotMatch(sql, /\b(drop|create)\s+(table|index|type|policy|trigger)\b|\bdrop\s+function\b|\balter\s+table\b|\bgrant\b|\binsert\b|\bdelete\b/i);
+  const sets = [...sql.matchAll(/update public\.notification_templates set([\s\S]*?)\bwhere\b/gi)].map((m) => m[1]);
+  assert.equal(sets.length, 2);
+  for (const set of sets) assert.doesNotMatch(set, /\b(title_ar|title_en|body_ar|body_en|version|updated_by|updated_at)\b\s*=/, "admin override columns, version and updated_by are never written");
+  const pj = (v) => JSON.parse(readFileSync(here(`../../supabase/permissions/${v}.json`), "utf8"));
+  const a = pj(SLUG_VERSION), b = pj(STOCK_VERSION);
+  assert.deepEqual({ ...b, version: 0, source: "" }, { ...a, version: 0, source: "" }, "no new permission: the contract equals the previous one except version and note");
+  assert.equal(b.version, STOCK_VERSION);
+});
+test("marketplace-stock-notify forward-fix: pinned, one transaction, guard RAISEs before any change, restores the pre-plan function and default texts, never touches admin columns or version", () => {
+  const sql = readFileSync(here(FORWARD_FIX["marketplace-stock-notify"].file), "utf8");
+  const code = sql.split("\n").filter((l) => !l.startsWith("--")).join("\n"), low = code.toLowerCase();
+  assert.match(code, /^begin;/m); assert.match(code, /commit;\s*$/);
+  assert.ok(low.indexOf("raise exception") > -1 && low.indexOf("raise exception") < low.indexOf("create or replace function"), "the guard precedes the first change");
+  assert.deepEqual([...code.matchAll(/^CREATE OR REPLACE FUNCTION ([a-z_.]+)\(/gm)].map((m) => m[1]), ["app.marketplace_stock_notify"]);
+  assert.doesNotMatch(code, /\b(delete|insert|truncate|drop)\b|cascade/i);
+  for (const set of [...code.matchAll(/update public\.notification_templates set([\s\S]*?)\bwhere\b/gi)].map((m) => m[1])) assert.doesNotMatch(set, /\b(title_ar|title_en|body_ar|body_en|version|updated_by)\b\s*=/);
+  assert.match(code, /jsonb_build_object\('product_name', coalesce\(v_name_ar, v_name_en\), 'quantity', v_new,/, "the previous one-variable call is restored");
+  assert.doesNotMatch(code.slice(code.lastIndexOf("$guard$")), /product_name_(ar|en)/, "after the guard, nothing refers to the new variables");
+  assert.equal(createHash("sha256").update(readFileSync(here(FORWARD_FIX["marketplace-stock-notify"].file))).digest("hex"), FORWARD_FIX["marketplace-stock-notify"].sha256);
+});
+test("marketplace-slug: recovery needs no backup label; a pinned label is only a historical reference; a wrong forward-fix sha is refused", () => {
+  const shas = allShas();
+  assert.deepEqual(checkRecovery({ plan: "marketplace-slug", label: "", forwardFixSha256: shas }), []);
+  assert.deepEqual(checkRecovery({ plan: "marketplace-slug", label: "aladdin-acceptance-20261124T092536Z", forwardFixSha256: shas }), []);
+  has(checkRecovery({ plan: "marketplace-slug", label: "aladdin-acceptance-20261123T000000Z", forwardFixSha256: shas }), /not a pinned restore-verified snapshot/);
+  has(checkRecovery({ plan: "marketplace-slug", label: "", forwardFixSha256: { ...shas, "marketplace-slug": "0".repeat(64) } }), /sha256/);
+  has(checkRecovery({ plan: "marketplace-slug", label: "", forwardFixSha256: { ...shas, "marketplace-stock-notify": "0".repeat(64) } }), /marketplace-stock-notify-restore-previous\.sql/);
+});
+test("prod-marketplace-v2 recovery needs BOTH forward-fixes (slug and marketplace-v2): a wrong sha of either is refused", () => {
+  const shas = allShas(), label = "aladdin-production-20261124T000000Z";
+  PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS[label] = { backupRun: "x", restoreRun: "y", tables: 1, rows: 1, migrations: 237 };
+  try {
+    assert.deepEqual(checkRecovery({ plan: "prod-marketplace-v2", label, forwardFixSha256: shas }), []);
+    has(checkRecovery({ plan: "prod-marketplace-v2", label, forwardFixSha256: { ...shas, "marketplace-slug": "0".repeat(64) } }), /marketplace-slug-remove\.sql/);
+    has(checkRecovery({ plan: "prod-marketplace-v2", label, forwardFixSha256: { ...shas, "marketplace-v2": "0".repeat(64) } }), /marketplace-v2-remove\.sql/);
+    has(checkRecovery({ plan: "prod-marketplace-v2", label, forwardFixSha256: { ...shas, "marketplace-stock-notify": "0".repeat(64) } }), /marketplace-stock-notify-restore-previous\.sql/);
+  } finally { delete PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS[label]; }
+});
+test("drift guard: passes today on this checkout for BOTH the Acceptance plan (marketplace-slug) and the Production plan (prod-marketplace-v2), and names an unplanned later migration", () => {
+  const all = mv2Files().filter((v) => v <= STOCK_VERSION);
+  assert.ok(all.includes(SLUG_VERSION) && all.includes(STOCK_VERSION));
+  for (const name of ["marketplace-slug", "prod-marketplace-v2"]) {
+    assert.deepEqual(pendingDrift({ plan: name, localVersions: all }), { unplanned: [], missing: [] }, name);
+    assert.deepEqual(pendingDrift({ plan: name, localVersions: [...all, "20261125090001"] }).unplanned, ["20261125090001"], name);
+  }
+  assert.equal(pendingDrift({ plan: "prod-marketplace-v2", localVersions: all.filter((v) => v !== SLUG_VERSION) }).missing[0], SLUG_VERSION, "dropping the slug migration is a gap, not a pass");
+  assert.deepEqual(pendingDrift({ plan: "marketplace-v2", localVersions: all }).unplanned, [SLUG_VERSION, STOCK_VERSION], "marketplace-v2 is historical (already applied on Acceptance): the slug migration is outside it, which is why Acceptance uses marketplace-slug");
+});
+test("scripts: acceptance scripts accept marketplace-slug and run its smoke before and after the push; production scripts run both smokes and pass the 245 history; Production refuses the Acceptance plan", () => {
+  const apply = readFileSync(here("./acceptance-apply.sh"), "utf8"), pre = readFileSync(here("./acceptance-preflight.sh"), "utf8"), prod = readFileSync(here("./production-apply.sh"), "utf8");
+  assert.match(apply, /marketplace-v2\|marketplace-slug\)\$ \]\]/); assert.match(pre, /marketplace-v2\|marketplace-slug\)\$ \]\]/);
+  const push = apply.indexOf('STEP="push"');
+  assert.ok(apply.indexOf("marketplace-slug-smoke.mjs facts pre") > -1 && apply.indexOf("marketplace-slug-smoke.mjs facts pre") < push);
+  assert.ok(apply.indexOf("marketplace-slug-smoke.mjs facts post") > push);
+  const pp = prod.indexOf('STEP="push"');
+  assert.ok(prod.indexOf("marketplace-slug-smoke.mjs facts pre") > -1 && prod.indexOf("marketplace-slug-smoke.mjs facts pre") < pp && prod.indexOf("marketplace-slug-smoke.mjs facts post") > pp);
+  assert.match(prod, /marketplace-v2-smoke\.mjs facts post "\$OUT\/mv2-post\.json" --applied "\$POST_APPLIED" --latest "\$LATEST"/);
+  assert.ok(!/marketplace-slug\)\$/.test(prod), "production-apply.sh does not whitelist the Acceptance plan");
+  has(checkAcceptance({ target: "production", plan: "marketplace-slug", list: list("marketplace-slug"), dry: dry([SLUG_VERSION]), localVersions: mv2Files() }), /targets acceptance/);
+});
+test("marketplace-v2 smoke: the post judgement takes the combined Production history (246 / 20261124120001) and still defaults to 244 / 20261123160002", async () => {
+  const { judgeFacts, NEW_TABLES, MUST_EXIST, SEED } = await import("./marketplace-v2-smoke.mjs");
+  const f = { applied_migrations: 246, latest_migration: STOCK_VERSION, new_tables: [...NEW_TABLES], templates: 8, stock_templates: 2, presets: 15, preset_actions: SEED.presetActions, marketplace_open: true, marketplace_open_default: "true",
+    media_verification_ready: true, enum_has_marketplace: true, permission: 1, permission_super_admin_locked: 1, permission_other_roles: 0, marketplace_videos: 0, sellers: 1, products: 1, published_products: 0,
+    functions_present: [...MUST_EXIST], public_status: { open: true }, public_catalog_page: "object", public_facets: "object", publication_blockers_unknown_product: "array" };
+  assert.equal(judgeFacts("post", f).ok, false, "default expects 244");
+  assert.equal(judgeFacts("post", f, { applied: 246, latest: STOCK_VERSION }).ok, true);
 });

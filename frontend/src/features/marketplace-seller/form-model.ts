@@ -206,6 +206,18 @@ export function requiredIssues(draft: ProductDraft, schema: ProductTypeSchema | 
   return issues;
 }
 
+/**
+ * Conditions that only PUBLISHING needs (owner decision, 2026-11-24): a draft is saved with the product fields alone, so a
+ * seller can start a product, leave, and add the stock and photos later. They stay red on the page as hints, and Publish
+ * (and the database publication gate) still require them.
+ */
+export const PUBLICATION_ONLY_ISSUES: ReadonlySet<string> = new Set(["stock", "images"]);
+
+/** The issues that block "Save as draft": every required product field, but not stock or images. */
+export function draftBlockingIssues(issues: ReadonlySet<string>): Set<string> {
+  return new Set([...issues].filter((id) => !PUBLICATION_ONLY_ISSUES.has(id)));
+}
+
 /** The seller-level publish conditions the product page shows as required rows (they are set on the store pages). */
 export type StoreSetup = { paymentReady: boolean; deliveryReady: boolean };
 
