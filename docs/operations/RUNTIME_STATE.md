@@ -4,7 +4,7 @@ Migrations 20261124150001-150003 exist only in the branch. Nothing applied to Ac
 
 ## Marketplace checkout and order model, PR 12 (draft PR #267, not deployed) - 2026-11-24
 
-- Migration `20261124120001` exists only on the PR branch; applied nowhere hosted. Checkout v2 (`/market/checkout`, thank-you page) stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. Orders placed through it have `source = 'v2'`; older orders keep their statuses and legacy RPCs.
+- Migration `20261124120002` exists only on the PR branch; applied nowhere hosted. Checkout v2 (`/market/checkout`, thank-you page) stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. Orders placed through it have `source = 'v2'`; older orders keep their statuses and legacy RPCs.
 - Merges after #258 then #257; PR 13/14/15 build on its schema through the contract (PR #260).
 
 ## Marketplace saved addresses, PR 10 (draft PR, not deployed) - 2026-11-24
@@ -12,6 +12,7 @@ Migrations 20261124150001-150003 exist only in the branch. Nothing applied to Ac
 - Migration `20261124100001` (buyer addresses) exists only on the PR branch; applied nowhere hosted. Page `/settings/addresses` follows `NEXT_PUBLIC_MARKETPLACE_PREVIEW` and is not linked publicly; ordering stays behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`. `NEXT_PUBLIC_MAPS_PROVIDER` / `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` are unset everywhere (map provider = none). The phone verification authority is unchanged and still OFF.
 ## Marketplace cart and sign-in, PR 11 (draft PR, not deployed) - 2026-11-24
 - Branch `feat/mkt-cart-signin-20261124`: migration `20261124110001` (account cart, guest-cart merge, own-showroom rule on the cart and on `marketplace_orders`) is NOT applied to Acceptance or Production (rolled-back transactions on the local isolated stack only). Everything is behind `NEXT_PUBLIC_MARKETPLACE_ORDERING` = "true" (default off) and the Marketplace preview flag; the cart ends at a disabled "continue to checkout" until PR 12. Acceptance remains at 237 migrations, latest `20261122090002`; main's latest migration is `20261123160002`.
+
 ## Stock notification fix stacked on the gated plans (draft PR, nothing applied) - 2026-11-24
 - Migration `20261124120001_marketplace_stock_notify_localized.sql` (EXPAND-only, no new permission) is NOT applied to Acceptance or Production. `marketplace-slug` = Acceptance 244 -> 246 (2 migrations), `prod-marketplace-v2` = Production 237 -> 246 (9 migrations, post contract `20261124120001`). Undo order: marketplace-stock-notify, marketplace-slug, marketplace-v2. Apply is owner-run on an explicit GO.
 
