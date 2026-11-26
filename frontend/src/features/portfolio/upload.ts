@@ -36,10 +36,11 @@ import type { UploadTicket } from "@/server/actions/portfolio";
  * WHAT HAPPENS WHEN A STEP FAILS, which is the part that matters:
  *
  *   * start fails            nothing exists. Nothing to clean up.
- *   * upload fails           a PENDING row remains. It is invisible to the public,
- *                            cannot be published (the table refuses it), and the
- *                            owner sees an "unfinished" card with Discard.
- *   * finish fails           the same pending row, but the bytes are there too.
+ *   * upload fails           the pending row is released at once (ADR-0032), so it
+ *                            holds no slot, storage or allowance. If the release
+ *                            cannot be sent, the row stops counting after an hour.
+ *   * finish fails           a PENDING row remains, with the bytes there too. It is
+ *                            invisible to the public and cannot be published.
  *     or the response         `portfolio_item_finalize` is IDEMPOTENT, so simply
  *     is lost                 calling it again completes the upload — which is
  *                             what the retry below does, and what the card's
@@ -76,7 +77,7 @@ export async function uploadAsset(
 
   try {
     await uploadWithGrant(ticket.grant ?? { provider: "supabase", bucket: ticket.bucket,
-      key: ticket.objectPath, token: ticket.token }, file, onProgress);
+      key: ticket.objectPath, token: ticket.token }, file, { namespace, key: ticket.objectPath }, onProgress);
   } catch { return { ok: false, code: "assets.errors.uploadFailed" }; }
 
   try {

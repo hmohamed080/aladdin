@@ -1,6 +1,7 @@
 "use client";
 
 import { useI18n } from "@/lib/i18n/context";
+import { AutofillGuard } from "./autofill-guard";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input, LabeledField, Textarea } from "@/components/ui/controls";
 import { PlayIcon, RefreshIcon } from "@/components/ui/icons";
@@ -50,6 +51,7 @@ export function BackupRunDialog({
           <Input id={`backup-confirm-${kind}`} name="confirmation" dir="ltr" autoComplete="off" required placeholder="back up production" />
         </LabeledField>
       ) : null}
+      <AutofillGuard />
       <LabeledField label={t("backups.run.password")} htmlFor={`backup-password-${kind}`} hint={t("backups.run.passwordHint")}>
         <Input id={`backup-password-${kind}`} name="password" type="password" autoComplete="current-password" required />
       </LabeledField>

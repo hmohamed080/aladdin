@@ -103,7 +103,7 @@ export function AvatarField({ avatarUrl, displayName }: { avatarUrl: string | nu
       const blob = await cropToBlob(source, area);
       const ticket = await requestAvatarUploadAction(blob.type, blob.size);
       if (!ticket.ok) throw new Error(ticket.code);
-      await uploadWithGrant(ticket.grant, blob);
+      await uploadWithGrant(ticket.grant, blob, { namespace: "avatar", key: ticket.key });
       const confirmed = await confirmAvatarUploadAction(ticket.key);
       if (!confirmed.ok) throw new Error(confirmed.code);
       reset();

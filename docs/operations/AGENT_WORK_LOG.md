@@ -13,6 +13,27 @@
 - Validation: pgTAP 390 = 237/237 on a local isolated Postgres, concurrency script PASS (3 races), vitest 117 in the touched folders, eslint clean on new files, tsc clean except the pre-existing `postgres` module error in `edge/media-worker`.
 - Not done: buyer request wizard with evidence upload UI (actions exist), seller settings page, non-returnable toggle on the product edit page, navigation entries, product page disclosure badge (PR 12 exposes `non_returnable` only in quote and order), browser run, clean replay of all migrations, CI permission gate.
 
+## 2026-11-26 - Admin backups console: what the owner sees now matches what ran (draft PR, not deployed)
+
+- Scope: branch `fix/admin-backups-console-20261126`, frontend only, no migration. History link derived from the configured repository (the background reporter stores no URL); history and tiles show the claim time instead of the later verification time; checks that took no backup are hidden behind a toggle; the system reason is translated; the schedule tile shows frequency and time; the weekday shows only for weekly; saving no longer clears a running pause; password managers get their own login field; Production activation is a closed section at the bottom; includes the #242 fix (form keyed on the settings version).
+- Found on Production (read-only): every "skipped" row is a later check that found the day's backup complete; two scheduled runs on 2026-11-24 failed at "Claim run" and have no ledger row, most likely because a stuck `running` row held the one-pending slot.
+- Validation: vitest 91 passed (backups, server/backups, i18n), typecheck clean, eslint 0 errors on the changed files.
+- Not verified: no browser run; hosted untouched. The console also shows hand-started GitHub runs correctly; labelling new ones as manual comes with the database change in the stacked backup PR (aladdin#279).
+
+## 2026-11-26 - Backup ledger and freshness follow what really happens (draft PR, nothing applied or synced)
+
+- Scope: branch `fix/backups-ledger-freshness-20261126`, on top of `fix/backups-service-20261126`. Migration `20261126120001` (expand only): a run pending for more than 6 h is closed as `failed` / `stale_unverified` before the next claim or console request, so it cannot hold the one-pending slot; a later verified result replaces that mark; a run started by hand on GitHub is recorded as manual. `freshness.yml` now takes what it watches and the age limit (daily 26 h, weekly 194 h) from the Admin console through `backup-control-<label>`; `plan.sh freshness` is removed.
+- Owner request (2026-11-26): backup settings are controlled from the Admin console, and run history must match what ran.
+- Validation: pgTAP 124 on a local stack inside a rolled-back transaction 93/93 (6 failed before the migration); runtime-schedule 15 tests and workflow isolation pass (both failed first).
+- Not done: not applied to Acceptance or Production (needs a gate plan and the owner's GO); kit not synced to `aladdin-backups`; no hosted run of the new freshness workflow. Existing ledger rows keep their old labels.
+
+## 2026-11-26 - Backup runner: the Admin console is the one switch for the monthly restore test (draft PR, not synced)
+
+- Scope: branch `fix/backups-service-20261126`. `plan.sh restore` no longer needs the GitHub variable `PRODUCTION_RESTORE_SCHEDULE_ENABLED`; a scheduled restore still needs `PRODUCTION_BACKUP_ENABLED=true` and the console setting that `restore-control` reads (the restore job waits for it). The ledger report now carries the GitHub event, for a later database change that labels hand-started runs.
+- Owner request (2026-11-26): backup settings are controlled from the Admin console.
+- Validation: report-run tests OK; workflow isolation checks pass; plan tests have no new failure (18 Cairo-time cases fail on this Windows shell, which has no time zone data, on main too).
+- Not done: the kit is not synced to `aladdin-backups`, so nothing changes until the owner approves the sync. Still open: labelling hand-started runs, expiring a stuck pending run, freshness alarm following the console schedule.
+
 ## 2026-11-24 - Marketplace plan PR 14: order timers, notifications, payment complaints (code, not applied anywhere hosted)
 
 - Scope: branch `worktree-agent-a8d32205ec1779177`, PR 12's branch merged in (never edited). Migrations `20261125120001` (complaints tables + permission `marketplace_payment_complaints.review`), `20261125120002` (timer runner `public.marketplace_timers_run`, service_role only; 4 templates; return-timer hook no-op for PR 15), `20261125120003` (complaint file + 4 admin RPCs, hook bodies for PR 12's complaint hooks, 2 templates), contract `supabase/permissions/20261125120003.json`, pgTAP `360`, `marketplace_timers_concurrency_test.sh`, Worker `edge/marketplace-timers-worker` (cron every 5 min, NOT deployed, no secret set), `scripts/marketplace-timers.mjs` (manual runner, dry run by default), admin pages `/admin/marketplace/payment-complaints`, `FileComplaint` slot for PR 13, i18n en/ar.
@@ -7997,3 +8018,9 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 ## 2026-11-26 - Independent publishers can publish (migration 20261126090001, owner decision, nothing applied)
 - `app.showroom_publish_guard` asked for showroom readiness even when a product has no organization, so an independent publisher could publish nothing. It now asks only for organization products; the ownership trigger prevents omitting the organization.
 - pgTAP 400 (trigger enabled) 6/6; `publisher_concurrency_test.sh` passes and joins CI.
+
+## 2026-11-26 - A failed upload holds nothing; admin upload limits and exemptions (migration 20261126110001, nothing applied)
+- Owner decisions (ADR-0032, do NOT re-ask): allowance 50/hour (successful and in progress) plus a 150 attempts ceiling; Super Admin edits them and exempts chosen users or organizations.
+- Found: slots, storage and hourly allowance stayed consumed after failed uploads; return photos could lock an order; the media cleanup is not scheduled anywhere.
+- Done: release RPC used by the browser uploader and the server grant/verify path; one-hour database expiry; `/admin/media-limits` allowances and exemptions; guards (pgTAP 410, upload-guard.test.ts).
+- Open: scheduling `media-storage.mjs cleanup` (bytes only) needs owner approval; apply with the next hosted plan.

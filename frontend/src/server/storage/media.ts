@@ -9,6 +9,7 @@ import type { MediaNamespace, StorageProviderName } from "@/lib/storage/provider
 import { SupabaseStorageProvider } from "./supabase-provider";
 import { CloudflareR2StorageProvider } from "./r2-provider";
 import { verifyMediaBytes, withMediaProcessingSlot } from "./validation";
+import { isDecodeRefusal, isFinalRefusal } from "./content-refusal";
 import { runtimeImageProcessor } from "./image-processing/runtime";
 import { generateImageVariants, variantManifest, type VariantManifest } from "./public-image-variants";
 import type { StorageProvider } from "@/lib/storage/provider-types";
@@ -70,12 +71,36 @@ export function requireR2ForRead(namespace: MediaNamespace, provider: StoragePro
   if (isR2OnlyMedia(namespace) && provider !== "r2") throw new Error("media unavailable");
 }
 
+/** Frees a reservation that will not become a file (ADR-0032). Never throws: it must not hide the original refusal. */
+export async function releaseReservation(client: SupabaseClient, namespace: MediaNamespace, key: string): Promise<boolean> {
+  try {
+    const { data, error } = await client.rpc("media_upload_abandon", { p_namespace: namespace, p_key: key });
+    if (error) console.warn(JSON.stringify({ event: "media.release_failed", namespace }));
+    return data === true;
+  } catch {
+    console.warn(JSON.stringify({ event: "media.release_failed", namespace }));
+    return false;
+  }
+}
+
+/** Issues the upload grant. A refusal (limit, size, provider) releases the pending reservation behind the key. */
 export async function authorizeMediaUpload(client: SupabaseClient, namespace: MediaNamespace, key: string, expectedBytes?: number) {
+  try {
+    return await grantMediaUpload(client, namespace, key, expectedBytes);
+  } catch (error) {
+    await releaseReservation(client, namespace, key);
+    throw error;
+  }
+}
+
+async function grantMediaUpload(client: SupabaseClient, namespace: MediaNamespace, key: string, expectedBytes?: number) {
   const media = await resolveMedia(client, namespace, key, "upload");
   // An extra per-user brake ahead of the reservation quota (Redis, or per-instance memory when Redis is down).
   const identity = await readSessionIdentity(client);
   if (identity && (await consumeRateLimit("media-upload", identity.id)).outcome === "limited") {
-    throw new Error("upload rate limited");
+    // an account the Super Admin exempted passes this brake too; asked only when the brake would refuse
+    const { data: exempt } = await client.rpc("my_upload_exempt", { p_namespace: namespace, p_key: key });
+    if (exempt !== true) throw new Error("upload rate limited");
   }
   const env = readStorageEnv();
   // Existing R2 records remain R2 when routing is disabled. Reserve is authoritative and rejects provider changes.
@@ -144,15 +169,21 @@ export async function verifyPendingMedia(client: SupabaseClient, namespace: Medi
   const provider = await mediaProvider(pending.provider === "supabase" ? privilegedStorageClient() : client, namespace, pending.provider, key);
   requireWriteApproval(pending.provider);
   const maxBytes = await imageMaxBytes(namespace); // the stored, admin-configurable limit
-  const bytes = await provider.readObject(key, maxBytes);
-  const checked = await verifyMediaBytes(bytes, pending.contentType, maxBytes);
+  // refused content never becomes a file: free its reservation now; a failure a retry can fix keeps it
+  const releaseIf = (refused: (error: unknown) => boolean) => async (error: unknown): Promise<never> => {
+    if (refused(error)) await releaseReservation(client, namespace, key);
+    throw error;
+  };
+  const bytes = await provider.readObject(key, maxBytes).catch(releaseIf(isFinalRefusal));
+  const checked = await verifyMediaBytes(bytes, pending.contentType, maxBytes).catch(releaseIf(isDecodeRefusal));
   // On R2 the stored original is the verified upload RE-ENCODED (sRGB, bounded edge, no personal metadata).
   // Fail closed: an image whose metadata cannot be removed is refused, never stored as uploaded.
   // The legacy Supabase provider cannot replace an object (keys are immutable, commit is a no-op), so there the
   // stored bytes ARE the upload: re-encoding would make the receipt describe bytes that were never stored.
   // The receipt must always describe the stored object, so that path attests the upload as it is.
   const stored = pending.provider === "r2" && checked.contentType.startsWith("image/") && reencodesOriginal(namespace)
-    ? (await withMediaProcessingSlot(() => runtimeImageProcessor().reencodeOriginal(bytes, checked.contentType, maxBytes))).bytes
+    ? (await withMediaProcessingSlot(() => runtimeImageProcessor().reencodeOriginal(bytes, checked.contentType, maxBytes))
+        .catch(releaseIf(isFinalRefusal))).bytes
     : bytes;
   const verified = stored === bytes ? checked
     : { ...checked, size: stored.byteLength, sha256: createHash("sha256").update(stored).digest("hex") };

@@ -815,5 +815,35 @@ select is(public.marketplace_seller_product_get(current_setting('t.p1')::uuid) -
 reset role;
 select ok(pg_get_functiondef('public.marketplace_public_product(text)'::regprocedure) like '%''non_returnable'', v_p.non_returnable%', 'L10. the public read returns it');
 
+-- abandoned photos (ADR-0032): six unfinished ones older than an hour no longer hold the six waiting places
+reset role;
+update public.marketplace_return_evidence set created_at = now() - interval '3 hours' where order_id = current_setting('t.o1')::uuid;
+update public.marketplace_return_evidence set upload_state = 'deleting' where order_id = current_setting('t.o1')::uuid and return_id is null;
+insert into public.marketplace_return_evidence (order_id, object_key, mime_type, created_by, created_at)
+select current_setting('t.o1')::uuid, 'returns/' || current_setting('t.o1') || '/abandoned' || g || '.png', 'image/png',
+       current_setting('t.buyer')::uuid, now() - interval '2 hours' from generate_series(1, 6) g;
+select set_config('request.jwt.claims', json_build_object('sub', current_setting('t.buyer'), 'role', 'authenticated')::text, true);
+set local role authenticated;
+select lives_ok(format($q$select public.marketplace_buyer_return_request_upload(%L::uuid, 'image/png')$q$, current_setting('t.o1')),
+  'L11. six abandoned uploads do not block a new photo');
+reset role;
+select is((select count(*)::int from public.marketplace_return_evidence where order_id = current_setting('t.o1')::uuid
+  and object_key like '%/abandoned%' and upload_state = 'deleting'), 6, 'L12. the abandoned ones went to the cleanup queue');
+-- failed attempts do not use the hourly ten, up to thirty attempts
+insert into public.marketplace_return_evidence (order_id, object_key, mime_type, created_by, upload_state)
+select current_setting('t.o1')::uuid, 'returns/' || current_setting('t.o1') || '/failed' || g || '.png', 'image/png',
+       current_setting('t.buyer')::uuid, 'deleting' from generate_series(1, 20) g;
+set local role authenticated;
+select lives_ok(format($q$select public.marketplace_buyer_return_request_upload(%L::uuid, 'image/png')$q$, current_setting('t.o1')),
+  'L13. twenty failed uploads in the hour do not refuse the next one');
+reset role;
+insert into public.marketplace_return_evidence (order_id, object_key, mime_type, created_by, upload_state)
+select current_setting('t.o1')::uuid, 'returns/' || current_setting('t.o1') || '/failed' || g || '.png', 'image/png',
+       current_setting('t.buyer')::uuid, 'deleting' from generate_series(21, 30) g;
+set local role authenticated;
+select throws_like(format($q$select public.marketplace_buyer_return_request_upload(%L::uuid, 'image/png')$q$, current_setting('t.o1')),
+  'mp:upload_rate_limited%', 'L14. thirty attempts in the hour are the ceiling');
+reset role;
+
 select * from finish();
 rollback;
