@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { useI18n } from "@/lib/i18n/context";
+import { AutofillGuard } from "./autofill-guard";
 import { Card, SectionTitle } from "@/components/ui/primitives";
 import { Input, LabeledField, SubmitButton, Textarea } from "@/components/ui/controls";
 import { setProductionBackupActivationAction } from "@/server/actions/admin-backups";
@@ -37,6 +38,7 @@ export function BackupActivationForm({ enabled, canManage }: { enabled: boolean;
         >
           <Input id="backup-activation-confirmation" name="confirmation" dir="ltr" autoComplete="off" required placeholder={phrase} disabled={!canManage} />
         </LabeledField>
+        <AutofillGuard />
         <LabeledField label={t("backups.activation.password")} htmlFor="backup-activation-password" hint={t("backups.activation.passwordHint")}>
           <Input id="backup-activation-password" name="password" type="password" autoComplete="current-password" required disabled={!canManage} />
         </LabeledField>

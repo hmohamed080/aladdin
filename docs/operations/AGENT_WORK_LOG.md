@@ -7,6 +7,13 @@
 - Validation: pgTAP 390 = 237/237 on a local isolated Postgres, concurrency script PASS (3 races), vitest 117 in the touched folders, eslint clean on new files, tsc clean except the pre-existing `postgres` module error in `edge/media-worker`.
 - Not done: buyer request wizard with evidence upload UI (actions exist), seller settings page, non-returnable toggle on the product edit page, navigation entries, product page disclosure badge (PR 12 exposes `non_returnable` only in quote and order), browser run, clean replay of all migrations, CI permission gate.
 
+## 2026-11-26 - Admin backups console: what the owner sees now matches what ran (draft PR, not deployed)
+
+- Scope: branch `fix/admin-backups-console-20261126`, frontend only, no migration. History link derived from the configured repository (the background reporter stores no URL); history and tiles show the claim time instead of the later verification time; checks that took no backup are hidden behind a toggle; the system reason is translated; the schedule tile shows frequency and time; the weekday shows only for weekly; saving no longer clears a running pause; password managers get their own login field; Production activation is a closed section at the bottom; includes the #242 fix (form keyed on the settings version).
+- Found on Production (read-only): every "skipped" row is a later check that found the day's backup complete; two scheduled runs on 2026-11-24 failed at "Claim run" and have no ledger row, most likely because a stuck `running` row held the one-pending slot.
+- Validation: vitest 91 passed (backups, server/backups, i18n), typecheck clean, eslint 0 errors on the changed files.
+- Not verified: no browser run; hosted untouched. The console also shows hand-started GitHub runs correctly; labelling new ones as manual comes with the database change in the stacked backup PR (aladdin#279).
+
 ## 2026-11-26 - Backup ledger and freshness follow what really happens (draft PR, nothing applied or synced)
 
 - Scope: branch `fix/backups-ledger-freshness-20261126`, on top of `fix/backups-service-20261126`. Migration `20261126120001` (expand only): a run pending for more than 6 h is closed as `failed` / `stale_unverified` before the next claim or console request, so it cannot hold the one-pending slot; a later verified result replaces that mark; a run started by hand on GitHub is recorded as manual. `freshness.yml` now takes what it watches and the age limit (daily 26 h, weekly 194 h) from the Admin console through `backup-control-<label>`; `plan.sh freshness` is removed.
