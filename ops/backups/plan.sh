@@ -8,7 +8,6 @@
 #
 # Environment (repository variables in aladdin-backups, set by the owner):
 #   EVENT                       schedule | workflow_dispatch
-#   PRODUCTION_RESTORE_SCHEDULE_ENABLED  "true" only when the owner separately approves the SCHEDULED monthly Production restore
 #   INPUT_LABEL, INPUT_CONFIRM  manual runs: the chosen project, and for Production the typed confirmation
 #   PRODUCTION_BACKUP_ENABLED   "true" only after the owner's Production activation GO
 #   ACCEPTANCE_BACKUP_SCHEDULE  off (default) | daily (the Acceptance trial) | weekly (Sundays, Cairo)
@@ -30,12 +29,13 @@ case "$schedule" in off|daily|weekly) ;; *) echo "ACCEPTANCE_BACKUP_SCHEDULE mus
 production=false; [ "${PRODUCTION_BACKUP_ENABLED:-}" = true ] && production=true
 
 # Monthly restore test. A manual run is always allowed (it restores what it is asked to). A SCHEDULED run restores
-# Production, so it needs BOTH Production backups switched on AND its own switch: enabling backups alone never
-# starts a scheduled restore, whose environment and keys may not exist yet.
+# Production and needs Production backups switched on here AND the Admin console setting "monthly Production
+# restore test": restore-control reads it (runtime-schedule.py) and the restore job waits for that answer, so
+# the console is the one switch for the schedule.
 if [ "$mode" = restore ]; then
   case "${EVENT:-}" in
     workflow_dispatch) echo true ;;
-    schedule) if [ "$production" = true ] && [ "${PRODUCTION_RESTORE_SCHEDULE_ENABLED:-}" = true ]; then echo true; else echo false; fi ;;
+    schedule) if [ "$production" = true ]; then echo true; else echo false; fi ;;
     *) echo "unknown event: ${EVENT:-}" >&2; exit 1 ;;
   esac
   exit 0

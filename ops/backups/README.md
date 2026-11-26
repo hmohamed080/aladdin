@@ -21,10 +21,10 @@ Nothing in these workflows can write to a database or delete a backup. Only the 
 
 ### Which projects a run covers
 
-`plan.sh` decides; `plan-test.sh` tests it offline (86 checks, also run in the main repo's CI).
+`plan.sh` decides; `plan-test.sh` tests it offline (84 checks, also run in the main repo's CI).
 
 - **Production** is backed up only when the repository variable `PRODUCTION_BACKUP_ENABLED` is exactly `true`. A manual Production run also needs the typed confirmation `back up production`. `db-backup.sh` and `media-backup.sh` refuse a Production label without the same variable, so the gate holds even if a workflow is edited.
-- **Monthly restore test** (`plan.sh restore`): a manual run is always allowed and unchanged. A SCHEDULED run restores Production, so it needs BOTH `PRODUCTION_BACKUP_ENABLED=true` AND its own repository variable `PRODUCTION_RESTORE_SCHEDULE_ENABLED=true` (default off, exact value `true`). Enabling Production backups alone never starts it. Set the second switch only after a manual Production restore has passed and the `restore-test-production` environment and its keys exist. When it is off the run's summary says "NO RESTORE TEST RAN". The restore job itself (environment `restore-test-<label>`, read-only permission, the schema and integrity guards) is unchanged.
+- **Monthly restore test** (`plan.sh restore`): a manual run is always allowed. A SCHEDULED run restores Production and needs `PRODUCTION_BACKUP_ENABLED=true` **and** the Admin console setting "monthly Production restore test", which `restore-control` reads and the restore job waits for. The console is the switch for the schedule.
 - **Acceptance** follows `ACCEPTANCE_BACKUP_SCHEDULE`:
   - `off` (default): no scheduled runs and no freshness check;
   - `daily`: the trial; freshness allows 26 h;
