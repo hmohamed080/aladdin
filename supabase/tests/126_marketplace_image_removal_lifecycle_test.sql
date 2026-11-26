@@ -21,7 +21,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(70);
+select plan(71);
 
 update auth.users set email_confirmed_at = now()
   where id in ('70000001-0000-4000-8000-000000000001', '70000002-0000-4000-8000-000000000002',
@@ -316,7 +316,7 @@ end $$;
 select throws_like($$ select public.marketplace_seller_image_request_upload(current_setting('t.p')::uuid, 'image/png') $$,
   'mp:too_many_images%', 'H4. at most 5 live image slots per product at once');
 reset role;
--- hourly cap per organization: 200 withdrawn rows created in the last hour
+-- hourly cap per organization: withdrawn rows count only toward the attempts ceiling
 insert into public.marketplace_product_images (product_id, object_key, sort_order, is_primary, status, upload_state)
 select current_setting('t.p')::uuid, 
        current_setting('t.a') || '/bulk/' || g || '.png', 5000 + g, false, 'rejected', 'deleting'
@@ -325,8 +325,18 @@ update public.marketplace_product_images set upload_state = 'deleting', status =
   where product_id = current_setting('t.p')::uuid and upload_state = 'awaiting_upload';
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
+select lives_ok($$ select public.marketplace_seller_image_request_upload(current_setting('t.p')::uuid, 'image/png') $$,
+  'H4b. 200 failed or removed keys do not use up the hourly allowance (ADR-0032)');
+reset role;
+update public.marketplace_product_images set upload_state = 'deleting', status = 'rejected'
+  where product_id = current_setting('t.p')::uuid and upload_state = 'awaiting_upload';
+insert into public.marketplace_product_images (product_id, object_key, sort_order, is_primary, status, upload_state)
+select current_setting('t.p')::uuid, current_setting('t.a') || '/bulk/' || g || '.png', 6000 + g, false, 'rejected', 'deleting'
+from generate_series(201, 600) g;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
 select throws_like($$ select public.marketplace_seller_image_request_upload(current_setting('t.p')::uuid, 'image/png') $$,
-  'mp:upload_rate_limited%', 'H5. at most 200 new keys per organization per hour');
+  'mp:upload_rate_limited%', 'H5. at most 600 attempts per organization per hour, failed ones included');
 select throws_ok($$ select public.marketplace_seller_image_request_upload(current_setting('t.p')::uuid, 'image/png') $$, 'P0001', null,
   'H6. ...refused with a non-retryable SQLSTATE (PostgREST would retry 40001)');
 reset role;

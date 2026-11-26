@@ -7991,3 +7991,9 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 ## 2026-11-26 - Independent publishers can publish (migration 20261126090001, owner decision, nothing applied)
 - `app.showroom_publish_guard` asked for showroom readiness even when a product has no organization, so an independent publisher could publish nothing. It now asks only for organization products; the ownership trigger prevents omitting the organization.
 - pgTAP 400 (trigger enabled) 6/6; `publisher_concurrency_test.sh` passes and joins CI.
+
+## 2026-11-26 - A failed upload holds nothing; admin upload limits and exemptions (migration 20261126110001, nothing applied)
+- Owner decisions (ADR-0032, do NOT re-ask): allowance 50/hour (successful and in progress) plus a 150 attempts ceiling; Super Admin edits them and exempts chosen users or organizations.
+- Found: slots, storage and hourly allowance stayed consumed after failed uploads; return photos could lock an order; the media cleanup is not scheduled anywhere.
+- Done: release RPC used by the browser uploader and the server grant/verify path; one-hour database expiry; `/admin/media-limits` allowances and exemptions; guards (pgTAP 410, upload-guard.test.ts).
+- Open: scheduling `media-storage.mjs cleanup` (bytes only) needs owner approval; apply with the next hosted plan.

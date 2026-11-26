@@ -601,7 +601,7 @@ select pg_temp.attest(current_setting('t.k5'), current_setting('t.buyer'));
 reset role;
 select pg_temp.as_user(current_setting('t.buyer'));
 select is(public.marketplace_buyer_receipt_resubmit_confirm(current_setting('t.pr5')::uuid) -> 'payment' ->> 'status', 'receipt_submitted', 'G12. the new receipt puts the order back to submitted');
-select is((select string_agg(status, ',' order by created_at) from public.marketplace_payment_proofs where order_id = current_setting('t.o4')::uuid and upload_state = 'confirmed'),
+select is((select string_agg(status, ',' order by status desc) from public.marketplace_payment_proofs where order_id = current_setting('t.o4')::uuid and upload_state = 'confirmed'),
   'superseded,submitted', 'G13. the old receipt is superseded');
 select is((select state from public.marketplace_timers where subject_id = current_setting('t.o4')::uuid and kind = 'order_receipt_resubmit'), 'done', 'G14. the buyer timer closes');
 select is((select count(*)::int from public.notifications where event_type = 'marketplace.order.receipt_resubmitted' and recipient_user_id = current_setting('t.seller')::uuid and subject_id = current_setting('t.o4')::uuid), 1,

@@ -38,6 +38,7 @@ A one-screen index of every Architecture Decision Record — understand the deci
 | [0029](ADR-0029-business-verification-documents-on-r2.md) | Business-verification documents move to R2; Supabase Storage holds no files (amends ADR-0018) | Accepted (owner, 2026-11-23) | 2026-11-17 | Amends ADR-0018 (the bullet that kept these documents in Supabase Storage). Needs owner approval. |
 | [0030](ADR-0030-site-wide-media-upload-policy.md) | Site-wide media upload policy: per-file caps (10 MB image / 100 MB video), re-encoded originals without personal metadata, video original deleted only after verification, rejected-image purge after 2 days | Proposed | 2026-11-21 | Supersedes in part ADR-0020 Revision 2 (no video cap). |
 | [0031](ADR-0031-account-registration-verification-statuses.md) | Account, Registration and Verification are three separate statuses; two organization trust levels (Approved / Commercially verified); revocation; one account per chosen type | Accepted (staged; nothing applied hosted) | 2026-11-22 | Refines the account/organization model. Rollout steps 1-6 each need their own owner GO. |
+| [0032](ADR-0032-upload-reservations-limits-exemptions.md) | A failed upload holds nothing; hourly allowance 50 with a 150 attempts ceiling, admin settings and account exemptions | Accepted (nothing applied hosted) | 2026-11-26 | Binding for every upload place. |
 
 ## Related decision material (not ADRs)
 - [`agent-instruction-migration.md`](agent-instruction-migration.md) — source→destination map for the agent-instruction consolidation (supports ADR-0003).

@@ -16,7 +16,7 @@ export async function uploadRequestImage(itemId: string, picked: File): Promise<
   const file = prepared.file;
   const ticket = await requestRequestImageUploadAction(itemId, file.type, file.size);
   if (!ticket.ok) throw new Error(ticket.code);
-  try { await uploadWithGrant(ticket.grant, file); }
+  try { await uploadWithGrant(ticket.grant, file, { namespace: "request", key: ticket.key }); }
   catch { throw new Error("states.genericRetry"); }
   const confirmed = await confirmRequestImageUploadAction(ticket.key);
   if (!confirmed.ok) throw new Error(confirmed.code);

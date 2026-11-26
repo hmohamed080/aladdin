@@ -62,7 +62,7 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
       const ticket = await requestEvidenceUploadAction(orderId, f.type, f.size);
       if (!ticket.ok) return setError(returnErrorText(locale, ticket.code));
       try {
-        await uploadWithGrant(ticket.grant, f);
+        await uploadWithGrant(ticket.grant, f, { namespace: "marketplace", key: ticket.objectKey });
       } catch {
         return setError(returnErrorText(locale, "upload_failed"));
       }

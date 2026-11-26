@@ -91,7 +91,7 @@ export function InstallerProfileHero({
       if (blob.size > AVATAR_MAX_BYTES) throw new Error("too large");
       const ticket = isCover ? await requestCoverUploadAction(blob.type, blob.size) : await requestAvatarUploadAction(blob.type, blob.size);
       if (!ticket.ok) throw new Error(ticket.code);
-      await uploadWithGrant(ticket.grant, blob);
+      await uploadWithGrant(ticket.grant, blob, { namespace: "avatar", key: ticket.key });
       const confirmed = isCover ? await confirmCoverUploadAction(ticket.key) : await confirmAvatarUploadAction(ticket.key);
       if (!confirmed.ok) throw new Error(confirmed.code);
       close();
