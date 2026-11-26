@@ -11,6 +11,7 @@ import { LOCALE_COOKIE, directionFor, resolveLocale } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/provider";
 import { getCurrentUser } from "@/server/auth/session";
 import { loadBuyerAddresses } from "@/server/queries/marketplace-addresses";
+import { loadMyIdentity } from "@/server/queries/profile-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export default async function MarketplaceCheckoutRoute() {
   const c = buyerCopy[locale];
   const user = await getCurrentUser();
   const addressState = user ? await loadBuyerAddresses() : null;
+  const identity = user ? await loadMyIdentity() : null;
   const next = encodeURIComponent("/market/checkout");
 
   return (
@@ -39,6 +41,7 @@ export default async function MarketplaceCheckoutRoute() {
         {user ? (
           <CheckoutPage
             addresses={addressState?.addresses ?? []}
+            accountPhone={identity ? { e164: identity.phoneE164, verified: identity.phoneVerified } : null}
             userName={typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name.trim().split(/\s+/)[0]?.slice(0, 40) ?? "" : ""}
           />
         ) : (
