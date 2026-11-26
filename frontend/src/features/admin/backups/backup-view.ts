@@ -67,6 +67,13 @@ export function pauseHoursFor(choice: string, pausedUntil: string | null, now = 
   return /^\d{1,3}$/.test(choice) ? Number(choice) : -1;
 }
 
+/** Saving asks "are you sure?" only when it would stop something that runs today. */
+export function needsStopConfirmation(current: BackupSettings, next: { schedule: BackupSettings["acceptance_schedule"]; pauseChoice: string; restore: boolean }): boolean {
+  if (next.schedule === "off" && current.acceptance_schedule !== "off") return true;
+  if (next.pauseChoice !== "keep" && next.pauseChoice !== "0") return true;
+  return current.production_restore_schedule_enabled && !next.restore;
+}
+
 export const BACKUP_KINDS: readonly BackupKind[] = ["backup", "restore_test"];
 export const BACKUP_STATUSES: readonly BackupRunStatus[] = ["succeeded", "failed", "running", "requested", "dispatched", "unknown", "skipped"];
 

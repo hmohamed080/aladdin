@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BackupRun, BackupSettings } from "@/server/queries/admin-backups";
-import { historyFilterFrom, historyHref, isSystemReason, pageCount, latestRunTime, pauseHoursFor, requesterOf, runTime, runUrl, scheduleSummary } from "./backup-view";
+import { historyFilterFrom, historyHref, isSystemReason, needsStopConfirmation, pageCount, latestRunTime, pauseHoursFor, requesterOf, runTime, runUrl, scheduleSummary } from "./backup-view";
 
 const run = (over: Partial<BackupRun> = {}): BackupRun => ({
   id: "r1",
@@ -148,5 +148,21 @@ describe("history address", () => {
   });
   it("counts pages, at least one", () => {
     expect([pageCount(0, 20), pageCount(20, 20), pageCount(21, 20)]).toEqual([1, 1, 2]);
+  });
+});
+
+describe("needsStopConfirmation", () => {
+  const next = (over: Partial<Parameters<typeof needsStopConfirmation>[1]> = {}) => ({ schedule: "daily" as const, pauseChoice: "0", restore: false, ...over });
+  it("asks when something is switched off or paused", () => {
+    expect(needsStopConfirmation(settings(), next({ schedule: "off" }))).toBe(true);
+    expect(needsStopConfirmation(settings(), next({ pauseChoice: "24" }))).toBe(true);
+    expect(needsStopConfirmation(settings({ production_restore_schedule_enabled: true }), next({ restore: false }))).toBe(true);
+  });
+  it("does not ask for other changes", () => {
+    expect(needsStopConfirmation(settings({ acceptance_schedule: "off" }), next({ schedule: "off" }))).toBe(false);
+    expect(needsStopConfirmation(settings(), next({ pauseChoice: "keep" }))).toBe(false);
+    expect(needsStopConfirmation(settings(), next())).toBe(false);
+    expect(needsStopConfirmation(settings(), next({ schedule: "weekly" as never }))).toBe(false);
+    expect(needsStopConfirmation(settings(), next({ restore: true }))).toBe(false);
   });
 });

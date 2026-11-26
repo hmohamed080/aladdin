@@ -221,18 +221,6 @@ export function adminBackupSaveSchedule(a: {
   );
 }
 
-export function adminBackupActivate(a: { actor: string; enabled: boolean; confirmation: string; reason: string; receipt: string }) {
-  return whatsappOtpRpc<boolean>((c) =>
-    c.rpc("admin_backup_activate", {
-      p_actor: a.actor,
-      p_enabled: a.enabled,
-      p_confirmation: a.confirmation,
-      p_reason: a.reason,
-      p_receipt: a.receipt,
-    }),
-  );
-}
-
 export function whatsappOtpNotificationRecord(a: { eventKey: string; kind: string; sourceEnv: string; occurredAt: number; stats: Json }) {
   return whatsappOtpRpc<{ status: "recorded" | "duplicate"; recipients: number }>((c) =>
     c.rpc("whatsapp_otp_notification_record", { p_event_key: a.eventKey, p_kind: a.kind, p_source_env: a.sourceEnv, p_occurred_at: a.occurredAt, p_stats: a.stats }),

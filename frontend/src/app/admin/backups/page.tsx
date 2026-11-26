@@ -14,7 +14,7 @@ import { AdminHeader, StatTile } from "@/features/admin/parts";
 import { Card, SectionTitle, StatePanel } from "@/components/ui/primitives";
 import { BackupRunDialog, BackupRefreshButton } from "@/features/admin/backups/backup-run-dialog";
 import { BackupScheduleForm } from "@/features/admin/backups/backup-schedule-form";
-import { BackupActivationForm } from "@/features/admin/backups/backup-activation-form";
+import { BackupProductionSwitch } from "@/features/admin/backups/backup-production-switch";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +50,6 @@ export default async function AdminBackupsPage({ searchParams }: { searchParams:
   const canExecute = can(access, "backup.execute");
   const canRestore = can(access, "backup.restore_test");
   const canSchedule = can(access, "backup.schedule_manage");
-  const canActivate = can(access, "backup.schedule_manage") && environment === "production";
 
   const params = await searchParams;
   const filter = historyFilterFrom(params);
@@ -81,6 +80,8 @@ export default async function AdminBackupsPage({ searchParams }: { searchParams:
   return (
     <div className="flex flex-col gap-lg" data-testid="admin-backups">
       {header}
+
+      {environment === "production" ? <BackupProductionSwitch enabled={status.settings.production_enabled} canManage={canSchedule} /> : null}
 
       <div className="grid gap-sm sm:grid-cols-2 lg:grid-cols-4">
         <StatTile locale={locale} label={t("backups.overview.environment")} value={t(`backups.environment.${environment}`)} />
@@ -147,17 +148,6 @@ export default async function AdminBackupsPage({ searchParams }: { searchParams:
 
       <BackupHistory result={history} filter={filter} t={t} who={who} when={when} repo={repo} />
 
-      {/* The go-live master switch: used once, so it sits closed at the bottom while Production is active. */}
-      {environment === "production" ? (
-        <details open={!status.settings.production_enabled} data-testid="backup-activation-section">
-          <summary className="cursor-pointer text-label font-medium text-fg-secondary">
-            {t(status.settings.production_enabled ? "backups.activation.advancedOn" : "backups.activation.advancedOff")}
-          </summary>
-          <div className="mt-sm">
-            <BackupActivationForm enabled={status.settings.production_enabled} canManage={canActivate} />
-          </div>
-        </details>
-      ) : null}
     </div>
   );
 }

@@ -1,10 +1,17 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createTranslator } from "@/lib/i18n/translate";
 import { I18nProvider } from "@/lib/i18n/provider";
 import type { BackupSettings } from "@/server/queries/admin-backups";
 import { BackupScheduleForm } from "./backup-schedule-form";
 
-vi.mock("@/server/actions/admin-backups", () => ({ saveBackupScheduleAction: vi.fn() }));
+const save = vi.hoisted(() => vi.fn());
+vi.mock("@/server/actions/admin-backups", () => ({ saveBackupScheduleAction: save }));
+const t = createTranslator("en");
+beforeEach(() => {
+  save.mockReset();
+  save.mockResolvedValue({ ok: true, code: "backups.done.saved" });
+});
 
 const settings = (over: Partial<BackupSettings> = {}): BackupSettings => ({
   acceptance_schedule: "daily",
@@ -52,9 +59,48 @@ describe("BackupScheduleForm", () => {
     expect(field("pause_hours").value).toBe("0");
   });
 
-  it("gives a password manager its own login field instead of the confirmation phrase", () => {
+  it("asks for no password, reason or phrase", () => {
     draw(settings());
-    expect(field("username").getAttribute("autocomplete")).toBe("username");
-    expect(screen.getByPlaceholderText("change production schedule").getAttribute("autocomplete")).toBe("off");
+    expect(document.querySelectorAll('[name="password"], [name="reason"], [name="confirmation"]').length).toBe(0);
+  });
+
+  const choose = (name: string, value: string) => fireEvent.change(field(name), { target: { value } });
+  const saveButton = () => screen.getByRole("button", { name: t("backups.schedule.save") });
+
+  it("saves a time change at once", async () => {
+    draw(settings());
+    choose("schedule_time", "03:15");
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("backup-schedule-confirm-stop")).toBeNull();
+  });
+
+  it("asks before switching the schedule off, and cancelling saves nothing and keeps the choice on screen", () => {
+    draw(settings());
+    choose("acceptance_schedule", "off");
+    fireEvent.click(saveButton());
+    expect(screen.getByTestId("backup-schedule-confirm-stop")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: t("common.cancel") }));
+    expect(screen.queryByTestId("backup-schedule-confirm-stop")).toBeNull();
+    expect(field("acceptance_schedule").value).toBe("off");
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("saves once the stop is confirmed", async () => {
+    draw(settings());
+    choose("pause_hours", "24");
+    fireEvent.click(saveButton());
+    fireEvent.click(screen.getByRole("button", { name: t("backups.schedule.confirmStop") }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect((save.mock.calls[0]?.[1] as FormData).get("pause_hours")).toBe("24");
+  });
+
+  it("withdraws the question when the form changes, so the answer is about what is on screen", () => {
+    draw(settings());
+    choose("pause_hours", "24");
+    fireEvent.click(saveButton());
+    choose("pause_hours", "72");
+    expect(screen.queryByTestId("backup-schedule-confirm-stop")).toBeNull();
+    expect(save).not.toHaveBeenCalled();
   });
 });
