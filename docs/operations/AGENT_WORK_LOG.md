@@ -8022,3 +8022,8 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 ## 2026-11-26 - search_path pinned on the last nine functions (migration 20261126120002, nothing applied; first numbered 120001, taken by PR #279)
 - `set search_path = ''` on the nine `app` helpers the Supabase advisor named (same nine on Acceptance); settings only. pgTAP 420 refuses any new unpinned function.
 - Merge after 20261126110001 (PR #285). Last migration planned before the Acceptance apply plan.
+
+## 2026-11-26 - Restore test matches the hosted Auth schema again (no migration, nothing applied)
+- Acceptance restore run 45836920455 stopped at STACK MISMATCH: both hosted projects run gotrue v2.199.0; the newest CLI ships v2.198.0.
+- `restore-test.sh` pins the Auth image to v2.199.0 for its throwaway stack; the guard is unchanged.
+- Open: sync the kit to `aladdin-backups` (owner approval), then rerun the restore test.
