@@ -3120,7 +3120,7 @@ export const en = {
       triggerSchedule: "Schedule",
       triggerManual: "Manual",
       requestedBySystem: "System (schedule)",
-      systemReason: "A run that was not requested from this page", showSkipped: "Show checks that took no backup ({count})", hideSkipped: "Hide checks that took no backup",
+      systemReason: "A run that was not requested from this page", requestedByGithub: "Started on GitHub", showSkipped: "Show checks that took no backup ({count})", hideSkipped: "Hide checks that took no backup",
       skippedHint: "A skipped run is a check that found the day's backup complete, so it took none.",
       noRunRecorded: "No run id recorded",
       status: {

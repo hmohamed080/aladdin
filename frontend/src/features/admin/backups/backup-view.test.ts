@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BackupRun, BackupSettings } from "@/server/queries/admin-backups";
-import { latestRunTime, pauseHoursFor, runTime, runUrl, scheduleSummary, splitSkipped } from "./backup-view";
+import { isSystemReason, latestRunTime, pauseHoursFor, requesterOf, runTime, runUrl, scheduleSummary, splitSkipped } from "./backup-view";
 
 const run = (over: Partial<BackupRun> = {}): BackupRun => ({
   id: "r1",
@@ -115,5 +115,18 @@ describe("splitSkipped", () => {
   });
   it("shows everything on request", () => {
     expect(splitSkipped([run({ status: "skipped" })], true).shown).toHaveLength(1);
+  });
+});
+
+describe("runs nobody requested from the console", () => {
+  it("translates both reasons the database writes for them, and keeps a person's own words", () => {
+    expect(isSystemReason("Scheduled run reported by GitHub.")).toBe(true);
+    expect(isSystemReason("Run started directly on GitHub.")).toBe(true);
+    expect(isSystemReason("Backup before the release")).toBe(false);
+  });
+  it("says who started a run", () => {
+    expect(requesterOf(run({ requested_by: "u1", trigger: "manual" }))).toBe("person");
+    expect(requesterOf(run())).toBe("system");
+    expect(requesterOf(run({ trigger: "manual" }))).toBe("github");
   });
 });

@@ -6,7 +6,7 @@ import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatDateTime, formatNumber } from "@/lib/ui/format";
 import { readBackupGithubEnv } from "@/lib/env/backups";
-import { latestRunTime, runTime, runUrl, scheduleSummary, splitSkipped, SYSTEM_REPORT_REASON } from "@/features/admin/backups/backup-view";
+import { isSystemReason, latestRunTime, requesterOf, runTime, runUrl, scheduleSummary, splitSkipped } from "@/features/admin/backups/backup-view";
 import { can } from "@/lib/permissions/admin";
 import { requireAdminRoute } from "@/server/authorization/admin";
 import { reconcileBackupRuns } from "@/server/backups/reconcile";
@@ -230,6 +230,11 @@ function HistoryRow({
   repo: string;
 }) {
   const url = runUrl(run, repo);
+  const requester = {
+    person: () => who(run.requested_by),
+    system: () => t("backups.history.requestedBySystem"),
+    github: () => t("backups.history.requestedByGithub"),
+  }[requesterOf(run)]();
   return (
     <tr className="border-b last:border-b-0" data-testid="backup-run-row">
       <td className="px-3 py-2 text-fg-secondary">{when(runTime(run))}</td>
@@ -239,8 +244,8 @@ function HistoryRow({
         <Badge tone={STATUS_TONE[run.status]}>{t(`backups.history.status.${run.status}`)}</Badge>
         {run.error_code ? <span className="ms-1 text-label text-fg-muted" dir="ltr">{run.error_code}</span> : null}
       </td>
-      <td className="px-3 py-2 text-fg-secondary">{run.requested_by ? who(run.requested_by) : run.trigger === "schedule" ? t("backups.history.requestedBySystem") : "—"}</td>
-      <td className="max-w-[22rem] px-3 py-2 text-fg-secondary"><span dir="auto">{run.reason === SYSTEM_REPORT_REASON ? t("backups.history.systemReason") : run.reason}</span></td>
+      <td className="px-3 py-2 text-fg-secondary">{requester}</td>
+      <td className="max-w-[22rem] px-3 py-2 text-fg-secondary"><span dir="auto">{isSystemReason(run.reason) ? t("backups.history.systemReason") : run.reason}</span></td>
       <td className="px-3 py-2">
         {url ? (
           <a href={url} target="_blank" rel="noreferrer" className="text-accent underline underline-offset-2" dir="ltr">

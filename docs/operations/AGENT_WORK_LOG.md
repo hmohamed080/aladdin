@@ -12,7 +12,7 @@
 - Scope: branch `fix/admin-backups-console-20261126`, frontend only, no migration. History link derived from the configured repository (the background reporter stores no URL); history and tiles show the claim time instead of the later verification time; checks that took no backup are hidden behind a toggle; the system reason is translated; the schedule tile shows frequency and time; the weekday shows only for weekly; saving no longer clears a running pause; password managers get their own login field; Production activation is a closed section at the bottom; includes the #242 fix (form keyed on the settings version).
 - Found on Production (read-only): every "skipped" row is a later check that found the day's backup complete; two scheduled runs on 2026-11-24 failed at "Claim run" and have no ledger row, most likely because a stuck `running` row held the one-pending slot.
 - Validation: vitest 91 passed (backups, server/backups, i18n), typecheck clean, eslint 0 errors on the changed files.
-- Not verified: no browser run; hosted untouched. Runs started by hand on GitHub still read as automatic (needs a database change).
+- Not verified: no browser run; hosted untouched. The console also shows hand-started GitHub runs correctly; labelling new ones as manual comes with the database change in the stacked backup PR (aladdin#279).
 
 ## 2026-11-24 - Marketplace plan PR 14: order timers, notifications, payment complaints (code, not applied anywhere hosted)
 

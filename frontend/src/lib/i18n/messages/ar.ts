@@ -3006,7 +3006,7 @@ export const ar: Messages = {
       requestedBy: "مقدم الطلب", reason: "السبب", github: "تفاصيل التشغيل", kindBackup: "نسخ احتياطي", kindRestoreTest: "اختبار استعادة",
       triggerSchedule: "تلقائي", triggerManual: "يدوي",
       requestedBySystem: "النظام (جدولة)", noRunRecorded: "لم يُسجَّل رقم تشغيل",
-      systemReason: "تشغيل لم يُطلب من هذه الصفحة", showSkipped: "إظهار الفحوصات التي لم تأخذ نسخة ({count})", hideSkipped: "إخفاء الفحوصات التي لم تأخذ نسخة",
+      systemReason: "تشغيل لم يُطلب من هذه الصفحة", requestedByGithub: "من خارج الصفحة", showSkipped: "إظهار الفحوصات التي لم تأخذ نسخة ({count})", hideSkipped: "إخفاء الفحوصات التي لم تأخذ نسخة",
       skippedHint: "«تم التجاوز» فحص وجد نسخة اليوم مكتملة فلم يأخذ نسخة جديدة.",
       status: { requested: "مطلوب", dispatched: "تم الإرسال", running: "قيد التنفيذ", succeeded: "ناجح", failed: "فشل", skipped: "تم التجاوز", unknown: "غير متحقق" },
     },

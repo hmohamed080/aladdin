@@ -3,7 +3,17 @@ import type { BackupEnvironment, BackupOutcome, BackupRun, BackupSettings } from
 /** Display rules of `/admin/backups`. Pure: the database and the private runner stay authoritative. */
 
 /** What `backup_report_run` writes as the reason of a run nobody requested from the console. */
-export const SYSTEM_REPORT_REASON = "Scheduled run reported by GitHub.";
+const SYSTEM_REPORT_REASONS = ["Scheduled run reported by GitHub.", "Run started directly on GitHub."];
+
+export function isSystemReason(reason: string): boolean {
+  return SYSTEM_REPORT_REASONS.includes(reason);
+}
+
+/** A console request names its person; otherwise the schedule or someone on GitHub started the run. */
+export function requesterOf(run: Pick<BackupRun, "requested_by" | "trigger">): "person" | "system" | "github" {
+  if (run.requested_by) return "person";
+  return run.trigger === "schedule" ? "system" : "github";
+}
 
 const HOUR = 3_600_000;
 const MAX_PAUSE_HOURS = 168;
