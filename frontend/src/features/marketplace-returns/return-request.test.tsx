@@ -18,6 +18,7 @@ vi.mock("@/server/actions/marketplace-returns", () => ({
   requestEvidenceUploadAction: (...a: unknown[]) => request(...a),
   confirmEvidenceAction: (...a: unknown[]) => confirm(...a),
   saveReturnSettingsAction: (...a: unknown[]) => save(...a),
+  evidenceUrlAction: vi.fn(),
 }));
 
 const ORDER = "11111111-1111-4111-8111-111111111111";
@@ -70,6 +71,43 @@ describe("return request", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("The return period for this reason has ended.");
     expect(create.mock.calls[0]![0]).toMatchObject({ evidenceIds: ["e1"] });
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("sends only ticked photos: an earlier one stays out, and an unticked one stays unticked", async () => {
+    request.mockResolvedValueOnce({ ok: true, evidenceId: "e1", objectKey: "returns/o/e1.jpg", grant: {} });
+    request.mockResolvedValueOnce({ ok: true, evidenceId: "e2", objectKey: "returns/o/e2.jpg", grant: {} });
+    const row = (id: string) => ({ id, object_key: `returns/o/${id}.jpg`, created_at: "" });
+    confirm.mockResolvedValueOnce({ ok: true, evidence: [row("old"), row("e1")] });
+    confirm.mockResolvedValueOnce({ ok: true, evidence: [row("old"), row("e1"), row("e2")] });
+    create.mockResolvedValue({ ok: true, return: { id: "ret-2" } });
+    view();
+    fireEvent.click(screen.getByRole("radio", { name: /Defective/ }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: /Wallpaper/ }), { target: { value: "1" } });
+    const input = screen.getByTestId("return-photo-input");
+    const file = () => ({ target: { files: [new File(["x"], "a.jpg", { type: "image/jpeg" })] } });
+    fireEvent.change(input, file());
+    expect(await screen.findByText("Photos (1 of 6)")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Attach photo 1" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Attach photo 2" }));
+    expect(screen.getByText("This reason needs at least one photo.")).toBeInTheDocument();
+    fireEvent.change(input, file());
+    expect(await screen.findByRole("checkbox", { name: "Attach photo 3" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Attach photo 2" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Send the request" }));
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    expect(create.mock.calls[0]![0]).toMatchObject({ evidenceIds: ["e2"] });
+  });
+
+  it("drops a line the newly chosen reason refuses instead of blocking the request", async () => {
+    create.mockResolvedValue({ ok: true, return: { id: "ret-3" } });
+    view();
+    fireEvent.click(screen.getByRole("radio", { name: /Defective/ }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: /Curtain/ }), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("radio", { name: /Changed my mind/ }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: /Wallpaper/ }), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send the request" }));
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    expect(create.mock.calls[0]![0]).toMatchObject({ lines: [{ item_id: "i1", quantity: 1 }] });
   });
 
   it("offers only the reasons whose period is still open", () => {

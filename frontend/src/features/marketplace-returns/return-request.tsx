@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { Button, Input, LabeledField, Textarea } from "@/components/ui/controls";
+import { Button, Checkbox, Input, LabeledField, Textarea } from "@/components/ui/controls";
 import { InlineError } from "@/components/ui/primitives";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { MARKETPLACE_IMAGE_ALLOWED_TYPES } from "@/lib/storage/marketplace-images";
 import { formatEgp } from "@/lib/ui/egp-format";
-import { confirmEvidenceAction, createReturnAction, requestEvidenceUploadAction } from "@/server/actions/marketplace-returns";
+import { confirmEvidenceAction, createReturnAction, evidenceUrlAction, requestEvidenceUploadAction } from "@/server/actions/marketplace-returns";
 import { MAX_EVIDENCE, claimWindowOpen, draftProblem, lineAcceptsClaim, openReasons, type Eligibility, type ReturnKind } from "./contract";
 import { RETURN_REQUEST_COPY, returnErrorText } from "./copy";
 
@@ -32,7 +32,8 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [reasonId, setReasonId] = useState("");
   const [note, setNote] = useState("");
-  const [photos, setPhotos] = useState<string[]>([]);
+  // every confirmed photo still waiting for a request; only the ticked ones are sent
+  const [photos, setPhotos] = useState<{ id: string; key: string; include: boolean }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [pending, start] = useTransition();
@@ -44,8 +45,13 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
     : null;
   const reasons = deadlines ? openReasons(eligibility.reasons, deadlines, new Date(now)) : [];
   const reason = reasons.find((r) => r.id === reasonId) ?? null;
-  const lines = Object.entries(quantities).filter(([, q]) => q > 0).map(([item_id, quantity]) => ({ item_id, quantity }));
-  const problem = draftProblem({ lines, eligibility, reason, evidenceCount: photos.length });
+  const accepts = (l: Eligibility["lines"][number]) => (reason ? lineAcceptsClaim(l, reason.claim_type) : l.returnable_quantity > 0);
+  // a quantity typed under another reason stays out of the request while this reason refuses its line
+  const lines = eligibility.lines
+    .filter((l) => accepts(l) && (quantities[l.item_id] ?? 0) > 0)
+    .map((l) => ({ item_id: l.item_id, quantity: quantities[l.item_id]! }));
+  const evidenceIds = photos.filter((p) => p.include).map((p) => p.id);
+  const problem = draftProblem({ lines, eligibility, reason, evidenceCount: evidenceIds.length });
   const generalClosed = deadlines ? !claimWindowOpen("general", false, deadlines, new Date(now)) : false;
 
   const upload = async (f: File | undefined) => {
@@ -62,12 +68,25 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
       }
       const done = await confirmEvidenceAction(ticket.evidenceId, ticket.objectKey);
       if (!done.ok) return setError(returnErrorText(locale, done.code));
-      // the database answers every confirmed photo still waiting for a request, including one from an earlier visit
-      setPhotos(done.evidence.map((e) => e.id).slice(0, MAX_EVIDENCE));
+      // the database answers every confirmed photo still waiting, including ones from an earlier visit: those are listed
+      // but not ticked, and a photo the buyer unticked stays unticked
+      setPhotos((before) =>
+        done.evidence.map((e) => ({
+          id: e.id,
+          key: e.object_key,
+          include: before.find((p) => p.id === e.id)?.include ?? e.id === ticket.evidenceId,
+        })),
+      );
     } finally {
       setUploading(false);
       if (file.current) file.current.value = "";
     }
+  };
+
+  const view = async (objectKey: string) => {
+    const r = await evidenceUrlAction(objectKey);
+    if (r.ok) window.open(r.url, "_blank", "noopener");
+    else setError(returnErrorText(locale, r.code));
   };
 
   const submit = (e: React.FormEvent) => {
@@ -75,7 +94,7 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
     if (problem || !reason) return;
     start(async () => {
       setError(null);
-      const r = await createReturnAction({ orderId, kind, lines, reasonPresetId: reason.id, note, evidenceIds: photos, idempotencyKey: key });
+      const r = await createReturnAction({ orderId, kind, lines, reasonPresetId: reason.id, note, evidenceIds, idempotencyKey: key });
       if (!r.ok) {
         setError(returnErrorText(locale, r.code));
         return;
@@ -118,7 +137,7 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
       <div className={card} role="group" aria-label={c.items}>
         <p className="text-body font-semibold">{c.items}</p>
         {eligibility.lines.map((l) => {
-          const accepted = reason ? lineAcceptsClaim(l, reason.claim_type) : l.returnable_quantity > 0;
+          const accepted = accepts(l);
           const id = `return-qty-${l.item_id}`;
           return (
             <LabeledField
@@ -146,15 +165,22 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
         <LabeledField label={c.note} htmlFor="return-note">
           <Textarea id="return-note" maxLength={500} rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
         </LabeledField>
-        <p className="text-body font-semibold">{c.photos(photos.length, MAX_EVIDENCE)}</p>
+        <p className="text-body font-semibold">{c.photos(evidenceIds.length, MAX_EVIDENCE)}</p>
         <p className="text-caption text-fg-secondary">{c.photosHint}</p>
         <input ref={file} data-testid="return-photo-input" type="file" hidden accept={MARKETPLACE_IMAGE_ALLOWED_TYPES.join(",")} onChange={(e) => void upload(e.target.files?.[0])} />
         <div className="flex flex-wrap gap-sm">
           <Button variant="outline" size="sm" disabled={uploading || photos.length >= MAX_EVIDENCE} onClick={() => file.current?.click()}>
             {uploading ? c.uploading : c.addPhoto}
           </Button>
-          {photos.length > 0 ? <Button variant="ghost" size="sm" onClick={() => setPhotos([])}>{c.clearPhotos}</Button> : null}
         </div>
+        {photos.map((p, i) => (
+          <div key={p.id} className="flex flex-wrap items-center gap-sm">
+            <Checkbox id={`return-photo-${p.id}`} name="return-photo" checked={p.include} onChange={(v) => setPhotos((all) => all.map((x) => (x.id === p.id ? { ...x, include: v } : x)))}>
+              {c.attach(i + 1)}
+            </Checkbox>
+            <Button variant="ghost" size="sm" onClick={() => void view(p.key)}>{c.view}</Button>
+          </div>
+        ))}
       </div>
 
       {error ? <InlineError>{error}</InlineError> : null}

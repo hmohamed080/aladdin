@@ -52,7 +52,7 @@ export const RETURN_REQUEST_COPY = {
     generalClosed: "انتهت مدة الإرجاع العادية لهذا الطلب. الأسباب المعروضة فقط هي المتاحة.",
     items: "المنتجات والكمية", nonReturnable: "مصنوع حسب الطلب: يُقبل للعيوب فقط.", upTo: (n: number) => `حتى ${n}`,
     note: "ملاحظة للمعرض (اختياري)", photos: (n: number, max: number) => `الصور (${n} من ${max})`,
-    photosHint: "صور JPG أو PNG أو WebP توضّح المشكلة.", addPhoto: "إضافة صورة", uploading: "جارٍ رفع الصورة…", clearPhotos: "إزالة الصور من الطلب",
+    photosHint: "صور JPG أو PNG أو WebP توضّح المشكلة.", addPhoto: "إضافة صورة", uploading: "جارٍ رفع الصورة…", attach: (n: number) => `إرفاق الصورة ${n}`, view: "عرض",
     send: "إرسال الطلب", sending: "جارٍ الإرسال…", back: "العودة إلى الطلب",
     unavailable: "لا يمكن فتح طلب إرجاع لهذا الطلب. قد تكون المدة انتهت أو لم يعد فيه ما يُرجع.",
     problem: {
@@ -66,7 +66,7 @@ export const RETURN_REQUEST_COPY = {
     generalClosed: "The regular return period of this order has ended. Only the reasons shown are still open.",
     items: "Products and quantity", nonReturnable: "Made to order: accepted for defects only.", upTo: (n: number) => `Up to ${n}`,
     note: "Note for the showroom (optional)", photos: (n: number, max: number) => `Photos (${n} of ${max})`,
-    photosHint: "JPG, PNG or WebP photos that show the problem.", addPhoto: "Add a photo", uploading: "Uploading the photo…", clearPhotos: "Remove the photos from the request",
+    photosHint: "JPG, PNG or WebP photos that show the problem.", addPhoto: "Add a photo", uploading: "Uploading the photo…", attach: (n: number) => `Attach photo ${n}`, view: "View",
     send: "Send the request", sending: "Sending…", back: "Back to the order",
     unavailable: "A return cannot be opened for this order. The period may have ended, or nothing is left to return.",
     problem: {
