@@ -9,6 +9,7 @@ import {
   adminBackupRequest,
   adminBackupUpdateSchedule,
 } from "@/lib/supabase/admin-server";
+import { pauseHoursFor } from "@/features/admin/backups/backup-view";
 import { dispatchBackupWorkflow } from "@/server/backups/github";
 import { reconcileBackupRuns } from "@/server/backups/reconcile";
 import { loadBackupStatus, type BackupEnvironment } from "@/server/queries/admin-backups";
@@ -152,7 +153,7 @@ export async function saveBackupScheduleAction(_prev: FormState, fd: FormData): 
     actor: user.id,
     acceptanceSchedule: schedule,
     config: { time: text(fd, "schedule_time"), weekday: Number(text(fd, "schedule_weekday")),
-      pause_hours: Number(text(fd, "pause_hours")), confirmation: text(fd, "confirmation") },
+      pause_hours: pauseHoursFor(text(fd, "pause_hours"), status.settings.paused_until), confirmation: text(fd, "confirmation") },
     productionRestoreScheduleEnabled: fd.get("production_restore_schedule_enabled") === "on",
     expectedVersion: version,
     reason,

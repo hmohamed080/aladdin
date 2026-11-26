@@ -1,9 +1,12 @@
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/server/auth/session";
 import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatDateTime, formatNumber } from "@/lib/ui/format";
+import { readBackupGithubEnv } from "@/lib/env/backups";
+import { latestRunTime, runTime, runUrl, scheduleSummary, splitSkipped, SYSTEM_REPORT_REASON } from "@/features/admin/backups/backup-view";
 import { can } from "@/lib/permissions/admin";
 import { requireAdminRoute } from "@/server/authorization/admin";
 import { reconcileBackupRuns } from "@/server/backups/reconcile";
@@ -34,7 +37,7 @@ const STATUS_TONE = {
  * a best-effort settlement of in-flight GitHub runs — it never dispatches a
  * backup and never changes a setting.
  */
-export default async function AdminBackupsPage() {
+export default async function AdminBackupsPage({ searchParams }: { searchParams: Promise<{ skipped?: string }> }) {
   const access = await requireAdminRoute("/admin/backups");
   const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
   const t = createTranslator(locale);
@@ -81,12 +84,19 @@ export default async function AdminBackupsPage() {
   const when = (iso: string | null) => (iso ? formatDateTime(new Date(iso).toISOString(), locale) : "—");
   const n = (value: number) => formatNumber(value, locale);
 
-  const scheduleLabel =
-    environment === "production"
-      ? status.settings.production_enabled
-        ? t("backups.schedule.productionOn")
-        : t("backups.schedule.productionOff")
-      : t(`backups.schedule.${status.settings.acceptance_schedule}`);
+  const summary = scheduleSummary(status.settings, environment);
+  const scheduleLabel = {
+    inactive: () => t("backups.schedule.productionOff"),
+    off: () => t("backups.schedule.off"),
+    paused: () => t("backups.schedule.summaryPaused"),
+    daily: () => t("backups.schedule.summaryDaily", { time: summary.time }),
+    weekly: () => t("backups.schedule.summaryWeekly", { day: t(`backups.schedule.day${summary.weekday ?? 0}`), time: summary.time }),
+  }[summary.state]();
+
+  const repo = readBackupGithubEnv().BACKUP_GITHUB_REPO;
+  const includeSkipped = (await searchParams).skipped === "1";
+  const { shown, skippedCount } = splitSkipped(status.runs, includeSkipped);
+  const latestTime = (outcome: NonNullable<typeof status.latest.backup>) => when(latestRunTime(outcome, status.runs));
 
   return (
     <div className="flex flex-col gap-lg" data-testid="admin-backups">
@@ -97,13 +107,13 @@ export default async function AdminBackupsPage() {
         <StatTile
           locale={locale}
           label={t("backups.overview.lastBackup")}
-          value={status.latest.backup ? when(status.latest.backup.at) : t("backups.overview.never")}
-          hint={status.latest.backup?.github_run_id ? `#${n(status.latest.backup.github_run_id)}` : undefined}
+          value={status.latest.backup ? latestTime(status.latest.backup) : t("backups.overview.never")}
+          hint={status.latest.backup?.github_run_id ? `#${status.latest.backup.github_run_id}` : undefined}
         />
         <StatTile
           locale={locale}
           label={t("backups.overview.lastRestoreTest")}
-          value={status.latest.restore_test ? when(status.latest.restore_test.at) : t("backups.overview.never")}
+          value={status.latest.restore_test ? latestTime(status.latest.restore_test) : t("backups.overview.never")}
         />
         <StatTile
           locale={locale}
@@ -116,7 +126,7 @@ export default async function AdminBackupsPage() {
       {status.latest.last_failure ? (
         <StatePanel tone="danger" title={t("backups.overview.lastFailure")} body={t("backups.overview.lastFailureBody", {
             kind: t(status.latest.last_failure.kind === "restore_test" ? "backups.history.kindRestoreTest" : "backups.history.kindBackup"),
-            when: when(status.latest.last_failure.at),
+            when: latestTime(status.latest.last_failure),
             code: status.latest.last_failure.code ?? t("backups.overview.unknownCode"),
           })} />
       ) : null}
@@ -146,7 +156,7 @@ export default async function AdminBackupsPage() {
         )}
       </Card>
 
-      <BackupScheduleForm environment={environment} settings={status.settings} canManage={canSchedule} />
+      <BackupScheduleForm key={status.settings.version} environment={environment} settings={status.settings} canManage={canSchedule} />
 
       <Card>
         <SectionTitle>{t("backups.overview.coverage")}</SectionTitle>
@@ -155,11 +165,17 @@ export default async function AdminBackupsPage() {
         <p className="mt-sm text-body text-fg-secondary">{t("backups.overview.retryHint")}</p>
       </Card>
 
-      {environment === "production" ? <BackupActivationForm enabled={status.settings.production_enabled} canManage={canActivate} /> : null}
-
       <Card>
-        <SectionTitle>{t("backups.history.title")}</SectionTitle>
-        {status.runs.length === 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-sm">
+          <SectionTitle>{t("backups.history.title")}</SectionTitle>
+          {skippedCount > 0 ? (
+            <Link href={includeSkipped ? "/admin/backups" : "/admin/backups?skipped=1"} scroll={false} className="text-label text-accent underline underline-offset-2" data-testid="backup-skipped-toggle">
+              {includeSkipped ? t("backups.history.hideSkipped") : t("backups.history.showSkipped", { count: n(skippedCount) })}
+            </Link>
+          ) : null}
+        </div>
+        {skippedCount > 0 ? <p className="mt-xs text-label text-fg-muted">{t("backups.history.skippedHint")}</p> : null}
+        {shown.length === 0 ? (
           <p className="mt-md text-body text-fg-secondary">{t("backups.history.empty")}</p>
         ) : (
           <div className="mt-md">
@@ -176,14 +192,26 @@ export default async function AdminBackupsPage() {
                 </tr>
               </thead>
               <tbody>
-                {status.runs.map((run) => (
-                  <HistoryRow key={run.id} run={run} t={t} who={who} when={when} />
+                {shown.map((run) => (
+                  <HistoryRow key={run.id} run={run} t={t} who={who} when={when} repo={repo} />
                 ))}
               </tbody>
             </TableScroll>
           </div>
         )}
       </Card>
+
+      {/* The go-live master switch: used once, so it sits closed at the bottom while Production is active. */}
+      {environment === "production" ? (
+        <details open={!status.settings.production_enabled} data-testid="backup-activation-section">
+          <summary className="cursor-pointer text-label font-medium text-fg-secondary">
+            {t(status.settings.production_enabled ? "backups.activation.advancedOn" : "backups.activation.advancedOff")}
+          </summary>
+          <div className="mt-sm">
+            <BackupActivationForm enabled={status.settings.production_enabled} canManage={canActivate} />
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -193,15 +221,18 @@ function HistoryRow({
   t,
   who,
   when,
+  repo,
 }: {
   run: BackupRun;
   t: ReturnType<typeof createTranslator>;
   who: (id: string | null) => string;
   when: (iso: string | null) => string;
+  repo: string;
 }) {
+  const url = runUrl(run, repo);
   return (
     <tr className="border-b last:border-b-0" data-testid="backup-run-row">
-      <td className="px-3 py-2 text-fg-secondary">{when(run.finished_at ?? run.requested_at)}</td>
+      <td className="px-3 py-2 text-fg-secondary">{when(runTime(run))}</td>
       <td className="px-3 py-2 text-fg">{t(run.kind === "restore_test" ? "backups.history.kindRestoreTest" : "backups.history.kindBackup")}</td>
       <td className="px-3 py-2 text-fg-secondary">{t(run.trigger === "schedule" ? "backups.history.triggerSchedule" : "backups.history.triggerManual")}</td>
       <td className="px-3 py-2">
@@ -209,15 +240,12 @@ function HistoryRow({
         {run.error_code ? <span className="ms-1 text-label text-fg-muted" dir="ltr">{run.error_code}</span> : null}
       </td>
       <td className="px-3 py-2 text-fg-secondary">{run.requested_by ? who(run.requested_by) : run.trigger === "schedule" ? t("backups.history.requestedBySystem") : "—"}</td>
-      <td className="max-w-[22rem] px-3 py-2 text-fg-secondary"><span dir="auto">{run.reason}</span></td>
+      <td className="max-w-[22rem] px-3 py-2 text-fg-secondary"><span dir="auto">{run.reason === SYSTEM_REPORT_REASON ? t("backups.history.systemReason") : run.reason}</span></td>
       <td className="px-3 py-2">
-        {run.github_run_url && run.github_run_id ? (
-          <a href={run.github_run_url} target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline" dir="ltr">
+        {url ? (
+          <a href={url} target="_blank" rel="noreferrer" className="text-accent underline underline-offset-2" dir="ltr">
             #{run.github_run_id}
           </a>
-        ) : run.github_run_id ? (
-          // The scheduled-run reporter stores the id but never the URL (backup_report_run), so show the id as text.
-          <span className="text-fg-secondary" dir="ltr">#{run.github_run_id}</span>
         ) : (
           <span className="text-label text-fg-muted">{t("backups.history.noRunRecorded")}</span>
         )}

@@ -2961,8 +2961,8 @@ export const ar: Messages = {
     overview: {
       coverage: "تغطية قاعدة البيانات والملفات",
       coverageHint: "تشمل النسخة المتحققة قاعدة البيانات وكل ملف أصلي مطلوب في سجلها. تظل التغطية غير متحققة حتى نجاح النسخ. قد تكون مدة استعادة ملفات النسخ الأقدم أقصر.",
-      nextRun: "الموعد المخطط التالي: {time}",
-      retryHint: "تُفحص المهام كل 30 دقيقة. تُعاد المحاولة خلال فترة الاستحقاق، ويُوقف الطلب غير المؤكد حتى التحقق من نتيجته.",
+      nextRun: "أقرب موعد للنسخة التالية: {time}",
+      retryHint: "الموعد الذي تختاره هو أقرب وقت لبدء النسخة. خدمة النسخ تفحص المواعيد على فترات غير منتظمة وقد تتأخر عدة ساعات. الفحوصات اللاحقة في نفس اليوم لا تأخذ نسخة جديدة، وإذا فشلت النسخة تُعاد المحاولة.",
       environment: "البيئة", lastBackup: "آخر نسخة ناجحة", lastRestoreTest: "آخر اختبار استعادة ناجح",
       schedule: "الجدول", version: "إصدار الإعدادات {version}", lastFailure: "آخر إخفاق",
       lastFailureBody: "فشلت عملية {kind} في {when} ({code}). التخطيط الناجح أو التشغيل المتجاوز لا يعني نجاح النسخ.",
@@ -2990,6 +2990,7 @@ export const ar: Messages = {
       password: "كلمة المرور الحالية", passwordHint: "تأكيد لمرة واحدة تنتهي صلاحيته بعد 60 ثانية.",
       reason: "السبب", reasonHint: "10 أحرف على الأقل. يُحفظ في سجل التدقيق.",
       versionNote: "إصدار الإعدادات {version}. إذا سبقك شخص بتعديلها، أعد التحميل قبل المحاولة.",
+      keepPause: "إبقاء الإيقاف المؤقت الحالي", summaryPaused: "متوقف مؤقتًا", summaryDaily: "يومي {time}", summaryWeekly: "أسبوعي: {day} {time}",
       save: "حفظ الجدول", saving: "جارٍ الحفظ…",
     },
     activation: {
@@ -2998,12 +2999,15 @@ export const ar: Messages = {
       confirmationHint: "اكتب بالضبط: {phrase}", password: "كلمة المرور الحالية", passwordHint: "تأكيد لمرة واحدة تنتهي صلاحيته بعد 60 ثانية.",
       reason: "السبب", reasonHint: "10 أحرف على الأقل. يُحفظ في سجل التدقيق.",
       turnOn: "تفعيل نسخ الإنتاج", turnOff: "إلغاء تفعيل نسخ الإنتاج", saving: "جارٍ الحفظ…",
+      advancedOn: "إعدادات متقدمة: إلغاء تفعيل نسخ الإنتاج (يوقف النسخ التلقائي واليدوي)", advancedOff: "نسخ الإنتاج غير مفعّل",
     },
     history: {
       title: "سجل التشغيل", empty: "لا توجد عمليات مسجلة بعد.", when: "الوقت", kind: "النوع", trigger: "طريقة البدء", statusLabel: "الحالة",
       requestedBy: "مقدم الطلب", reason: "السبب", github: "تفاصيل التشغيل", kindBackup: "نسخ احتياطي", kindRestoreTest: "اختبار استعادة",
       triggerSchedule: "تلقائي", triggerManual: "يدوي",
       requestedBySystem: "النظام (جدولة)", noRunRecorded: "لم يُسجَّل رقم تشغيل",
+      systemReason: "تشغيل لم يُطلب من هذه الصفحة", showSkipped: "إظهار الفحوصات التي لم تأخذ نسخة ({count})", hideSkipped: "إخفاء الفحوصات التي لم تأخذ نسخة",
+      skippedHint: "«تم التجاوز» فحص وجد نسخة اليوم مكتملة فلم يأخذ نسخة جديدة.",
       status: { requested: "مطلوب", dispatched: "تم الإرسال", running: "قيد التنفيذ", succeeded: "ناجح", failed: "فشل", skipped: "تم التجاوز", unknown: "غير متحقق" },
     },
     errors: {

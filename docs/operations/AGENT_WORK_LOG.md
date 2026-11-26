@@ -7,6 +7,13 @@
 - Validation: pgTAP 390 = 237/237 on a local isolated Postgres, concurrency script PASS (3 races), vitest 117 in the touched folders, eslint clean on new files, tsc clean except the pre-existing `postgres` module error in `edge/media-worker`.
 - Not done: buyer request wizard with evidence upload UI (actions exist), seller settings page, non-returnable toggle on the product edit page, navigation entries, product page disclosure badge (PR 12 exposes `non_returnable` only in quote and order), browser run, clean replay of all migrations, CI permission gate.
 
+## 2026-11-26 - Admin backups console: what the owner sees now matches what ran (draft PR, not deployed)
+
+- Scope: branch `fix/admin-backups-console-20261126`, frontend only, no migration. History link derived from the configured repository (the background reporter stores no URL); history and tiles show the claim time instead of the later verification time; checks that took no backup are hidden behind a toggle; the system reason is translated; the schedule tile shows frequency and time; the weekday shows only for weekly; saving no longer clears a running pause; password managers get their own login field; Production activation is a closed section at the bottom; includes the #242 fix (form keyed on the settings version).
+- Found on Production (read-only): every "skipped" row is a later check that found the day's backup complete; two scheduled runs on 2026-11-24 failed at "Claim run" and have no ledger row, most likely because a stuck `running` row held the one-pending slot.
+- Validation: vitest 91 passed (backups, server/backups, i18n), typecheck clean, eslint 0 errors on the changed files.
+- Not verified: no browser run; hosted untouched. Runs started by hand on GitHub still read as automatic (needs a database change).
+
 ## 2026-11-24 - Marketplace plan PR 14: order timers, notifications, payment complaints (code, not applied anywhere hosted)
 
 - Scope: branch `worktree-agent-a8d32205ec1779177`, PR 12's branch merged in (never edited). Migrations `20261125120001` (complaints tables + permission `marketplace_payment_complaints.review`), `20261125120002` (timer runner `public.marketplace_timers_run`, service_role only; 4 templates; return-timer hook no-op for PR 15), `20261125120003` (complaint file + 4 admin RPCs, hook bodies for PR 12's complaint hooks, 2 templates), contract `supabase/permissions/20261125120003.json`, pgTAP `360`, `marketplace_timers_concurrency_test.sh`, Worker `edge/marketplace-timers-worker` (cron every 5 min, NOT deployed, no secret set), `scripts/marketplace-timers.mjs` (manual runner, dry run by default), admin pages `/admin/marketplace/payment-complaints`, `FileComplaint` slot for PR 13, i18n en/ar.
