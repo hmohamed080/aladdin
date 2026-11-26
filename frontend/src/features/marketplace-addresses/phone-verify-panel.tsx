@@ -16,7 +16,7 @@ type Stage = { name: "idle" } | { name: "sent"; challengeId: string } | { name: 
  * never sends the number; the server knows the account's phone. While the authority is switched off (its default) every answer is
  * "unavailable" and the panel says so plainly. A verified number flips every address that uses it, by derivation in the database.
  */
-export function PhoneVerifyPanel() {
+export function PhoneVerifyPanel({ onVerified }: { onVerified?: () => void } = {}) {
   const { t } = useI18n();
   const router = useRouter();
   const [stage, setStage] = useState<Stage>({ name: "idle" });
@@ -34,6 +34,7 @@ export function PhoneVerifyPanel() {
         setStage({ name: "done" });
         setNote(null);
         router.refresh();
+        onVerified?.();
         return;
       case "invalid":
         setNote({ tone: "error", key: "buyerAddresses.phone.wrong" });

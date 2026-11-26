@@ -9,7 +9,10 @@
 .head p { margin: 2px 0 0; color: var(--stone); }
 
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 24px; align-items: start; }
-.main { display: grid; gap: 20px; min-width: 0; }
+/* shared controls inside this fixed-light shell: their semantic tokens point at its palette (they rendered dark in dark mode) */
+.main { display: grid; gap: 20px; min-width: 0; --canvas: var(--quartz-raised); --field: var(--quartz-raised); --field-fg: var(--ink); --field-line: var(--quartz-line-strong); --field-placeholder: var(--stone);
+  --surface: var(--quartz-raised); --surface-2: var(--quartz-sunk, var(--sand)); --surface-hover: var(--sand); --fg: var(--ink); --fg-secondary: var(--stone); --fg-muted: var(--stone);
+  --border: var(--quartz-line); --border-strong: var(--quartz-line-strong); }
 .side { position: sticky; inset-block-start: 16px; display: grid; gap: 16px; }
 .card { padding: 20px; border: 1px solid var(--quartz-line); border-radius: 16px; background: var(--quartz-raised); }
 .cardTitle { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 1.125rem; color: var(--shell-deep); }
