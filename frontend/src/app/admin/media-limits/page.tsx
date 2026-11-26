@@ -9,6 +9,8 @@ import { IMAGE_PLACES, MEDIA_LIMIT_CEILING, MEDIA_LIMIT_FLOOR, VIDEO_PLACES, for
 import { AdminHeader } from "@/features/admin/parts";
 import { Card, SectionTitle, StatePanel } from "@/components/ui/primitives";
 import { MediaLimitRow } from "@/features/admin-ops/media-limit-row";
+import { UploadAllowances } from "@/features/admin-ops/upload-allowances";
+import { parseUploadLimits } from "@/lib/media/upload-allowances";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,11 @@ export default async function MediaLimitsPage() {
   const t = createTranslator(locale);
   const supabase = await getServerSupabase();
 
-  const [limits, history] = await Promise.all([supabase.rpc("media_limits_get"), supabase.rpc("admin_media_limit_events", { p_limit: 30 })]);
+  const [limits, history, allowances] = await Promise.all([
+    supabase.rpc("media_limits_get"),
+    supabase.rpc("admin_media_limit_events", { p_limit: 30 }),
+    supabase.rpc("admin_upload_limits_get"),
+  ]);
   const header = <AdminHeader locale={locale} title={t("mediaLimits.title")} subtitle={t("mediaLimits.subtitle")} />;
   if (history.error?.code === "42501") return <StatePanel tone="danger" title={t("mediaLimits.errors.forbidden")} />;
   if (limits.error || history.error) return <div className="flex flex-col gap-lg">{header}<StatePanel tone="danger" title={t("mediaLimits.errors.unavailable")} /></div>;
@@ -33,6 +39,7 @@ export default async function MediaLimitsPage() {
   const rows = parseLimitRows(limits.data);
   const events = (history.data ?? []) as EventRow[];
   const canManage = can(access, "media_limits.manage");
+  const uploadLimits = allowances.error ? null : parseUploadLimits(allowances.data);
 
   const actorIds = [...new Set(events.map((e) => e.actor_id))];
   const names = new Map<string, string>();
@@ -83,6 +90,7 @@ export default async function MediaLimitsPage() {
       {canManage ? null : <StatePanel tone="neutral" title={t("mediaLimits.viewOnly")} />}
       {section("image", IMAGE_PLACES, t("mediaLimits.imagesTitle"))}
       {section("video", VIDEO_PLACES, t("mediaLimits.videosTitle"))}
+      {uploadLimits ? <UploadAllowances data={uploadLimits} canManage={canManage} /> : <StatePanel tone="danger" title={t("mediaLimits.errors.unavailable")} />}
       <ul className="list-disc ps-lg text-label text-fg-muted">
         <li>{t("mediaLimits.notes.ceiling")}</li>
         <li>{t("mediaLimits.notes.existing")}</li>

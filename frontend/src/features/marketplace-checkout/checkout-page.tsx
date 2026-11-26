@@ -103,7 +103,7 @@ export function CheckoutPage({ addresses, userName, accountPhone }: { addresses:
       const ticket = await requestReceiptUploadAction(prepared.session_id, f.type, f.size);
       if (!ticket.ok) return setProblem(checkoutError(locale, ticket.code));
       try {
-        await uploadWithGrant(ticket.grant, f);
+        await uploadWithGrant(ticket.grant, f, { namespace: "marketplace", key: ticket.objectKey });
       } catch {
         return setProblem(checkoutError(locale, "upload_failed"));
       }

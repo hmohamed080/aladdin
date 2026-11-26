@@ -10291,6 +10291,17 @@ export type Database = {
         Args: { p_assignment_id: string; p_reason?: string }
         Returns: undefined
       }
+      admin_upload_exemption_add: { Args: { p_reason: string; p_subject_id: string; p_subject_type: string }; Returns: Json }
+      admin_upload_exemption_remove: { Args: { p_id: string; p_reason: string }; Returns: Json }
+      admin_upload_limits_get: { Args: never; Returns: Json }
+      admin_upload_limits_set: {
+        Args: { p_hourly_attempts: number; p_hourly_uploads: number; p_reason: string; p_storage_quota_mb: number }
+        Returns: Json
+      }
+      admin_upload_subject_search: {
+        Args: { p_query: string }
+        Returns: { detail: string; label: string; subject_id: string; subject_type: string }[]
+      }
       admin_subject_suspension: {
         Args: { p_subject_id: string; p_subject_type: string }
         Returns: Json
@@ -11779,6 +11790,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      media_upload_abandon: {
+        Args: { p_key: string; p_namespace: string }
+        Returns: boolean
+      }
       media_storage_reserve: {
         Args: {
           p_key: string
@@ -11931,6 +11946,7 @@ export type Database = {
           status: Database["public"]["Enums"]["referral_status"]
         }[]
       }
+      my_upload_exempt: { Args: { p_key: string; p_namespace: string }; Returns: boolean }
       my_work_companies: {
         Args: never
         Returns: {
