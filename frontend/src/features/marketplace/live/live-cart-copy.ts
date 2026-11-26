@@ -7,7 +7,6 @@ import type { Locale } from "../marketplace-types";
 type LiveCartCopy = {
   subtitle: string;
   /** the trust strip (title, detail) — worded for what the platform really does */
-  perks: [string, string][];
   checkoutSoon: string;
   soon: string;
   checkoutSoonNote: string;
@@ -33,7 +32,6 @@ type LiveCartCopy = {
   viewCart: string;
   /** PR 11: continue to checkout, sign-in modal, blocking lines, merge notice */
   continueToCheckout: string;
-  checkoutOpensSoon: string;
   blockedLines: string;
   signInTitle: string;
   signInText: string;
@@ -48,12 +46,6 @@ type LiveCartCopy = {
 export const liveCartCopy = {
   ar: {
     subtitle: "راجع منتجاتك قبل إتمام الطلب",
-    perks: [
-      ["توصيل حسب منطقتك", "كل معرض يحدد سعر التوصيل"],
-      ["منتجات من معارض متعددة", "على علاء الدين"],
-      ["معارض معتمدة", "تتم مراجعة المعرض قبل النشر"],
-      ["مساعدة في الاختيار", "تواصل معنا لأي استفسار"],
-    ],
     checkoutSoon: "إتمام الطلب",
     soon: "قريبًا",
     checkoutSoonNote: "إتمام الطلب والدفع الإلكتروني سيتوفران قريبًا. تواصل مع المعرض لطلب المنتجات الآن.",
@@ -78,7 +70,6 @@ export const liveCartCopy = {
     addedToCart: "تمت الإضافة إلى السلة",
     viewCart: "عرض السلة",
     continueToCheckout: "متابعة إلى إتمام الطلب",
-    checkoutOpensSoon: "إتمام الطلب سيتوفر قريبًا. سلتك محفوظة في حسابك.",
     blockedLines: "أزل المنتجات المعلّمة (غير المتوفرة) لتتمكن من المتابعة.",
     signInTitle: "سجّل الدخول لمتابعة طلبك",
     signInText: "سلتك محفوظة على جهازك وستنتقل معك إلى حسابك بعد تسجيل الدخول، وتعود إلى هذه الصفحة نفسها.",
@@ -94,12 +85,6 @@ export const liveCartCopy = {
   },
   en: {
     subtitle: "Review your products before placing the order",
-    perks: [
-      ["Delivery by your area", "Each showroom sets its delivery price"],
-      ["Products from many showrooms", "All on Aladdin"],
-      ["Approved showrooms", "Every showroom is reviewed before it sells"],
-      ["Help choosing", "Contact us with any question"],
-    ],
     checkoutSoon: "Place order",
     soon: "Coming soon",
     checkoutSoonNote: "Placing the order and paying online are coming soon. Contact the showroom to order these products now.",
@@ -124,7 +109,6 @@ export const liveCartCopy = {
     addedToCart: "Added to cart",
     viewCart: "View cart",
     continueToCheckout: "Continue to checkout",
-    checkoutOpensSoon: "Checkout opens soon. Your cart is saved in your account.",
     blockedLines: "Remove the marked (unavailable) items to continue.",
     signInTitle: "Sign in to continue your order",
     signInText: "Your cart is saved on this device. It moves into your account when you sign in, and you come back to this same page.",
