@@ -55,7 +55,7 @@ for path in sorted(WF.glob("*.yml")):
         if name == "backup":
             check(SERVICE not in used and AGE not in used, f"{where}: the backup job holds neither the service-role key nor an age private key")
         if env.startswith("backup-control-"):
-            check(not job.get("steps") or all("backup/db-backup" not in str(s) and "restore-test.sh" not in str(s) for s in job["steps"]),
+            check(not job.get("steps") or all(not re.search(r"backup/db-backup|restore-test\.sh|freshness\.sh", str(s)) for s in job["steps"]),
                   f"{where}: a control job runs no backup or restore code")
 check(total_service_jobs >= 3, f"service-role key is used by the control jobs and the reconciler only ({total_service_jobs} jobs)")
 
@@ -86,4 +86,15 @@ check("Verify complete coverage" in [s.get("name") for s in daily["backup"]["ste
 # The data jobs are gated on their control job and fail closed when it fails or does not authorize.
 check("needs.control.result == 'success'" in str(daily["backup"]["if"]), "the backup job runs only after a successful control job")
 check("needs.restore-control.result == 'success'" in str(restore["restore"]["if"]), "the restore job runs only after a successful control job")
+# The freshness alarm follows the Admin console too: the same split, and it still checks when the console cannot be read.
+fresh = yaml.safe_load((WF / "freshness.yml").read_text())["jobs"]
+fresh_text = (WF / "freshness.yml").read_text()
+check({"control", "gate", "check"} == set(fresh), "freshness.yml: control reads the console, gate builds the list, check reads the bucket")
+check(str(fresh.get("control", {}).get("environment", "")).startswith("backup-control-") and "backup/runtime-schedule.py" in str(fresh.get("control", {})),
+      "freshness.yml: the age limit comes from the Admin console, read in a backup-control job")
+check("PRODUCTION_BACKUP_ENABLED" not in fresh_text and "ACCEPTANCE_BACKUP_SCHEDULE" not in fresh_text,
+      "freshness.yml: no repository variable decides what is watched")
+check(all("always()" in str(fresh.get(j, {}).get("if", "")) for j in ("gate", "check")),
+      "freshness.yml: a failed console read does not skip the check")
+check(not secrets_in(fresh.get("gate", {})), "freshness.yml: the gate holds no secret")
 sys.exit(1 if failures else 0)

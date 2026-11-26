@@ -8,12 +8,13 @@
 --   F. Schedule: optimistic version, validation, audit
 --   G. Workflow reports vs the server cross-check: a report can never mark a run succeeded
 --   H. Closed tables and API-role isolation
+--   I. Hand-started runs are labelled; a pending run that never settled stops blocking (20261126120001)
 --
 -- Every fixture is created INSIDE this transaction; the file rolls back.
 create extension if not exists pgtap;
 
 begin;
-select plan(71);
+select plan(93);
 
 \set sa    'b1000000-0000-4000-8000-000000000001'
 \set adm   'b1000000-0000-4000-8000-000000000002'
@@ -233,6 +234,49 @@ select is(pg_temp.sv('select count(*) from app.backup_runs'), '42501', 'H3 not e
 select throws_ok($$select app.reauth_target_normalize('backup.execute', 'staging')$$, '22023', 'invalid backup environment', 'H4 a receipt target must be acceptance or production');
 select is(app.reauth_target_normalize('backup.schedule_manage', 'production'), 'production', 'H5 production is a valid receipt target');
 select is(pg_temp.call_anon('public.backup_schedule_read()') ->> 'sqlstate', '42501', 'H6 anon cannot read the schedule used by the workflow');
+
+-- ===========================================================================
+-- I. How a run started, and a pending run that never settled (20261126120001)
+-- ===========================================================================
+create function pg_temp.report(p_run bigint, p_status text, p_summary jsonb default '{}'::jsonb, p_conclusion text default null) returns text language sql as $$
+  select pg_temp.sv(format('public.backup_report_run(%L, %L, %s, %L, %L, %L::jsonb)', 'acceptance', 'backup', p_run, p_status, p_conclusion, p_summary)) $$;
+create function pg_temp.age_run(p_run bigint, p_age interval) returns void language sql as $$
+  update app.backup_runs set requested_at = clock_timestamp() - p_age where github_run_id = p_run $$;
+
+select is(pg_temp.report(601, 'skipped', '{"event":"workflow_dispatch"}'), 'ok', 'I1 a run started by hand on GitHub is recorded');
+select is((select trigger || ' / ' || reason from app.backup_runs where github_run_id = 601), 'manual / Run started directly on GitHub.',
+  'I2 as a manual run, not as a scheduled one');
+select is(pg_temp.report(602, 'skipped', '{"event":"schedule"}'), 'ok', 'I3 a scheduled run is recorded');
+select is((select trigger from app.backup_runs where github_run_id = 602), 'schedule', 'I4 as scheduled');
+select is(pg_temp.report(603, 'skipped'), 'ok', 'I5 a runner that sends no event is still accepted');
+select is((select trigger from app.backup_runs where github_run_id = 603), 'schedule', 'I6 and keeps the earlier label');
+
+select is(pg_temp.report(701, 'running'), 'ok', 'I7 a run starts');
+select pg_temp.age_run(701, interval '5 hours');
+select is(pg_temp.report(702, 'running'), '23505', 'I8 a pending run younger than six hours still holds the slot');
+select is((select status from app.backup_runs where github_run_id = 701), 'running', 'I9 and is left as it was');
+select pg_temp.age_run(701, interval '7 hours');
+select is(pg_temp.report(702, 'running'), 'ok', 'I10 after six hours it no longer blocks the next backup');
+select is((select status || ' / ' || error_code from app.backup_runs where github_run_id = 701), 'failed / stale_unverified',
+  'I11 it is closed as not verified, never as succeeded');
+select is((select count(*)::int from app.backup_run_events e join app.backup_runs r on r.id = e.run_id where r.github_run_id = 701 and e.kind = 'expired'), 1,
+  'I12 and the expiry is on its timeline');
+select is(pg_temp.report(701, 'succeeded', '{"coverage_verified":"true","event":"schedule"}', 'success'), 'ok', 'I13 a verified result that arrives late is accepted');
+select is((select status || ' / ' || coalesce(error_code, '-') from app.backup_runs where github_run_id = 701), 'succeeded / -',
+  'I14 and replaces the not-verified mark, even while a newer run is pending');
+select is(pg_temp.report(701, 'failed'), 'ok', 'I15 a settled run takes later reports quietly');
+select is((select status from app.backup_runs where github_run_id = 701), 'succeeded', 'I16 and does not change');
+
+select pg_temp.age_run(702, interval '7 hours');
+select is(pg_temp.report(702, 'skipped'), 'ok', 'I17 the old run''s own report arrives after six hours');
+select is((select status from app.backup_runs where github_run_id = 702), 'skipped', 'I18 and settles it normally instead of expiring it');
+
+select is(pg_temp.report(703, 'running'), 'ok', 'I19 another run starts');
+select pg_temp.age_run(703, interval '7 hours');
+select ok((pg_temp.request_as(:'sa', 'backup', 'Manual backup after a stuck run', pg_temp.receipt(:'sa', 'backup.execute', 'acceptance')) ->> 'id') is not null,
+  'I20 a stuck run does not block a manual request either');
+select is((select error_code from app.backup_runs where github_run_id = 703), 'stale_unverified', 'I21 because it was expired first');
+select is(pg_temp.sv($$app.backup_expire_stale('acceptance')$$), '42501', 'I22 the expiry is internal: no API role can call it');
 
 select * from finish();
 rollback;
