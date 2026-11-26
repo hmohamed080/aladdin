@@ -169,16 +169,17 @@ describe("live cart page", () => {
     expect(JSON.parse(window.localStorage.getItem(LIVE_CART_KEY)!)).toEqual([{ slug: "p-a", sku: "A", qty: 1 }]);
   });
 
-  it("keeps the next step a disabled stub for a signed-in buyer until checkout opens", async () => {
+  it("takes a signed-in buyer to checkout once every showroom can serve the chosen area", async () => {
     store([{ slug: "p-a", sku: "A", qty: 1 }]);
     quoteAction.mockImplementation(answer([ok("A", 1, 100, 9)], [showroom(1, "Decore Store", { cairo: 0 })]));
     render(
       <ViewerContext.Provider value={{ signedIn: true, ownSellers: [] }}>{wrap(<LiveCartPage suggestions={suggestions} />)}</ViewerContext.Provider>,
     );
     await screen.findByText("Product A");
+    expect(screen.getByRole("button", { name: /Continue to checkout/ })).toBeDisabled(); // no area yet
     choose("mp-gov", "cairo");
-    expect(await screen.findByText(/Checkout opens soon/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Continue to checkout/ })).toBeDisabled();
+    const link = await screen.findByRole("link", { name: /Continue to checkout/ });
+    expect(link.getAttribute("href")).toBe("/market/checkout");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 

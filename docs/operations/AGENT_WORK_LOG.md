@@ -7976,3 +7976,9 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Browser (local isolated stack): cart to checkout, a cash order placed and delivered, a return requested without photos, seller list and policy save. Photo upload not tried (no storage locally); admin queue not opened.
 - Still missing: the seller "made to order, not returnable" toggle and its notice on the product page. Neither read exposes the flag, so it needs a migration.
 - Review fixes (#281): photos are ticked individually (an earlier or unticked photo is never re-attached silently); a quantity the chosen reason refuses is left out. Open: no way to delete a waiting photo (6 waiting block new uploads until the 24 h cleanup); needs an RPC, planned with the non-returnable migration.
+
+## 2026-11-26 - The cart leads to checkout (audit finding, no migration)
+- A signed-in buyer had no way from `/market/cart` to `/market/checkout`: the button was still the pre-checkout stub. It is now a link once every showroom can serve the chosen way of receiving; guests still get the sign-in dialog.
+- Owner decision 2026-11-26: no coupon area in the cart for now.
+- Not carried over: the cart choice of delivery or pickup (checkout starts on delivery).
+- Owner decision 2026-11-26: the cart trust strip (four reassurance cards) is removed, as asked in the 2026-11-19 walkthrough.
