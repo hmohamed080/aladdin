@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, type FormEvent } from "react";
+import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { formatDateTime } from "@/lib/ui/format";
 import { isPaused, needsStopConfirmation } from "./backup-view";
@@ -37,6 +37,19 @@ export function BackupScheduleForm({
   const [state, dispatch] = useActionState(saveBackupScheduleAction, INITIAL);
   const [restore, setRestore] = useState(settings.production_restore_schedule_enabled);
   const [asking, setAsking] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const questionRef = useRef<HTMLDivElement>(null);
+
+  // The question itself takes focus, not its yes button: a second Enter must not answer it.
+  useEffect(() => {
+    if (asking) questionRef.current?.focus();
+  }, [asking]);
+
+  function cancel() {
+    setAsking(false);
+    // The first submit button is Save.
+    formRef.current?.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus();
+  }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     // The confirm button is the answer; every other way of submitting asks again.
@@ -58,7 +71,7 @@ export function BackupScheduleForm({
       <SectionTitle>{t("backups.schedule.title")}</SectionTitle>
       <p className="mt-xs text-label text-fg-muted">{t("backups.schedule.description")}</p>
       {!canManage ? <p className="mt-md text-body text-fg-secondary">{t("backups.viewOnly")}</p> : null}
-      <form action={dispatch} onSubmit={onSubmit} onChange={() => setAsking(false)} className="mt-md flex flex-col gap-md" data-testid="backup-schedule-form">
+      <form ref={formRef} action={dispatch} onSubmit={onSubmit} onChange={() => setAsking(false)} className="mt-md flex flex-col gap-md" data-testid="backup-schedule-form">
         <input type="hidden" name="version" value={settings.version} />
         <div className="grid gap-md sm:grid-cols-2">
           <LabeledField label={t("backups.schedule.acceptance")} htmlFor="backup-acceptance-schedule" hint={t("backups.schedule.acceptanceHint")}>
@@ -120,13 +133,13 @@ export function BackupScheduleForm({
           </SubmitButton>
         ) : null}
         {canManage && asking ? (
-          <div role="alert" className="flex flex-col gap-sm rounded-sm border border-danger/40 bg-danger/10 px-md py-sm" data-testid="backup-schedule-confirm-stop">
+          <div ref={questionRef} tabIndex={-1} role="alert" className="flex flex-col gap-sm rounded-sm border border-danger/40 bg-danger/10 px-md py-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" data-testid="backup-schedule-confirm-stop">
             <p className="text-body text-fg">{t("backups.schedule.confirmStopBody")}</p>
             <div className="flex flex-wrap gap-sm">
               <SubmitButton variant="danger" name={CONFIRM_STOP} value="yes" pendingLabel={t("backups.schedule.saving")}>
                 {t("backups.schedule.confirmStop")}
               </SubmitButton>
-              <Button type="button" variant="ghost" onClick={() => setAsking(false)}>
+              <Button type="button" variant="ghost" onClick={cancel}>
                 {t("common.cancel")}
               </Button>
             </div>

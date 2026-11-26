@@ -3083,7 +3083,7 @@ export const en = {
       productionRestore: "Scheduled restore test",
       productionRestoreLabel: "Run the monthly Production restore test automatically",
       productionRestoreHint: "Requires Production backups to be active. The restore runs in a throwaway environment.",
-      versionNote: "Settings version {version}. If someone else changed them first, your save is refused and the page reloads.",
+      versionNote: "Settings version {version}. If someone else changed them first, your save is refused; reload the page before trying again.",
       confirmStop: "Yes, stop it", confirmStopBody: "This stops or pauses something that runs automatically today. Are you sure?",
       keepPause: "Keep the current pause", summaryPaused: "Paused", summaryDaily: "Daily {time}", summaryWeekly: "Weekly: {day} {time}",
       save: "Save schedule",

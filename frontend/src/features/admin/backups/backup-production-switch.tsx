@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
@@ -29,15 +29,28 @@ export function BackupProductionSwitch({ enabled, canManage }: { enabled: boolea
     return result;
   }, INITIAL);
 
+  // On and off are drawn by different elements, so a change made here would drop the keyboard user on the page body.
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const pressedFrom = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (pending || pressedFrom.current === null || pressedFrom.current === enabled) return;
+    pressedFrom.current = null;
+    if (!document.activeElement || document.activeElement === document.body) toggleRef.current?.focus();
+  }, [enabled, pending]);
+
   const toggle = (type: "button" | "submit", onClick?: () => void) => (
     <button
+      ref={toggleRef}
       type={type}
       role="switch"
       aria-checked={enabled}
       aria-label={t("backups.activation.title")}
       aria-describedby="backup-production-switch-help"
       disabled={!canManage || pending}
-      onClick={onClick}
+      onClick={() => {
+        pressedFrom.current = enabled;
+        onClick?.();
+      }}
       data-testid="backup-production-toggle"
       className={cn(
         "relative inline-flex h-7 w-12 shrink-0 items-center rounded-pill border transition-colors",

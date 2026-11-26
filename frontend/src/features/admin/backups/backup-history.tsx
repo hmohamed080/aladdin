@@ -50,7 +50,7 @@ export function BackupHistory({
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-sm" data-testid="backup-history">
         <SectionTitle>{t("backups.history.title")}</SectionTitle>
-        {result && result.skippedTotal > 0 && filter.status !== "skipped" ? (
+        {result && result.skippedTotal > 0 && filter.status === null ? (
           <Link href={choose({ includeSkipped: !filter.includeSkipped })} scroll={false} className="text-label text-accent underline underline-offset-2" data-testid="backup-skipped-toggle">
             {filter.includeSkipped ? t("backups.history.hideSkipped") : t("backups.history.showSkipped", { count: result.skippedTotal })}
           </Link>
@@ -80,7 +80,7 @@ export function BackupHistory({
         </FilterRow>
       </div>
 
-      {result && result.skippedTotal > 0 ? <p className="mt-xs text-label text-fg-muted">{t("backups.history.skippedHint")}</p> : null}
+      {result && result.skippedTotal > 0 && filter.status === null ? <p className="mt-xs text-label text-fg-muted">{t("backups.history.skippedHint")}</p> : null}
 
       {!result ? (
         <p role="alert" className="mt-md text-body text-danger">{t("backups.history.loadError")}</p>

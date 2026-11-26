@@ -47,11 +47,17 @@ describe("BackupHistory", () => {
     draw(page(), filter({ status: "failed" }));
     expect(href("backup-filter-kind-restore_test")).toBe("/admin/backups?kind=restore_test&status=failed");
     expect(href("backup-filter-status-all")).toBe("/admin/backups");
-    expect(href("backup-skipped-toggle")).toBe("/admin/backups?status=failed&skipped=1");
+    cleanup();
+    draw(page(), filter({ kind: "backup" }));
+    expect(href("backup-skipped-toggle")).toBe("/admin/backups?kind=backup&skipped=1");
   });
-  it("has no skipped toggle when skipped runs are what was asked for", () => {
-    draw(page(), filter({ status: "skipped" }));
-    expect(screen.queryByTestId("backup-skipped-toggle")).toBeNull();
+  it("offers skipped checks only under the all-statuses filter, where the choice changes something", () => {
+    for (const status of ["failed", "succeeded", "skipped"] as const) {
+      draw(page(), filter({ status }));
+      expect(screen.queryByTestId("backup-skipped-toggle"), status).toBeNull();
+      expect(screen.queryByText(t("backups.history.skippedHint")), status).toBeNull();
+      cleanup();
+    }
   });
   it("says the history could not be read instead of saying it is empty", () => {
     draw(null);

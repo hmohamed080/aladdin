@@ -57,6 +57,30 @@ describe("BackupProductionSwitch", () => {
     await waitFor(() => expect(mocks.set).toHaveBeenCalledTimes(1));
     expect((mocks.set.mock.calls[0]?.[1] as FormData).get("enabled")).toBe("false");
   });
+  const redraw = (view: ReturnType<typeof draw>, enabled: boolean) =>
+    view.rerender(<I18nProvider locale="en" dir="ltr"><BackupProductionSwitch enabled={enabled} canManage /></I18nProvider>);
+  it("keeps focus on the switch after it was turned on from here", async () => {
+    const view = draw(<BackupProductionSwitch enabled={false} canManage />);
+    toggle().focus();
+    fireEvent.click(toggle());
+    await waitFor(() => expect(mocks.set).toHaveBeenCalledTimes(1));
+    redraw(view, true);
+    await waitFor(() => expect(document.activeElement).toBe(toggle()));
+  });
+  it("keeps focus on the switch after it was turned off from here", async () => {
+    const view = draw(<BackupProductionSwitch enabled canManage />);
+    toggle().focus();
+    fireEvent.click(toggle());
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: t("backups.activation.turnOff") }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    redraw(view, false);
+    await waitFor(() => expect(document.activeElement).toBe(toggle()));
+  });
+  it("does not grab focus when the state changed somewhere else", () => {
+    const view = draw(<BackupProductionSwitch enabled={false} canManage />);
+    redraw(view, true);
+    expect(document.activeElement).toBe(document.body);
+  });
   it("is disabled for someone who can only view", () => {
     draw(<BackupProductionSwitch enabled={false} canManage={false} />);
     expect((toggle() as HTMLButtonElement).disabled).toBe(true);

@@ -108,6 +108,16 @@ describe("BackupScheduleForm", () => {
     expect(save).not.toHaveBeenCalled();
   });
 
+  it("moves focus to the question, not to the yes button, and back to Save on cancel", () => {
+    draw(settings());
+    choose("acceptance_schedule", "off");
+    saveButton().focus();
+    fireEvent.click(saveButton());
+    expect(document.activeElement).toBe(screen.getByTestId("backup-schedule-confirm-stop"));
+    fireEvent.click(screen.getByRole("button", { name: t("common.cancel") }));
+    expect(document.activeElement).toBe(saveButton());
+  });
+
   it("withdraws the question when the form changes, so the answer is about what is on screen", () => {
     draw(settings());
     choose("pause_hours", "24");
