@@ -104,7 +104,7 @@ export function OrganizationImageField({ orgId, imageUrl, canManage }: { orgId: 
       const blob = await cropToBlob(source, area, sourceType);
       const ticket = await requestOrganizationImageUploadAction(orgId, blob.type, blob.size);
       if (!ticket.ok) throw new Error(ticket.code);
-      await uploadWithGrant(ticket.grant, blob);
+      await uploadWithGrant(ticket.grant, blob, { namespace: "organization", key: ticket.key });
       const confirmed = await confirmOrganizationImageUploadAction(ticket.key);
       if (!confirmed.ok) throw new Error(confirmed.code);
       reset();

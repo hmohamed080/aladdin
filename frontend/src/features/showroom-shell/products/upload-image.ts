@@ -22,7 +22,7 @@ export async function uploadProductImage(productId: string, picked: File): Promi
   const file = prepared.file;
   const ticket = await requestProductImageUploadAction(productId, file.type, file.size);
   if (!ticket.ok) throw new Error(ticket.code);
-  try { await uploadWithGrant(ticket.grant, file); }
+  try { await uploadWithGrant(ticket.grant, file, { namespace: "product", key: ticket.key }); }
   catch { throw new Error("showroomProducts.images.errorUpload"); }
   const confirmed = await confirmProductImageUploadAction(ticket.key);
   if (!confirmed.ok) throw new Error(confirmed.code);
