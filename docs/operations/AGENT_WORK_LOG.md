@@ -7965,3 +7965,8 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Owner decision: keep the verified-mobile requirement; do it inside checkout. `checkout-phone-step.tsx` appears while the database reports `phone_unverified`: add a number (accounts without one, `profile_set_phone`), verify it (the existing panel and authority), or explain that the chosen address names another number.
 - Checkout shared controls now follow the fixed-light shell tokens (they rendered dark in dark mode).
 - Browser (local isolated stack): pickup with no number -> add -> verify panel -> "unavailable" because the verification flag is off locally. A real code was not sent or entered; verified only by unit tests.
+
+## 2026-11-26 - Concurrency scripts into CI (launch plan 1.1/1.2, no migration)
+- The five Marketplace concurrency scripts now require an explicit target through `supabase/tests/lib/db_target.sh` (no container auto-pick); the organization application script passes `p_legal_name`.
+- `supabase-rls.yml` runs 11 more scripts (6 B2B/admin + 5 Marketplace). All passed on an isolated local stack. `admin_suspension` also passed locally but stays manual: its own guard refuses the shared stack name the CI runner uses.
+- Still outside CI: `publisher_concurrency_test.sh`. It fails on a fresh database because `app.showroom_publish_guard` calls `app.showroom_seller_ready(NULL)` for an independent publisher (organization_id null), so such a product cannot be published. pgTAP 79 disables that trigger for its fixtures. Production read-only check: no independent publisher today. A fix needs a migration and an owner decision.
