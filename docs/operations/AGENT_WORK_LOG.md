@@ -7987,3 +7987,7 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Seller product read and public product read return `non_returnable`; toggle on the product edit page, notice on the product page.
 - `marketplace_buyer_return_evidence_remove`: the uploader deletes a photo no request holds (closes the 6-photo dead end).
 - Merge after 20261126090001 (independent publisher).
+
+## 2026-11-26 - Independent publishers can publish (migration 20261126090001, owner decision, nothing applied)
+- `app.showroom_publish_guard` asked for showroom readiness even when a product has no organization, so an independent publisher could publish nothing. It now asks only for organization products; the ownership trigger prevents omitting the organization.
+- pgTAP 400 (trigger enabled) 6/6; `publisher_concurrency_test.sh` passes and joins CI.
