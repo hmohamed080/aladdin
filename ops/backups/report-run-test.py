@@ -67,5 +67,8 @@ c, ok = run_case(jobs=[claimed, good], env_extra={"GITHUB_REPOSITORY": "someone/
 c, ok = run_case(jobs=[claimed, good], env_extra={"SUPABASE_URL": "https://nxossqhdfltcqdwvbewi.supabase.co"}); check("the wrong project for the label is refused", not ok and c == [])
 c, ok = run_case(argv=("report-run.py",), env_extra={"REQUEST_ID": "r"}); check("a claim (no --complete) records running", ok and c[0]["p_status"] == "running" and c[0]["p_request_id"] == "r")
 
+c, ok = run_case(argv=("report-run.py",), env_extra={"EVENT": "workflow_dispatch"}); check("a claim says how the run was started", ok and c[0]["p_summary"] == {"event": "workflow_dispatch"})
+c, ok = run_case(run={"event": "workflow_dispatch"}, jobs=[claimed, good]); check("a completion says how the run was started", ok and c[0]["p_summary"]["event"] == "workflow_dispatch")
+
 print("report-run-test: %s" % ("OK" if not fails else "%d failed" % fails))
 sys.exit(1 if fails else 0)
