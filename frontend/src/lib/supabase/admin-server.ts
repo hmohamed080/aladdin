@@ -199,24 +199,24 @@ export function adminBackupReconcile(a: {
   );
 }
 
-export function adminBackupUpdateSchedule(a: {
+export function adminBackupSetProduction(a: { actor: string; enabled: boolean }) {
+  return whatsappOtpRpc<boolean>((c) => c.rpc("admin_backup_set_production", { p_actor: a.actor, p_enabled: a.enabled }));
+}
+
+export function adminBackupSaveSchedule(a: {
   actor: string;
   acceptanceSchedule: "off" | "daily" | "weekly";
-  config: Json;
   productionRestoreScheduleEnabled: boolean;
   expectedVersion: number;
-  reason: string;
-  receipt: string;
+  config: Json;
 }) {
   return whatsappOtpRpc<number>((c) =>
-    c.rpc("admin_backup_update_schedule", {
+    c.rpc("admin_backup_save_schedule", {
       p_actor: a.actor,
       p_acceptance_schedule: a.acceptanceSchedule,
-      p_config: a.config,
       p_production_restore_schedule_enabled: a.productionRestoreScheduleEnabled,
       p_expected_version: a.expectedVersion,
-      p_reason: a.reason,
-      p_receipt: a.receipt,
+      p_config: a.config,
     }),
   );
 }

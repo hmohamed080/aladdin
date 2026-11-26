@@ -160,3 +160,24 @@ export async function loadBackupStatus(supabase: Client): Promise<BackupStatus |
   if (status?.initialized && status.environment !== expected) return null;
   return status;
 }
+
+export type BackupRunsFilter = { page: number; kind: BackupKind | null; status: BackupRunStatus | null; includeSkipped: boolean };
+export type BackupRunsPage = { runs: BackupRun[]; total: number; page: number; pageSize: number; skippedTotal: number };
+
+/** One page of the history. `null` means the read failed: the page says so instead of showing an empty history. */
+export async function loadBackupRuns(supabase: Client, filter: BackupRunsFilter): Promise<BackupRunsPage | null> {
+  const { data, error } = await supabase.rpc("admin_backup_runs", {
+    p_page: filter.page,
+    p_kind: filter.kind ?? undefined,
+    p_status: filter.status ?? undefined,
+    p_include_skipped: filter.includeSkipped,
+  });
+  if (error) return null;
+  const root = obj(data);
+  const total = num(root.total);
+  const page = num(root.page);
+  const pageSize = num(root.page_size);
+  const skippedTotal = num(root.skipped_total);
+  if (!Array.isArray(root.runs) || total === null || page === null || pageSize === null || skippedTotal === null) return null;
+  return { runs: root.runs.flatMap((r) => parseRun(r) ?? []), total, page, pageSize, skippedTotal };
+}
