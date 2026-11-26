@@ -131,6 +131,8 @@ export type PublicProduct = {
   seller_official?: boolean;
   stock_left?: number | null;
   ships_free?: boolean;
+  /** "Made to order": returned only if defective. */
+  non_returnable?: boolean;
   cover_image_id: string | null;
   attributes: PublicAttribute[];
   variants: PublicVariant[];
