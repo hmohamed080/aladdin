@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Select } from "@/components/ui/controls";
 import {
-  ChevronLeftIcon, ChevronRightIcon, FileTextIcon, HelpIcon, MapPinIcon, PackageIcon,
+  ChevronLeftIcon, ChevronRightIcon, FileTextIcon, MapPinIcon,
   ShieldIcon, ShoppingBagIcon, StorefrontIcon, TrashIcon, TruckIcon,
 } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
@@ -152,8 +152,8 @@ function LineRow({ line, locale, images, onQty, onRemove }: {
 /**
  * The live guest cart. What is in it (slug + SKU + quantity) comes from this browser; every price,
  * stock level and showroom delivery fee comes from the database through a read-only quote, so the
- * page never shows a number the showrooms did not set. Checkout is not open yet: the button is
- * open once every showroom can serve the chosen way of receiving.
+ * page never shows a number the showrooms did not set. The checkout button opens once every showroom
+ * can serve the chosen way of receiving.
  */
 export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
   const { locale, dir } = useI18n();
@@ -303,15 +303,6 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
               </ul>
             </section>
 
-            <ul className={styles.perks}>
-              {[TruckIcon, PackageIcon, ShieldIcon, HelpIcon].map((Icon, i) => (
-                <li key={i}>
-                  <Icon size={30} aria-hidden="true" />
-                  <span><strong>{l.perks[i]![0]}</strong><small>{l.perks[i]![1]}</small></span>
-                </li>
-              ))}
-            </ul>
-
             <Shelf id="cart-also-title" title={t.alsoLike} cards={cards} locale={locale} dir={dir} />
           </div>
 
@@ -402,18 +393,17 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
             </section>
 
             <div className={styles.actions}>
-              {/* Guest: the button opens the sign-in dialog. Signed in: checkout is not open yet (Marketplace PR 12), so the step is a disabled stub. */}
-              {canContinue && !viewer.signedIn ? (
-                <button type="button" className={styles.checkout} onClick={() => setSignInOpen(true)}>
+              {/* Guest: the button opens the sign-in dialog. Signed in: it goes to checkout, where the database prices and checks everything again. */}
+              {canContinue && viewer.signedIn ? (
+                <Link href="/market/checkout" className={styles.checkout}>
                   <ShieldIcon size={18} aria-hidden="true" />{l.continueToCheckout}
-                </button>
+                </Link>
               ) : (
-                <button type="button" className={styles.checkout} disabled aria-disabled="true">
+                <button type="button" className={styles.checkout} disabled={!canContinue} onClick={() => setSignInOpen(true)}>
                   <ShieldIcon size={18} aria-hidden="true" />{l.continueToCheckout}
                 </button>
               )}
               {blocked ? <p className={styles.warn} role="status">{l.blockedLines}</p> : null}
-              {canContinue && viewer.signedIn ? <p className={styles.hint}>{l.checkoutOpensSoon}</p> : null}
               <Link href="/market" className={styles.secondary}>
                 {dir === "rtl" ? <ChevronRightIcon size={18} aria-hidden="true" /> : <ChevronLeftIcon size={18} aria-hidden="true" />}
                 {t.continueShopping}

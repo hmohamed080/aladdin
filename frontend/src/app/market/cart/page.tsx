@@ -19,10 +19,10 @@ export const metadata: Metadata = {
 };
 
 /**
- * The guest cart of the live Marketplace. What is in the cart lives in the visitor's browser; the
- * page asks the database for current prices, availability and each showroom's delivery fee (a
- * read-only server action), and checkout stays closed ("coming soon"). Behind the same flag as the
- * rest of the Marketplace, so it is a plain 404 wherever the Marketplace is not open.
+ * The cart of the live Marketplace. What is in the cart lives in the browser; the page asks the
+ * database for current prices, availability and each showroom's delivery fee (a read-only server
+ * action) and leads to `/market/checkout`. Behind the same two flags as ordering, so it redirects
+ * to `/market` wherever ordering is not open.
  */
 export default async function MarketplaceCartRoute() {
   // Closed Marketplace: every deep link lands on the "coming soon" page.

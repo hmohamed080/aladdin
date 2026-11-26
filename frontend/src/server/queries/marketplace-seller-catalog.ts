@@ -130,6 +130,8 @@ export type SellerProductDetail = {
   }[];
   images: SellerProductImage[];
   blockers: string[];
+  /** "Made to order, not returnable" (saved by its own seller RPC). */
+  nonReturnable?: boolean;
   /** Facts that drive the required fields and the Publish button (no blocker list is ever shown). */
   publication: PublicationState | null;
   /** Images the seller removed whose bytes are not confirmed deleted yet (retryable). */
@@ -166,6 +168,7 @@ export async function loadSellerProduct(supabase: Client, productId: string): Pr
     slug: String(p.slug),
     status: p.status as SellerProductDetail["status"],
     attributes: (p.attributes ?? {}) as Record<string, unknown>,
+    nonReturnable: p.non_returnable === true,
     variants: (p.variants ?? []) as SellerProductDetail["variants"],
     images: rawImages.map((i) => ({
       id: i.id,

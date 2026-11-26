@@ -1,7 +1,8 @@
+import { ButtonLink } from "@/components/ui/controls";
 import { PageHeader } from "@/components/ui/workspace-layout";
 import { ReceiptIcon } from "@/components/ui/icons";
 import { requireApprovedSeller } from "@/features/marketplace-seller/seller-gate";
-import { RETURN_COPY } from "@/features/marketplace-returns/copy";
+import { RETURN_COPY, RETURN_POLICY_COPY } from "@/features/marketplace-returns/copy";
 import { ReturnList } from "@/features/marketplace-returns/return-view";
 import type { SellerReturnsPage } from "@/features/marketplace-returns/contract";
 
@@ -15,6 +16,7 @@ export default async function SellerReturnsPage() {
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader locale={locale} Icon={ReceiptIcon} title={RETURN_COPY.sellerTitle[locale]} subtitle="" />
+      <div><ButtonLink href="/showroom/marketplace/return-policy" variant="outline" size="sm">{RETURN_POLICY_COPY[locale].title}</ButtonLink></div>
       <ReturnList items={page.items} locale={locale} base="/showroom/marketplace/returns" />
     </div>
   );

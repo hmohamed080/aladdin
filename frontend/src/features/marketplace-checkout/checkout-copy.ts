@@ -120,7 +120,7 @@ export const checkoutCopy: Record<Locale, Copy> = {
     missing: {
       insufficient_stock: "إحدى الكميات لم تعد متاحة. عدّل السلة.",
       address_missing: "اختر عنوان توصيل محفوظًا.",
-      phone_unverified: "وثّق رقم هاتف حسابك أولًا من إعدادات العناوين.",
+      phone_unverified: "وثّق رقم موبايل حسابك من قسم «رقم الموبايل» في هذه الصفحة.",
       delivery_not_available: "المعرض لا يوصّل إلى هذا العنوان.",
       next_day_not_available: "التوصيل في اليوم التالي غير متاح لهذا العنوان.",
       pickup_not_available: "المعرض لا يوفّر الاستلام من الفرع.",
@@ -194,7 +194,7 @@ export const checkoutCopy: Record<Locale, Copy> = {
     missing: {
       insufficient_stock: "One of the quantities is no longer available. Edit the cart.",
       address_missing: "Choose a saved delivery address.",
-      phone_unverified: "Verify your account phone first (in the address settings).",
+      phone_unverified: "Verify your account mobile in the “Mobile number” section on this page.",
       delivery_not_available: "The showroom does not deliver to this address.",
       next_day_not_available: "Next-day delivery is not available for this address.",
       pickup_not_available: "The showroom does not offer branch pickup.",
