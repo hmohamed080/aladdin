@@ -118,9 +118,9 @@ jobs:
         run: bash supabase/tests/admin_staff_invitation_concurrency_test.sh
 
       # admin_suspension stays manual on purpose: its own guard refuses the shared stack name this runner uses.
-      - name: Prove customer, follow-up, governance, lead ownership, application and quotation races
+      - name: Prove customer, follow-up, governance, lead ownership, application, quotation and publisher races
         run: |
-          for name in customer_update follow_up_update governance lead_ownership organization_application quotation; do
+          for name in customer_update follow_up_update governance lead_ownership organization_application quotation publisher; do
             echo "::group::${name}"
             bash "supabase/tests/${name}_concurrency_test.sh"
             echo "::endgroup::"
