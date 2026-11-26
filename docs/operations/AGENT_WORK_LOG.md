@@ -7960,3 +7960,8 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - The showroom records that it paid back a `refund_due` cancelled order, the buyer confirms, then the order is `refunded`. No money moves through the platform. Notifications `marketplace.order.refund_sent` / `refund_confirmed`.
 - Also: the flaky seller order page test waits for the reasons to load.
 - Not verified: browser pass (ordering is off); applied nowhere. Main carries the 13 unapplied migrations 20261125090001 .. 140001 and needs a new apply plan.
+
+## 2026-11-26 - Mobile verification inside checkout (launch plan 1.3, no migration)
+- Owner decision: keep the verified-mobile requirement; do it inside checkout. `checkout-phone-step.tsx` appears while the database reports `phone_unverified`: add a number (accounts without one, `profile_set_phone`), verify it (the existing panel and authority), or explain that the chosen address names another number.
+- Checkout shared controls now follow the fixed-light shell tokens (they rendered dark in dark mode).
+- Browser (local isolated stack): pickup with no number -> add -> verify panel -> "unavailable" because the verification flag is off locally. A real code was not sent or entered; verified only by unit tests.
