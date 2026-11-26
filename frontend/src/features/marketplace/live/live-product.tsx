@@ -6,6 +6,7 @@ import { ChevronLeftIcon, ChevronRightIcon, PackageIcon } from "@/components/ui/
 import { isMarketplaceOrderingEnabled } from "@/lib/env";
 import { useI18n } from "@/lib/i18n/context";
 import { DeliveryBlock } from "./delivery-block";
+import { RETURNABILITY_COPY } from "@/features/marketplace-returns/copy";
 import { deliveryCopy } from "./live-delivery-copy";
 import { OfficialBadge } from "./product-card";
 import { useIsOwnShowroom } from "./viewer-context";
@@ -133,6 +134,7 @@ export function LiveProduct({ product, terms = null, place = null }: { product: 
                 {t.sku}: <bdi dir="ltr">{variant.sku}</bdi>
               </p>
               {variant.stock_left ? <p className={v2.lowStockPage}>{d.onlyLeft(fmtNum(variant.stock_left, locale))}</p> : null}
+              {product.non_returnable ? <p className={styles.sku} role="note"><strong>{RETURNABILITY_COPY[locale].notice}</strong></p> : null}
               {isMarketplaceOrderingEnabled() && !ownShowroom ? (
                 <>
               <button

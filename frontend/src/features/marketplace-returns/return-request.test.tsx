@@ -4,6 +4,7 @@ import { renderWithI18n } from "@/test/render";
 import type { Eligibility } from "./contract";
 import { ReturnPolicyForm } from "./return-policy-form";
 import { ReturnRequest } from "./return-request";
+import { ReturnabilityToggle } from "./returnability-toggle";
 
 const push = vi.fn();
 const create = vi.fn();
@@ -11,6 +12,8 @@ const request = vi.fn();
 const confirm = vi.fn();
 const save = vi.fn();
 const upload = vi.fn();
+const removePhoto = vi.fn();
+const setFlag = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/lib/storage/browser-upload", () => ({ uploadWithGrant: (...a: unknown[]) => upload(...a) }));
 vi.mock("@/server/actions/marketplace-returns", () => ({
@@ -19,6 +22,8 @@ vi.mock("@/server/actions/marketplace-returns", () => ({
   confirmEvidenceAction: (...a: unknown[]) => confirm(...a),
   saveReturnSettingsAction: (...a: unknown[]) => save(...a),
   evidenceUrlAction: vi.fn(),
+  removeEvidenceAction: (...a: unknown[]) => removePhoto(...a),
+  setNonReturnableAction: (...a: unknown[]) => setFlag(...a),
 }));
 
 const ORDER = "11111111-1111-4111-8111-111111111111";
@@ -39,7 +44,7 @@ const view = (now = "2026-11-27T10:00:00Z") =>
   renderWithI18n(<ReturnRequest orderId={ORDER} eligibility={eligibility} initialKind="return" locale="en" now={now} />, "en");
 
 beforeEach(() => {
-  [push, create, request, confirm, save, upload].forEach((m) => m.mockReset());
+  [push, create, request, confirm, save, upload, removePhoto, setFlag].forEach((m) => m.mockReset());
 });
 
 describe("return request", () => {
@@ -110,10 +115,36 @@ describe("return request", () => {
     expect(create.mock.calls[0]![0]).toMatchObject({ lines: [{ item_id: "i1", quantity: 1 }] });
   });
 
+  it("deletes a waiting photo so another can be added", async () => {
+    request.mockResolvedValue({ ok: true, evidenceId: "e1", objectKey: "returns/o/e1.jpg", grant: {} });
+    confirm.mockResolvedValue({ ok: true, evidence: [{ id: "e1", object_key: "returns/o/e1.jpg", created_at: "" }] });
+    removePhoto.mockResolvedValue({ ok: true, removed: true });
+    view();
+    fireEvent.change(screen.getByTestId("return-photo-input"), { target: { files: [new File(["x"], "a.jpg", { type: "image/jpeg" })] } });
+    fireEvent.click(await screen.findByRole("button", { name: "Delete photo 1" }));
+    await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Attach photo 1" })).toBeNull());
+    expect(removePhoto).toHaveBeenCalledWith("e1");
+    expect(screen.getByText("Photos (0 of 6)")).toBeInTheDocument();
+  });
+
   it("offers only the reasons whose period is still open", () => {
     view("2026-12-15T10:00:00Z");
     expect(screen.queryByRole("radio", { name: /Changed my mind/ })).toBeNull();
     expect(screen.getByRole("radio", { name: /Defective/ })).toBeInTheDocument();
+  });
+});
+
+describe("returnability toggle", () => {
+  it("saves the flag, and puts it back when the save is refused", async () => {
+    setFlag.mockResolvedValueOnce({ ok: true, nonReturnable: true }).mockResolvedValueOnce({ ok: false, code: "not_permitted" });
+    renderWithI18n(<ReturnabilityToggle organizationId="org-1" productId="p-1" initial={false} locale="en" />, "en");
+    const box = screen.getByRole("checkbox", { name: "Made to order: cannot be returned" });
+    fireEvent.click(box);
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(setFlag).toHaveBeenCalledWith("org-1", "p-1", true);
+    fireEvent.click(box);
+    expect(await screen.findByRole("alert")).toHaveTextContent("You are not allowed to do this.");
+    expect(box).toBeChecked();
   });
 });
 

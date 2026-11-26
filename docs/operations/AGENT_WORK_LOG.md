@@ -7982,3 +7982,8 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Owner decision 2026-11-26: no coupon area in the cart for now.
 - Not carried over: the cart choice of delivery or pickup (checkout starts on delivery).
 - Owner decision 2026-11-26: the cart trust strip (four reassurance cards) is removed, as asked in the 2026-11-19 walkthrough.
+
+## 2026-11-26 - Not-returnable flag on screen, and removing a return photo (migration 20261126100001, nothing applied)
+- Seller product read and public product read return `non_returnable`; toggle on the product edit page, notice on the product page.
+- `marketplace_buyer_return_evidence_remove`: the uploader deletes a photo no request holds (closes the 6-photo dead end).
+- Merge after 20261126090001 (independent publisher).

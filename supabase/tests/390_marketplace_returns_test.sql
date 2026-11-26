@@ -199,7 +199,7 @@ select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.
              'marketplace_seller_returns_page', 'marketplace_seller_refund_record', 'marketplace_seller_exchange_fulfil',
              'marketplace_seller_product_returnability_set', 'marketplace_return_complaint_file', 'admin_marketplace_returns'))
              and has_function_privilege('authenticated', p.oid, 'execute') and not has_function_privilege('anon', p.oid, 'execute')
-             and not has_function_privilege('public', p.oid, 'execute')), 23, 'A3. the 23 public returns functions are authenticated-only');
+             and not has_function_privilege('public', p.oid, 'execute')), 24, 'A3. the 24 public returns functions are authenticated-only');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'app' and p.proname like 'marketplace\_return\_%' and has_function_privilege('authenticated', p.oid, 'execute')), 0,
   'A4. no internal returns function is callable by clients');
@@ -784,6 +784,36 @@ select is((select count(*)::int from public.marketplace_return_requests where id
             and status = 'approved' and decided_by_role = 'admin' and not in_admin_queue), 2, 'K9. both are admin decisions and out of the queue');
 select is((select count(*)::int from public.notifications where event_type = 'marketplace.return.admin_decided' and subject_id = current_setting('t.r11')::uuid), 2,
   'K10. buyer and showroom are told');
+
+-- L. the flag in the product reads, and removing a waiting photo (20261126100001)
+reset role;
+update public.marketplace_platform_settings set marketplace_open = true;
+select set_config('t.o_l', (select id::text from public.marketplace_orders where buyer_user_id = current_setting('t.buyer')::uuid limit 1), true);
+insert into public.marketplace_return_evidence (id, order_id, object_key, mime_type, created_by, upload_state)
+values ('39000000-0000-4000-8000-0000000000f1', current_setting('t.o_l')::uuid, 'returns/' || current_setting('t.o_l') || '/39000000-0000-4000-8000-0000000000f1.jpg',
+        'image/jpeg', current_setting('t.buyer')::uuid, 'confirmed'),
+       ('39000000-0000-4000-8000-0000000000f2', current_setting('t.o_l')::uuid, 'returns/' || current_setting('t.o_l') || '/39000000-0000-4000-8000-0000000000f2.jpg',
+        'image/jpeg', current_setting('t.buyer')::uuid, 'confirmed');
+update public.marketplace_return_evidence set return_id = (select id from public.marketplace_return_requests where order_id = current_setting('t.o_l')::uuid limit 1)
+ where id = '39000000-0000-4000-8000-0000000000f2';
+select isnt((select return_id from public.marketplace_return_evidence where id = '39000000-0000-4000-8000-0000000000f2'), null::uuid, 'L0. fixture: one photo is held by a request');
+select pg_temp.as_user(current_setting('t.buyer2'));
+select throws_ok($q$select public.marketplace_buyer_return_evidence_remove('39000000-0000-4000-8000-0000000000f1')$q$, '42501', 'mp:not_found',
+  'L1. another buyer cannot remove it');
+select pg_temp.as_user(current_setting('t.buyer'));
+select lives_ok($q$select public.marketplace_buyer_return_evidence_remove('39000000-0000-4000-8000-0000000000f1')$q$, 'L2. the uploader removes a waiting photo');
+select lives_ok($q$select public.marketplace_buyer_return_evidence_remove('39000000-0000-4000-8000-0000000000f1')$q$, 'L3. removing twice is a replay');
+select throws_ok($q$select public.marketplace_buyer_return_evidence_remove('39000000-0000-4000-8000-0000000000f2')$q$, '23514', 'mp:invalid_transition',
+  'L4. a photo a request holds stays');
+reset role;
+select is((select upload_state from public.marketplace_return_evidence where id = '39000000-0000-4000-8000-0000000000f1'), 'deleting', 'L5. queued for the media cleanup');
+select is((select upload_state from public.marketplace_return_evidence where id = '39000000-0000-4000-8000-0000000000f2'), 'confirmed', 'L6. the held photo is untouched');
+select is(has_function_privilege('anon', 'public.marketplace_buyer_return_evidence_remove(uuid)', 'execute'), false, 'L7. never anonymous');
+select pg_temp.as_user(current_setting('t.seller'));
+select lives_ok(format($q$select public.marketplace_seller_product_returnability_set(%L, %L, true)$q$, current_setting('t.a'), current_setting('t.p1')), 'L8. the showroom sets the flag');
+select is(public.marketplace_seller_product_get(current_setting('t.p1')::uuid) ->> 'non_returnable', 'true', 'L9. the seller read shows it');
+reset role;
+select ok(pg_get_functiondef('public.marketplace_public_product(text)'::regprocedure) like '%''non_returnable'', v_p.non_returnable%', 'L10. the public read returns it');
 
 select * from finish();
 rollback;

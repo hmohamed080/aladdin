@@ -8,7 +8,7 @@ import { InlineError } from "@/components/ui/primitives";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { MARKETPLACE_IMAGE_ALLOWED_TYPES } from "@/lib/storage/marketplace-images";
 import { formatEgp } from "@/lib/ui/egp-format";
-import { confirmEvidenceAction, createReturnAction, evidenceUrlAction, requestEvidenceUploadAction } from "@/server/actions/marketplace-returns";
+import { confirmEvidenceAction, createReturnAction, evidenceUrlAction, removeEvidenceAction, requestEvidenceUploadAction } from "@/server/actions/marketplace-returns";
 import { MAX_EVIDENCE, claimWindowOpen, draftProblem, lineAcceptsClaim, openReasons, type Eligibility, type ReturnKind } from "./contract";
 import { RETURN_REQUEST_COPY, returnErrorText } from "./copy";
 
@@ -86,6 +86,13 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
   const view = async (objectKey: string) => {
     const r = await evidenceUrlAction(objectKey);
     if (r.ok) window.open(r.url, "_blank", "noopener");
+    else setError(returnErrorText(locale, r.code));
+  };
+
+  const remove = async (id: string) => {
+    setError(null);
+    const r = await removeEvidenceAction(id);
+    if (r.ok) setPhotos((all) => all.filter((p) => p.id !== id));
     else setError(returnErrorText(locale, r.code));
   };
 
@@ -179,6 +186,7 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
               {c.attach(i + 1)}
             </Checkbox>
             <Button variant="ghost" size="sm" onClick={() => void view(p.key)}>{c.view}</Button>
+            <Button variant="ghost" size="sm" aria-label={c.removeNth(i + 1)} onClick={() => void remove(p.id)}>{c.remove}</Button>
           </div>
         ))}
       </div>
