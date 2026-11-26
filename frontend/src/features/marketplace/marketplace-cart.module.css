@@ -45,13 +45,6 @@
 .trash { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--stone); cursor: pointer; }
 .trash:hover { color: var(--lumen-deep); background: color-mix(in srgb, var(--lumen) 10%, transparent); }
 
-/* perks */
-.perks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; padding: 0; margin: 0; list-style: none; border: 1px solid var(--quartz-line); border-radius: 16px; background: var(--quartz-raised); }
-.perks li { display: flex; align-items: center; gap: 12px; padding: 16px; color: var(--lumen); }
-.perks li + li { border-inline-start: 1px solid var(--quartz-line); }
-.perks strong { display: block; color: var(--ink); font-size: .875rem; }
-.perks small { display: block; color: var(--stone); font-size: .75rem; }
-
 /* suggestions */
 .also { display: grid; gap: 12px; }
 .alsoHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -119,8 +112,6 @@
   .line { grid-template-columns: 1fr auto; gap: 10px 12px; }
   .product { grid-column: 1 / -1; }
   .cell[data-label]::before { content: attr(data-label) ": "; margin-inline-end: 6px; font-size: .75rem; color: var(--stone); }
-  .perks { grid-template-columns: 1fr 1fr; }
-  .perks li:nth-child(odd) { border-inline-start: 0; }
   .twoCols { grid-template-columns: 1fr; }
   .head h1 { font-size: 1.5rem; }
 }
@@ -141,16 +132,11 @@
   .product { grid-column: 1 / -1; }
   .thumb { width: 88px; }
   .cell[data-label]::before { content: attr(data-label) ": "; margin-inline-end: 6px; font-size: .75rem; color: var(--stone); }
-  .perks { grid-template-columns: 1fr 1fr; }
-  .perks li:nth-child(odd) { border-inline-start: 0; }
-  .perks li:nth-child(n + 3) { border-block-start: 1px solid var(--quartz-line); }
 }
 @container cart-main (max-width: 420px) {
   .line { grid-template-columns: 1fr; }
   .cell { justify-content: space-between; }
   .cell[data-label]::before { flex: 1; }
-  .perks { grid-template-columns: 1fr; }
-  .perks li + li { border-inline-start: 0; border-block-start: 1px solid var(--quartz-line); }
 }
 
 /* ---------- live cart additions ---------- */

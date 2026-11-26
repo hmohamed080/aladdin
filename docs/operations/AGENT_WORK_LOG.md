@@ -7977,3 +7977,15 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - The five Marketplace concurrency scripts now require an explicit target through `supabase/tests/lib/db_target.sh` (no container auto-pick); the organization application script passes `p_legal_name`.
 - `supabase-rls.yml` runs 11 more scripts (6 B2B/admin + 5 Marketplace). All passed on an isolated local stack. `admin_suspension` also passed locally but stays manual: its own guard refuses the shared stack name the CI runner uses.
 - Still outside CI: `publisher_concurrency_test.sh`. It fails on a fresh database because `app.showroom_publish_guard` calls `app.showroom_seller_ready(NULL)` for an independent publisher (organization_id null), so such a product cannot be published. pgTAP 79 disables that trigger for its fixtures. Production read-only check: no independent publisher today. A fix needs a migration and an owner decision.
+
+## 2026-11-26 - Returns: the missing screens (audit finding, no migration)
+- PR 15 (#270) shipped the return RPCs and the decision screens but no way to start a return. Added: `/market/returns/new` (request, with photo upload), photos on the return page, request/exchange buttons and return links on the order pages, a link from the buyer order list, the showroom return policy page, the showroom and admin menu entries (`marketplace_returns.review` in the console catalog), readable request history.
+- Browser (local isolated stack): cart to checkout, a cash order placed and delivered, a return requested without photos, seller list and policy save. Photo upload not tried (no storage locally); admin queue not opened.
+- Still missing: the seller "made to order, not returnable" toggle and its notice on the product page. Neither read exposes the flag, so it needs a migration.
+- Review fixes (#281): photos are ticked individually (an earlier or unticked photo is never re-attached silently); a quantity the chosen reason refuses is left out. Open: no way to delete a waiting photo (6 waiting block new uploads until the 24 h cleanup); needs an RPC, planned with the non-returnable migration.
+
+## 2026-11-26 - The cart leads to checkout (audit finding, no migration)
+- A signed-in buyer had no way from `/market/cart` to `/market/checkout`: the button was still the pre-checkout stub. It is now a link once every showroom can serve the chosen way of receiving; guests still get the sign-in dialog.
+- Owner decision 2026-11-26: no coupon area in the cart for now.
+- Not carried over: the cart choice of delivery or pickup (checkout starts on delivery).
+- Owner decision 2026-11-26: the cart trust strip (four reassurance cards) is removed, as asked in the 2026-11-19 walkthrough.
