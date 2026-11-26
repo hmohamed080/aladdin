@@ -33,6 +33,8 @@ export function BuyerOrdersList({ page, query, failed = false }: { page: BuyerOr
         </div>
       </header>
 
+      <div><ButtonLink href="/market/returns" variant="outline" size="sm">{b.returnsTitle}</ButtonLink></div>
+
       <form method="get" action="/market/orders" role="search" aria-label={b.searchLabel} className="grid gap-sm rounded-md border bg-surface p-md tablet:grid-cols-[1fr_auto_auto] tablet:items-end">
         <label className="grid gap-1 text-label text-fg-secondary">
           {b.searchLabel}
