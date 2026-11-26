@@ -7997,3 +7997,7 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Found: slots, storage and hourly allowance stayed consumed after failed uploads; return photos could lock an order; the media cleanup is not scheduled anywhere.
 - Done: release RPC used by the browser uploader and the server grant/verify path; one-hour database expiry; `/admin/media-limits` allowances and exemptions; guards (pgTAP 410, upload-guard.test.ts).
 - Open: scheduling `media-storage.mjs cleanup` (bytes only) needs owner approval; apply with the next hosted plan.
+
+## 2026-11-26 - search_path pinned on the last nine functions (migration 20261126120001, nothing applied)
+- `set search_path = ''` on the nine `app` helpers the Supabase advisor named (same nine on Acceptance); settings only. pgTAP 420 refuses any new unpinned function.
+- Merge after 20261126110001 (PR #285). Last migration planned before the Acceptance apply plan.
