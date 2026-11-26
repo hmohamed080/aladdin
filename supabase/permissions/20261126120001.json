@@ -1,6 +1,6 @@
 {
  "version": "20261126120001",
- "source": "Exact function permission contract after 20261126120001_backup_ledger_stale_and_manual.sql: the contract of 20261125140001 plus the internal app.backup_expire_stale (no API role). Entry measured on a local stack inside a rolled-back transaction; the CI permission gate on a clean replay is the authority.",
+ "source": "Exact function permission contract after 20261126120001_backup_ledger_stale_and_manual.sql: the contract of 20261125140001 plus the internal app.backup_expire_stale (no API role). Entry measured on a local stack inside a rolled-back transaction; the CI permission gate on a clean replay is the authority. Includes the function added by 20261126100001 on main.",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.marketplace_public_browse(text,text,text,text,integer,integer,numeric,numeric,jsonb,boolean,integer,text,text,text)",
@@ -26467,6 +26467,43 @@
     "supabase_storage_admin": false
    },
    "signature": "public.marketplace_buyer_return_evidence_confirm(uuid)",
+   "schemaUsage": {
+    "anon": true,
+    "service_role": true,
+    "authenticated": true,
+    "authenticator": true,
+    "dashboard_user": true,
+    "supabase_auth_admin": true,
+    "supabase_storage_admin": true
+   }
+  },
+  {
+   "kind": "f",
+   "owner": "postgres",
+   "config": [
+    "search_path=\"\""
+   ],
+   "grants": [
+    {
+     "role": "authenticated",
+     "grantable": false
+    },
+    {
+     "role": "postgres",
+     "grantable": false
+    }
+   ],
+   "definer": true,
+   "effective": {
+    "anon": false,
+    "service_role": false,
+    "authenticated": true,
+    "authenticator": false,
+    "dashboard_user": false,
+    "supabase_auth_admin": false,
+    "supabase_storage_admin": false
+   },
+   "signature": "public.marketplace_buyer_return_evidence_remove(uuid)",
    "schemaUsage": {
     "anon": true,
     "service_role": true,
