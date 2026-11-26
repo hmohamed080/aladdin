@@ -7,6 +7,13 @@
 - Validation: pgTAP 390 = 237/237 on a local isolated Postgres, concurrency script PASS (3 races), vitest 117 in the touched folders, eslint clean on new files, tsc clean except the pre-existing `postgres` module error in `edge/media-worker`.
 - Not done: buyer request wizard with evidence upload UI (actions exist), seller settings page, non-returnable toggle on the product edit page, navigation entries, product page disclosure badge (PR 12 exposes `non_returnable` only in quote and order), browser run, clean replay of all migrations, CI permission gate.
 
+## 2026-11-26 - Backup ledger and freshness follow what really happens (draft PR, nothing applied or synced)
+
+- Scope: branch `fix/backups-ledger-freshness-20261126`, on top of `fix/backups-service-20261126`. Migration `20261126120001` (expand only): a run pending for more than 6 h is closed as `failed` / `stale_unverified` before the next claim or console request, so it cannot hold the one-pending slot; a later verified result replaces that mark; a run started by hand on GitHub is recorded as manual. `freshness.yml` now takes what it watches and the age limit (daily 26 h, weekly 194 h) from the Admin console through `backup-control-<label>`; `plan.sh freshness` is removed.
+- Owner request (2026-11-26): backup settings are controlled from the Admin console, and run history must match what ran.
+- Validation: pgTAP 124 on a local stack inside a rolled-back transaction 93/93 (6 failed before the migration); runtime-schedule 15 tests and workflow isolation pass (both failed first).
+- Not done: not applied to Acceptance or Production (needs a gate plan and the owner's GO); kit not synced to `aladdin-backups`; no hosted run of the new freshness workflow. Existing ledger rows keep their old labels.
+
 ## 2026-11-26 - Backup runner: the Admin console is the one switch for the monthly restore test (draft PR, not synced)
 
 - Scope: branch `fix/backups-service-20261126`. `plan.sh restore` no longer needs the GitHub variable `PRODUCTION_RESTORE_SCHEDULE_ENABLED`; a scheduled restore still needs `PRODUCTION_BACKUP_ENABLED=true` and the console setting that `restore-control` reads (the restore job waits for it). The ledger report now carries the GitHub event, for a later database change that labels hand-started runs.
