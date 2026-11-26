@@ -98,20 +98,21 @@ check "manual freshness with the schedule off still checks Acceptance" "$(fresh 
 # Monthly restore gate: enabling Production backups alone never starts the scheduled restore.
 rest() { env -i PATH="$PATH" "$@" bash "$HERE/plan.sh" restore 2>/dev/null || echo ERROR; }
 check "restore: both switches off, scheduled -> no" "$(rest EVENT=schedule)" false
-check "restore: backups only, scheduled -> no" "$(rest EVENT=schedule PRODUCTION_BACKUP_ENABLED=true)" false
-check "restore: restore switch only, scheduled -> no" "$(rest EVENT=schedule PRODUCTION_RESTORE_SCHEDULE_ENABLED=true)" false
-check "restore: both on, scheduled -> yes" "$(rest EVENT=schedule PRODUCTION_BACKUP_ENABLED=true PRODUCTION_RESTORE_SCHEDULE_ENABLED=true)" true
-check "restore: backups false, restore true, scheduled -> no" "$(rest EVENT=schedule PRODUCTION_BACKUP_ENABLED=false PRODUCTION_RESTORE_SCHEDULE_ENABLED=true)" false
-check "restore: only the exact value true counts" "$(rest EVENT=schedule PRODUCTION_BACKUP_ENABLED=true PRODUCTION_RESTORE_SCHEDULE_ENABLED=TRUE)" false
-for b in "" PRODUCTION_BACKUP_ENABLED=true; do for r in "" PRODUCTION_RESTORE_SCHEDULE_ENABLED=true; do
-  check "restore: manual run is always allowed [$b $r]" "$(rest EVENT=workflow_dispatch $b $r)" true
-done; done
+check "restore: backups on, scheduled -> may start (the Admin console setting decides in restore-control)" "$(rest EVENT=schedule PRODUCTION_BACKUP_ENABLED=true)" true
+check "restore: the retired restore variable alone starts nothing" "$(rest EVENT=schedule PRODUCTION_RESTORE_SCHEDULE_ENABLED=true)" false
+check "restore: backups false, scheduled -> no" "$(rest EVENT=schedule PRODUCTION_BACKUP_ENABLED=false)" false
+check "restore: only the exact value true counts" "$(rest EVENT=schedule PRODUCTION_BACKUP_ENABLED=TRUE)" false
+for b in "" PRODUCTION_BACKUP_ENABLED=true; do
+  # shellcheck disable=SC2086
+  check "restore: manual run is always allowed [$b]" "$(rest EVENT=workflow_dispatch $b)" true
+done
 check "restore: an unknown event is refused" "$(rest EVENT=push)" ERROR
 # The workflow must use that decision, and nothing else, to start the restore job; isolation settings stay as they were.
 # The kit lives in ops/backups/ (workflows/) here and in backup/ (workflows at ../.github/workflows) in the backup repo.
 WDIR="$HERE/workflows"; [ -d "$WDIR" ] || WDIR="$HERE/../.github/workflows"
 W="$WDIR/restore-test.yml"
 check "restore workflow: the control job and the restore job both wait for the plan" "$(grep -c "needs.plan.outputs.run == 'true'" "$W")" 2
+check "restore workflow: the restore job waits for the Admin console decision" "$(grep -c "needs.restore-control.outputs.run == 'true'" "$W")" 1
 check "restore workflow: no inline vars.PRODUCTION_BACKUP_ENABLED shortcut" "$(grep -c "if:.*vars.PRODUCTION_BACKUP_ENABLED" "$W")" 0
 # shellcheck disable=SC2016
 check "restore workflow: still its own per-project environment" "$(grep -c 'environment: restore-test-\${{ inputs.label' "$W")" 1
