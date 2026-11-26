@@ -19,7 +19,8 @@ select is(
   0, 'anon holds no write privilege on any app object');
 
 select is(
-  (select string_agg(format('%s.%s:%s', n.nspname, c.relname, a.privilege_type), ',' order by 1)
+  -- Sort by the columns: inside an aggregate, ORDER BY 1 is the constant 1, which leaves the order to the scan.
+  (select string_agg(format('%s.%s:%s', n.nspname, c.relname, a.privilege_type), ',' order by n.nspname, c.relname, a.privilege_type)
    from pg_class c join pg_namespace n on n.oid = c.relnamespace, aclexplode(c.relacl) a
    where n.nspname in ('public', 'app') and a.grantee = 'authenticated'::regrole and a.privilege_type <> 'SELECT'),
   'public.contacts:DELETE,public.user_availability_windows:DELETE',
