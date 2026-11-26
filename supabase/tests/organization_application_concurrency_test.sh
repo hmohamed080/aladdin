@@ -39,7 +39,7 @@ session_sql() {
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"${uid}","role":"authenticated"}', true);
-select public.business_draft_save(p_display_name => 'C7 Additional', p_org_type => 'importer');
+select public.business_draft_save(p_display_name => 'C7 Additional', p_legal_name => 'C7 Additional LLC', p_org_type => 'importer');
 select pg_sleep(2);
 select 'ORG:' || public.business_draft_submit(null);
 commit;

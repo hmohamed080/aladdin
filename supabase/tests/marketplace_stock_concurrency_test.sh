@@ -17,11 +17,9 @@ set -euo pipefail
 # the duration of the cleanup, which is what the EXIT trap does. Run it ONLY against the
 # local isolated database.
 
-db_container="$(docker ps --filter 'name=supabase_db_aladdin' --format '{{.Names}}' | head -n 1)"
-if [[ -z "${db_container}" ]]; then
-  echo "Supabase database container not found" >&2
-  exit 1
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/db_target.sh"
+db_target_require   # explicit DB_CONTAINER only; refuses shared / ambiguous / remote targets (no auto-selection)
+db_target_mark_dirty "$(basename "$0")"   # commits rows and toggles guards: pgTAP needs a reset afterwards
 psql_() { docker exec -i "${db_container}" psql -U postgres -d postgres -qAt -v ON_ERROR_STOP=1 "$@"; }
 q() { docker exec -i "${db_container}" psql -U postgres -d postgres -qAt -v ON_ERROR_STOP=1 -c "$1" </dev/null; }
 

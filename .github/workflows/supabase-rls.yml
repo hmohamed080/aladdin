@@ -117,6 +117,22 @@ jobs:
       - name: Prove Admin Staff invitations serialize (one acceptance, one invitation, revoke-vs-accept)
         run: bash supabase/tests/admin_staff_invitation_concurrency_test.sh
 
+      - name: Prove suspension, customer, follow-up, governance, lead ownership, application and quotation races
+        run: |
+          for name in admin_suspension customer_update follow_up_update governance lead_ownership organization_application quotation; do
+            echo "::group::${name}"
+            bash "supabase/tests/${name}_concurrency_test.sh"
+            echo "::endgroup::"
+          done
+
+      - name: Prove Marketplace stock, checkout, timer and return races
+        run: |
+          for name in stock seller_stock checkout timers returns; do
+            echo "::group::marketplace_${name}"
+            bash "supabase/tests/marketplace_${name}_concurrency_test.sh"
+            echo "::endgroup::"
+          done
+
       - name: Prove repeatability (second clean reset + tests)
         run: |
           pnpm exec supabase db reset
