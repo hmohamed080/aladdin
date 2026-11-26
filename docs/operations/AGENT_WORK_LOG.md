@@ -7982,3 +7982,7 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Owner decision 2026-11-26: no coupon area in the cart for now.
 - Not carried over: the cart choice of delivery or pickup (checkout starts on delivery).
 - Owner decision 2026-11-26: the cart trust strip (four reassurance cards) is removed, as asked in the 2026-11-19 walkthrough.
+
+## 2026-11-26 - Independent publishers can publish (migration 20261126090001, owner decision, nothing applied)
+- `app.showroom_publish_guard` asked for showroom readiness even when a product has no organization, so an independent publisher could publish nothing. It now asks only for organization products; the ownership trigger prevents omitting the organization.
+- pgTAP 400 (trigger enabled) 6/6; `publisher_concurrency_test.sh` passes and joins CI.
