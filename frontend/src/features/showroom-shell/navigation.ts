@@ -56,6 +56,7 @@ export const SHOWROOM_GROUPS = [
     legacy("marketplace-approval", "/showroom/marketplace", "اعتماد المتجر", "Marketplace approval", StorefrontIcon, [MARKETPLACE_REQUEST_ENTITLEMENT]),
     legacy("marketplace-products", "/showroom/marketplace/products", "منتجات الماركت", "Marketplace products", StorefrontIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
     legacy("marketplace-orders", "/showroom/marketplace/orders", "طلبات الماركت", "Marketplace orders", ReceiptIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
+    legacy("marketplace-returns", "/showroom/marketplace/returns", "المرتجعات", "Returns", ReceiptIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
     legacy("marketplace-areas", "/showroom/marketplace/areas", "المناطق", "Delivery areas", MapPinIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
     legacy("marketplace-delivery", "/showroom/marketplace/delivery", "توصيل المناطق", "Delivery prices", TruckIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
     legacy("marketplace-payments", "/showroom/marketplace/payments", "طرق الدفع", "Payment methods", MoneyIcon, [MARKETPLACE_SELL_ENTITLEMENT]),

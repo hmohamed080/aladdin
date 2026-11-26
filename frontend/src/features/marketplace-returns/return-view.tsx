@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formatEgp } from "@/lib/ui/egp-format";
 import { RETURN_COPY, RETURN_STATUS_LABEL } from "./copy";
 import { ReturnActions } from "./return-actions";
+import { EvidenceList } from "./evidence-list";
 import type { ReturnDocument, ReturnSummary } from "./contract";
 
 type Locale = "ar" | "en";
@@ -43,6 +44,7 @@ export function ReturnDetail({ doc, role, locale }: { doc: ReturnDocument; role:
           </li>
         ))}
       </ul>
+      <EvidenceList evidence={doc.evidence} locale={locale} />
       <ReturnActions doc={doc} role={role} locale={locale} />
       <section aria-label={RETURN_COPY.events[locale]}>
         <h3 className="text-label font-semibold">{RETURN_COPY.events[locale]}</h3>

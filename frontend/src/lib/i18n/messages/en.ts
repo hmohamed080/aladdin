@@ -886,6 +886,7 @@ export const en = {
       marketplaceMedia: "Product review",
       marketplaceVideos: "Product videos",
       marketplaceComplaints: "Payment complaints",
+      marketplaceReturns: "Returns queue",
     },
     status: {
       pending_verification: "Pending verification",
@@ -1943,6 +1944,7 @@ export const en = {
           media_limits: "Upload limits",
           notification_templates: "Notification templates",
           marketplace_payment_complaints: "payment complaints",
+          marketplace_returns: "marketplace returns",
         },
         permissionDesc: {
           users: {
@@ -2023,6 +2025,9 @@ export const en = {
           },
           marketplace_payment_complaints: {
             review: "Review and decide Marketplace payment complaints (a disputed InstaPay receipt that was escalated).",
+          },
+          marketplace_returns: {
+            review: "Review Marketplace returns that reached the admin queue and decide them.",
           },
         },
         scopes: {

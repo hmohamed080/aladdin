@@ -60,6 +60,8 @@ export const ADMIN_PERMISSIONS = [
   "notification_templates.manage",
   // Marketplace payment complaints (a disputed InstaPay receipt escalated by the buyer or the showroom): Super Admin by default, grantable.
   "marketplace_payment_complaints.review",
+  // Marketplace returns that reached the admin queue: Super Admin by default, grantable.
+  "marketplace_returns.review",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
@@ -130,6 +132,7 @@ export const ADMIN_ROUTE_RULES: Readonly<Record<string, AdminRequirement>> = {
   "/admin/media-limits": "media_limits.view",
   "/admin/notification-templates": "notification_templates.view",
   "/admin/marketplace/payment-complaints": "marketplace_payment_complaints.review",
+  "/admin/marketplace/returns": "marketplace_returns.review",
   "/admin/points": "points.read",
   "/admin/analytics": "analytics.read",
   "/admin/audit": "audit.read",

@@ -851,6 +851,7 @@ export const ar: Messages = {
       marketplaceMedia: "مراجعة المنتجات",
       marketplaceVideos: "فيديوهات المنتجات",
       marketplaceComplaints: "شكاوى الدفع",
+      marketplaceReturns: "مرتجعات الماركت",
     },
     status: {
       pending_verification: "بانتظار التحقق",
@@ -1908,6 +1909,7 @@ export const ar: Messages = {
           media_limits: "حدود الرفع",
           notification_templates: "قوالب الإشعارات",
           marketplace_payment_complaints: "شكاوى الدفع",
+          marketplace_returns: "مرتجعات المتجر",
         },
         permissionDesc: {
           users: {
@@ -1988,6 +1990,9 @@ export const ar: Messages = {
           },
           marketplace_payment_complaints: {
             review: "مراجعة شكاوى الدفع في المتجر والبتّ فيها (إيصال إنستاباي متنازع عليه تم تصعيده).",
+          },
+          marketplace_returns: {
+            review: "مراجعة مرتجعات المتجر التي وصلت لقائمة الإدارة والبتّ فيها.",
           },
         },
         scopes: {
