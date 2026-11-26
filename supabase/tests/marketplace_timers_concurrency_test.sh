@@ -12,10 +12,11 @@ set -euo pipefail
 #
 # It commits real rows (unique run id) and removes them afterwards; the append-only guards are disabled by the EXIT trap only
 # for the cleanup, as the other concurrency scripts do. Run it ONLY against the local isolated database.
-# DB_CONTAINER overrides the container name (default: the first supabase_db_aladdin* container).
+#   DB_CONTAINER=<container> bash supabase/tests/marketplace_timers_concurrency_test.sh
 
-db_container="${DB_CONTAINER:-$(docker ps --filter 'name=supabase_db_aladdin' --format '{{.Names}}' | head -n 1)}"
-if [[ -z "${db_container}" ]]; then echo "Supabase database container not found" >&2; exit 1; fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/db_target.sh"
+db_target_require   # explicit DB_CONTAINER only; refuses shared / ambiguous / remote targets (no auto-selection)
+db_target_mark_dirty "$(basename "$0")"   # commits rows and toggles guards: pgTAP needs a reset afterwards
 psql_() { docker exec -i "${db_container}" psql -U postgres -d postgres -qAt -v ON_ERROR_STOP=1 "$@"; }
 
 run="$(date +%s)"
