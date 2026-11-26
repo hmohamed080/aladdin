@@ -1,12 +1,29 @@
 "use client";
-import type { UploadGrant } from "./provider-types";
+import type { MediaNamespace, UploadGrant } from "./provider-types";
+import { releaseUploadAction } from "@/server/actions/media-release";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 let active = 0;
 const waiters: Array<() => void> = [];
 
-/** Four uploads per tab; database pending limits bound concurrency across devices. */
-export async function uploadWithGrant(grant: UploadGrant, body: Blob, onProgress?: (percent: number) => void) {
+/** The reservation behind a grant: what to free when the bytes never arrive. */
+export type UploadReservation = { namespace: MediaNamespace; key: string };
+
+/**
+ * The ONLY way the browser sends a file (ADR-0032). A failed upload releases its reservation at once, so it holds no slot,
+ * storage or hourly allowance. Four uploads per tab; database pending limits bound concurrency across devices.
+ */
+export async function uploadWithGrant(grant: UploadGrant, body: Blob, reservation: UploadReservation, onProgress?: (percent: number) => void) {
+  try {
+    await send(grant, body, onProgress);
+  } catch (error) {
+    // best effort: a reservation that cannot be released now stops counting after an hour
+    try { await releaseUploadAction(reservation.namespace, reservation.key); } catch { /* the upload error is the one to report */ }
+    throw error;
+  }
+}
+
+async function send(grant: UploadGrant, body: Blob, onProgress?: (percent: number) => void) {
   if (active >= 4) await new Promise<void>((resolve) => waiters.push(resolve));
   else active++;
   try {

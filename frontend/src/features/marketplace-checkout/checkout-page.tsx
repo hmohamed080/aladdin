@@ -15,6 +15,7 @@ import type { SavedAddress } from "@/features/marketplace-addresses/address-mode
 import { areaName, governorateName } from "@/features/marketplace-seller/place-label";
 import styles from "@/features/marketplace/marketplace-cart.module.css";
 import { checkoutCopy, checkoutError } from "./checkout-copy";
+import { CheckoutPhoneStep, type CheckoutAccountPhone } from "./checkout-phone-step";
 import {
   canConfirm,
   idempotencyKeyFor,
@@ -33,7 +34,7 @@ import {
  * receipt is uploaded to the checkout session BEFORE the order can be confirmed; the confirm call is idempotent (one key per
  * session), so a double press can never place two orders.
  */
-export function CheckoutPage({ addresses, userName }: { addresses: SavedAddress[]; userName: string }) {
+export function CheckoutPage({ addresses, userName, accountPhone }: { addresses: SavedAddress[]; userName: string; accountPhone: CheckoutAccountPhone | null }) {
   const { locale, dir } = useI18n();
   const c = checkoutCopy[locale];
   const router = useRouter();
@@ -102,7 +103,7 @@ export function CheckoutPage({ addresses, userName }: { addresses: SavedAddress[
       const ticket = await requestReceiptUploadAction(prepared.session_id, f.type, f.size);
       if (!ticket.ok) return setProblem(checkoutError(locale, ticket.code));
       try {
-        await uploadWithGrant(ticket.grant, f);
+        await uploadWithGrant(ticket.grant, f, { namespace: "marketplace", key: ticket.objectKey });
       } catch {
         return setProblem(checkoutError(locale, "upload_failed"));
       }
@@ -240,6 +241,14 @@ export function CheckoutPage({ addresses, userName }: { addresses: SavedAddress[
                 </div>
               ) : null}
             </section>
+
+            {prepared.missing.includes("phone_unverified") ? (
+              <CheckoutPhoneStep
+                account={accountPhone}
+                recipientPhone={fulfilment === "delivery" ? addresses.find((a) => a.id === addressId)?.recipient_phone_e164 ?? null : null}
+                onChanged={() => setAttempt((n) => n + 1)}
+              />
+            ) : null}
 
             <section className={styles.card} aria-labelledby="co-pay">
               <h2 id="co-pay" className={styles.cardTitle} data-plain><MoneyIcon size={20} aria-hidden="true" />{c.payment}</h2>

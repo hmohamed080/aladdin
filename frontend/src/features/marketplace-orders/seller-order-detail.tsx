@@ -14,6 +14,7 @@ import { ReasonPanel, type ReasonValue } from "./reason-panel";
 import { orderError, ordersCopy } from "./orders-copy";
 import { FileComplaintSlot } from "./order-slots";
 import { CancelRefund } from "./cancel-refund";
+import { OrderReturnLinks } from "./order-returns";
 
 type Msg = { ok: boolean; text: string } | null;
 type Panel = SellerOrderActionName | "shipment_edit" | null;
@@ -249,6 +250,12 @@ export function SellerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
             <div key={key}>{entry()}</div>
           ))}
         </section>
+        {order.returns?.length ? (
+          <section className={`${card} grid gap-sm`}>
+            <h2 className="text-body font-semibold text-fg" data-plain>{t.returnsTitle}</h2>
+            <OrderReturnLinks returns={order.returns} base="/showroom/marketplace/returns" locale={locale} />
+          </section>
+        ) : null}
         <section className={`${card} grid gap-sm`}>
           <h2 className="text-body font-semibold text-fg" data-plain>{t.printTitle}</h2>
           {canWaybill ? <ButtonLink href={`/showroom/marketplace/orders/${order.id}/waybill`} variant="outline">{t.printWaybill}</ButtonLink> : null}

@@ -1,6 +1,8 @@
 # Daily alarm: fails, and emails the owner, when a backup is missing, late, suspiciously small, or its media
-# step did not finish complete. Covers Acceptance on schedule whenever ACCEPTANCE_BACKUP_SCHEDULE is daily or weekly (the
-# trial included); a MANUAL run always covers Acceptance, even with the schedule off. Production once PRODUCTION_BACKUP_ENABLED is "true" (backup/plan.sh).
+# step did not finish complete. What it watches comes from the Admin console, like the backups themselves: a
+# SCHEDULED check skips a project whose schedule is off, paused or (Production) not activated, and allows 26 h
+# for a daily schedule and 194 h for a weekly one. A MANUAL run also checks while off or paused. If the console
+# cannot be read, the project is still checked with the 26 h limit and the run stays red.
 name: Backup freshness
 on:
   schedule:
@@ -15,33 +17,56 @@ on:
 permissions:
   contents: read
 jobs:
-  plan:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    outputs:
-      targets: ${{ steps.plan.outputs.targets }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: plan
-        env:
-          EVENT: ${{ github.event_name }}
-          INPUT_MAX_AGE_HOURS: ${{ inputs.max_age_hours }}
-          PRODUCTION_BACKUP_ENABLED: ${{ vars.PRODUCTION_BACKUP_ENABLED }}
-          ACCEPTANCE_BACKUP_SCHEDULE: ${{ vars.ACCEPTANCE_BACKUP_SCHEDULE }}
-        run: |
-          targets="$(bash backup/plan.sh freshness)"
-          echo "targets=$targets" >> "$GITHUB_OUTPUT"
-          # Never let "nothing to check" look like a pass: say it in the run summary.
-          if [ "$targets" = "[]" ]; then echo "NOTHING WAS CHECKED: no project is scheduled (ACCEPTANCE_BACKUP_SCHEDULE=${ACCEPTANCE_BACKUP_SCHEDULE:-off}, Production not enabled)." | tee -a "$GITHUB_STEP_SUMMARY"; fi
-          echo "Checking: $targets" >> "$GITHUB_STEP_SUMMARY"
-
-  check:
-    needs: plan
-    if: needs.plan.outputs.targets != '[]'
+  # The service-role key lives only in this job (environment `backup-control-<label>`): it reads the console
+  # schedule and hands on one number. It touches no bucket.
+  control:
+    name: control (${{ matrix.label }})
     strategy:
       fail-fast: false
       matrix:
-        target: ${{ fromJSON(needs.plan.outputs.targets) }}
+        label: [acceptance, production]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: backup-control-${{ matrix.label }}
+    outputs:
+      max_age_acceptance: ${{ matrix.label == 'acceptance' && steps.control.outputs.max_age_hours || '' }}
+      max_age_production: ${{ matrix.label == 'production' && steps.control.outputs.max_age_hours || '' }}
+    env:
+      EVENT: ${{ github.event_name }}
+      BACKUP_KIND: freshness
+      BACKUP_LABEL: ${{ matrix.label }}
+      INPUT_MAX_AGE_HOURS: ${{ inputs.max_age_hours }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the console schedule
+        id: control
+        run: python3 backup/runtime-schedule.py
+
+  gate:
+    name: gate
+    needs: control
+    if: always() && !cancelled()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      targets: ${{ steps.gate.outputs.targets }}
+    env:
+      MAX_AGE_ACCEPTANCE: ${{ needs.control.outputs.max_age_acceptance }}
+      MAX_AGE_PRODUCTION: ${{ needs.control.outputs.max_age_production }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: gate
+        run: python3 backup/runtime-schedule.py targets | tee -a "$GITHUB_STEP_SUMMARY"
+
+  check:
+    needs: gate
+    if: always() && !cancelled() && needs.gate.result == 'success' && needs.gate.outputs.targets != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.gate.outputs.targets) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: backup-check-${{ matrix.target.label }}

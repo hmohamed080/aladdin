@@ -9,7 +9,7 @@ Status: built and tested locally. **Not active anywhere yet.** Acceptance runs f
 | Workflow | When | Does | Credentials it sees |
 |---|---|---|---|
 | Daily backup | Fires at 22:30 and 23:30 UTC. `plan.sh` keeps the firing that is 01:30 Cairo, in summer and in winter | `db-backup.sh`, then `media-backup.sh`. Read-only on the project; it only writes new objects | Database URL, service-role key (media read), R2 **write** token, age **public** keys |
-| Backup freshness | 05:00 UTC (07:00 or 08:00 Cairo) | `freshness.sh` for every active project. It fails and emails when the newest backup is older than the limit, less than half the size of the one before, missing, or when that snapshot's media step did not finish complete | R2 **read** token, Resend key |
+| Backup freshness | 05:00 UTC (07:00 or 08:00 Cairo) | `freshness.sh` for every project the Admin console schedules. It fails and emails when the newest backup is older than the limit, less than half the size of the one before, missing, or when that snapshot's media step did not finish complete | Control job: service-role key only. Check job: R2 **read** token, Resend key |
 | Monthly restore test | 04:00 UTC on the 2nd | `restore-test.sh`: restores the newest backup, or any retained snapshot you name, into a throwaway local Supabase stack on the runner (details below) | R2 **read** token, restore-test **private** key |
 
 The restore test proves three things:
@@ -21,16 +21,14 @@ Nothing in these workflows can write to a database or delete a backup. Only the 
 
 ### Which projects a run covers
 
-`plan.sh` decides; `plan-test.sh` tests it offline (86 checks, also run in the main repo's CI).
+`plan.sh` decides; `plan-test.sh` tests it offline (68 checks, also run in the main repo's CI).
 
 - **Production** is backed up only when the repository variable `PRODUCTION_BACKUP_ENABLED` is exactly `true`. A manual Production run also needs the typed confirmation `back up production`. `db-backup.sh` and `media-backup.sh` refuse a Production label without the same variable, so the gate holds even if a workflow is edited.
-- **Monthly restore test** (`plan.sh restore`): a manual run is always allowed and unchanged. A SCHEDULED run restores Production, so it needs BOTH `PRODUCTION_BACKUP_ENABLED=true` AND its own repository variable `PRODUCTION_RESTORE_SCHEDULE_ENABLED=true` (default off, exact value `true`). Enabling Production backups alone never starts it. Set the second switch only after a manual Production restore has passed and the `restore-test-production` environment and its keys exist. When it is off the run's summary says "NO RESTORE TEST RAN". The restore job itself (environment `restore-test-<label>`, read-only permission, the schema and integrity guards) is unchanged.
-- **Acceptance** follows `ACCEPTANCE_BACKUP_SCHEDULE`:
-  - `off` (default): no scheduled runs and no freshness check;
-  - `daily`: the trial; freshness allows 26 h;
-  - `weekly`: Sundays, Cairo; freshness allows 8 days.
-  
+- **Monthly restore test** (`plan.sh restore`): a manual run is always allowed. A SCHEDULED run restores Production and needs `PRODUCTION_BACKUP_ENABLED=true` **and** the Admin console setting "monthly Production restore test", which `restore-control` reads and the restore job waits for. The console is the switch for the schedule.
+- **Scheduled runs** of both projects follow the Admin console (frequency, time, pause, Production activation), read by the `control` job with `runtime-schedule.py`. The repository variable `ACCEPTANCE_BACKUP_SCHEDULE` is only read by `plan.sh backup` in its offline tests.
+
   A manual Acceptance run is always allowed.
+- **Freshness limit** (also from the console, `runtime-schedule-test.py`): daily 26 h, weekly 194 h. A scheduled check skips a project that is off, paused or (Production) not activated, and the run summary says so. A manual check also covers an off or paused project. If the console cannot be read, the project is checked with the 26 h limit and the run fails. The check after a pause ends can alarm if the next backup has not run yet.
 - **Cairo time:** Egypt changes the clock on the last Friday of April and the last Thursday of October. Two cron firings, plus "Cairo hour 01 to 03 counts", put the backup at 01:30 Cairo all year. In summer both firings count, and the second one finds today's backup and does nothing (`SKIP_IF_TAKEN`). `plan-test.sh` prints the real firings around both changes (UTC to Cairo):
   - 2026-04-23 22:30 UTC is 01:30 Cairo (summer time from that day), and it runs.
   - 2026-10-29 22:30 UTC is 00:30 Cairo, and it is skipped.
@@ -182,7 +180,6 @@ Part A is read-only preparation and changes nothing hosted. Part B changes hoste
    | Where | Name | Value |
    |---|---|---|
    | Repo variables | `PRODUCTION_BACKUP_ENABLED` | `false` |
-   | | `ACCEPTANCE_BACKUP_SCHEDULE` | `daily` for the trial (`off` stops it) |
    | Environment `backup-acceptance` | variables `BACKUP_BUCKET` = `aladdin-acceptance-backups-weur`, `R2_ACCOUNT_ID`, `AGE_RECIPIENTS` (the two public keys from step 1), `R2_MEDIA_BACKUP` = `1` once the media backup is wanted, `R2_MEDIA_SOURCE_BUCKET` = `aladdin-r2-acceptance-20261011-private`; `LEGACY_MEDIA_BACKUP` unset (off) | Acceptance only |
    | | secrets `BACKUP_DB_URL`, `R2_BACKUP_WRITE_KEY_ID`, `R2_BACKUP_WRITE_SECRET`, `R2_MEDIA_READ_KEY_ID`, `R2_MEDIA_READ_SECRET` | |
    | Environment `backup-control-acceptance` | variable `SUPABASE_URL` = `https://nxossqhdfltcqdwvbewi.supabase.co`; secret `SUPABASE_SERVICE_ROLE_KEY` and **nothing else** | The ONLY place the service-role key lives. Used by the `control` jobs (read the schedule, claim the run) and the reconciler. No R2 token, no database URL, no age key |
@@ -223,7 +220,7 @@ Each check below must pass:
 - **Restore test:** `RESULT: PASS`. Schema and row counts are exact, the inventory is exact, and the sampled media restore.
 - **Wrong-project test:** temporarily put the Production URL into `backup-acceptance`. The run must stop at "is not the acceptance project" before any request. Then put the Acceptance URL back.
 - **Nightly runs:** for 7 nights, one Acceptance snapshot per Cairo night (summer and winter alike) and green freshness.
-- **Freshness alarm:** set `ACCEPTANCE_BACKUP_SCHEDULE=off` for one night. Freshness checks nothing, which is expected. Then run freshness manually with the schedule set back to `daily` and `MAX_AGE_HOURS` low, and confirm the alert email arrives.
+- **Freshness alarm:** set the Acceptance schedule to off in the Admin console for one morning. The scheduled check skips Acceptance and says so. Then run freshness manually with `max_age_hours` = 1 and confirm the alert email arrives.
 
 ### Milestone: Acceptance manual backup and restore, PASS (2026-11-01)
 
@@ -235,7 +232,7 @@ Verified by the owner on runs of `aladdin-backups` main (inactive build):
 
 This is the manual milestone only. Schedules stay off (`ACCEPTANCE_BACKUP_SCHEDULE=off`), `PRODUCTION_BACKUP_ENABLED=false`, PR #118 stays a draft. Still open for automatic Acceptance backups: the wrong-project test, the 7-night trial and the freshness-alarm test above, each needing a separate owner approval.
 
-Rollback: set `ACCEPTANCE_BACKUP_SCHEDULE=off`. Nothing else runs on its own.
+Rollback: set the schedule to off in the Admin console. Nothing else runs on its own.
 - The backups never write to Acceptance. Turning them off leaves nothing to undo there.
 - Objects already written stay until their lock and expiry pass. Daily copies go after about 15 days. Media copies are not locked and expire on their own (R2 generations after 90 days, legacy copies after 30).
 - If the lock or lifecycle rules have to go, `wrangler r2 bucket lock set` and `lifecycle set` with an empty rule list remove them. Objects that are already locked stay locked until their own expiry.
@@ -253,12 +250,12 @@ Nothing below happens without the owner's separate approval for each step. The `
 **Before activation (done offline, in CI):** `target-guard-test.sh` (a Production-shaped URL with dummy credentials, the wrong bucket, endpoint or Supabase URL stop every script before any tool runs), `plan-test.sh`, `freshness-test.sh` (including the alert path), `restore-pin-test.sh`.
 
 **Activation**
-1. Confirm the manual milestone above, `ACCEPTANCE_BACKUP_SCHEDULE=off`, `PRODUCTION_BACKUP_ENABLED=false`, and that the `ALERT_EMAIL` variable and `RESEND_API_KEY` secret are set in `backup-check-acceptance` (owner, dashboard only).
+1. Confirm the manual milestone above, the Acceptance schedule off in the Admin console, `PRODUCTION_BACKUP_ENABLED=false`, and that the `ALERT_EMAIL` variable and `RESEND_API_KEY` secret are set in `backup-check-acceptance` (owner, dashboard only).
 2. Rebuild with `bash ops/backups/build-repo.sh <aladdin-backups checkout> --scheduled`, review the diff (only `schedule:` blocks differ), push to `main`.
 3. Run the alarm drill once (below) and confirm the email arrives.
-4. Set the repository variable `ACCEPTANCE_BACKUP_SCHEDULE=daily`. The next 01:30 Cairo run is the first scheduled snapshot.
+4. Set the Acceptance schedule to daily in the Admin console. The next 01:30 Cairo run is the first scheduled snapshot.
 
-**Alarm drill (does not touch any backup):** Actions, "Backup freshness", Run workflow, `max_age_hours` = 1. The snapshot is older than 1 h, so the run must FAIL with "newest database backup is N h old" and an email must arrive at `ALERT_EMAIL`. The input can only lower the limit (`plan.sh` refuses 26 or more). Then run it again with the input empty: it must pass.
+**Alarm drill (does not touch any backup):** Actions, "Backup freshness", Run workflow, `max_age_hours` = 1. The snapshot is older than 1 h, so the run must FAIL with "newest database backup is N h old" and an email must arrive at `ALERT_EMAIL`. The input can only lower the limit (the control job refuses the current limit or more). Then run it again with the input empty: it must pass.
 
 **Seven-night acceptance criteria (all must hold, otherwise stop and report):**
 - Seven consecutive Cairo nights each have exactly one `db/acceptance/daily/` snapshot taken between 01:30 and 04:00 Cairo, each with a complete `.r2media.json` (`"complete":true`, `copy_failures` 0, `excluded_retired` counts present).
@@ -268,11 +265,11 @@ Nothing below happens without the owner's separate approval for each step. The `
 - One monthly-style restore test (manual, newest snapshot) passes in the middle of the trial.
 - No unexpected cost: stored bytes and operation counts in the Cloudflare dashboard stay within the estimate in this README.
 
-**Monitoring:** the freshness email is the primary signal (it does not depend on anyone watching GitHub). GitHub's own failed-run notification is the second signal. Once a week the owner glances at the freshness run list: seven green runs, none skipped. A scheduled freshness run with the Acceptance schedule off prints "NOTHING WAS CHECKED" in its summary, so that case never looks like a pass.
+**Monitoring:** the freshness email is the primary signal (it does not depend on anyone watching GitHub). GitHub's own failed-run notification is the second signal. Once a week the owner glances at the freshness run list: seven green runs, none skipped. A scheduled freshness run with every schedule off prints "NOTHING WAS CHECKED" in its summary, so that case never looks like a pass.
 
 **Notification recommendation:** native GitHub Actions notifications alone are not enough. They go only to the person who last edited the schedule, depend on that person's notification settings, and say nothing when a run never starts (a dropped or disabled schedule). Minimum reliable setup: (1) the freshness workflow's own Resend email (already built, tested, fails closed), (2) GitHub failed-workflow notifications left on as a backup, (3) the weekly glance above. A dead-man's switch from an outside monitoring service would close the last gap (a freshness run that never happens) and is optional.
 
-**Rollback:** set `ACCEPTANCE_BACKUP_SCHEDULE=off` (nothing else runs on its own; freshness then checks nothing and says so). To stop even the workflow triggers, rebuild without `--scheduled`. Existing snapshots stay until their lifecycle expiry; revoke the two tokens to cut access.
+**Rollback:** set the schedule to off in the Admin console (nothing else runs on its own; freshness then skips that project and says so). To stop even the workflow triggers, rebuild without `--scheduled`. Existing snapshots stay until their lifecycle expiry; revoke the two tokens to cut access.
 
 ## Restoring for real
 

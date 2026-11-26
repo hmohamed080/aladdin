@@ -48,6 +48,7 @@ const items: Item[] = [
   { href: "/admin/marketplace/videos", key: "admin.nav.marketplaceVideos", exact: false, Icon: CameraIcon },
   // Gated by its own grantable permission through the route table (hidden for admins without it).
   { href: "/admin/marketplace/payment-complaints", key: "admin.nav.marketplaceComplaints", exact: false, Icon: MoneyIcon },
+  { href: "/admin/marketplace/returns", key: "admin.nav.marketplaceReturns", exact: false, Icon: PackageIcon },
   { href: "/admin/audit", key: "admin.preview.nav.audit", exact: false, Icon: ScrollIcon },
   { href: "/admin/backups", key: "backups.title", exact: false, Icon: PackageIcon },
   { href: "/admin/media-limits", key: "mediaLimits.title", exact: false, Icon: CameraIcon },

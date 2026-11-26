@@ -62,7 +62,7 @@ export async function uploadProductImages(
       break;
     }
     try {
-      await uploadWithGrant(ticket.grant, file);
+      await uploadWithGrant(ticket.grant, file, { namespace: "marketplace", key: ticket.objectKey });
     } catch {
       failures.push({ name: file.name, code: "upload_failed" });
       await removeImageAction(ticket.imageId);
@@ -86,7 +86,7 @@ export async function replaceProductImage(imageId: string, file: File): Promise<
   const ticket = await requestImageReplacementAction(imageId, file.type, file.size);
   if (!ticket.ok) return ticket.code;
   try {
-    await uploadWithGrant(ticket.grant, file);
+    await uploadWithGrant(ticket.grant, file, { namespace: "marketplace", key: ticket.objectKey });
   } catch {
     await removeImageAction(ticket.imageId);
     return "upload_failed";

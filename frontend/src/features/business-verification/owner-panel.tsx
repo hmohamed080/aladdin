@@ -60,7 +60,7 @@ export function BvOwnerPanel({
     try {
       const ticket = await requestBvUploadAction({ orgId, docType, contentType: file.type, sizeBytes: file.size, fileName: file.name });
       if (!ticket.ok) throw new Error(ticket.code);
-      try { await uploadWithGrant(ticket.grant, file); }
+      try { await uploadWithGrant(ticket.grant, file, { namespace: "verification", key: ticket.key }); }
       catch { throw new Error("businessVerification.errors.upload"); }
       const confirmed = await confirmBvUploadAction(ticket.key);
       if (!confirmed.ok) throw new Error(confirmed.code);

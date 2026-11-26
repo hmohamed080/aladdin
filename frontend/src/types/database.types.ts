@@ -10268,6 +10268,17 @@ export type Database = {
         Args: { p_assignment_id: string; p_reason?: string }
         Returns: undefined
       }
+      admin_upload_exemption_add: { Args: { p_reason: string; p_subject_id: string; p_subject_type: string }; Returns: Json }
+      admin_upload_exemption_remove: { Args: { p_id: string; p_reason: string }; Returns: Json }
+      admin_upload_limits_get: { Args: never; Returns: Json }
+      admin_upload_limits_set: {
+        Args: { p_hourly_attempts: number; p_hourly_uploads: number; p_reason: string; p_storage_quota_mb: number }
+        Returns: Json
+      }
+      admin_upload_subject_search: {
+        Args: { p_query: string }
+        Returns: { detail: string; label: string; subject_id: string; subject_type: string }[]
+      }
       admin_subject_suspension: {
         Args: { p_subject_id: string; p_subject_type: string }
         Returns: Json
@@ -11184,6 +11195,7 @@ export type Database = {
       marketplace_buyer_return_create: { Args: { p_evidence_ids: string[]; p_idempotency_key: string; p_kind: string; p_lines: Json; p_note: string; p_order_id: string; p_reason_preset_id: string; p_remedy: string }; Returns: Json }
       marketplace_buyer_return_eligibility: { Args: { p_order_id: string }; Returns: Json }
       marketplace_buyer_return_evidence_confirm: { Args: { p_evidence_id: string }; Returns: Json }
+      marketplace_buyer_return_evidence_remove: { Args: { p_evidence_id: string }; Returns: Json }
       marketplace_buyer_return_get: { Args: { p_return_id: string }; Returns: Json }
       marketplace_buyer_return_mark_shipped: { Args: { p_return_id: string; p_tracking?: string }; Returns: Json }
       marketplace_buyer_return_request_upload: { Args: { p_content_type: string; p_order_id: string }; Returns: Json }
@@ -11755,6 +11767,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      media_upload_abandon: {
+        Args: { p_key: string; p_namespace: string }
+        Returns: boolean
+      }
       media_storage_reserve: {
         Args: {
           p_key: string
@@ -11907,6 +11923,7 @@ export type Database = {
           status: Database["public"]["Enums"]["referral_status"]
         }[]
       }
+      my_upload_exempt: { Args: { p_key: string; p_namespace: string }; Returns: boolean }
       my_work_companies: {
         Args: never
         Returns: {

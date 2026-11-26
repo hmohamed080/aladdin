@@ -16,6 +16,7 @@ import styles from "@/features/marketplace/marketplace-cart.module.css";
 import { writeAccountCartLines } from "@/features/marketplace/live/live-cart-store";
 import { FileComplaintSlot } from "./order-slots";
 import { CancelRefund } from "./cancel-refund";
+import { OrderReturnLinks } from "./order-returns";
 import { formatEstimate, hoursLeft, isInstapay, isLegacy, isReadyForPickup, knownActions, reorderLines } from "./order-model";
 import type { OrderDocumentV2, ReasonPreset } from "./order-types";
 import { dateTime, OrderLineRow, PaymentBadge, ProgressBar, StatusBadge, Timeline, Totals } from "./order-parts";
@@ -94,7 +95,7 @@ export function BuyerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
       const ticket = await requestResubmitUploadAction(order.id, f.type, f.size);
       if (!ticket.ok) return setMsg({ ok: false, text: orderError(locale, ticket.code) });
       try {
-        await uploadWithGrant(ticket.grant, f);
+        await uploadWithGrant(ticket.grant, f, { namespace: "marketplace", key: ticket.objectKey });
       } catch {
         return setMsg({ ok: false, text: orderError(locale, "upload_failed") });
       }
@@ -167,6 +168,13 @@ export function BuyerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
   };
   registry.file_complaint = () => <FileComplaintSlot key="file_complaint" orderId={order.id} />;
   registry.confirm_cancel_refund = () => <CancelRefund key="confirm_cancel_refund" order={order} mode="confirm" onDone={setOrder} />;
+  for (const kind of ["return", "exchange"] as const) {
+    registry[`request_${kind}`] = () => (
+      <ButtonLink href={`/market/returns/new?order=${order.id}&kind=${kind}`} variant="outline" className="w-full">
+        {kind === "return" ? b.requestReturn : b.requestExchange}
+      </ButtonLink>
+    );
+  }
   const buttons = knownActions(order.actions, registry);
 
   return (
@@ -279,6 +287,13 @@ export function BuyerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
               </div>
             ) : null}
           </section>
+
+          {order.returns?.length ? (
+            <section className={card} aria-labelledby="bo-returns">
+              <h2 id="bo-returns" className={h2} data-plain>{b.returnsTitle}</h2>
+              <OrderReturnLinks returns={order.returns} base="/market/returns" locale={locale} />
+            </section>
+          ) : null}
 
           <section className={card} aria-labelledby="bo-time">
             <h2 id="bo-time" className={h2} data-plain>{b.timelineTitle}</h2>

@@ -78,6 +78,14 @@ Locked. Do not replace without a documented blocking reason recorded in an ADR. 
 
 Do **not** introduce Kubernetes, Kafka, RabbitMQ, Redis, Elasticsearch/OpenSearch, event sourcing, CQRS frameworks, a service mesh, an API gateway, or additional databases unless an existing approved requirement makes it unavoidable. Record future scaling options in `docs/architecture/scaling-strategy.md` instead of building speculative infrastructure.
 
+## Uploads (non-negotiable)
+
+Any place that accepts a file follows [ADR-0032](docs/decisions/ADR-0032-upload-reservations-limits-exemptions.md); read its checklist before adding or changing an upload.
+
+- A failed, rejected or deleted upload frees its slot and storage **at once**; an abandoned one stops counting after an hour **in the database**, never waiting for a cleanup job.
+- Send bytes only through `uploadWithGrant(grant, file, { namespace, key })`; reserve only through the central media system; extend `public.media_upload_abandon` for a new place.
+- No private hourly or storage quota: use the admin settings and honour exemptions (`app.upload_exempt`).
+
 ## Dependency policy
 
 **Default: write it yourself. Reach for a library only when the alternative would be non-trivial, error-prone, or reinvention of a standard.** Every dependency is a liability — bundle size, supply-chain risk, upgrade work.
