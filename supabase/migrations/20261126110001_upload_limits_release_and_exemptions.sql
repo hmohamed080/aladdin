@@ -396,7 +396,10 @@ begin
        from public.users u
        join auth.users a on a.id = u.id
        left join public.profiles p on p.user_id = u.id
-      where u.id::text = q or lower(a.email) = lower(q) or a.phone = ltrim(q, '+') or p.display_name ilike v_like
+      where u.id::text = q or lower(a.email) = lower(q) or p.display_name ilike v_like
+         -- phone accounts keep the number on the profile (their Auth identity is an internal alias)
+         or a.phone = ltrim(q, '+') or p.phone_e164 = '+' || ltrim(q, '+')
+         or (q ~ '^01[0-9]{9}$' and p.phone_e164 = '+2' || q)
       order by p.display_name limit 10)
     union all
     (select 'organization'::text, o.id, o.name, o.org_type::text

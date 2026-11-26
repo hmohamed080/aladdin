@@ -9,6 +9,7 @@ import type { MediaNamespace, StorageProviderName } from "@/lib/storage/provider
 import { SupabaseStorageProvider } from "./supabase-provider";
 import { CloudflareR2StorageProvider } from "./r2-provider";
 import { verifyMediaBytes, withMediaProcessingSlot } from "./validation";
+import { isDecodeRefusal, isFinalRefusal } from "./content-refusal";
 import { runtimeImageProcessor } from "./image-processing/runtime";
 import { generateImageVariants, variantManifest, type VariantManifest } from "./public-image-variants";
 import type { StorageProvider } from "@/lib/storage/provider-types";
@@ -168,21 +169,21 @@ export async function verifyPendingMedia(client: SupabaseClient, namespace: Medi
   const provider = await mediaProvider(pending.provider === "supabase" ? privilegedStorageClient() : client, namespace, pending.provider, key);
   requireWriteApproval(pending.provider);
   const maxBytes = await imageMaxBytes(namespace); // the stored, admin-configurable limit
-  const bytes = await provider.readObject(key, maxBytes);
-  let checked: Awaited<ReturnType<typeof verifyMediaBytes>>;
-  try {
-    checked = await verifyMediaBytes(bytes, pending.contentType, maxBytes);
-  } catch (error) {
-    await releaseReservation(client, namespace, key); // refused content never becomes a file
+  // refused content never becomes a file: free its reservation now; a failure a retry can fix keeps it
+  const releaseIf = (refused: (error: unknown) => boolean) => async (error: unknown): Promise<never> => {
+    if (refused(error)) await releaseReservation(client, namespace, key);
     throw error;
-  }
+  };
+  const bytes = await provider.readObject(key, maxBytes).catch(releaseIf(isFinalRefusal));
+  const checked = await verifyMediaBytes(bytes, pending.contentType, maxBytes).catch(releaseIf(isDecodeRefusal));
   // On R2 the stored original is the verified upload RE-ENCODED (sRGB, bounded edge, no personal metadata).
   // Fail closed: an image whose metadata cannot be removed is refused, never stored as uploaded.
   // The legacy Supabase provider cannot replace an object (keys are immutable, commit is a no-op), so there the
   // stored bytes ARE the upload: re-encoding would make the receipt describe bytes that were never stored.
   // The receipt must always describe the stored object, so that path attests the upload as it is.
   const stored = pending.provider === "r2" && checked.contentType.startsWith("image/") && reencodesOriginal(namespace)
-    ? (await withMediaProcessingSlot(() => runtimeImageProcessor().reencodeOriginal(bytes, checked.contentType, maxBytes))).bytes
+    ? (await withMediaProcessingSlot(() => runtimeImageProcessor().reencodeOriginal(bytes, checked.contentType, maxBytes))
+        .catch(releaseIf(isFinalRefusal))).bytes
     : bytes;
   const verified = stored === bytes ? checked
     : { ...checked, size: stored.byteLength, sha256: createHash("sha256").update(stored).digest("hex") };

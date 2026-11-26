@@ -162,6 +162,11 @@ select is((select count(*)::int from jsonb_array_elements(public.admin_upload_li
 select is((select subject_id from public.admin_upload_subject_search('ul-one@probe.test')), :'u1'::uuid, 'E11. found by exact email');
 select is((select count(*)::int from public.admin_upload_subject_search('r 100%') ), 1, 'E12. a percent sign is searched literally');
 select is((select count(*)::int from public.admin_upload_subject_search('ul-one@')), 0, 'E13. part of an email finds nothing');
+select pg_temp.as_owner();
+update public.profiles set phone_e164 = '+201099900410' where user_id = :'u2';
+select pg_temp.act_as(:'sup');
+select is((select subject_id from public.admin_upload_subject_search('01099900410')), :'u2'::uuid, 'E13b. found by the profile mobile number');
+select is((select subject_id from public.admin_upload_subject_search('+201099900410')), :'u2'::uuid, 'E13c. also in international form');
 select throws_ok($$select public.admin_upload_exemption_add('user', gen_random_uuid(), 'because')$$, '22023', 'unknown account', 'E14. unknown account');
 select pg_temp.as_owner();
 select throws_ok($$delete from public.upload_limit_events$$, '23514', null, 'E15. the history is append-only');
