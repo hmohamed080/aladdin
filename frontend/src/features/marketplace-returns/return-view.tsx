@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatEgp } from "@/lib/ui/egp-format";
-import { RETURN_COPY, RETURN_STATUS_LABEL } from "./copy";
+import { RETURN_COPY, RETURN_EVENT_LABEL, RETURN_ROLE_LABEL, RETURN_STATUS_LABEL } from "./copy";
 import { ReturnActions } from "./return-actions";
 import { EvidenceList } from "./evidence-list";
 import type { ReturnDocument, ReturnSummary } from "./contract";
@@ -51,7 +51,7 @@ export function ReturnDetail({ doc, role, locale }: { doc: ReturnDocument; role:
         <ol className="mt-sm flex flex-col gap-1 text-body">
           {doc.events.map((e) => (
             <li key={e.id}>
-              <span className="text-fg-secondary">{e.actor_role} · {e.action}</span>
+              <span className="text-fg-secondary">{RETURN_ROLE_LABEL[e.actor_role]?.[locale] ?? e.actor_role} · {RETURN_EVENT_LABEL[e.action]?.[locale] ?? e.action}</span>
               {e.note ? <span> — {e.note}</span> : null}
             </li>
           ))}

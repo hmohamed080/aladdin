@@ -87,24 +87,25 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
   const card = "grid gap-sm rounded-md border bg-surface p-md";
   return (
     <form onSubmit={submit} className="flex flex-col gap-md">
-      <fieldset className={card}>
-        <legend className="text-body font-semibold">{c.kind}</legend>
+      <div className={card} role="radiogroup" aria-label={c.kind}>
+        <p className="text-body font-semibold">{c.kind}</p>
         {(["return", "exchange"] as const).map((k) => (
           <label key={k} className="flex items-center gap-sm text-body">
             <input type="radio" name="return-kind" checked={kind === k} onChange={() => setKind(k)} />
             {k === "return" ? c.kindReturn : c.kindExchange}
           </label>
         ))}
-      </fieldset>
+      </div>
 
-      <fieldset className={card}>
-        <legend className="text-body font-semibold">{c.reason}</legend>
+      <div className={card} role="radiogroup" aria-label={c.reason}>
+        <p className="text-body font-semibold">{c.reason}</p>
         {reasons.map((r) => (
           <label key={r.id} className="flex items-center gap-sm text-body">
             <input type="radio" name="return-reason" checked={reasonId === r.id} onChange={() => setReasonId(r.id)} />
             <span>
               {locale === "ar" ? r.label_ar : r.label_en}
-              <span className="ms-sm text-caption text-fg-secondary">
+              <span className="text-caption text-fg-secondary">
+                {" — "}
                 {r.shipping_payer === "seller" ? c.shippingSeller : c.shippingBuyer}
                 {r.requires_evidence ? ` · ${c.photoRequired}` : ""}
               </span>
@@ -112,10 +113,10 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
           </label>
         ))}
         {generalClosed ? <p className="text-caption text-fg-secondary">{c.generalClosed}</p> : null}
-      </fieldset>
+      </div>
 
-      <fieldset className={card}>
-        <legend className="text-body font-semibold">{c.items}</legend>
+      <div className={card} role="group" aria-label={c.items}>
+        <p className="text-body font-semibold">{c.items}</p>
         {eligibility.lines.map((l) => {
           const accepted = reason ? lineAcceptsClaim(l, reason.claim_type) : l.returnable_quantity > 0;
           const id = `return-qty-${l.item_id}`;
@@ -139,7 +140,7 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
             </LabeledField>
           );
         })}
-      </fieldset>
+      </div>
 
       <div className={card}>
         <LabeledField label={c.note} htmlFor="return-note">

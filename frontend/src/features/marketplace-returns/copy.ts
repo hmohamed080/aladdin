@@ -111,3 +111,28 @@ const RETURN_ERRORS: Record<string, L> = {
 export function returnErrorText(locale: "ar" | "en", code: string): string {
   return RETURN_ERRORS[code]?.[locale] ?? RETURN_COPY.failed[locale];
 }
+
+/** Words of the request history: who did what. An unknown name from a newer database is shown as it is. */
+export const RETURN_ROLE_LABEL: Record<string, L> = {
+  buyer: { ar: "المشتري", en: "Buyer" },
+  seller: { ar: "المعرض", en: "Showroom" },
+  admin: { ar: "إدارة المنصة", en: "Platform admin" },
+  system: { ar: "النظام", en: "System" },
+};
+
+export const RETURN_EVENT_LABEL: Record<string, L> = {
+  requested: { ar: "أُرسل الطلب", en: "Request sent" },
+  approved: { ar: "تمت الموافقة", en: "Approved" },
+  rejected: { ar: "تم الرفض", en: "Rejected" },
+  cancelled: { ar: "أُلغي الطلب", en: "Cancelled" },
+  shipped: { ar: "شُحن المنتج", en: "Shipped back" },
+  in_transit: { ar: "في الطريق للمعرض", en: "On its way back" },
+  received: { ar: "استلم المعرض المنتج", en: "Received" },
+  refund_sent: { ar: "سُجّل رد المبلغ", en: "Refund recorded" },
+  refund_confirmed: { ar: "تأكد استلام المبلغ", en: "Refund confirmed" },
+  refunded: { ar: "تم الاسترداد", en: "Refunded" },
+  exchanged: { ar: "تم الاستبدال", en: "Exchanged" },
+  complaint_filed: { ar: "قُدمت شكوى", en: "Complaint filed" },
+  escalated: { ar: "أُحيل الطلب لإدارة المنصة", en: "Sent to the platform team" },
+  admin_reminded: { ar: "ذكّرت الإدارة المعرض", en: "The showroom was reminded" },
+};
