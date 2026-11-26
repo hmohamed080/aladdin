@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BackupRun, BackupSettings } from "@/server/queries/admin-backups";
-import { isSystemReason, latestRunTime, pauseHoursFor, requesterOf, runTime, runUrl, scheduleSummary, splitSkipped } from "./backup-view";
+import { historyFilterFrom, historyHref, isSystemReason, pageCount, latestRunTime, pauseHoursFor, requesterOf, runTime, runUrl, scheduleSummary } from "./backup-view";
 
 const run = (over: Partial<BackupRun> = {}): BackupRun => ({
   id: "r1",
@@ -106,18 +106,6 @@ describe("pauseHoursFor", () => {
   });
 });
 
-describe("splitSkipped", () => {
-  it("separates the checks that found nothing to do", () => {
-    const rows = [run({ id: "a", status: "skipped" }), run({ id: "b" }), run({ id: "c", status: "failed" })];
-    const { shown, skippedCount } = splitSkipped(rows, false);
-    expect(shown.map((r) => r.id)).toEqual(["b", "c"]);
-    expect(skippedCount).toBe(1);
-  });
-  it("shows everything on request", () => {
-    expect(splitSkipped([run({ status: "skipped" })], true).shown).toHaveLength(1);
-  });
-});
-
 describe("runs nobody requested from the console", () => {
   it("translates both reasons the database writes for them, and keeps a person's own words", () => {
     expect(isSystemReason("Scheduled run reported by GitHub.")).toBe(true);
@@ -128,5 +116,37 @@ describe("runs nobody requested from the console", () => {
     expect(requesterOf(run({ requested_by: "u1", trigger: "manual" }))).toBe("person");
     expect(requesterOf(run())).toBe("system");
     expect(requesterOf(run({ trigger: "manual" }))).toBe("github");
+  });
+});
+
+const DEFAULT_FILTER = { page: 1, kind: null, status: null, includeSkipped: false } as const;
+
+describe("history address", () => {
+  it("starts at the first page with no filter", () => {
+    expect(historyFilterFrom({})).toEqual(DEFAULT_FILTER);
+  });
+  it("treats a page that is not a whole positive number as page 1", () => {
+    for (const page of ["0", "-2", "abc", "1.5", "", "1e3", ["2", "3"]]) {
+      expect(historyFilterFrom({ page }).page, String(page)).toBe(1);
+    }
+    expect(historyFilterFrom({ page: "12" }).page).toBe(12);
+  });
+  it("never sends the database a page it cannot read", () => {
+    expect(historyFilterFrom({ page: "99999999999" }).page).toBe(1);
+  });
+  it("ignores filters it does not know", () => {
+    expect(historyFilterFrom({ kind: "x", status: "done" })).toEqual(DEFAULT_FILTER);
+    expect(historyFilterFrom({ kind: "restore_test", status: "failed", skipped: "1" })).toEqual({
+      page: 1, kind: "restore_test", status: "failed", includeSkipped: true,
+    });
+  });
+  it("keeps the address short and reads back what it wrote", () => {
+    expect(historyHref({ ...DEFAULT_FILTER })).toBe("/admin/backups");
+    const filter = { page: 3, kind: "backup", status: "failed", includeSkipped: true } as const;
+    const query = new URLSearchParams(historyHref(filter).split("?")[1]);
+    expect(historyFilterFrom(Object.fromEntries(query))).toEqual(filter);
+  });
+  it("counts pages, at least one", () => {
+    expect([pageCount(0, 20), pageCount(20, 20), pageCount(21, 20)]).toEqual([1, 1, 2]);
   });
 });

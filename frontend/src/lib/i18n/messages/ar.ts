@@ -3012,6 +3012,7 @@ export const ar: Messages = {
       triggerSchedule: "تلقائي", triggerManual: "يدوي",
       requestedBySystem: "النظام (جدولة)", noRunRecorded: "لم يُسجَّل رقم تشغيل",
       systemReason: "تشغيل لم يُطلب من هذه الصفحة", requestedByGithub: "من خارج الصفحة", showSkipped: "إظهار الفحوصات التي لم تأخذ نسخة ({count})", hideSkipped: "إخفاء الفحوصات التي لم تأخذ نسخة",
+      all: "الكل", previous: "السابق", next: "التالي", pageOf: "صفحة {page} من {pages}", loadError: "تعذر قراءة سجل التشغيل. حدّث الصفحة.",
       skippedHint: "«تم التجاوز» فحص وجد نسخة اليوم مكتملة فلم يأخذ نسخة جديدة.",
       status: { requested: "مطلوب", dispatched: "تم الإرسال", running: "قيد التنفيذ", succeeded: "ناجح", failed: "فشل", skipped: "تم التجاوز", unknown: "غير متحقق" },
     },

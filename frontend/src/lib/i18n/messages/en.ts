@@ -3126,6 +3126,7 @@ export const en = {
       triggerManual: "Manual",
       requestedBySystem: "System (schedule)",
       systemReason: "A run that was not requested from this page", requestedByGithub: "Started on GitHub", showSkipped: "Show checks that took no backup ({count})", hideSkipped: "Hide checks that took no backup",
+      all: "All", previous: "Previous", next: "Next", pageOf: "Page {page} of {pages}", loadError: "The run history could not be read. Refresh the page.",
       skippedHint: "A skipped run is a check that found the day's backup complete, so it took none.",
       noRunRecorded: "No run id recorded",
       status: {
