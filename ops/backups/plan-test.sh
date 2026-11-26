@@ -52,17 +52,6 @@ check "Acceptance weekly: not a Monday" "$(plan EVENT=schedule ACCEPTANCE_BACKUP
 check "both projects" "$(plan EVENT=schedule ACCEPTANCE_BACKUP_SCHEDULE=daily PRODUCTION_BACKUP_ENABLED=true NOW=2026-11-03T23:30:00Z)" '["acceptance","production"]'
 check "bad Acceptance schedule: refused" "$(plan EVENT=schedule ACCEPTANCE_BACKUP_SCHEDULE=sometimes NOW=2026-11-03T23:30:00Z)" ERROR
 
-fresh() { env -i PATH="$PATH" "$@" bash "$HERE/plan.sh" freshness 2>/dev/null || echo ERROR; }
-check "freshness: nothing before any activation" "$(fresh EVENT=schedule)" '[]'
-check "freshness: the Acceptance trial is watched daily" "$(fresh EVENT=schedule ACCEPTANCE_BACKUP_SCHEDULE=daily)" '[{"label":"acceptance","max_age_hours":26}]'
-check "freshness: a manual check covers Acceptance although its schedule is off" "$(fresh EVENT=workflow_dispatch)" '[{"label":"acceptance","max_age_hours":26}]'
-check "freshness: a manual check never adds Production before activation" "$(fresh EVENT=workflow_dispatch ACCEPTANCE_BACKUP_SCHEDULE=off PRODUCTION_BACKUP_ENABLED=false)" '[{"label":"acceptance","max_age_hours":26}]'
-check "freshness: a manual check adds Production once activated" "$(fresh EVENT=workflow_dispatch PRODUCTION_BACKUP_ENABLED=true)" '[{"label":"acceptance","max_age_hours":26},{"label":"production","max_age_hours":26}]'
-check "freshness: a manual check follows a weekly Acceptance schedule" "$(fresh EVENT=workflow_dispatch ACCEPTANCE_BACKUP_SCHEDULE=weekly)" '[{"label":"acceptance","max_age_hours":194}]'
-check "freshness: the SCHEDULED check still does nothing while Acceptance is off" "$(fresh EVENT=schedule ACCEPTANCE_BACKUP_SCHEDULE=off)" '[]'
-check "freshness: weekly Acceptance allows 8 days" "$(fresh EVENT=schedule ACCEPTANCE_BACKUP_SCHEDULE=weekly PRODUCTION_BACKUP_ENABLED=true)" \
-  '[{"label":"acceptance","max_age_hours":194},{"label":"production","max_age_hours":26}]'
-
 # Target checks: a credential or URL of the other project, or a wrong bucket, is refused before any request.
 lib() { ( export BACKUP_LABEL="$1" BACKUP_BUCKET="${4:-$(case "$1" in acceptance) echo aladdin-acceptance-backups-weur;; *) echo aladdin-production-db-backups;; esac)}" R2_ENDPOINT=https://0123abcd.r2.cloudflarestorage.com \
   AWS_ACCESS_KEY_ID=x AWS_SECRET_ACCESS_KEY=x; . "$HERE/lib.sh"; check_target && $2 "$3" ) >/dev/null 2>&1 && echo ok || echo refused; }
@@ -83,17 +72,8 @@ check "a hosted label with another bucket is refused" "$(lib acceptance check_su
 check "Production writes need the activation switch" "$(lib production require_production_go "")" refused
 check "Acceptance writes do not" "$(lib acceptance require_production_go "")" ok
 
-# Alarm drill: a manual freshness run may only LOWER the age limit.
-fresh() { env -i PATH="$PATH" "$@" bash "$HERE/plan.sh" freshness 2>/dev/null || echo ERROR; }
-check "drill: a lower limit applies to a manual Acceptance check" "$(fresh EVENT=workflow_dispatch INPUT_MAX_AGE_HOURS=1)" '[{"label":"acceptance","max_age_hours":1}]'
-check "drill: a lower limit also applies on a weekly schedule" "$(fresh EVENT=workflow_dispatch ACCEPTANCE_BACKUP_SCHEDULE=weekly INPUT_MAX_AGE_HOURS=24)" '[{"label":"acceptance","max_age_hours":24}]'
-check "drill: the limit cannot be raised" "$(fresh EVENT=workflow_dispatch INPUT_MAX_AGE_HOURS=26)" ERROR
-check "drill: the limit cannot be raised far above" "$(fresh EVENT=workflow_dispatch INPUT_MAX_AGE_HOURS=999)" ERROR
-check "drill: zero is refused" "$(fresh EVENT=workflow_dispatch INPUT_MAX_AGE_HOURS=0)" ERROR
-check "drill: non-numbers are refused" "$(fresh EVENT=workflow_dispatch INPUT_MAX_AGE_HOURS=1h)" ERROR
-check "drill: scheduled runs ignore the input" "$(fresh EVENT=schedule ACCEPTANCE_BACKUP_SCHEDULE=daily INPUT_MAX_AGE_HOURS=1)" '[{"label":"acceptance","max_age_hours":26}]'
-check "scheduled freshness with the Acceptance schedule off checks nothing (and the workflow says so)" "$(fresh EVENT=schedule)" '[]'
-check "manual freshness with the schedule off still checks Acceptance" "$(fresh EVENT=workflow_dispatch)" '[{"label":"acceptance","max_age_hours":26}]'
+# The freshness alarm has no plan here any more: it follows the Admin console (runtime-schedule-test.py).
+check "the retired freshness mode is refused" "$(env -i PATH="$PATH" EVENT=workflow_dispatch bash "$HERE/plan.sh" freshness 2>/dev/null || echo ERROR)" ERROR
 
 # Monthly restore gate: enabling Production backups alone never starts the scheduled restore.
 rest() { env -i PATH="$PATH" "$@" bash "$HERE/plan.sh" restore 2>/dev/null || echo ERROR; }

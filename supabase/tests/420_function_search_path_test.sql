@@ -1,4 +1,4 @@
--- pgTAP: every application function pins its search_path (20261126120001), and the nine pinned helpers still answer.
+-- pgTAP: every application function pins its search_path (20261126120002), and the nine pinned helpers still answer.
 create extension if not exists pgtap;
 
 begin;

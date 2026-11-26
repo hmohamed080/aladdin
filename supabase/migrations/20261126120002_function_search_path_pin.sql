@@ -1,5 +1,5 @@
 -- ===========================================================================
--- Database - Migration 20261126120001: pin search_path on the last nine functions that had none
+-- Database - Migration 20261126120002: pin search_path on the last nine functions that had none
 -- ===========================================================================
 -- WHY
 --   Supabase advisor `function_search_path_mutable`: a function without a pinned search_path resolves names with the
