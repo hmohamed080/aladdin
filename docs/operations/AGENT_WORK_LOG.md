@@ -8011,3 +8011,8 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Found: slots, storage and hourly allowance stayed consumed after failed uploads; return photos could lock an order; the media cleanup is not scheduled anywhere.
 - Done: release RPC used by the browser uploader and the server grant/verify path; one-hour database expiry; `/admin/media-limits` allowances and exemptions; guards (pgTAP 410, upload-guard.test.ts).
 - Open: scheduling `media-storage.mjs cleanup` (bytes only) needs owner approval; apply with the next hosted plan.
+
+## 2026-11-26 - Restore test matches the hosted Auth schema again (no migration, nothing applied)
+- Acceptance restore run 45836920455 stopped at STACK MISMATCH: both hosted projects run gotrue v2.199.0; the newest CLI ships v2.198.0.
+- `restore-test.sh` pins the Auth image to v2.199.0 for its throwaway stack; the guard is unchanged.
+- Open: sync the kit to `aladdin-backups` (owner approval), then rerun the restore test.
