@@ -113,6 +113,12 @@ export function BackupScheduleForm({
             {t(state.code)}
           </p>
         ) : null}
+        {/* Always the first submit button: the Enter key presses it, so Enter can never answer the question below. */}
+        {canManage ? (
+          <SubmitButton pendingLabel={t("backups.schedule.saving")} className="self-start">
+            {t("backups.schedule.save")}
+          </SubmitButton>
+        ) : null}
         {canManage && asking ? (
           <div role="alert" className="flex flex-col gap-sm rounded-sm border border-danger/40 bg-danger/10 px-md py-sm" data-testid="backup-schedule-confirm-stop">
             <p className="text-body text-fg">{t("backups.schedule.confirmStopBody")}</p>
@@ -125,10 +131,6 @@ export function BackupScheduleForm({
               </Button>
             </div>
           </div>
-        ) : canManage ? (
-          <SubmitButton pendingLabel={t("backups.schedule.saving")} className="self-start">
-            {t("backups.schedule.save")}
-          </SubmitButton>
         ) : null}
       </form>
     </Card>

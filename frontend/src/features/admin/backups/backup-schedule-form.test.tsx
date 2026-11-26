@@ -95,6 +95,19 @@ describe("BackupScheduleForm", () => {
     expect((save.mock.calls[0]?.[1] as FormData).get("pause_hours")).toBe("24");
   });
 
+  it("never lets the Enter key answer yes: the form's default button asks again", () => {
+    draw(settings());
+    choose("acceptance_schedule", "off");
+    fireEvent.click(saveButton());
+    const form = screen.getByTestId("backup-schedule-form") as HTMLFormElement;
+    // Enter in a field presses the form's default button: the first submit button in the document.
+    const defaultButton = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    expect(defaultButton.textContent).not.toContain(t("backups.schedule.confirmStop"));
+    fireEvent.click(defaultButton);
+    expect(screen.getByTestId("backup-schedule-confirm-stop")).toBeTruthy();
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it("withdraws the question when the form changes, so the answer is about what is on screen", () => {
     draw(settings());
     choose("pause_hours", "24");
