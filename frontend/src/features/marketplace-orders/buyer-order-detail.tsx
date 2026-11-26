@@ -95,7 +95,7 @@ export function BuyerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
       const ticket = await requestResubmitUploadAction(order.id, f.type, f.size);
       if (!ticket.ok) return setMsg({ ok: false, text: orderError(locale, ticket.code) });
       try {
-        await uploadWithGrant(ticket.grant, f);
+        await uploadWithGrant(ticket.grant, f, { namespace: "marketplace", key: ticket.objectKey });
       } catch {
         return setMsg({ ok: false, text: orderError(locale, "upload_failed") });
       }
