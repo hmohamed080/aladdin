@@ -6,7 +6,7 @@ import { parseSellerError, type SellerActionError } from "@/features/marketplace
 import { returnErrorCode, type ReturnDocument, type ReturnKind, type ReturnSettings } from "@/features/marketplace-returns/contract";
 import { isMarketplaceReturnKey, MARKETPLACE_IMAGE_ALLOWED_TYPES } from "@/lib/storage/marketplace-images";
 import type { UploadGrant } from "@/lib/storage/provider-types";
-import { authorizeMediaUpload, verifyPendingMedia } from "@/server/storage/media";
+import { authorizeMediaUpload, removeMedia, verifyPendingMedia } from "@/server/storage/media";
 import { readableMediaUrl } from "@/server/storage/edge-ticket";
 import { imageMaxBytes } from "@/server/media/limits";
 import type { Json } from "@/types/database.types";
@@ -72,6 +72,26 @@ export async function confirmEvidenceAction(
   const { data, error } = await supabase.rpc("marketplace_buyer_return_evidence_confirm", { p_evidence_id: evidenceId });
   if (error || !data) return { ok: false, ...fail(error) };
   return { ok: true, evidence: (data as { evidence: { id: string; object_key: string; created_at: string }[] }).evidence };
+}
+
+/**
+ * Removes a photo that no request holds. The database marks it for deletion (only its uploader may); deleting the bytes now is
+ * best effort, the central media cleanup removes whatever is left.
+ */
+export async function removeEvidenceAction(evidenceId: string): Promise<ReturnResult<{ removed: true }>> {
+  if (!UUID.test(evidenceId)) return { ok: false, code: "not_found" };
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("marketplace_buyer_return_evidence_remove", { p_evidence_id: evidenceId });
+  if (error || !data) return { ok: false, ...fail(error) };
+  const key = (data as { object_key?: string }).object_key;
+  if (key && isMarketplaceReturnKey(key)) {
+    try {
+      await removeMedia(supabase, "marketplace", key);
+    } catch {
+      // left in the cleanup queue
+    }
+  }
+  return { ok: true, removed: true };
 }
 
 /** A short-lived URL of one evidence photo for whoever may read it right now (the media resolver re-checks on every call). */

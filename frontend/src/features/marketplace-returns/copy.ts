@@ -52,7 +52,7 @@ export const RETURN_REQUEST_COPY = {
     generalClosed: "انتهت مدة الإرجاع العادية لهذا الطلب. الأسباب المعروضة فقط هي المتاحة.",
     items: "المنتجات والكمية", nonReturnable: "مصنوع حسب الطلب: يُقبل للعيوب فقط.", upTo: (n: number) => `حتى ${n}`,
     note: "ملاحظة للمعرض (اختياري)", photos: (n: number, max: number) => `الصور (${n} من ${max})`,
-    photosHint: "صور JPG أو PNG أو WebP توضّح المشكلة.", addPhoto: "إضافة صورة", uploading: "جارٍ رفع الصورة…", attach: (n: number) => `إرفاق الصورة ${n}`, view: "عرض",
+    photosHint: "صور JPG أو PNG أو WebP توضّح المشكلة.", addPhoto: "إضافة صورة", uploading: "جارٍ رفع الصورة…", attach: (n: number) => `إرفاق الصورة ${n}`, view: "عرض", remove: "حذف", removeNth: (n: number) => `حذف الصورة ${n}`,
     send: "إرسال الطلب", sending: "جارٍ الإرسال…", back: "العودة إلى الطلب",
     unavailable: "لا يمكن فتح طلب إرجاع لهذا الطلب. قد تكون المدة انتهت أو لم يعد فيه ما يُرجع.",
     problem: {
@@ -66,7 +66,7 @@ export const RETURN_REQUEST_COPY = {
     generalClosed: "The regular return period of this order has ended. Only the reasons shown are still open.",
     items: "Products and quantity", nonReturnable: "Made to order: accepted for defects only.", upTo: (n: number) => `Up to ${n}`,
     note: "Note for the showroom (optional)", photos: (n: number, max: number) => `Photos (${n} of ${max})`,
-    photosHint: "JPG, PNG or WebP photos that show the problem.", addPhoto: "Add a photo", uploading: "Uploading the photo…", attach: (n: number) => `Attach photo ${n}`, view: "View",
+    photosHint: "JPG, PNG or WebP photos that show the problem.", addPhoto: "Add a photo", uploading: "Uploading the photo…", attach: (n: number) => `Attach photo ${n}`, view: "View", remove: "Delete", removeNth: (n: number) => `Delete photo ${n}`,
     send: "Send the request", sending: "Sending…", back: "Back to the order",
     unavailable: "A return cannot be opened for this order. The period may have ended, or nothing is left to return.",
     problem: {
@@ -86,6 +86,19 @@ export const RETURN_POLICY_COPY = {
     title: "Return policy", subtitle: "How many days after delivery a buyer may ask for a return.",
     general: "Regular returns (days)", defect: "Defects (days)", minimum: (n: number) => `At least ${n} days. You may offer longer.`,
     save: "Save", saving: "Saving…", saved: "The return policy was saved.",
+  },
+} as const;
+
+export const RETURNABILITY_COPY = {
+  ar: {
+    title: "الإرجاع", label: "مصنوع حسب الطلب: غير قابل للإرجاع", saved: "تم الحفظ.",
+    hint: "يظهر للمشتري في صفحة المنتج وقبل الدفع. يبقى له حق المطالبة إذا وصل المنتج بعيب. يسري على الطلبات الجديدة.",
+    notice: "منتج مصنوع حسب الطلب: لا يُرجع بعد الاستلام إلا إذا كان به عيب.",
+  },
+  en: {
+    title: "Returns", label: "Made to order: cannot be returned", saved: "Saved.",
+    hint: "Buyers see this on the product page and before paying. A defective item can still be claimed. Applies to new orders.",
+    notice: "Made to order: it cannot be returned after delivery unless it is defective.",
   },
 } as const;
 

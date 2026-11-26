@@ -378,7 +378,7 @@ select is(
   -- PR 9 added seller_slug / seller_official / ships_free / stock_left (public, no stock ledger data)
   -- Migration 09 added the public seller and taxonomy names and the cover image id (still no keys, stock or admin data)
   array['attributes', 'brand', 'category_key', 'category_name_ar', 'category_name_en', 'cover_image_id',
-        'description_ar', 'description_en', 'images', 'name_ar', 'name_en', 'product_type_key',
+        'description_ar', 'description_en', 'images', 'name_ar', 'name_en', 'non_returnable', 'product_type_key',
         'product_type_name_ar', 'product_type_name_en', 'published_at', 'seller_name', 'seller_official', 'seller_slug', 'ships_free', 'slug', 'stock_left', 'variants'],
   'G8. the detail document has exactly the approved top-level keys');
 select ok(

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/workspace-layout";
 import { StorefrontIcon } from "@/components/ui/icons";
 import { requireApprovedSeller } from "@/features/marketplace-seller/seller-gate";
 import { ProductForm } from "@/features/marketplace-seller/product-form";
+import { ReturnabilityToggle } from "@/features/marketplace-returns/returnability-toggle";
 import { VideoManager } from "@/features/video/video-manager";
 import { listMarketplaceVideos } from "@/server/queries/videos";
 import { videoEnabled } from "@/server/video/playback";
@@ -58,6 +59,7 @@ export default async function EditMarketplaceProductPage({
         product={product}
         notice={sp.created ? t.created : undefined}
       />
+      <ReturnabilityToggle key={`returns-${product.id}`} organizationId={org.organizationId} productId={product.id} initial={product.nonReturnable === true} locale={locale} />
       {videos ? <VideoManager scope="marketplace" productId={product.id} videos={videos} canPublish={false} /> : null}
     </div>
   );
