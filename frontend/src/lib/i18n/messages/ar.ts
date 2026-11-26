@@ -2881,6 +2881,8 @@ export const ar: Messages = {
           payment_complaint_filed: "شكوى دفع جديدة (للمسؤولين المخوَّلين)",
           payment_complaint_resolved: "تم البتّ في شكوى الدفع (للمشتري وللمعرض)",
           refund_check: "طلب ملغي بإيصال غير مؤكد (للمسؤولين المخوَّلين)",
+          refund_sent: "تسجيل رد مبلغ طلب ملغي (للمشتري)",
+          refund_confirmed: "تأكيد استلام مبلغ طلب ملغي (للمعرض)",
           placed: "طلب جديد",
           preparing: "الطلب قيد التجهيز",
           ready_pickup: "الطلب جاهز للاستلام",

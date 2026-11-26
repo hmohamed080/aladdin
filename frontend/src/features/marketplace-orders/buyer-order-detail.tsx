@@ -15,6 +15,7 @@ import { areaName, governorateName } from "@/features/marketplace-seller/place-l
 import styles from "@/features/marketplace/marketplace-cart.module.css";
 import { writeAccountCartLines } from "@/features/marketplace/live/live-cart-store";
 import { FileComplaintSlot } from "./order-slots";
+import { CancelRefund } from "./cancel-refund";
 import { formatEstimate, hoursLeft, isInstapay, isLegacy, isReadyForPickup, knownActions, reorderLines } from "./order-model";
 import type { OrderDocumentV2, ReasonPreset } from "./order-types";
 import { dateTime, OrderLineRow, PaymentBadge, ProgressBar, StatusBadge, Timeline, Totals } from "./order-parts";
@@ -165,6 +166,7 @@ export function BuyerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
     ),
   };
   registry.file_complaint = () => <FileComplaintSlot key="file_complaint" orderId={order.id} />;
+  registry.confirm_cancel_refund = () => <CancelRefund key="confirm_cancel_refund" order={order} mode="confirm" onDone={setOrder} />;
   const buttons = knownActions(order.actions, registry);
 
   return (

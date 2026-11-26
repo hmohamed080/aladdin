@@ -485,7 +485,7 @@ select pg_temp.as_user(current_setting('t.buyer'));
 select is(public.marketplace_buyer_order_cancel_v2(current_setting('t.g3')::uuid, null, null) ->> 'status', 'cancelled', 'G11. the buyer cancels after uploading a receipt');
 select is((select payment_status from public.marketplace_orders where id = current_setting('t.g3')::uuid), 'refund_due', 'G12. the unchecked transfer is owed back');
 select is(pg_temp.notes(current_setting('t.g3'), 'marketplace.order.refund_check') >= 1, true, 'G13. the authorised admins are told');
-select is(app.marketplace_order_extra_actions(current_setting('t.g3')::uuid, 'seller'), array['file_complaint'], 'G14. the showroom may file a complaint');
+select is(app.marketplace_order_extra_actions(current_setting('t.g3')::uuid, 'seller'), array['file_complaint', 'record_cancel_refund'], 'G14. the showroom may complain or record the refund');
 
 -- G (continued): rejecting the receipt and then cancelling does not keep the money
 reset role;
@@ -496,6 +496,41 @@ select is(public.marketplace_seller_order_action(current_setting('t.g4')::uuid, 
 select is((select payment_status from public.marketplace_orders where id = current_setting('t.g4')::uuid), 'refund_due', 'G16. the amount is owed back');
 select is(pg_temp.notes(current_setting('t.g4'), 'marketplace.order.refund_check') >= 1, true, 'G17. the authorised admins are told');
 select is(app.marketplace_order_extra_actions(current_setting('t.g4')::uuid, 'buyer'), array['file_complaint'], 'G18. the buyer may file a complaint');
+
+-- H. the refund of a cancelled order: the showroom records it, the buyer confirms it (g1 stays refund_due after the ruling)
+reset role;
+select is(app.marketplace_order_extra_actions(current_setting('t.g1')::uuid, 'seller'), array['record_cancel_refund'], 'H1. the showroom may record the refund');
+select pg_temp.as_user(current_setting('t.buyer'));
+select throws_ok(format($q$select public.marketplace_buyer_cancel_refund_confirm(%L)$q$, current_setting('t.g1')), '23514', 'mp:invalid_transition',
+  'H2. nothing to confirm before the showroom records it');
+select pg_temp.as_user(current_setting('t.sellerb'));
+select throws_ok(format($q$select public.marketplace_seller_cancel_refund_record(%L, null)$q$, current_setting('t.g1')), '42501', 'mp:not_found',
+  'H3. another showroom cannot record it');
+select pg_temp.as_user(current_setting('t.seller'));
+select is(public.marketplace_seller_cancel_refund_record(current_setting('t.g1')::uuid, 'InstaPay ref 1') ->> 'payment_status', 'refund_due',
+  'H4. recorded; the money stays owed until the buyer confirms');
+select lives_ok(format($q$select public.marketplace_seller_cancel_refund_record(%L, null)$q$, current_setting('t.g1')), 'H5. recording twice is a replay');
+select is((select count(*)::int from public.marketplace_order_events where order_id = current_setting('t.g1')::uuid and action = 'cancel_refund_sent'), 1, 'H6. one event');
+select is(app.marketplace_order_extra_actions(current_setting('t.g1')::uuid, 'buyer'), array['confirm_cancel_refund'], 'H7. the buyer may confirm');
+select is(pg_temp.notes(current_setting('t.g1'), 'marketplace.order.refund_sent'), 1, 'H8. the buyer is told');
+select pg_temp.as_user(current_setting('t.buyer'));
+select is(public.marketplace_buyer_cancel_refund_confirm(current_setting('t.g1')::uuid) ->> 'payment_status', 'refunded', 'H9. confirmed: refunded');
+select lives_ok(format($q$select public.marketplace_buyer_cancel_refund_confirm(%L)$q$, current_setting('t.g1')), 'H10. confirming twice is a replay');
+select is((select count(*)::int from public.marketplace_order_events where order_id = current_setting('t.g1')::uuid and action = 'cancel_refund_confirmed'), 1, 'H11. one event');
+select is(pg_temp.notes(current_setting('t.g1'), 'marketplace.order.refund_confirmed') >= 1, true, 'H12. the showroom is told');
+select is(app.marketplace_order_extra_actions(current_setting('t.g1')::uuid, 'buyer'), '{}'::text[], 'H13. nothing left to do');
+select pg_temp.as_user(current_setting('t.seller'));
+select throws_ok(format($q$select public.marketplace_seller_cancel_refund_record(%L, null)$q$, current_setting('t.g2')), '23514', 'mp:invalid_transition',
+  'H14. an order where the money never arrived owes nothing');
+select is(has_function_privilege('anon', 'public.marketplace_buyer_cancel_refund_confirm(uuid)', 'execute')
+          or has_function_privilege('anon', 'public.marketplace_seller_cancel_refund_record(uuid, text)', 'execute'), false, 'H15. never anonymous');
+
+select pg_temp.as_user(current_setting('t.buyer'));
+select set_config('t.kg3', (public.marketplace_payment_complaint_file(current_setting('t.g3')::uuid, 'transfer_made', null) ->> 'complaint_id'), true);
+select is(app.marketplace_order_extra_actions(current_setting('t.g3')::uuid, 'seller'), '{}'::text[], 'H16. no refund step while a complaint is open');
+select pg_temp.as_user(current_setting('t.seller'));
+select throws_ok(format($q$select public.marketplace_seller_cancel_refund_record(%L, null)$q$, current_setting('t.g3')), '23514', 'mp:invalid_transition',
+  'H17. and the database refuses it until the admin rules');
 
 select * from finish();
 rollback;

@@ -118,6 +118,29 @@ export async function buyerCancelOrderPageAction(orderId: string, presetId: stri
   return { ok: true, order: data as OrderDocumentV2 };
 }
 
+/** The showroom records that it paid back the amount of a cancelled order (the platform moves no money). */
+export async function sellerRecordCancelRefundAction(orderId: string, note: string): Promise<OrderPageResult<{ order: OrderDocumentV2 }>> {
+  if (!isMarketplaceOrderingEnabled()) return { ok: false, code: "not_found" };
+  if (!UUID.test(orderId)) return { ok: false, code: "not_found" };
+  const { data, error } = await rpcOf(await getServerSupabase()).rpc("marketplace_seller_cancel_refund_record", {
+    p_order_id: orderId,
+    p_note: note.trim().slice(0, 300) || null,
+  });
+  if (error || !data) return { ok: false, ...fail(error) };
+  revalidatePath(SELLER_ORDERS);
+  return { ok: true, order: data as OrderDocumentV2 };
+}
+
+/** The buyer confirms the refund of a cancelled order arrived; only then is the order `refunded`. */
+export async function buyerConfirmCancelRefundAction(orderId: string): Promise<OrderPageResult<{ order: OrderDocumentV2 }>> {
+  if (!isMarketplaceOrderingEnabled()) return { ok: false, code: "not_found" };
+  if (!UUID.test(orderId)) return { ok: false, code: "not_found" };
+  const { data, error } = await rpcOf(await getServerSupabase()).rpc("marketplace_buyer_cancel_refund_confirm", { p_order_id: orderId });
+  if (error || !data) return { ok: false, ...fail(error) };
+  revalidatePath(BUYER_ORDERS);
+  return { ok: true, order: data as OrderDocumentV2 };
+}
+
 /** Upload ticket for the replacement receipt after «لم تصلني الفلوس» (the first receipt is uploaded at checkout). */
 export async function requestResubmitUploadAction(
   orderId: string,

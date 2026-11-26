@@ -90,6 +90,7 @@ describe("seller order page", () => {
     renderWithI18n(<SellerOrderDetail initial={doc} />, "en");
     fireEvent.click(screen.getByRole("button", { name: "Money did not arrive" }));
     expect(await screen.findByText(/within 48 hours/)).toBeInTheDocument();
+    await screen.findByRole("radio", { name: "Out of stock" }); // the reasons load after the panel opens
     fireEvent.click(screen.getByRole("button", { name: "Tell the buyer" }));
     await waitFor(() => expect(action).toHaveBeenCalledWith(doc.id, "flag_receipt_not_received", { preset_id: "p1" }));
     expect(await screen.findByText(/Progress is on hold/)).toBeInTheDocument();
