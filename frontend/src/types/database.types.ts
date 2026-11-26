@@ -11184,6 +11184,7 @@ export type Database = {
       marketplace_buyer_return_create: { Args: { p_evidence_ids: string[]; p_idempotency_key: string; p_kind: string; p_lines: Json; p_note: string; p_order_id: string; p_reason_preset_id: string; p_remedy: string }; Returns: Json }
       marketplace_buyer_return_eligibility: { Args: { p_order_id: string }; Returns: Json }
       marketplace_buyer_return_evidence_confirm: { Args: { p_evidence_id: string }; Returns: Json }
+      marketplace_buyer_return_evidence_remove: { Args: { p_evidence_id: string }; Returns: Json }
       marketplace_buyer_return_get: { Args: { p_return_id: string }; Returns: Json }
       marketplace_buyer_return_mark_shipped: { Args: { p_return_id: string; p_tracking?: string }; Returns: Json }
       marketplace_buyer_return_request_upload: { Args: { p_content_type: string; p_order_id: string }; Returns: Json }
