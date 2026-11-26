@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Select } from "@/components/ui/controls";
 import {
-  ChevronLeftIcon, ChevronRightIcon, FileTextIcon, HelpIcon, MapPinIcon, PackageIcon,
+  ChevronLeftIcon, ChevronRightIcon, FileTextIcon, MapPinIcon,
   ShieldIcon, ShoppingBagIcon, StorefrontIcon, TrashIcon, TruckIcon,
 } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
@@ -302,15 +302,6 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
                 ))}
               </ul>
             </section>
-
-            <ul className={styles.perks}>
-              {[TruckIcon, PackageIcon, ShieldIcon, HelpIcon].map((Icon, i) => (
-                <li key={i}>
-                  <Icon size={30} aria-hidden="true" />
-                  <span><strong>{l.perks[i]![0]}</strong><small>{l.perks[i]![1]}</small></span>
-                </li>
-              ))}
-            </ul>
 
             <Shelf id="cart-also-title" title={t.alsoLike} cards={cards} locale={locale} dir={dir} />
           </div>

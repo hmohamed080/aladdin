@@ -7975,3 +7975,4 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - A signed-in buyer had no way from `/market/cart` to `/market/checkout`: the button was still the pre-checkout stub. It is now a link once every showroom can serve the chosen way of receiving; guests still get the sign-in dialog.
 - Owner decision 2026-11-26: no coupon area in the cart for now.
 - Not carried over: the cart choice of delivery or pickup (checkout starts on delivery).
+- Owner decision 2026-11-26: the cart trust strip (four reassurance cards) is removed, as asked in the 2026-11-19 walkthrough.

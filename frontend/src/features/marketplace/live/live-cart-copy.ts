@@ -7,7 +7,6 @@ import type { Locale } from "../marketplace-types";
 type LiveCartCopy = {
   subtitle: string;
   /** the trust strip (title, detail) — worded for what the platform really does */
-  perks: [string, string][];
   checkoutSoon: string;
   soon: string;
   checkoutSoonNote: string;
@@ -47,12 +46,6 @@ type LiveCartCopy = {
 export const liveCartCopy = {
   ar: {
     subtitle: "راجع منتجاتك قبل إتمام الطلب",
-    perks: [
-      ["توصيل حسب منطقتك", "كل معرض يحدد سعر التوصيل"],
-      ["منتجات من معارض متعددة", "على علاء الدين"],
-      ["معارض معتمدة", "تتم مراجعة المعرض قبل النشر"],
-      ["مساعدة في الاختيار", "تواصل معنا لأي استفسار"],
-    ],
     checkoutSoon: "إتمام الطلب",
     soon: "قريبًا",
     checkoutSoonNote: "إتمام الطلب والدفع الإلكتروني سيتوفران قريبًا. تواصل مع المعرض لطلب المنتجات الآن.",
@@ -92,12 +85,6 @@ export const liveCartCopy = {
   },
   en: {
     subtitle: "Review your products before placing the order",
-    perks: [
-      ["Delivery by your area", "Each showroom sets its delivery price"],
-      ["Products from many showrooms", "All on Aladdin"],
-      ["Approved showrooms", "Every showroom is reviewed before it sells"],
-      ["Help choosing", "Contact us with any question"],
-    ],
     checkoutSoon: "Place order",
     soon: "Coming soon",
     checkoutSoonNote: "Placing the order and paying online are coming soon. Contact the showroom to order these products now.",
