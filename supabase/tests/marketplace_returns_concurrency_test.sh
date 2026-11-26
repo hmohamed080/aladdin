@@ -15,12 +15,10 @@ set -euo pipefail
 # against a local isolated database:
 #   DB_CONTAINER=<container> bash supabase/tests/marketplace_returns_concurrency_test.sh
 
-db_container="${DB_CONTAINER:-}"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/db_target.sh"
+db_target_require   # explicit DB_CONTAINER only; refuses shared / ambiguous / remote targets (no auto-selection)
+db_target_mark_dirty "$(basename "$0")"   # commits rows and toggles guards: pgTAP needs a reset afterwards
 db_name="${DB_NAME:-postgres}"
-if [[ -z "${db_container}" ]]; then
-  echo "DB_CONTAINER is required (the isolated local database container)" >&2
-  exit 1
-fi
 psql_() { docker exec -i "${db_container}" psql -U postgres -d "${db_name}" -qAt -v ON_ERROR_STOP=1 "$@"; }
 q() { docker exec -i "${db_container}" psql -U postgres -d "${db_name}" -qAt -v ON_ERROR_STOP=1 -c "$1" </dev/null; }
 
