@@ -20,7 +20,9 @@ def main():
     kind = os.environ['BACKUP_KIND']
     run_id = int(os.environ['TARGET_RUN_ID'])
     request_id = os.environ.get('REQUEST_ID') or None
-    status, conclusion, summary = 'running', None, {}
+    # How the run was started, so the ledger can tell a run started by hand on GitHub from a scheduled one.
+    event = os.environ.get('EVENT') or None
+    status, conclusion, summary = 'running', None, ({'event': event} if event else {})
     if '--complete' in sys.argv:
         repo = os.environ['GITHUB_REPOSITORY']
         if repo != 'hmohamed080/aladdin-backups': raise ValueError('repository mismatch')
@@ -47,7 +49,7 @@ def main():
         status = 'succeeded' if verified else 'failed'
         if job['conclusion'] == 'success' and coverage and coverage['conclusion'] == 'skipped':
             status = 'skipped'
-        summary = {'coverage_verified':bool(verified),'job':name,'run_attempt':run['run_attempt']}
+        summary = {'coverage_verified':bool(verified),'job':name,'run_attempt':run['run_attempt'],'event':run['event']}
     key = os.environ['SUPABASE_SERVICE_ROLE_KEY']
     call(url+'/rest/v1/rpc/backup_report_run',
          {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
