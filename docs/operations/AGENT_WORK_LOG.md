@@ -8027,3 +8027,8 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Acceptance restore run 45836920455 stopped at STACK MISMATCH: both hosted projects run gotrue v2.199.0; the newest CLI ships v2.198.0.
 - `restore-test.sh` pins the Auth image to v2.199.0 for its throwaway stack; the guard is unchanged.
 - Open: sync the kit to `aladdin-backups` (owner approval), then rerun the restore test.
+
+## 2026-11-26 - Acceptance apply plan "marketplace-orders" prepared (nothing applied)
+- 18 migrations, 246 -> 264. Snapshot pinned: aladdin-acceptance-20261126T140613Z (restore run 45847352834 PASS).
+- Forward-fix proved from the full plan and every partly applied state; live Acceptance function definitions equal the replayed pre-state.
+- Open: owner GO for preflight, apply, then the frontend deploy. Runbook: MARKETPLACE_ORDERS_ACCEPTANCE_PLAN_20261126.md.
