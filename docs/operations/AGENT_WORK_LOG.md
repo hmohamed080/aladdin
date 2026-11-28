@@ -1,3 +1,10 @@
+## 2026-11-28 - Production plan for the Marketplace order flow (246 -> 266): prepared, not applied
+
+- Scope: branch `feat/production-plan-marketplace-266-20261128`. Plan `prod-marketplace-orders` in `acceptance-gate.mjs` (pending list, catalog changes and forward-fixes derived from `marketplace-orders` and `marketplace-clarity`), `--plan` option on the two smokes, `production-apply.sh` / `production-preflight.sh`, tests, scratch proof, [runbook](MARKETPLACE_ORDERS_PRODUCTION_PLAN_20261128.md). No migration, no frontend change, no hosted write.
+- Validation: script tests 513 (511 pass, 0 fail); scratch proof OK (27 checks: 727 objects, forward-fixes from every partial state, 3 refusals); local rehearsal of the apply steps OK (permissions 954 before, 1092 after); `bash -n` on both scripts; doc links checked.
+- Not verified: the two scripts against Production; a restore-tested snapshot at 246 (none exists); the old frontend on 266.
+- Unfinished: owner decisions D1-D9; frontend flag PR; Production timers Worker configuration; Acceptance retest (another session).
+
 ## 2026-11-25 - Marketplace plan PR 15: returns and exchanges (draft PR, not applied anywhere hosted)
 
 - Scope: branch `feat/mkt-returns-exchanges-20261124`. Migrations `20261125130001` (tables, permission `marketplace_returns.review`), `150002` (rules, RPCs, seeds, media hooks), `150003` (patches PR 12's order document `return_window` / `returns` keys and wraps `app.marketplace_order_extra_actions` at apply time). Permission contract `supabase/permissions/20261125130003.json` (46 new functions).

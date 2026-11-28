@@ -32,6 +32,9 @@
  *   prod-marketplace-v2  PRODUCTION, COMBINED plan (owner decision 2026-11-24): the seven marketplace-v2 migrations + 20261124090001 + 20261124120001, 237 -> 246, on top of Production at 237 / 20261122090002
  *             (prod-catchup applied by the owner 2026-11-23, RUNTIME_STATE). Same measured catalog diff + the 3 slug objects; three pinned forward-fixes, undo order marketplace-stock-notify, marketplace-slug then
  *             marketplace-v2; needs a restore-verified PRODUCTION snapshot taken at >= 237 migrations (the pinned 210 one is refused). See docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md.
+ *   prod-marketplace-orders  PRODUCTION: the 18 marketplace-orders migrations plus the 2 marketplace-clarity ones, 246 -> 266, ONE plain push, on top of Production at 246 / 20261124120001.
+ *             Same measured catalog diffs as the two Acceptance plans (derived in code); undo order marketplace-clarity then marketplace-orders; needs a restore-verified PRODUCTION
+ *             snapshot taken at >= 246 migrations (none pinned yet). See docs/operations/MARKETPLACE_ORDERS_PRODUCTION_PLAN_20261128.md.
  *   prod-catchup  PRODUCTION: the single plan 210 -> 237 (27 migrations, 20261114090001 .. 20261122090002, plus PC_LATER). Needs a restore-verified PRODUCTION snapshot (none pinned).
  *   m3a       after `m1` is applied (Acceptance and Production are both at 209 today): only 20261112090001 (P1 M3a) is pending. 209 -> 210.
  *
@@ -946,6 +949,15 @@ export const PLANS = {
 // Recovery: TWO pinned forward-fixes, in this order: marketplace-slug, then marketplace-v2. freshBackup: a restore-verified PRODUCTION snapshot taken at >= 237 migrations is required.
 PLANS["prod-marketplace-v2"] = { ...PLANS["marketplace-v2"], target: "production", fixes: ["marketplace-stock-notify", "marketplace-slug", "marketplace-v2"], pending: [...MV2_PENDING, ...SLUG_PENDING, ...STOCK_PENDING],
   postContract: STOCK_PENDING.at(-1), changed: [...new Set([...PLANS["marketplace-v2"].changed, ...SLUG_CHANGED, ...STOCK_CHANGED])] };
+
+// prod-marketplace-orders (PRODUCTION, target "production"): everything on main after Production's 246 / 20261124120001 (read live 2026-11-28, re-read by production-preflight.sh):
+// the marketplace-orders migrations followed by the marketplace-clarity ones, 246 -> 266, ONE plain push. Derived from the two applied Acceptance plans so the lists cannot drift apart.
+// "changed" = the union of both measured lists; marketplace-orders-prod-scratch-proof.mjs measured that one 246 -> 266 push changes exactly that union.
+// The last migration adds no function, so the permission contract after is the clarity plan's. Recovery: the pinned forward-fixes in THIS order: marketplace-clarity (only once its
+// migrations are applied), then marketplace-orders; a restore-verified PRODUCTION snapshot taken at >= 246 migrations is mandatory.
+PLANS["prod-marketplace-orders"] = { ...PLANS["marketplace-orders"], target: "production", fixes: ["marketplace-clarity", "marketplace-orders"],
+  pending: [...ORD_PENDING, ...CLARITY_PENDING], postContract: PLANS["marketplace-clarity"].postContract,
+  changed: [...new Set([...PLANS["marketplace-orders"].changed, ...PLANS["marketplace-clarity"].changed])] };
 
 /**
  * Recovery evidence (re-pinned 2026-11-11). Every plan's migrations replace or add functions only: CREATE OR REPLACE FUNCTION /

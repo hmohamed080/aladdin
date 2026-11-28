@@ -1,4 +1,4 @@
--- READ-ONLY. Facts for the plan "marketplace-orders" (Acceptance 246 -> 264). acceptance-apply.sh runs it before and after the push; marketplace-orders-smoke.mjs
+-- READ-ONLY. Facts for the plans "marketplace-orders" (Acceptance 246 -> 264) and "prod-marketplace-orders" (Production 246 -> 266). The apply scripts run it before and after the push; marketplace-orders-smoke.mjs
 -- judges the output. One row, one jsonb column `facts`. Only SELECTs; objects that may not exist before the plan are looked up by name. No user data: counts and booleans.
 with new_tables(t) as (values ('marketplace_buyer_address_events'), ('marketplace_buyer_addresses'), ('marketplace_cart_items'), ('marketplace_cart_merges'),
   ('marketplace_checkout_sessions'), ('marketplace_order_cancellations'), ('marketplace_order_invoices'), ('marketplace_order_refunds'), ('marketplace_order_shipments'),
@@ -18,6 +18,9 @@ select jsonb_build_object(
   'orders_not_legacy', (select count(*) from orders where coalesce(o ->> 'source', 'legacy') <> 'legacy'),
   'orders_unmigrated', (select count(*) from orders where o ->> 'placed_at' is null or o ->> 'paid_now_egp' is null or o ->> 'payment_method' = 'instapay'),
   'templates', (select count(*) from public.notification_templates),
+  'marketplace_open', (select marketplace_open from public.marketplace_platform_settings),
+  'approved_sellers', (select count(*) from public.marketplace_seller_accounts where status::text = 'approved'),
+  'marketplace_products', (select count(*) from public.marketplace_products),
   'presets', (select count(*) from public.marketplace_seller_message_presets),
   'new_permissions', (select count(*) from public.admin_permissions where key in ('marketplace_payment_complaints.review', 'marketplace_returns.review')),
   'new_permission_grants', (select count(*) from public.admin_role_permissions where permission_key in ('marketplace_payment_complaints.review', 'marketplace_returns.review')),
