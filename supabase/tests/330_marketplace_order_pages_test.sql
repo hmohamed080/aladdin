@@ -297,6 +297,7 @@ update public.marketplace_orders set payment_status = 'collected', address_snaps
 select set_config('app.marketplace_order_apply', 'off', true);
 select pg_temp.as_user(current_setting('t.seller'));
 select is(public.marketplace_order_waybill_get(current_setting('t.o_done')::uuid) #>> '{address_parts,building}', '15', 'G17 the labelled address parts are returned');
+select is(public.marketplace_order_waybill_get(current_setting('t.o_done')::uuid) #>> '{payment,status}', 'collected', 'G18 the payment status is returned, so the sheet can say why nothing is collected');
 select is(jsonb_array_length(public.marketplace_order_waybill_get(current_setting('t.o_ready')::uuid) -> 'items'), 2, 'G7 the items come from the snapshot');
 select is(public.marketplace_order_waybill_get(current_setting('t.o_ready')::uuid) ->> 'notes', 'Call before arriving', 'G8 the delivery note is printed');
 select throws_ok(format($$select public.marketplace_order_waybill_get(%L)$$, current_setting('t.o_pick')), '23514', 'mp:not_a_delivery_order', 'G9 a pickup order has no waybill');
@@ -343,5 +344,32 @@ select is((select count(*)::text from public.marketplace_stock_movements), curre
 select is((select status || '/' || payment_status || '/' || stock_state from public.marketplace_orders where id = current_setting('t.o_ready')::uuid), 'ready/pending/deducted', 'I2 a ready order is unchanged');
 select is((select status || '/' || payment_status || '/' || stock_state from public.marketplace_orders where id = current_setting('t.o_new')::uuid), 'new/pending/pending', 'I3 a new order is unchanged');
 
+-- ---------------------------------------------------------------------------
+-- J. RETEST NOTES (20261128150001): seller address on new invoices, money in notifications
+-- ---------------------------------------------------------------------------
+reset role;
+alter table public.branches disable trigger showroom_live_address_required;
+update public.branches set address_ar = null, address_en = null where organization_id = current_setting('t.a')::uuid;
+update public.branches set address_en = '10 Fallback Street', is_active = true, deleted_at = null
+ where id = (select id from public.branches where organization_id = current_setting('t.a')::uuid order by created_at, id limit 1);
+select set_config('t.o_adr', pg_temp.mk_order('adr', 'ready', 'cod', 'pending', 'delivery', current_setting('t.buyer'), current_setting('t.a'))::text, true);
+select is((select branch_id from public.marketplace_stock_locations where id = current_setting('t.loc')::uuid), null::uuid, 'J1 the automatic stock location has no branch');
+select pg_temp.as_user(current_setting('t.seller'));
+select is(public.marketplace_order_invoice_get(current_setting('t.o_adr')::uuid) #>> '{seller,address}', '10 Fallback Street', 'J2 the invoice takes the showroom branch address when the location has no branch');
+reset role;
+update public.branches set address_en = null where organization_id = current_setting('t.a')::uuid;
+select set_config('t.o_adr2', pg_temp.mk_order('adr2', 'ready', 'cod', 'pending', 'delivery', current_setting('t.buyer'), current_setting('t.a'))::text, true);
+select pg_temp.as_user(current_setting('t.seller'));
+select is(public.marketplace_order_invoice_get(current_setting('t.o_adr2')::uuid) #>> '{seller,address}', null, 'J3 with no address anywhere the invoice stays without one');
+select is(public.marketplace_order_invoice_get(current_setting('t.o_adr')::uuid) #>> '{seller,address}', '10 Fallback Street', 'J4 an issued invoice keeps its address');
+reset role;
+alter table public.branches enable trigger showroom_live_address_required;
+select is(app.marketplace_money(150.00, false) || ' | ' || app.marketplace_money(1500.5, false) || ' | ' || app.marketplace_money(150, true),
+  'EGP 150 | EGP 1,500.50 | 150 ج.م', 'J5 money is written like the pages write it');
+select ok(not has_function_privilege('anon', 'app.marketplace_money(numeric, boolean)', 'execute')
+      and not has_function_privilege('authenticated', 'app.marketplace_money(numeric, boolean)', 'execute'), 'J6 the money helper is internal');
+select is((select count(*)::int from pg_proc p where p.prosrc like '%app.marketplace_money(%'
+            and p.proname in ('marketplace_order_notify', 'marketplace_return_notify', 'marketplace_seller_cancel_refund_record', 'marketplace_buyer_cancel_refund_confirm')), 4,
+  'J7 the four notification writers use the helper');
 select * from finish();
 rollback;

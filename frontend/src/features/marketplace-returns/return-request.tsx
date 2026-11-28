@@ -7,7 +7,7 @@ import { Button, Checkbox, Input, LabeledField, Textarea } from "@/components/ui
 import { InlineError } from "@/components/ui/primitives";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { MARKETPLACE_IMAGE_ALLOWED_TYPES } from "@/lib/storage/marketplace-images";
-import { formatEgp } from "@/lib/ui/egp-format";
+import { fmtEgp } from "@/features/marketplace/live/live-copy";
 import { confirmEvidenceAction, createReturnAction, evidenceUrlAction, removeEvidenceAction, requestEvidenceUploadAction } from "@/server/actions/marketplace-returns";
 import { MAX_EVIDENCE, claimWindowOpen, draftProblem, lineAcceptsClaim, openReasons, type Eligibility, type ReturnKind } from "./contract";
 import { RETURN_REQUEST_COPY, returnErrorText } from "./copy";
@@ -150,7 +150,7 @@ export function ReturnRequest({ orderId, eligibility, initialKind, locale, now }
             <LabeledField
               key={l.item_id}
               htmlFor={id}
-              label={`${locale === "ar" ? l.name_ar : l.name_en} — ${formatEgp(Number(l.unit_price_egp), locale)}`}
+              label={`${locale === "ar" ? l.name_ar : l.name_en} — ${fmtEgp(Number(l.unit_price_egp), locale)}`}
               hint={l.non_returnable ? c.nonReturnable : c.upTo(l.returnable_quantity)}
             >
               <Input
