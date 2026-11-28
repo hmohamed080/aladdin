@@ -49,7 +49,7 @@ export const liveCopy = {
     searchButton: "Search",
     categories: "Categories",
     allProducts: "All products",
-    results: (n: string) => `${n} products`,
+    results: (n: string) => (n === "1" ? "1 product" : `${n} products`),
     from: "From",
     inStock: "In stock",
     outOfStock: "Currently unavailable",

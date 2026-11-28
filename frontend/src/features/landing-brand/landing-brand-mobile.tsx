@@ -12,7 +12,7 @@ import { formatStat, type LandingStats } from "./landing-brand-stats";
  */
 const PILL_ICON = {"users": "M2.5 20c.5-4 3-6 6.5-6s6 2 6.5 6M16 5a3.5 3.5 0 0 1 0 6.5M18 14.5c2 .8 3.2 2.6 3.5 5.5", "building": "M4 21V5l8-2v18M12 9l8 2v10M2 21h20M7 8v.01M7 12v.01M7 16v.01M16 14v.01M16 17v.01", "layers": "M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 17l9 5 9-5"} as const;
 
-export function MobileHero({ stats, showCart = false }: { stats: LandingStats; showCart?: boolean }) {
+export function MobileHero({ stats, showCart = false, signedIn = false }: { stats: LandingStats; showCart?: boolean; signedIn?: boolean }) {
   const pills = ([
     ["users", stats.users, "مستخدم", 1],
     ["building", stats.organizations, "شركة ومعرض", 1.3],
@@ -21,7 +21,7 @@ export function MobileHero({ stats, showCart = false }: { stats: LandingStats; s
   return (
 <section id="m-top" style={{"padding": "12px 12px 0"}}>
 <div style={{"position": "relative", "background": "var(--lb-navy-2)", "color": "var(--lb-cream)", "borderRadius": "28px", "overflow": "hidden"}}>
-<LandingBrandMobileHeader showCart={showCart} />
+<LandingBrandMobileHeader showCart={showCart} signedIn={signedIn} />
 
 <div style={{"position": "relative", "height": "290px", "overflow": "hidden"}}>
 <Image src="/landing-brand/hero.jpg" width={2000} height={667} sizes={HERO_SIZES} quality={65} priority fetchPriority="high" alt="فيلا حديثة بإضاءة دافئة" style={{"width": "100%", "height": "100%", "objectFit": "cover", "objectPosition": "30% 40%", "display": "block"}} />

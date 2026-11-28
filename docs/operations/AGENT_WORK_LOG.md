@@ -7,6 +7,12 @@
 - Validation: pgTAP 390 = 237/237 on a local isolated Postgres, concurrency script PASS (3 races), vitest 117 in the touched folders, eslint clean on new files, tsc clean except the pre-existing `postgres` module error in `edge/media-worker`.
 - Not done: buyer request wizard with evidence upload UI (actions exist), seller settings page, non-returnable toggle on the product edit page, navigation entries, product page disclosure badge (PR 12 exposes `non_returnable` only in quote and order), browser run, clean replay of all migrations, CI permission gate.
 
+## 2026-11-28 - UI fixes from the signed-in Acceptance browser check (frontend only, nothing deployed)
+- A product that is free to ship only above an order value no longer says "free" before a place is chosen.
+- Seller product list shows the currency once; the returns toggle sits above Save; "1 product" in English.
+- Owner correction: sign-in and sign-up in the public headers are for guests only. A signed-in caller sees "My account" on `/` and `/market`, plus "My orders" while ordering is on.
+- Not checked in a browser. Test files: vitest on the marketplace, landing, seller, returns and i18n folders.
+
 ## 2026-11-26 - Admin backups console: what the owner sees now matches what ran (draft PR, not deployed)
 
 - Scope: branch `fix/admin-backups-console-20261126`, frontend only, no migration. History link derived from the configured repository (the background reporter stores no URL); history and tiles show the claim time instead of the later verification time; checks that took no backup are hidden behind a toggle; the system reason is translated; the schedule tile shows frequency and time; the weekday shows only for weekly; saving no longer clears a running pause; password managers get their own login field; Production activation is a closed section at the bottom; includes the #242 fix (form keyed on the settings version).

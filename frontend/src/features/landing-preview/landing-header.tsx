@@ -9,6 +9,7 @@ import { LanguageSwitch } from "@/components/layout/switchers";
 import { useI18n } from "@/lib/i18n/context";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
 import { useCartViewer } from "@/features/marketplace/live/viewer-context";
+import { isMarketplaceOrderingEnabled } from "@/lib/env";
 import { useLiveCart } from "@/features/marketplace/live/live-cart-store";
 import styles from "./landing-header.module.css";
 
@@ -44,7 +45,8 @@ export function LandingHeader({ anchorBase = "", showCart = false, cartCount = 0
   const t = content[locale];
   // The browser cart (same store the Marketplace pages write), so "Add to cart" anywhere updates this at once.
   const liveCart = useLiveCart();
-  // A signed-in buyer (known to the /market layout) sees his orders and account instead of the sign-in and sign-up buttons.
+  // A signed-in caller (known to the /market layout) sees their account (and orders, once ordering is on) instead of the
+  // sign-in and sign-up buttons, which are for guests.
   const { signedIn } = useCartViewer();
   const count = showCart ? Math.max(cartCount, liveCart.count) : 0;
   const lastCount = useRef<number | null>(null);
@@ -114,7 +116,7 @@ export function LandingHeader({ anchorBase = "", showCart = false, cartCount = 0
         <span className={styles.language}><LanguageSwitch /><GlobeIcon size={14} aria-hidden="true" /></span>
         {signedIn ? (
           <>
-            <Link className={styles.signIn} href="/market/orders" dir={dir}>{t.myOrders}</Link>
+            {isMarketplaceOrderingEnabled() ? <Link className={styles.signIn} href="/market/orders" dir={dir}>{t.myOrders}</Link> : null}
             <a className={styles.signIn} href="/home" dir={dir}>{t.account}</a>
           </>
         ) : (

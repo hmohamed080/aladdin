@@ -1,14 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { LandingBrandCart } from "./landing-brand-cart";
 import { brandContent } from "./landing-brand-content";
 
 const link = { padding: "13px 4px", fontSize: "16px", color: "var(--lb-cream)", borderBottom: "1px solid color-mix(in srgb, var(--lb-cream) 10%, transparent)" } as const;
 
-/** Mobile header from the approved mockup: logo at the inline start, burger at the end, links and the two account buttons in the opened menu. */
-export function LandingBrandMobileHeader({ showCart = false }: { showCart?: boolean } = {}) {
+/** Mobile header from the approved mockup: logo at the inline start, burger at the end, links and the account buttons in the opened menu (sign up and sign in are for a guest only). */
+export function LandingBrandMobileHeader({ showCart = false, signedIn = false }: { showCart?: boolean; signedIn?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const t = brandContent.nav;
   const items: [string, string][] = t.items.map(([label, href]) => [label, href === "#top" ? "#top" : href === "#market" ? "#market" : href === "#roles" ? "#m-roles" : href === "#why" ? "#m-why" : "#m-footer"]);
@@ -30,8 +31,17 @@ export function LandingBrandMobileHeader({ showCart = false }: { showCart?: bool
             <a key={label} href={href} onClick={() => setOpen(false)} style={{ ...link, textDecoration: "none" }}>{label}</a>
           ))}
           <div style={{ display: "flex", gap: "10px", paddingTop: "14px" }}>
-            <a href="/auth/sign-up" style={{ flex: 1, textAlign: "center", background: "var(--lb-cream)", color: "var(--lb-navy)", fontWeight: 800, fontSize: "15px", padding: "13px", borderRadius: "999px", textDecoration: "none" }}>{t.register}</a>
-            <a href="/auth/sign-in" style={{ flex: 1, textAlign: "center", border: "1px solid var(--lb-sand)", color: "var(--lb-sand)", fontWeight: 700, fontSize: "15px", padding: "12px", borderRadius: "999px", textDecoration: "none" }}>{t.signIn}</a>
+            {signedIn ? (
+              <>
+                <a href="/home" style={{ flex: 1, textAlign: "center", background: "var(--lb-cream)", color: "var(--lb-navy)", fontWeight: 800, fontSize: "15px", padding: "13px", borderRadius: "999px", textDecoration: "none" }}>{t.account}</a>
+                {showCart ? <Link href="/market/orders" style={{ flex: 1, textAlign: "center", border: "1px solid var(--lb-sand)", color: "var(--lb-sand)", fontWeight: 700, fontSize: "15px", padding: "12px", borderRadius: "999px", textDecoration: "none" }}>{t.myOrders}</Link> : null}
+              </>
+            ) : (
+              <>
+                <a href="/auth/sign-up" style={{ flex: 1, textAlign: "center", background: "var(--lb-cream)", color: "var(--lb-navy)", fontWeight: 800, fontSize: "15px", padding: "13px", borderRadius: "999px", textDecoration: "none" }}>{t.register}</a>
+                <a href="/auth/sign-in" style={{ flex: 1, textAlign: "center", border: "1px solid var(--lb-sand)", color: "var(--lb-sand)", fontWeight: 700, fontSize: "15px", padding: "12px", borderRadius: "999px", textDecoration: "none" }}>{t.signIn}</a>
+              </>
+            )}
           </div>
         </nav>
       ) : null}

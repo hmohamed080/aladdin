@@ -60,3 +60,12 @@ describe("fee and free-shipping wording", () => {
     expect(freeReasonText(terms(), "en")).toBeNull();
   });
 });
+
+describe("fee before a place is chosen", () => {
+  const open = { status: "needs_area" as const, fee_egp: null, fee_min_egp: 50, fee_max_egp: 50, free_shipping: true };
+  it("answers free only when it holds in every place", () => {
+    expect(feeText(terms({ ...open, free_reason: "product" }), "en")).toBe("Free");
+    expect(feeText(terms({ ...open, free_reason: "free_delivery" }), "en")).toBe("Free");
+    expect(feeText(terms({ ...open, free_reason: "threshold", free_min_egp: 100 }), "en")).toBeNull();
+  });
+});

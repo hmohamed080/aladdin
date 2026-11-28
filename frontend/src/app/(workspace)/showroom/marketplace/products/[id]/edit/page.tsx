@@ -58,8 +58,8 @@ export default async function EditMarketplaceProductPage({
         schemas={schemas}
         product={product}
         notice={sp.created ? t.created : undefined}
+        beforeActions={<ReturnabilityToggle key={`returns-${product.id}`} organizationId={org.organizationId} productId={product.id} initial={product.nonReturnable === true} locale={locale} />}
       />
-      <ReturnabilityToggle key={`returns-${product.id}`} organizationId={org.organizationId} productId={product.id} initial={product.nonReturnable === true} locale={locale} />
       {videos ? <VideoManager scope="marketplace" productId={product.id} videos={videos} canPublish={false} /> : null}
     </div>
   );

@@ -7913,7 +7913,6 @@ export const ar: Messages = {
     review: { approved: "معتمد", pending_review: "قيد المراجعة", rejected: "لم يُعتمد", no_image: "لا توجد صورة بعد" },
     status: { draft: "مسودة", published: "منشور", unpublished: "غير منشور", archived: "مؤرشف", low: "منخفض", out: "نفد المخزون" },
     moreSkus: "+{n}",
-    price: "{amount} جنيه",
     action: { edit: "تعديل", preview: "معاينة في الماركت", previewUnavailable: "المعاينة متاحة للمنتجات المنشورة فقط", more: "المزيد", publish: "نشر في الماركت", unpublish: "إلغاء النشر", checking: "جارٍ الفحص…", published: "تم النشر — المنتج ظاهر في الماركت الآن.", unpublished: "تم إلغاء النشر.", needsApproval: "يُتاح النشر بعد اعتماد المنتج من فريق المنصة." },
     showing: "عرض {shown} من {total} منتج",
     pagination: "ترقيم الصفحات",
