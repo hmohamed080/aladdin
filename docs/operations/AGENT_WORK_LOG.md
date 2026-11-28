@@ -8071,3 +8071,8 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - F07: new invoices fall back to the showroom branch address. F09: notifications and two pages write "EGP 150". F27: waybill says why nothing is collected. F28: thank-you page labels the address. F29: admin decisions ask for confirmation.
 - Validation: local `supabase test db` Files=202 Tests=10212 PASS; `node --test scripts/*.test.mjs scripts/hosted-db/*.test.mjs` 493 pass; vitest 5548 pass, 1 timeout under load that passed when run alone; tsc only the existing `edge/media-worker` `postgres` error. No browser check of these changes.
 - Open: owner merge, gated Acceptance plan for `20261128150001`, apply, frontend deploy, retest F18-F21 with an approved return, F30 decision.
+
+## 2026-11-28 - Gated Acceptance plan marketplace-retest prepared (nothing hosted changed)
+- Plan 266 -> 267 for `20261128150001` on PR 298: gate entry, apply/preflight wiring, read-only smoke, pinned forward-fix, scratch proof, [runbook](MARKETPLACE_RETEST_ACCEPTANCE_PLAN_20261128.md).
+- Scratch proof OK (7 functions); `node --test scripts/*.test.mjs scripts/hosted-db/*.test.mjs` 511 pass, 2 skipped. Read-only on Acceptance: pre-state matches.
+- Open: owner merge, owner apply, frontend deploy, retest.
