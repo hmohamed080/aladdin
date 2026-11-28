@@ -209,7 +209,7 @@ select is((select count(*)::int from public.admin_role_permissions rp join publi
 select is((select count(*)::int from public.admin_role_permissions where permission_key = 'marketplace_returns.review'), 1, 'A7. nobody else holds it by default (grantable)');
 select is((select count(*)::int from public.marketplace_return_reason_rules), 6, 'A8. six return reasons are seeded with their rules');
 select is((select count(*)::int from public.marketplace_seller_message_presets where action = 'return_reject'), 4, 'A9. four rejection reasons are seeded');
-select is((select count(*)::int from public.notification_templates where key like 'marketplace.return.%'), 10, 'A10. ten return templates (both languages)');
+select is((select count(*)::int from public.notification_templates where key like 'marketplace.return.%'), 13, 'A10. thirteen return templates (both languages)');
 select is((select count(*)::int from public.marketplace_return_reason_rules where claim_type = 'defect' and requires_evidence and shipping_payer = 'seller'), 4,
   'A11. defect, wrong item, not as described and transit damage need evidence and are shipped by the showroom');
 select is((select shipping_payer from public.marketplace_return_reason_rules ru join public.marketplace_seller_message_presets p on p.id = ru.preset_id
@@ -487,6 +487,9 @@ select throws_like(format($$ select public.marketplace_seller_refund_record(%L::
 select is(public.marketplace_seller_refund_record(current_setting('t.rid1')::uuid, 200, 'InstaPay ref 123') -> 'refund' ->> 'state', 'sent', 'E46. the showroom records the refund it paid');
 select is(public.marketplace_seller_refund_record(current_setting('t.rid1')::uuid, 200, 'InstaPay ref 123') -> 'refund' ->> 'state', 'sent', 'E47. recording twice is a no-op');
 select is((select count(*)::int from public.marketplace_order_refunds where return_id = current_setting('t.rid1')::uuid), 1, 'E48. one refund row');
+select is((select count(*)::int from public.marketplace_timers where subject_id = current_setting('t.rid1')::uuid and kind = 'return_refund_confirm' and state = 'active'), 1, 'E48a. the confirmation clock starts');
+select is((select count(*)::int from public.notifications where event_type = 'marketplace.return.shipped' and subject_id = current_setting('t.rid1')::uuid
+            and recipient_user_id = current_setting('t.seller')::uuid), 1, 'E48b. the showroom was told the parcel left (once)');
 select is((select method from public.marketplace_order_refunds where return_id = current_setting('t.rid1')::uuid), 'cod', 'E49. through the ORIGINAL method of the order');
 select is((select status from public.marketplace_return_requests where id = current_setting('t.rid1')::uuid), 'received', 'E50. the return is not closed until the buyer confirms');
 select pg_temp.as_user(current_setting('t.buyer'));
@@ -499,6 +502,7 @@ select is(public.marketplace_buyer_refund_confirm(current_setting('t.rid1')::uui
 select is((select payment_status from public.marketplace_orders where id = current_setting('t.o1')::uuid), 'collected', 'E55. a partial refund returns the payment status to collected');
 select is((select state from public.marketplace_order_refunds where return_id = current_setting('t.rid1')::uuid), 'confirmed', 'E56. refund confirmed');
 select is((select count(*)::int from public.marketplace_timers where subject_id = current_setting('t.rid1')::uuid and kind = 'return_refund_due' and state = 'active'), 0, 'E57. the refund timer is closed');
+select is((select count(*)::int from public.marketplace_timers where subject_id = current_setting('t.rid1')::uuid and kind = 'return_refund_confirm' and state = 'active'), 0, 'E57a. so is the confirmation clock');
 select is((select status from public.marketplace_orders where id = current_setting('t.o1')::uuid), 'delivered', 'E58. the order itself stays delivered');
 select is((select quantity_returned from public.marketplace_order_items where id = current_setting('t.i1')::uuid), 2, 'E59. two units stay counted as returned');
 reset role;
@@ -623,7 +627,18 @@ select pg_temp.as_user(current_setting('t.super'));
 select is((public.admin_marketplace_returns() -> 'counts' ->> 'escalated')::int, 1, 'H6. the queue holds the escalated return');
 select is(jsonb_array_length(public.admin_marketplace_returns('open', 'all') -> 'items') >= 2, true, 'H7. the full list shows the others');
 select is(public.admin_marketplace_return_get(current_setting('t.rid6')::uuid) -> 'buyer' ->> 'name', (select buyer_name from public.marketplace_orders where id = current_setting('t.o4')::uuid), 'H8. the admin sees the names');
-select is(public.admin_marketplace_return_get(current_setting('t.rid6')::uuid) ? 'phone', false, 'H9. never a phone number');
+select is(public.admin_marketplace_return_get(current_setting('t.rid6')::uuid) -> 'buyer' ->> 'phone',
+  (select buyer_phone from public.marketplace_orders where id = current_setting('t.o4')::uuid), 'H9. the admin sees the buyer''s phone to follow the case up');
+reset role;
+update public.organizations set contact_phone = '+201001112222'
+ where id = (select seller_organization_id from public.marketplace_return_requests where id = current_setting('t.rid6')::uuid);
+select pg_temp.as_user(current_setting('t.super'));
+select is(public.admin_marketplace_return_get(current_setting('t.rid6')::uuid) -> 'seller' ->> 'phone', '+201001112222', 'H9b. ...and the showroom''s business phone');
+select pg_temp.as_user(current_setting('t.buyer'));
+select is(public.marketplace_buyer_return_get(current_setting('t.rid6')::uuid) -> 'seller' ->> 'phone', null, 'H9c. the buyer never gets the showroom''s phone');
+select pg_temp.as_user(current_setting('t.seller'));
+select is(public.marketplace_seller_return_get(current_setting('t.rid6')::uuid) -> 'seller' ->> 'phone', null, 'H9d. the showroom document carries no showroom phone');
+select pg_temp.as_user(current_setting('t.super'));
 select is(public.admin_marketplace_return_get(current_setting('t.rid6')::uuid) -> 'actions', '["remind_seller", "approve", "reject"]'::jsonb, 'H10. the admin actions come from the database');
 select is(public.admin_marketplace_return_remind_seller(current_setting('t.rid6')::uuid) ->> 'status', 'requested', 'H11. the admin reminds the showroom');
 select is((select count(*)::int from public.notifications where event_type = 'marketplace.return.admin_reminder' and subject_id = current_setting('t.rid6')::uuid
@@ -666,6 +681,8 @@ select pg_temp.as_user(current_setting('t.buyer'));
 select is(public.marketplace_return_complaint_file((current_setting('t.r2')::jsonb ->> 'id')::uuid, 'The photos clearly show the chipped edge') ->> 'in_admin_queue', 'true',
   'H26. the buyer escalates a rejection with a complaint');
 select is((select escalated_reason from public.marketplace_return_requests where id = (current_setting('t.r2')::jsonb ->> 'id')::uuid), 'complaint', 'H27. reason: complaint');
+select is((select count(*)::int from public.notifications where event_type = 'marketplace.return.complaint_filed' and subject_id = (current_setting('t.r2')::jsonb ->> 'id')::uuid
+            and recipient_user_id = current_setting('t.seller')::uuid), 1, 'H27a. the showroom is told of the complaint');
 select is(public.marketplace_return_complaint_file((current_setting('t.r2')::jsonb ->> 'id')::uuid, 'The photos clearly show the chipped edge') ->> 'in_admin_queue', 'true',
   'H28. complaining again is a no-op');
 select pg_temp.as_user(current_setting('t.super'));
@@ -692,6 +709,19 @@ select is(app.marketplace_return_timer_tick((select t from public.marketplace_ti
   'G16. then the admin queue');
 select pg_temp.as_user(current_setting('t.seller'));
 select is(public.marketplace_seller_refund_record((current_setting('t.r2')::jsonb ->> 'id')::uuid, 80, null) -> 'refund' ->> 'amount_egp', '80.00', 'G17. the showroom still records the refund (80 EGP)');
+reset role;
+select set_config('t.timer3', (select id::text from public.marketplace_timers where subject_id = (current_setting('t.r2')::jsonb ->> 'id')::uuid and kind = 'return_refund_confirm' and state = 'active'), true);
+select is(app.marketplace_return_timer_tick((select t from public.marketplace_timers t where t.id = current_setting('t.timer3')::uuid), now() + interval '3 days'), 'reminded',
+  'G17a. the buyer is reminded to confirm after 3 days');
+select is((select count(*)::int from public.notifications where event_type = 'marketplace.return.refund_confirm_reminder' and subject_id = (current_setting('t.r2')::jsonb ->> 'id')::uuid
+            and recipient_user_id = current_setting('t.buyer')::uuid), 1, 'G17b. once');
+select ok((select next_remind_at is null and reminders_sent = 1 from public.marketplace_timers where id = current_setting('t.timer3')::uuid), 'G17c. the timer advances: no repeat on the next run');
+select is(app.marketplace_return_timer_tick((select t from public.marketplace_timers t where t.id = current_setting('t.timer3')::uuid), now() + interval '8 days'), 'escalated',
+  'G17d. unconfirmed after 7 days: the admin queue');
+select is((select escalated_reason from public.marketplace_return_requests where id = (current_setting('t.r2')::jsonb ->> 'id')::uuid), 'refund_unconfirmed', 'G17e. with its reason');
+select is((select state from public.marketplace_timers where id = current_setting('t.timer3')::uuid), 'expired', 'G17f. the timer is closed');
+select pg_temp.as_user(current_setting('t.super'));
+select is(public.admin_marketplace_return_get((current_setting('t.r2')::jsonb ->> 'id')::uuid) -> 'actions', '[]'::jsonb, 'G17g. nothing to decide: the admin follows up with the buyer');
 reset role;
 select is(app.marketplace_return_timer_tick((select t from public.marketplace_timers t where t.id = current_setting('t.timer2')::uuid), now() + interval '9 days'), 'noop',
   'G18. nothing happens once the refund is recorded');

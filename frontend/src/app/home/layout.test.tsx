@@ -19,6 +19,15 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/server/queries/business-setup", () => ({ loadMandatoryBusinessSetup: async () => state.mandatory }));
 vi.mock("@/server/actions/auth", () => ({ signOut: vi.fn() }));
+vi.mock("@/server/actions/notifications", () => ({ markNotificationReadAction: vi.fn(), markAllNotificationsReadAction: vi.fn() }));
+vi.mock("@/server/actions/chat", () => ({
+  CHAT_ACCESS_DENIED: "chat.error.access",
+  openConversationAction: vi.fn(),
+  sendMessageAction: vi.fn(),
+  markConversationReadAction: vi.fn(),
+  loadConversationThreadAction: vi.fn(),
+}));
+vi.mock("@/server/queries/notifications", () => ({ listNotifications: async () => [], countUnread: async () => 0 }));
 vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({}) }));
 vi.mock("@/server/queries/job-opportunities", () => ({ listJobOpportunities: async () => [] }));
 vi.mock("@/server/queries/workspace", () => ({ getWorkspaces: async () => ({ entries: state.entries }) }));

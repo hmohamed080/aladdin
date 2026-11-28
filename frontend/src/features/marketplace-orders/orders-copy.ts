@@ -667,6 +667,7 @@ export const EVENT_LABELS: Record<Locale, Record<string, string>> = {
     complaint_resolved: "Payment complaint decided",
     return_requested: "Return requested",
     return_closed: "Return closed",
+    invoice_issued: "Invoice issued",
   },
   ar: {
     placed: "تم الطلب",
@@ -691,5 +692,6 @@ export const EVENT_LABELS: Record<Locale, Record<string, string>> = {
     complaint_resolved: "تم البت في شكوى الدفع",
     return_requested: "تم طلب إرجاع",
     return_closed: "أُغلق طلب الإرجاع",
+    invoice_issued: "تم إصدار الفاتورة",
   },
 };

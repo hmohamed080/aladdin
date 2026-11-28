@@ -19,6 +19,9 @@ type LiveCartCopy = {
   onlyAvailable: (n: string) => string;
   deliveryFeeByShowroom: string;
   noFee: string;
+  savedAddress: string;
+  otherArea: string;
+  addressAtCheckout: string;
   showroomNoDelivery: (names: string) => string;
   showroomNoPickup: (names: string) => string;
   pickupDesc: string;
@@ -58,6 +61,9 @@ export const liveCartCopy = {
     onlyAvailable: (n) => `المتاح ${n} فقط`,
     deliveryFeeByShowroom: "رسوم التوصيل حسب المعرض",
     noFee: "—",
+    savedAddress: "عنوان التوصيل المحفوظ",
+    otherArea: "منطقة أخرى",
+    addressAtCheckout: "تكتب العنوان بالتفصيل في خطوة إتمام الطلب.",
     showroomNoDelivery: (names) => `لا يوصّل إلى هذه المنطقة: ${names}`,
     showroomNoPickup: (names) => `لا يوفّر الاستلام من المعرض: ${names}`,
     pickupDesc: "استلم طلبك بنفسك من المعرض دون رسوم توصيل",
@@ -97,6 +103,9 @@ export const liveCartCopy = {
     onlyAvailable: (n) => `Only ${n} available`,
     deliveryFeeByShowroom: "Delivery fee by showroom",
     noFee: "—",
+    savedAddress: "Saved delivery address",
+    otherArea: "Another area",
+    addressAtCheckout: "You enter the detailed address at checkout.",
     showroomNoDelivery: (names) => `Does not deliver to this area: ${names}`,
     showroomNoPickup: (names) => `No showroom pickup: ${names}`,
     pickupDesc: "Collect your order yourself, with no delivery fee",

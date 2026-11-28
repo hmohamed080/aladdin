@@ -39,8 +39,6 @@ type CartCopy = {
   deliveryDetails: string;
   governorate: string;
   area: string;
-  address: string;
-  addressPlaceholder: string;
   chooseGovernorate: string;
   chooseArea: string;
   notAvailable: string;
@@ -106,8 +104,6 @@ export const cartCopy = {
     deliveryDetails: "تفاصيل التوصيل",
     governorate: "المحافظة",
     area: "المنطقة / الحي",
-    address: "العنوان بالتفصيل",
-    addressPlaceholder: "مثال: شارع عباس العقاد، برج رقم 12، الدور 3",
     chooseGovernorate: "اختر المحافظة",
     chooseArea: "اختر المنطقة",
     notAvailable: "التوصيل غير متاح لهذه المنطقة حاليًا",
@@ -171,8 +167,6 @@ export const cartCopy = {
     deliveryDetails: "Delivery details",
     governorate: "Governorate",
     area: "Area / district",
-    address: "Detailed address",
-    addressPlaceholder: "e.g. Abbas El Akkad St., Tower 12, 3rd floor",
     chooseGovernorate: "Choose governorate",
     chooseArea: "Choose area",
     notAvailable: "Delivery is not available to this area right now",

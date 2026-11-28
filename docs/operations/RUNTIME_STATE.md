@@ -1,3 +1,9 @@
+## Marketplace test-round fixes prepared; current Acceptance frontend - 2026-11-28
+
+- **Acceptance frontend** is now `aladdin-frontend-preview` version `3fa20123-a84f-4e8c-836f-b49d4ca70412` (workflow run 46131423561, `main` `89b147f6`); rollback target `75fd1b92-2915-4a60-9b46-11018f39dfa1`. Ordering is on.
+- Migration `20261128090001` is in a branch only: **not merged, not applied** to Acceptance or Production, and has no apply plan yet. The frontend of that branch also runs against the current Acceptance database (new fields are optional).
+- The timers Worker is still not deployed, so no reminder, escalation or automatic cancellation runs.
+
 ## Acceptance: UI fixes deployed; ordering switched on in the repository - 2026-11-28
 
 - **Acceptance frontend**: `aladdin-frontend-preview` version `75fd1b92-2915-4a60-9b46-11018f39dfa1` (workflow run 46129164915, `main` `29ec0a98`, PR #291); smoke answered 200 (`/showroom` 307). Rollback target: `d96b440e-66fd-4ec4-b81b-0719186dd6aa`. A signed-in browser check confirmed the five fixes it covered (header account link, single currency, returns toggle above Save, "1 product", delivery fee of a free-shipping product).
