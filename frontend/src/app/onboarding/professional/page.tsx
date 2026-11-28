@@ -23,6 +23,9 @@ export default async function ProfessionalOnboardingPage() {
 
   const data = await getIndividualOnboardingData();
   if (!data || data.selectedTrack !== "professional") redirect("/onboarding");
+  // A Craftsman completes the professional profile in ONE place, /home/profile, and is verified from there
+  // (craftsman_profile_verification_submit). Every other professional keeps this flow unchanged.
+  if (data.selectedPersona === "installer_technician") redirect("/home/profile");
 
   const persona = data.selectedPersona ? PERSONA_BY_ACCOUNT_TYPE[data.selectedPersona] : undefined;
   if (!persona) redirect("/onboarding");

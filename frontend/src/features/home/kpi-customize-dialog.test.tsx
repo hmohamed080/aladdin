@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { KpiCustomizeDialog } from "./kpi-customize-dialog";
 import { SHOWROOM_KPI_CATALOG, SHOWROOM_KPI_DEFAULT_ORDER } from "@/features/showroom-shell/home/kpi-catalog";
 import { SYSTEM_DEFAULT_KPI_ORDER } from "@/lib/workspace/dashboard-kpi-catalog";

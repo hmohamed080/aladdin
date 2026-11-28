@@ -1,0 +1,355 @@
+{
+ "summary": {
+  "suite": "phone-signup-authority",
+  "mode": "confirm-on",
+  "posture": "observe",
+  "email_confirmations": true,
+  "gotrue_image": "public.ecr.aws/supabase/gotrue:v2.193.0",
+  "cli": "2.110.0",
+  "PASS": 40,
+  "FAIL": 0,
+  "XFAIL": 4,
+  "XPASS": 0,
+  "EVAL": 2,
+  "N/A": 2,
+  "total": 48
+ },
+ "results": [
+  {
+   "id": "SEC-ENV-1",
+   "area": "guard",
+   "title": "Target is loopback API + explicitly named non-shared DB container",
+   "status": "PASS",
+   "evidence": "supabase_db_aladdin_r1ci"
+  },
+  {
+   "id": "SEC-ENV-2",
+   "area": "guard",
+   "title": "No SMS provider / Send-SMS hook / Phone MFA / anonymous sign-in is enabled: nothing on this stack can deliver a message",
+   "status": "PASS",
+   "evidence": ""
+  },
+  {
+   "id": "SEC-ENV-3",
+   "area": "guard",
+   "title": "Toolchain under test",
+   "status": "EVAL",
+   "evidence": "posture=observe email_confirmations=true gotrue=public.ecr.aws/supabase/gotrue:v2.193.0 cli=2.110.0"
+  },
+  {
+   "id": "SEC-POS-0",
+   "area": "posture",
+   "title": "Migration defaults: enabled=false, signup_enabled=false, alias_guard_mode=off",
+   "status": "PASS",
+   "evidence": "false,false,off"
+  },
+  {
+   "id": "SEC-FX-1",
+   "area": "fixtures",
+   "title": "Legacy Installer (alias), Showroom (alias + organization) and e-mail accounts built through the real Admin-API + RPC path",
+   "status": "PASS",
+   "evidence": "LegacyInstaller:36f992d7 LegacyShowroom:42246e3f EmailSignup:3613f624"
+  },
+  {
+   "id": "SEC-POS-1",
+   "area": "posture",
+   "title": "Posture observe is active",
+   "status": "PASS",
+   "evidence": "true,true,observe"
+  },
+  {
+   "id": "SEC-A1",
+   "area": "bypass",
+   "title": "An anonymous caller CANNOT create an Auth user on the internal phone alias through GoTrue /signup [guard observing only]",
+   "status": "XFAIL",
+   "evidence": "status=ok auth_rows=1 confirmed=false"
+  },
+  {
+   "id": "SEC-A2",
+   "area": "bypass",
+   "title": "Anonymous alias sign-up yields no usable session",
+   "status": "N/A",
+   "evidence": "e-mail confirmations are ON: an unconfirmed row cannot sign in (it would still occupy the alias; see SEC-A4)"
+  },
+  {
+   "id": "SEC-A3b",
+   "area": "bypass",
+   "title": "Attacker finishes registration on the victim's number",
+   "status": "N/A",
+   "evidence": "no session was issued (confirmations ON)"
+  },
+  {
+   "id": "SEC-A12",
+   "area": "observe",
+   "title": "Observe mode: the anonymous alias sign-up is NOT blocked but IS recorded (no alias or number in the record)",
+   "status": "PASS",
+   "evidence": "observations 0 -> 1"
+  },
+  {
+   "id": "SEC-A4",
+   "area": "squatting",
+   "title": "An anonymous alias row does NOT block the real owner's account creation [guard observing only]",
+   "status": "XFAIL",
+   "evidence": "squat_rows=1 legit create -> 599:verify"
+  },
+  {
+   "id": "SEC-A5",
+   "area": "duplicate",
+   "title": "Anonymous sign-up on an EXISTING alias (also upper-cased) creates no second identity and changes nothing",
+   "status": "PASS",
+   "evidence": "plain=ok upper=ok"
+  },
+  {
+   "id": "SEC-A6",
+   "area": "duplicate",
+   "title": "Concurrent anonymous sign-ups on one alias produce at most one Auth user",
+   "status": "PASS",
+   "evidence": "rows=1 statuses=ok,500:23505,500:23505"
+  },
+  {
+   "id": "SEC-A7",
+   "area": "bypass",
+   "title": "A public /signup body cannot set raw_app_meta_data (forged grant marker never lands)",
+   "status": "PASS",
+   "evidence": "keys=provider,providers"
+  },
+  {
+   "id": "SEC-A7b",
+   "area": "bypass",
+   "title": "Forging the grant markers in the sign-up body (app_metadata AND user_metadata) cannot create an alias user [guard observing only]",
+   "status": "XFAIL",
+   "evidence": "status=ok"
+  },
+  {
+   "id": "SEC-A8",
+   "area": "bypass",
+   "title": "Direct GoTrue PHONE sign-up is refused (no Auth user with auth.users.phone)",
+   "status": "PASS",
+   "evidence": "status=400:phone_provider_disabled"
+  },
+  {
+   "id": "SEC-A9",
+   "area": "bypass",
+   "title": "Anonymous (no credential) sign-in is refused",
+   "status": "PASS",
+   "evidence": ""
+  },
+  {
+   "id": "SEC-A10",
+   "area": "bypass",
+   "title": "A signed-in e-mail user cannot swap their login e-mail for an alias directly",
+   "status": "PASS",
+   "evidence": "PUT /user -> ok"
+  },
+  {
+   "id": "SEC-A11",
+   "area": "enumeration",
+   "title": "Anonymous /signup answer for a FREE alias vs an EXISTING phone account (GoTrue-owned, not gated)",
+   "status": "EVAL",
+   "evidence": "free=ok existing=ok/ok identical=true"
+  },
+  {
+   "id": "SEC-C5",
+   "area": "legacy-path",
+   "title": "observe: the OLD no-grant Admin creation of an alias user still works (the migration cannot break existing legitimate sign-up before the dependent flow is ready)",
+   "status": "PASS",
+   "evidence": "ok"
+  },
+  {
+   "id": "SEC-C1",
+   "area": "admin",
+   "title": "Legitimate sign-up: proof -> Admin createUser WITH the grant succeeds; the account is confirmed with one identity",
+   "status": "PASS",
+   "evidence": "ok"
+  },
+  {
+   "id": "SEC-C2",
+   "area": "signup-state",
+   "title": "The usual initialisation RPCs run as before (consent, account type, profile_set_phone, username)",
+   "status": "PASS",
+   "evidence": "{\"record_consent\":\"ok\",\"onboarding_select_account_type\":\"ok\",\"profile_set_phone\":\"ok\",\"profile_set_username\":\"ok\"}"
+  },
+  {
+   "id": "SEC-C2b",
+   "area": "signup-state",
+   "title": "A completed phone sign-up records the number as verified: attach -> profiles.phone_verified_at set, for the exact proven number",
+   "status": "PASS",
+   "evidence": "attach=attached verified=true"
+  },
+  {
+   "id": "SEC-C2c",
+   "area": "signup-state",
+   "title": "Verification grants nothing else: no auth.users.phone, no MFA factor, exactly the one e-mail identity",
+   "status": "PASS",
+   "evidence": "{\"mfa\":0,\"auth_phone\":null,\"identities\":1}"
+  },
+  {
+   "id": "SEC-C3",
+   "area": "admin",
+   "title": "Rollback (Admin deleteUser) after a completed initialisation leaves no Auth user, identity, public user, profile or phone claim",
+   "status": "PASS",
+   "evidence": "{\"auth\":0,\"claims\":0,\"profiles\":0,\"identities\":0,\"public_users\":0}"
+  },
+  {
+   "id": "SEC-C4",
+   "area": "admin",
+   "title": "After a rollback the SPENT grant cannot recreate the alias (replay): a new proof is required",
+   "status": "PASS",
+   "evidence": "recreate with spent grant -> ok"
+  },
+  {
+   "id": "SEC-C4b",
+   "area": "admin",
+   "title": "...and a fresh proof for the same number creates the account again (no tombstone, no leaked reservation)",
+   "status": "PASS",
+   "evidence": "ok"
+  },
+  {
+   "id": "SEC-D1",
+   "area": "signup-proof",
+   "title": "A verified signup challenge is bound to the NEW Auth user and sets profiles.phone_verified_at for exactly the verified number (and no other account's flag)",
+   "status": "PASS",
+   "evidence": "attach=attached profile={\"phone\":\"+**********13\",\"verified\":true}"
+  },
+  {
+   "id": "SEC-D2",
+   "area": "signup-proof",
+   "title": "Replaying a consumed proof (same code and challenge), re-attaching, or re-using the grant to create a user are all refused and change nothing",
+   "status": "PASS",
+   "evidence": "verify=invalid attach=invalid create=422:email_exists"
+  },
+  {
+   "id": "SEC-D3",
+   "area": "signup-proof",
+   "title": "An expired proof cannot be verified, and an expired grant cannot create or verify an account",
+   "status": "PASS",
+   "evidence": "verify=invalid create=ok attach=invalid"
+  },
+  {
+   "id": "SEC-D4",
+   "area": "signup-proof",
+   "title": "A proof for number A cannot create/verify number B: a grant cannot create another alias, and the grant cannot be attached by another user or by a legacy account",
+   "status": "PASS",
+   "evidence": "cross-create=ok wrongUser=invalid legacy=invalid swapped=invalid"
+  },
+  {
+   "id": "SEC-D4b",
+   "area": "signup-proof",
+   "title": "...and neither attempt marked anything verified",
+   "status": "PASS",
+   "evidence": "installer=false b=false"
+  },
+  {
+   "id": "SEC-D5a",
+   "area": "signup-proof",
+   "title": "Three concurrent Admin creations racing on ONE grant create exactly one account",
+   "status": "PASS",
+   "evidence": "ok=1 rows=1 statuses=ok,500:23505,500:23505"
+  },
+  {
+   "id": "SEC-D5b",
+   "area": "signup-proof",
+   "title": "Three concurrent attach calls for one grant verify exactly once",
+   "status": "PASS",
+   "evidence": "statuses=attached,invalid,invalid"
+  },
+  {
+   "id": "SEC-D5c",
+   "area": "signup-proof",
+   "title": "Three concurrent verifications of ONE correct code mint exactly one grant",
+   "status": "PASS",
+   "evidence": "statuses=invalid,invalid,verified"
+  },
+  {
+   "id": "SEC-D6",
+   "area": "signup-proof",
+   "title": "Alias account creation without a valid proof is refused at the database, through GoTrue sign-up AND the Admin API [guard observing only]",
+   "status": "XFAIL",
+   "evidence": "anon=ok admin=ok"
+  },
+  {
+   "id": "SEC-D6b",
+   "area": "signup-proof",
+   "title": "A proven-but-never-attached account is NOT verified (creation alone verifies nothing)",
+   "status": "PASS",
+   "evidence": "verified=false"
+  },
+  {
+   "id": "SEC-D7",
+   "area": "signup-proof",
+   "title": "Five wrong codes close the challenge; the correct code afterwards is refused",
+   "status": "PASS",
+   "evidence": "wrong=invalid,invalid,invalid,invalid,invalid after=invalid"
+  },
+  {
+   "id": "SEC-D8",
+   "area": "signup-proof",
+   "title": "A number that already belongs to an account gets the SAME reply shape, nothing is delivered (deliver=false), and its code can never verify",
+   "status": "PASS",
+   "evidence": "keys equal=true deliver=false/true"
+  },
+  {
+   "id": "SEC-X1",
+   "area": "other-auth",
+   "title": "Email + password sign-up is unaffected",
+   "status": "PASS",
+   "evidence": "status=ok confirmed=false"
+  },
+  {
+   "id": "SEC-X2",
+   "area": "other-auth",
+   "title": "Email OTP (passwordless / sign-up code) is unaffected: the OTP request succeeds and creates the user row",
+   "status": "PASS",
+   "evidence": "status=ok"
+  },
+  {
+   "id": "SEC-X3",
+   "area": "other-auth",
+   "title": "Email recovery request is unaffected",
+   "status": "PASS",
+   "evidence": "ok"
+  },
+  {
+   "id": "SEC-X4",
+   "area": "other-auth",
+   "title": "Email + password sign-in of an existing account and legacy phone-alias sign-in are unaffected",
+   "status": "PASS",
+   "evidence": ""
+  },
+  {
+   "id": "SEC-X5",
+   "area": "other-auth",
+   "title": "Google-shaped, Facebook-without-e-mail and Facebook-unverified-e-mail users are created (the guard's WHEN clause never selects them)",
+   "status": "PASS",
+   "evidence": "rows=3"
+  },
+  {
+   "id": "SEC-E1",
+   "area": "legacy",
+   "title": "Legacy Installer, Showroom and e-mail identities are byte-identical (auth row, password digest, identities, MFA, profile, verified flag, memberships, consents) after every attack",
+   "status": "PASS",
+   "evidence": ""
+  },
+  {
+   "id": "SEC-E2",
+   "area": "legacy",
+   "title": "All legacy accounts still sign in with their original passwords",
+   "status": "PASS",
+   "evidence": "200,200,200"
+  },
+  {
+   "id": "SEC-E3",
+   "area": "legacy",
+   "title": "Legacy numbers stay UNVERIFIED (nothing in this suite writes their phone_verified_at)",
+   "status": "PASS",
+   "evidence": ""
+  },
+  {
+   "id": "SEC-E4",
+   "area": "legacy",
+   "title": "No duplicate alias identity exists in the whole database",
+   "status": "PASS",
+   "evidence": "dupes=0"
+  }
+ ]
+}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { InstallerPointsPreview } from "@/features/installer-points-preview/installer-points-preview";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { directionFor, LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { resolveTheme, resolveThemePreference, THEME_COOKIE } from "@/lib/theme/config";
 import { resolveSidebarMode, SIDEBAR_MODE_COOKIE } from "@/lib/ui/sidebar-mode";

@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { test, expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
-import { E2E_PASSWORD, registerWithPassword, signIn } from "./helpers/auth";
+import { E2E_PASSWORD, answerBusinessContactIfAsked, pickBusinessActivity, registerWithPassword, signIn } from "./helpers/auth";
 
 /**
  * MANDATORY FIRST BUSINESS for a business registration, end to end against the REAL local Supabase + Mailpit, through the
@@ -53,8 +53,7 @@ async function register(
     if (f === page.mainFrame()) visited.push(new URL(f.url()).pathname);
   });
   const email = `mb-${tag}-${uniq()}@example.test`;
-  const username = `mb${tag}${uniq()}`.slice(0, 24);
-  await registerWithPassword(page, request, { email, username, accountType: choice, displayName: `E2E ${tag}`, landing });
+  await registerWithPassword(page, request, { email, accountType: choice, displayName: `E2E ${tag}`, landing });
   return { email, visited };
 }
 
@@ -63,13 +62,21 @@ async function fillIdentity(page: Page, name: string): Promise<void> {
   await expect(page.getByRole("heading", { name: /set up your business/i })).toBeVisible();
   await page.locator("#bname").fill(name);
   await page.locator("#blegal").fill(`${name} Legal LLC`);
+  // Each business type answers its own activity list; a Showroom also gives its business phone.
+  await pickBusinessActivity(page);
+  if (await page.locator("#bphone").count()) {
+    await page.locator("#bphone").fill(`10${String(Date.now()).slice(-8)}`);
+    // A showroom needs at least one valid link to finish the identity step (showroom social links, #139).
+    await page.locator('button[aria-controls="blinks-instagram-panel"]').click();
+    await page.locator("#blinks-instagram").fill("@shop");
+  }
   await page.getByRole("button", { name: /^continue$/i }).click();
   await expect(page.getByRole("heading", { name: /where are you based/i })).toBeVisible();
 }
 
 async function finishWizardFromLocation(page: Page, branch = "Cairo HQ"): Promise<void> {
   await page.getByRole("button", { name: /^continue$/i }).click();
-  await expect(page.getByRole("heading", { name: /your primary branch/i })).toBeVisible();
+  await answerBusinessContactIfAsked(page);
   await page.locator("#bbranch").fill(branch);
   await page.getByRole("button", { name: /^continue$/i }).click();
   await expect(page.getByRole("heading", { name: /review and create your business/i })).toBeVisible();

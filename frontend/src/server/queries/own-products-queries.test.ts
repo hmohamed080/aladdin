@@ -124,15 +124,13 @@ describe("product image queries", () => {
     expect(calls).toEqual([]);
   });
 
-  it("signs each distinct key once, with the caller's own client", async () => {
-    const createSignedUrls = vi.fn(async (keys: string[]) => ({
-      data: keys.map((path) => ({ path, signedUrl: `https://signed/${path}`, error: null })),
-      error: null,
-    }));
-    const { supabase } = stub({ data: [], error: null }, { createSignedUrls });
+  it("returns application identifiers only for keys authorized with the caller's own identity", async () => {
+    const createSignedUrls = vi.fn();
+    const { supabase, calls } = stub({ data: ["a", "b"], error: null }, { createSignedUrls });
     const urls = await signProductImageUrls(supabase, ["a", null, "a", "b", undefined]);
-    expect(createSignedUrls).toHaveBeenCalledWith(["a", "b"], 300);
-    expect([...urls.entries()]).toEqual([["a", "https://signed/a"], ["b", "https://signed/b"]]);
+    expect(calls[0]).toEqual(["rpc", "organization_media_read_keys", { p_namespace: "product", p_keys: ["a", "b"], p_workspace: undefined }]);
+    expect(createSignedUrls).not.toHaveBeenCalled();
+    expect([...urls.entries()]).toEqual([["a", "/api/media/product?key=a"], ["b", "/api/media/product?key=b"]]);
   });
 
   it("leaves out a key that could not be signed instead of failing the page", async () => {
@@ -140,9 +138,9 @@ describe("product image queries", () => {
       data: [{ path: "a", signedUrl: null, error: "Object not found" }, { path: "b", signedUrl: "https://signed/b", error: null }],
       error: null,
     }));
-    const { supabase } = stub({ data: [], error: null }, { createSignedUrls });
+    const { supabase } = stub({ data: ["b"], error: null }, { createSignedUrls });
     expect([...(await signProductImageUrls(supabase, ["a", "b"])).keys()]).toEqual(["b"]);
-    const failing = stub({ data: [], error: null }, { createSignedUrls: async () => ({ data: null, error: new Error("down") }) });
+    const failing = stub({ data: null, error: new Error("authorization unavailable") });
     expect((await signProductImageUrls(failing.supabase, ["a"])).size).toBe(0);
   });
 
@@ -150,8 +148,9 @@ describe("product image queries", () => {
     const createSignedUrls = vi.fn(async (keys: string[]) => ({ data: keys.map((k) => ({ path: k, signedUrl: `https://signed/${k}`, error: null })), error: null }));
     const { supabase, calls } = stub({ data: ["a"], error: null }, { createSignedUrls });
     const urls = await signProductImageUrls(supabase, ["a"], { orgId: "org-1" });
-    expect(calls[0]).toEqual(["rpc", "product_image_access_grant", { p_org_id: "org-1", p_keys: ["a"] }]);
-    expect(urls.get("a")).toBe("https://signed/a");
+    expect(calls[0]).toEqual(["rpc", "organization_media_read_keys", { p_namespace: "product", p_workspace: "org-1", p_keys: ["a"] }]);
+    expect(urls.get("a")).toBe("/api/media/product?key=a&workspace=org-1");
+    expect(createSignedUrls).not.toHaveBeenCalled();
   });
 
   it("signs nothing when the grant is refused (not a member / not targeted) - the card falls back to its placeholder", async () => {
@@ -161,7 +160,7 @@ describe("product image queries", () => {
     expect(createSignedUrls).not.toHaveBeenCalled();
   });
 
-  it("grants in batches of 60 keys and never grants for the owner's own images", async () => {
+  it("authorizes in batches of60 and rechecks own images without minting bearer grants", async () => {
     const createSignedUrls = vi.fn(async (keys: string[]) => ({ data: keys.map((k) => ({ path: k, signedUrl: `u/${k}`, error: null })), error: null }));
     const many = Array.from({ length: 130 }, (_, i) => `k${i}`);
     const viewer = stub({ data: [], error: null }, { createSignedUrls });
@@ -169,7 +168,24 @@ describe("product image queries", () => {
     expect(viewer.calls.filter((c) => c[0] === "rpc").map((c) => ((c[2] as { p_keys: string[] }).p_keys.length))).toEqual([60, 60, 10]);
     const own = stub({ data: [], error: null }, { createSignedUrls });
     await signProductImageUrls(own.supabase, ["a"]);
-    expect(own.calls.some((c) => c[0] === "rpc")).toBe(false);
+    expect(own.calls[0]).toEqual(["rpc", "organization_media_read_keys", { p_namespace: "product", p_keys: ["a"], p_workspace: undefined }]);
+    expect(createSignedUrls).not.toHaveBeenCalled();
+  });
+
+  it("with edge delivery on, only R2 keys get media-Worker URLs; Supabase keys keep the proxy", async () => {
+    vi.stubEnv("MEDIA_EDGE_DELIVERY_ENABLED", "true");
+    vi.stubEnv("MEDIA_EDGE_ORIGIN", "https://media.example.test");
+    vi.stubEnv("MEDIA_EDGE_TICKET_KID", "k1");
+    vi.stubEnv("MEDIA_EDGE_TICKET_SECRET", "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8");
+    try {
+      const { supabase, calls } = stub({ data: { a: "r2", b: "supabase" }, error: null });
+      (supabase as { auth?: unknown }).auth = { getClaims: async () => ({ data: { claims: {
+        sub: "70000003-0000-4000-8000-000000000003", session_id: "e9000000-0000-4000-8000-000000000002", role: "authenticated", exp: 4_000_000_000 } }, error: null }) };
+      const urls = await signProductImageUrls(supabase, ["a", "b"], { orgId: "9d000000-dddd-4ddd-8ddd-000000000002" });
+      expect(calls[0]).toEqual(["rpc", "organization_media_read_providers", { p_namespace: "product", p_keys: ["a", "b"], p_workspace: "9d000000-dddd-4ddd-8ddd-000000000002" }]);
+      expect(urls.get("a")).toMatch(/^https:\/\/media\.example\.test\/m\/product\/original\?t=k1\./);
+      expect(urls.get("b")).toBe("/api/media/product?key=b&workspace=9d000000-dddd-4ddd-8ddd-000000000002");
+    } finally { vi.unstubAllEnvs(); }
   });
 
   it("lists another organization's gallery through the workspace-aware reader, never the table", async () => {

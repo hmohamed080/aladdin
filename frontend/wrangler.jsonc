@@ -1,0 +1,115 @@
+{
+  // Cloudflare Workers host for the Next.js frontend (ADR-0021). Built with
+  // `pnpm cf:build` (OpenNext). The live host since the 2026-10-27 cutover.
+  // Secrets are never written here: set them with `wrangler secret put` per
+  // environment (see docs/guides/cloudflare-frontend.md).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aladdin-frontend",
+  "main": "cloudflare/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend" }],
+  "images": { "binding": "IMAGES" },
+  "observability": { "enabled": true },
+  // The deployed version id keys the edge cache of optimized images (cloudflare/worker.ts).
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  // Local (`wrangler dev`) reads its variables from .dev.vars (never committed).
+  "workers_dev": false,
+
+  "env": {
+    // Isolated acceptance preview on workers.dev: aladdin-r2-acceptance Supabase
+    // project and the acceptance R2 buckets only. No custom domain.
+    "preview": {
+      "name": "aladdin-frontend-preview",
+      "workers_dev": true,
+      "preview_urls": true,
+      "services": [
+        { "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend-preview" },
+        { "binding": "BACKEND", "service": "aladdin-backend-preview" },
+        // Private route to the WhatsApp delivery Worker (it has no public URL). The target Worker must exist before this Worker is deployed.
+        { "binding": "OTP_WORKER", "service": "aladdin-whatsapp-otp-preview" }
+      ],
+      "images": { "binding": "IMAGES" },
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
+      "vars": {
+        "NEXT_PUBLIC_APP_ENV": "staging",
+        // Public Marketplace (ADR-0028) is open on this isolated preview ONLY: acceptance data, no custom domain.
+        // Production deliberately has no such variable, so it keeps serving the "coming soon" page until a separate approval.
+        "NEXT_PUBLIC_MARKETPLACE_PREVIEW": "true",
+        // Ordering is ON here only (acceptance data). The preview workflow also sets it at build time; Production has neither.
+        "NEXT_PUBLIC_MARKETPLACE_ORDERING": "true",
+        // Redis is OFF on the preview (owner decision 2026-11-15): the whole Free command quota goes to production.
+        "REDIS_CACHE_ENABLED": "false",
+        // R2 (stage 2): the acceptance private bucket only. R2_ACCOUNT_ID comes from the
+        // deploy workflow; the bucket-scoped keys and SUPABASE_SERVICE_ROLE_KEY are Worker secrets.
+        "R2_STORAGE_ENABLED": "true",
+        "R2_PRODUCTION_WRITES_APPROVED": "false",
+        "MEDIA_LEGACY_STORAGE_WRITES": "false",
+        "R2_PRIVATE_BUCKET": "aladdin-r2-acceptance-20261011-private",
+        // Siteverify must report this hostname, or the CAPTCHA check fails closed.
+        "TURNSTILE_ALLOWED_HOSTNAMES": "aladdin-frontend-preview.bstalent9.workers.dev",
+        // Contact-email links point back at the preview, never at production.
+        // RESEND_API_KEY is a Worker secret.
+        "EMAIL_FROM": "Aladdin <no-reply@aladdindecore.com>",
+        "APP_PUBLIC_ORIGIN": "https://aladdin-frontend-preview.bstalent9.workers.dev"
+        // Phone verification (PHONE_*) is intentionally absent: it ships OFF and delivery is never configured here.
+      }
+    },
+    // Production: deployed only after the owner approves the cutover. Routes
+    // (aladdindecore.com) are added at cutover, not before. Deployed by the manual
+    // `Cloudflare production` workflow, backend first: the BACKEND service must exist.
+    "production": {
+      "name": "aladdin-frontend-production",
+      "workers_dev": false,
+      "services": [
+        { "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend-production" },
+        { "binding": "BACKEND", "service": "aladdin-backend-production" },
+        // Private route to the WhatsApp delivery Worker (workers_dev off, no routes). DEPLOY ORDER GATE: `aladdin-whatsapp-otp-production` must
+        // already exist, or this Worker's deploy is refused. See docs/operations/WHATSAPP_OTP_PRODUCTION_B3_PREPARATION.md.
+        { "binding": "OTP_WORKER", "service": "aladdin-whatsapp-otp-production" }
+      ],
+      "images": { "binding": "IMAGES" },
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
+      "vars": {
+        "NEXT_PUBLIC_APP_ENV": "production",
+        // Siteverify (phone sign-up) must report one of these, or the check fails closed.
+        // A test hostname is added here only while it is approved and attached
+        // (next.aladdindecore.com was, for stage 11; removed 2026-10-28 after the cutover).
+        "TURNSTILE_ALLOWED_HOSTNAMES": "aladdindecore.com,www.aladdindecore.com",
+        // Contact-email verification links go out through Resend from the verified
+        // aladdindecore.com domain. RESEND_API_KEY is a Worker secret.
+        "EMAIL_FROM": "Aladdin <no-reply@aladdindecore.com>",
+        "APP_PUBLIC_ORIGIN": "https://aladdindecore.com",
+        // Mobile-number sign-up codes: PHONE_* switches are absent on purpose (feature OFF). The Meta token never
+        // lives in this app; it belongs to the separate delivery Worker (PR #114), which stays disabled.
+        // R2-only media (owner-approved 2026-11-11): every NEW upload goes to R2 and a Supabase Storage write fails
+        // closed (no fallback); reads of existing Supabase objects stay open. Merging this file activates nothing: the
+        // flags reach Production only through a Worker version that is promoted by hand, and the manual workflow
+        // refuses `stage=frontend` (immediate deploy) until the GitHub variable R2_CUTOVER_APPROVED is "true".
+        // Rolling back to a version older than this change reopens Supabase writes: do that only on purpose.
+        // Redis is ON (owner-approved 2026-11-15): the shared Upstash database with the key prefix `production`, so it never
+        // reads or writes the preview's entries. REDIS_REST_TOKEN is a Worker secret listed in secrets.required below: a deploy
+        // without it is refused. Rate limits and caches fall back to memory / Postgres if Redis is unreachable (ADR-0019).
+        "R2_STORAGE_ENABLED": "true",
+        "R2_PRODUCTION_WRITES_APPROVED": "true",
+        "MEDIA_LEGACY_STORAGE_WRITES": "false",
+        // Production R2 resources (owner-approved names; pinned in environment-manifest.ts, which a test keeps equal).
+        // The buckets must exist before R2 is switched on; the switches above stay false until their own approvals.
+        "R2_ACCOUNT_ID": "a4c2b7ac45e58a81691b9165492ce6a2",
+        "R2_PRIVATE_BUCKET": "aladdin-media-private",
+        "R2_SITE_BUCKET": "aladdin-site-media",
+        // Anonymous Landing page (`/`, no cookies, no query) is reused from the data-centre cache for this many seconds
+        // (src/lib/cloudflare/landing-cache.ts). One URL only; not a zone Cache Rule. Set to "0" or remove to switch it
+        // off. Takes effect only when a Worker version carrying this line is promoted by hand.
+        "LANDING_EDGE_CACHE_SECONDS": "300",
+        "REDIS_CACHE_ENABLED": "true",
+        "REDIS_REST_URL": "https://alert-bedbug-148148.upstash.io",
+        "REDIS_KEY_ENV": "production"
+      },
+      // Checked by `wrangler deploy`: the deploy fails if one is not set. The owner
+      // sets them with `wrangler secret put <NAME> --env production` (never in this file).
+      "secrets": { "required": ["SUPABASE_SERVICE_ROLE_KEY", "TURNSTILE_SECRET_KEY", "AUTH_PASSWORD_PREVIEW_GRANT_SECRET", "REDIS_REST_TOKEN"] }
+    }
+  }
+}

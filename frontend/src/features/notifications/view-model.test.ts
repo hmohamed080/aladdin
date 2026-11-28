@@ -4,6 +4,7 @@ import { en } from "@/lib/i18n/messages/en";
 import { ar } from "@/lib/i18n/messages/ar";
 import {
   KNOWN_NOTIFICATION_EVENTS,
+  TEMPLATE_NOTIFICATION_EVENTS,
   NOTIFICATION_FALLBACK_TITLE_KEY,
   toNotificationView,
   toNotificationViews,
@@ -136,6 +137,14 @@ describe("every approved event type has real bilingual copy", () => {
       "job.assignment.cancelled": { job_title: "T", reason: "R" },
       // Increment 12: one review, one recipient — the professional it is about.
       "job.review.received": { org_name: "C", job_title: "T" },
+      // Statistics only; the database allow-lists these keys per kind (whatsapp_otp_notification_record).
+      "whatsapp_otp.budget_warning": { percent: 72, consumed: 108, limit: 150, remaining: 42, environment: "production" },
+      "whatsapp_otp.budget_critical": { percent: 91, consumed: 137, limit: 150, remaining: 13, environment: "production" },
+      "whatsapp_otp.budget_exhausted": { limit: 150, environment: "production" },
+      "whatsapp_otp.failure_rate": { attempts: 20, failed: 8, failure_percent: 40, window_minutes: 60, environment: "production" },
+      // The version number only; no actor, value or reason is ever placed in a notification.
+      "whatsapp_otp.audit_unmatched": { version: 7 },
+      "whatsapp_otp.delivery_unmatched": { version: 7 },
     };
 
     const unfilled: string[] = [];
@@ -305,5 +314,53 @@ describe("message.sent renders through the generic pipeline", () => {
       const placeholders = t("notifications.message.sent.body").match(/\{[^}]+\}/g) ?? [];
       expect(placeholders).toEqual(["{counterparty_name}"]);
     }
+  });
+});
+
+describe("template-written rows render their own stored text", () => {
+  const content = {
+    ar: { title: "تم اعتماد معرضك", body: "معرض النيل: مبروك" },
+    en: { title: "Your showroom was approved", body: "Nile Showroom: congratulations" },
+  };
+  const templated = (over: Partial<NotificationSource> = {}) =>
+    row({
+      event_type: "marketplace.seller.approved",
+      title_key: "notifications.template.marketplace.seller.approved",
+      body_key: null,
+      params: {},
+      content,
+      ...over,
+    });
+
+  it("shows the reader's language from the stored snapshot", () => {
+    const ar = toNotificationView(templated(), arT, "ar", NOW);
+    const en = toNotificationView(templated(), enT, "en", NOW);
+    expect(ar.title).toBe("تم اعتماد معرضك");
+    expect(ar.body).toBe("معرض النيل: مبروك");
+    expect(en.title).toBe("Your showroom was approved");
+    expect(en.degraded).toBe(false);
+  });
+
+  it("never shows the dotted template key as text", () => {
+    const view = toNotificationView(templated(), enT, "en", NOW);
+    expect(view.title).not.toContain("notifications.template");
+  });
+
+  it("falls back to the neutral row when the snapshot is malformed", () => {
+    for (const bad of [null, "x", [], { ar: {}, en: {} }, { ar: { title: "" }, en: { title: "" } }]) {
+      const view = toNotificationView(templated({ content: bad }), enT, "en", NOW);
+      expect(view.degraded).toBe(true);
+      expect(view.title).toBe(enT(NOTIFICATION_FALLBACK_TITLE_KEY));
+    }
+  });
+
+  it("keeps a destination and the unread state", () => {
+    const view = toNotificationView(templated({ deep_link: "/showroom/marketplace" }), enT, "en", NOW);
+    expect(view.href).toBe("/showroom/marketplace");
+    expect(view.unread).toBe(true);
+  });
+
+  it("lists the six Phase 1 template events", () => {
+    expect([...TEMPLATE_NOTIFICATION_EVENTS]).toHaveLength(6);
   });
 });

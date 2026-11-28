@@ -69,39 +69,3 @@ export async function chooseAccountTypeAction(
 
   redirect("/onboarding");
 }
-
-export type UsernameState = { ok: boolean; code?: string };
-
-/**
- * The mandatory username step (`public.profile_set_username`) — reached
- * whenever `my_registration_state()` returns `username_pending`: consent and
- * an account type are already recorded, but no valid username is stored yet.
- * Shared by both the canonical `/onboarding/username` page and canonical
- * password auth's own finish-registration recovery screen, so the
- * error-code shape (`registration.error.*`) is the SAME anti-enumeration
- * boundary in both places — `profile_set_username` itself never reveals
- * whether a collision was with a reserved word or another account.
- */
-export async function chooseUsernameAction(_prev: UsernameState, formData: FormData): Promise<UsernameState> {
-  const username = formData.get("username");
-  if (typeof username !== "string" || username.length === 0) {
-    return { ok: false, code: "registration.error.usernameRequired" };
-  }
-
-  const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/auth/sign-in");
-
-  const { error } = await supabase.rpc("profile_set_username", { p_username: username });
-  if (error) {
-    // profile_set_username raises the SAME shape (23505, "username is
-    // unavailable") for a reserved word as for a genuine collision — this
-    // code intentionally does not try to distinguish them either.
-    if (error.code === "22023") return { ok: false, code: "registration.error.usernameShape" };
-    return { ok: false, code: "registration.error.usernameUnavailable" };
-  }
-
-  redirect("/onboarding");
-}

@@ -27,6 +27,7 @@ export const AUDIT_ACTIONS = [
   "verification.review_started",
   "verification.changes_requested",
   "verification.approved",
+  "verification.admin_initiated",
   "verification.rejected",
   "profile.listed",
   "profile.hidden",
@@ -71,6 +72,40 @@ export const AUDIT_ACTIONS = [
   "project.created",
   "project.activated",
   "project.completed",
+  // 20261021090002: business verification (the Verified badge), separate from organization approval.
+  "business_verification.document_added",
+  "business_verification.document_removed",
+  "business_verification.submitted",
+  "business_verification.review_started",
+  "business_verification.info_requested",
+  "business_verification.approved",
+  "business_verification.rejected",
+  // 20261021090004: current-password confirmation and unverified secondary phone reservations.
+  "account.password_confirmed",
+  "account.password_confirm_locked",
+  "secondary_phone.reserved",
+  "secondary_phone.renewed",
+  "secondary_phone.cancelled",
+  "secondary_phone.changed",
+  "secondary_phone.converted",
+  "phone_cooldown.overridden",
+  // 20261103090001: Super Admin control of the WhatsApp OTP limits.
+  "whatsapp_otp.settings_requested",
+  "whatsapp_otp.settings_changed",
+  "whatsapp_otp.settings_change_failed",
+  // 20261107090003: Super Admin delivery ON/OFF switch.
+  "whatsapp_otp.delivery_requested",
+  "whatsapp_otp.delivery_changed",
+  "whatsapp_otp.delivery_change_failed",
+  // 20261107090006: Admin backup control (schedule, Production activation, runs).
+  "backup.environment_initialized",
+  "backup.settings_changed",
+  "backup.production_activated",
+  "backup.production_deactivated",
+  "backup.run_requested",
+  "backup.run_dispatched",
+  "backup.run_failed",
+  "backup.run_verified",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { evaluatePasswordStrength } from "./password-strength";
-import { isUsernameWellFormed } from "@/lib/identity/username";
 
 /**
  * Length-first password policy (NIST SP 800-63B-aligned) PLUS weak-password
@@ -56,16 +55,6 @@ function addWeakPasswordIssues(password: string, context: readonly string[], pat
 }
 
 /**
- * Username + account-type shape validation only — this schema exists purely
- * for immediate client-side feedback before a round-trip. Both are
- * REVALIDATED, from scratch, server-side against the live database
- * (`username_available`, the account-type enums) at the moment they are
- * actually applied (`verifyPasswordSignUp`, after `verifyOtp` succeeds) —
- * this schema's job is only to keep an obviously-invalid submission from
- * ever reaching `signUp()` in the first place, never to be trusted as the
- * final word on availability.
- */
-/**
  * The registrant's Full Name — PROFILE data, never authorization. Trimmed,
  * 1..80 characters: the same bounds `profile_set_display_name` enforces and
  * `app.handle_new_user()` truncates to. The server action is authoritative;
@@ -82,18 +71,24 @@ export const registrationSchema = z
   .object({
     displayName: displayNameSchema,
     email: emailSchema,
-    username: z
-      .string()
-      .trim()
-      .refine((value) => isUsernameWellFormed(value), { message: "registration.error.usernameShape" }),
     accountType: z.string().trim().min(1, { message: "authPasswordPreview.error.accountTypeRequired" }),
     password: passwordSchema,
-    confirmPassword: loginPasswordSchema,
   })
   .superRefine((value, ctx) => {
-    if (value.password !== value.confirmPassword) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "authPasswordPreview.error.passwordMismatch", path: ["confirmPassword"] });
-    }
+    addWeakPasswordIssues(value.password, [value.email], ["password"], ctx);
+  });
+
+/**
+ * Registration for INVITED PLATFORM STAFF: exactly the marketplace rules for name, e-mail and password, with no username and no
+ * account type (staff are never given a marketplace persona). Kept beside registrationSchema so the two cannot drift.
+ */
+export const staffRegistrationSchema = z
+  .object({
+    displayName: displayNameSchema,
+    email: emailSchema,
+    password: passwordSchema,
+  })
+  .superRefine((value, ctx) => {
     addWeakPasswordIssues(value.password, [value.email], ["password"], ctx);
   });
 
@@ -114,4 +109,18 @@ export const resetPasswordSchema = z
 /** For flows where the account's email is already known server-side (migration, recovery reset, change-password) but isn't a form field. */
 export function passwordWithContextSchema(context: readonly string[]) {
   return passwordSchema.superRefine((password, ctx) => addWeakPasswordIssues(password, context, [], ctx));
+}
+
+/** The message key a registration refusal shows: the schema's own key, else the field's plain one. */
+const REGISTRATION_FIELD_CODES: Record<string, string> = {
+  displayName: "authPasswordPreview.error.fullNameRequired",
+  email: "authPasswordPreview.error.invalidEmail",
+  accountType: "authPasswordPreview.error.accountTypeRequired",
+  password: "authPasswordPreview.error.passwordTooShort",
+};
+
+export function registrationIssueCode(issue: { message?: string; path?: (string | number)[] } | undefined): string {
+  const message = issue?.message ?? "";
+  if (/^[A-Za-z]+(\.[A-Za-z0-9]+)+$/.test(message)) return message;
+  return REGISTRATION_FIELD_CODES[String(issue?.path?.[0] ?? "")] ?? "authPasswordPreview.error.invalidEmail";
 }

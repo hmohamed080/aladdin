@@ -12,15 +12,19 @@ set -euo pipefail
 # The container must be named explicitly; the shared local stack (supabase_db_aladdin) is refused, and it only
 # ever talks to a local Docker container — never to a hosted project.
 
-db_container="${1:-}"
-if [[ -z "${db_container}" ]]; then
-  echo "usage: $0 <supabase db container of an ISOLATED stack>" >&2
+if [[ -n "${1:-}" ]]; then DB_CONTAINER="$1"; fi
+if [[ -z "${DB_CONTAINER:-}" ]]; then
+  echo "usage: $0 <supabase db container of an ISOLATED stack>   (or set DB_CONTAINER)" >&2
   exit 2
 fi
-if [[ "${db_container}" == "supabase_db_aladdin" ]]; then
+if [[ "${DB_CONTAINER}" == "supabase_db_aladdin" ]]; then
   echo "Refusing to run against the shared local stack (supabase_db_aladdin). Use an isolated stack's container." >&2
   exit 2
 fi
+export DB_CONTAINER
+source "$(dirname "${BASH_SOURCE[0]}")/lib/db_target.sh"
+db_target_require   # also refuses ambiguous / remote / staging targets
+db_target_mark_dirty "$(basename "$0")"   # suspends seed admins: rebuild the stack (supabase db reset) before pgTAP
 psql_run() { docker exec -i "${db_container}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -At "$@"; }
 
 psql_run <<'SQL'

@@ -21,25 +21,25 @@ const PhoneField = dynamic(() => import("@/features/installer-dashboard-preview/
   loading: () => <div className="h-11 rounded-md border bg-canvas" aria-busy="true" />,
 });
 
-function SettingsSection({ number, title, description, icon: Icon, compact, children }: {
+export function SettingsSection({ number, title, description, icon: Icon, compact, children }: {
   number: string; title: string; description: string; icon: Icon; compact?: boolean; children: ReactNode;
 }) {
   return (
-    <section aria-labelledby={`settings-${number}`} className="grid min-w-0 gap-md rounded-lg border bg-surface p-sm desktop:grid-cols-4">
-      <div className={`relative flex gap-md rounded-md bg-surface-2 p-md desktop:col-span-1 ${compact ? "items-center" : "items-center desktop:flex-col desktop:justify-center desktop:py-xl desktop:text-center"}`}>
+    <section aria-labelledby={`settings-${number}`} data-settings-section className="grid min-w-0 gap-md rounded-lg border bg-surface p-sm desktop:grid-cols-4">
+      <div data-settings-summary className={`relative flex gap-md rounded-md bg-surface-2 p-md desktop:col-span-1 ${compact ? "items-center" : "items-center desktop:flex-col desktop:justify-center desktop:py-xl desktop:text-center"}`}>
         <span className="absolute end-3 top-3 text-label font-semibold tabular-nums text-fg" aria-hidden="true">{number}</span>
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-pill bg-canvas text-fg"><Icon size={28} /></span>
+        <span data-settings-summary-icon className="grid h-12 w-12 shrink-0 place-items-center rounded-pill bg-canvas text-fg"><Icon size={28} /></span>
         <div className="min-w-0 pe-lg">
           <h2 id={`settings-${number}`} className="text-title font-semibold text-fg">{title}</h2>
           <p className="mt-2 text-body leading-relaxed text-fg-secondary">{description}</p>
         </div>
       </div>
-      <div className="min-w-0 p-sm desktop:col-span-3 desktop:p-md">{children}</div>
+      <div data-settings-body className="min-w-0 p-sm desktop:col-span-3 desktop:p-md">{children}</div>
     </section>
   );
 }
 
-function SettingRow({ title, hint, icon: Icon, children }: { title: string; hint: string; icon: Icon; children: ReactNode }) {
+export function SettingRow({ title, hint, icon: Icon, children }: { title: string; hint: string; icon: Icon; children: ReactNode }) {
   return <div className="flex flex-wrap items-center justify-between gap-sm rounded-sm border p-3">
     <div className="flex min-w-0 flex-1 items-center gap-sm">
       <Icon size={23} className="shrink-0 text-fg" />
@@ -85,7 +85,6 @@ export function InstallerSettingsPreview({ theme, sidebarMode }: { theme: "light
           <form className="grid min-w-0 gap-md tablet:grid-cols-2" onChange={(event) => { setSaved(false); if (event.target instanceof HTMLInputElement && event.target.id === "settings-secondary-phone" && !event.target.value.trim()) setSecondPhoneValid(true); }} onSubmit={(event) => { event.preventDefault(); setSubmitted(true); setSaved(phoneValid && (!secondary || secondPhoneValid)); }}>
             <LabeledField htmlFor="settings-name" label={c.name}><Input id="settings-name" name="displayName" required maxLength={100} defaultValue={locale === "ar" ? "أحمد محمود" : "Ahmed Mahmoud"} autoComplete="name" /></LabeledField>
             <LabeledField htmlFor="settings-email" label={c.email} optional={c.optional}><Input id="settings-email" name="email" type="email" dir="ltr" placeholder="example@mail.com" autoComplete="email" /></LabeledField>
-            <LabeledField htmlFor="settings-username" label={c.username}><Input id="settings-username" name="username" required pattern="[a-zA-Z0-9_]{3,30}" dir="ltr" defaultValue="ahmed123" aria-describedby="settings-username-hint" /><p id="settings-username-hint" className="text-caption text-fg-secondary">{c.usernameHint}</p></LabeledField>
             <div><LabeledField htmlFor="settings-phone" label={c.phone}><PhoneField id="settings-phone" defaultCountryIso2="EG" placeholder="01012345678" onChange={(value) => setPhoneValid(value !== null)} error={submitted && !phoneValid ? c.phoneError : undefined} /></LabeledField></div>
             {secondary && <div className="tablet:col-span-2"><LabeledField htmlFor="settings-secondary-phone" label={c.secondaryPhone} optional={c.optional}><PhoneField id="settings-secondary-phone" defaultCountryIso2="EG" onChange={(value) => setSecondPhoneValid(value !== null)} error={submitted && !secondPhoneValid ? c.phoneError : undefined} /></LabeledField></div>}
             <div className="flex flex-wrap items-center justify-between gap-md tablet:col-span-2">

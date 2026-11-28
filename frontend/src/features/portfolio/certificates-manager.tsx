@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Card, InlineError, StatePanel } from "@/components/ui/primitives";
+import { Badge, Card, InlineError, StatePanel , ProgressMeter } from "@/components/ui/primitives";
 import { Button, Input, LabeledField, SubmitButton } from "@/components/ui/controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ScrollIcon, FileTextIcon } from "@/components/ui/icons";
@@ -310,6 +310,7 @@ function AddCertificate() {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   return (
     <AddPanel label={t("certificates.add")} title={t("certificates.form.heading")}>
@@ -328,24 +329,26 @@ function AddCertificate() {
               const v = String(data.get(name) ?? "").trim();
               return v === "" ? null : v;
             };
+            setProgress(0);
             setBusy(true);
             setError(null);
             const result = await uploadAsset(
               "certificate",
               file,
-              () =>
+              (prepared) =>
                 startCertificateUpload({
                   title: String(data.get("title") ?? ""),
                   issuer: read("issuer"),
                   issuedOn: read("issuedOn"),
                   expiresOn: read("expiresOn"),
-                  contentType: file.type,
-                  size: file.size,
+                  contentType: prepared.type,
+                  size: prepared.size,
                   // Kept for the owner's own recognition. It never becomes part
                   // of a key and never fetches anything.
                   originalFilename: file.name,
                 }),
               finishCertificateUpload,
+              setProgress,
             );
             setBusy(false);
             if (!result.ok) {
@@ -360,6 +363,7 @@ function AddCertificate() {
         >
           <CertificateFields idPrefix="new" />
           <AssetFileField namespace="certificate" onPick={setFile} />
+          {busy ? <ProgressMeter value={progress} label={t("certificates.form.uploading")} /> : null}
           {error ? <InlineError>{t(error)}</InlineError> : null}
           <div className="flex items-center gap-2">
             <Button type="submit" variant="primary" disabled={busy}>

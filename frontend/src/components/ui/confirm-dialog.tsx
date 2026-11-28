@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import { Button, SubmitButton } from "@/components/ui/controls";
+import { showToast } from "@/components/ui/toast";
 import { cn } from "@/lib/ui/cn";
 import type { FormState } from "@/server/actions/sales-forms";
 
@@ -28,6 +29,11 @@ const ICON_TONES = {
  *    validation feedback survive — useActionState does not reset the form on a
  *    non-redirect return); on success it refreshes and closes. `children` may be a
  *    render function `(state) => ReactNode` to show per-field errors.
+ *
+ * Success feedback: a successful `formAction` that returns a `code` ("Review started.", "Cooldown lifted.")
+ * is shown as a Toast (`@/components/ui/toast`, drawn by the root layout's `<Toaster />`, a polite live
+ * region). It cannot be drawn inside the dialog: the dialog closes on success, and the refreshed server data
+ * often unmounts the control that opened it, so anything local to either would be thrown away unseen.
  */
 export function ConfirmDialog({
   trigger,
@@ -45,6 +51,7 @@ export function ConfirmDialog({
   wide = false,
   triggerIconOnly = false,
   triggerTone = "neutral",
+  renderTrigger,
   children,
 }: {
   trigger: string;
@@ -75,6 +82,11 @@ export function ConfirmDialog({
    */
   triggerIconOnly?: boolean;
   triggerTone?: keyof typeof ICON_TONES;
+  /**
+   * Replace the built-in trigger button (e.g. with a switch). It must call `open` on activation. Focus returns to whatever held it when the
+   * dialog opened, which is that custom trigger.
+   */
+  renderTrigger?: (p: { open: () => void }) => ReactNode;
   children?: ReactNode | ((state: FormState) => ReactNode);
 }) {
   const { t } = useI18n();
@@ -91,6 +103,7 @@ export function ConfirmDialog({
       const res = await formAction(prev, fd);
       // Success (or a conflict we refreshed): close and reload the server data.
       if (res.ok) {
+        if (res.code) showToast(t(res.code));
         router.refresh();
         setOpen(false);
       } else if (res.code === "states.staleConflict" || res.code === "leads.conflict") {
@@ -146,7 +159,9 @@ export function ConfirmDialog({
 
   return (
     <>
-      {triggerIconOnly && triggerIcon ? (
+      {renderTrigger ? (
+        renderTrigger({ open: () => setOpen(true) })
+      ) : triggerIconOnly && triggerIcon ? (
         <button
           ref={triggerRef}
           type="button"

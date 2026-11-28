@@ -19,7 +19,7 @@ vi.mock("@/server/queries/landing", () => ({
   resolveActiveLanding,
 }));
 
-import { requestEmailOtp, verifyEmailOtp } from "./auth";
+import { requestEmailOtp, requestSignUpOtp, verifyEmailOtp } from "./auth";
 
 /** A form carrying the one Turnstile token GoTrue judges (forwarded, never Siteverified). */
 function withToken(entries: Record<string, string>): FormData {
@@ -113,6 +113,24 @@ describe("CAPTCHA on OTP sends (GoTrue validates the forwarded token)", () => {
     signInWithOtp.mockResolvedValueOnce({ error: null });
     const known = await requestEmailOtp({ ok: false }, withToken({ email: "a-owner@example.test" }));
     expect({ ok: unknown.ok, code: unknown.code }).toEqual({ ok: known.ok, code: known.code });
+  });
+
+  it("the legacy sign-up send is gated the same way and still forwards shouldCreateUser:true only with a token", async () => {
+    const consent = { consent_terms: "on", consent_privacy: "on", consent_pilot: "on" };
+    const refused = await requestSignUpOtp({ ok: false }, fd({ email: "new@example.test", ...consent }));
+    expect(refused).toMatchObject({ ok: false, code: "auth.error.captchaRequired" });
+    expect(signInWithOtp).not.toHaveBeenCalled();
+
+    signInWithOtp.mockResolvedValueOnce({ error: null });
+    const sent = await requestSignUpOtp({ ok: false }, withToken({ email: "new@example.test", ...consent }));
+    expect(sent.ok).toBe(true);
+    expect(signInWithOtp).toHaveBeenCalledWith({ email: "new@example.test", options: { shouldCreateUser: true, captchaToken: "otp-token" } });
+
+    signInWithOtp.mockResolvedValueOnce({ error: { code: "captcha_failed" } });
+    expect(await requestSignUpOtp({ ok: false }, withToken({ email: "new@example.test", ...consent }))).toMatchObject({
+      ok: false,
+      code: "auth.error.captchaRejected",
+    });
   });
 
   it("verifying a code needs no token (GoTrue does not CAPTCHA-gate verify)", async () => {

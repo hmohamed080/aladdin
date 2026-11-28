@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "e2e-acceptance/**/*.test.ts"],
     // Node for pure logic; happy-dom (a real DOM) for component/tsx tests.
     environmentMatchGlobs: [
       ["src/**/*.test.tsx", "happy-dom"],

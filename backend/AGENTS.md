@@ -11,6 +11,8 @@ Extends the root `AGENTS.md`. Read that first. This file governs `backend/`.
 
 FastAPI here is a **specialized service**, not the product's CRUD backend. It exists for: AI orchestration, OCR orchestration, document processing, chunking, embeddings, RAG, AI evaluations, NLP, large-Excel processing, background workers, and future computer-vision tasks.
 
+It also owns **media jobs and integrations** that are not CRUD (ADR-0018 Revision 2): today the historical-media purge (`app/workers/historical_media_purge.py`), next the R2 variant backfill. Caller identity comes from `app/auth` (local JWKS verification of the Supabase access token; `require_active_principal` also refuses suspended accounts and ended sessions). Every endpoint that acts for a person or runs a job depends on `require_configured` (directly or through those two), so a deployment missing configuration answers 503 instead of running half-configured.
+
 **Do not recreate application CRUD routes in FastAPI.** Standard product CRUD lives in the Next.js app against Supabase. If a feature can be a Server Action / Route Handler against Supabase, it does not belong here.
 
 ## Stack (locked — see ADR-0001)
@@ -45,8 +47,8 @@ tests/
 
 - Use async I/O for HTTP, database, storage, OpenAI, and OCR providers.
 - **Never run blocking AI, OCR, or document parsing directly in the request event loop.** Long-running work goes through the approved queue/worker path (Supabase Queues + Python workers; no worker is implemented yet and its host is undecided — see `../docs/decisions/ADR-0009-vercel-services-deployment.md`). Request handlers stay fast.
-- **This service is deployed as the `backend` Vercel Service** (root `vercel.json`, entrypoint `app/main.py`), reachable same-origin at **`/api/backend`**. It is still called **only from the server side of the web app, never the browser**.
-- **The `/api/backend` prefix is applied in exactly one place.** Vercel Services forwards the original path (verified), so `app/main.py` mounts the app under `API_PREFIX` at its single `include_router(...)` call. **Register new routers in `app/api/v1/__init__.py` with bare paths** (`/ocr`, not `/api/backend/ocr`) — hardcoding the prefix on a router or endpoint doubles it. Do not add a prefix strip to `vercel.json`, and do not use `root_path`. `tests/test_health.py` enforces all of this.
+- **This service runs on Cloudflare Containers** (`edge/backend-worker`, `backend/Dockerfile`, ADR-0022; Vercel retired, ADR-0024), reached through the web app Worker's `BACKEND` binding, same-origin at **`/api/backend`**. It is still called **only from the server side of the web app, never the browser**.
+- **The `/api/backend` prefix is applied in exactly one place.** The frontend Worker forwards the original path, so `app/main.py` mounts the app under `API_PREFIX` at its single `include_router(...)` call. **Register new routers in `app/api/v1/__init__.py` with bare paths** (`/ocr`, not `/api/backend/ocr`) — hardcoding the prefix on a router or endpoint doubles it. Do not add a prefix strip in the proxy, and do not use `root_path`. `tests/test_health.py` enforces all of this.
 
 ## Security (extends root baseline)
 

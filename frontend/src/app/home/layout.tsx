@@ -2,11 +2,12 @@ import "@/styles/engineer.css";
 import { EngineerSidebar } from "@/features/engineer/navigation";
 import { isEngineer } from "@/features/engineer/links";
 import { MobileNavProvider } from "@/features/showroom-shell/mobile-nav-context";
+import { loadMyIdentity } from "@/server/queries/profile-identity";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { getMessages, createTranslator } from "@/lib/i18n/translate";
 import { getWorkspaces } from "@/server/queries/workspace";
 import { loadMandatoryBusinessSetup } from "@/server/queries/business-setup";
@@ -107,12 +108,14 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
     const supabase = await getServerSupabase();
     const searchOpportunities = await listJobOpportunities(supabase, { limit: SEARCH_OPPORTUNITIES_LIMIT });
     const searchJobs = toOpportunityVMs(searchOpportunities, createTranslator(locale), locale);
+    const identity = await loadMyIdentity().catch(() => null);
     return (
       <I18nProvider locale={locale} dir={dir}>
         <InstallerDashboardShell
           theme={resolveTheme(themePreference)}
           sidebarMode={sidebarMode}
           displayName={home.displayName}
+          avatarUrl={identity?.avatarUrl ?? null}
           location={location}
           searchJobs={searchJobs}
         >

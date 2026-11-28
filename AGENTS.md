@@ -70,13 +70,21 @@ Locked. Do not replace without a documented blocking reason recorded in an ADR. 
 - **Data platform:** Supabase — PostgreSQL · Auth · Storage · RLS · Realtime · Queues · FTS · pg_trgm · pgvector · PostGIS (where geo is required).
 - **Schema source of truth:** Supabase SQL migrations (`supabase/migrations/*.sql`). **No Alembic. No `Base.metadata.create_all()` in Staging/Production.** See `docs/decisions/ADR-0002-database-migrations.md`.
 - **Specialized service:** Python 3.12+ / FastAPI for AI orchestration, OCR, document processing, chunking, embeddings, RAG, evaluations, NLP, large-Excel processing, and background workers. **FastAPI is NOT the primary CRUD backend for the MVP.**
-- **Hosting:** Next.js **and** FastAPI → **Vercel Services**, both declared in the repository-root `vercel.json` and shipped as one deployment (FastAPI is same-origin at `/api/backend`, still server-side-only) · Postgres/Auth/Storage/Realtime → Supabase · LLM/embeddings → OpenAI · OCR candidate → Azure Document Intelligence · errors → Sentry. Worker host is deliberately undecided. See `docs/decisions/ADR-0009-vercel-services-deployment.md` (supersedes ADR-0004 on hosting).
+- **Hosting:** Next.js → **Cloudflare Workers** (OpenNext, `frontend/wrangler.jsonc`) · FastAPI → **Cloudflare Containers** (`edge/backend-worker`, via the `BACKEND` binding, same-origin at `/api/backend`, still server-side-only); Vercel is retired (`docs/decisions/ADR-0024-vercel-retired.md`) · Postgres/Auth/Storage/Realtime → Supabase · LLM/embeddings → OpenAI · OCR candidate → Azure Document Intelligence · errors → Sentry. Worker host is deliberately undecided. See ADR-0021, ADR-0022 and ADR-0024 (ADR-0009 is superseded).
 
 ## Architectural style
 
 **Modular monolith**, not premature microservices: one Next.js web app, one shared Supabase data platform, one specialized FastAPI AI/document service, background workers only where async processing is genuinely required. Keep module boundaries clean enough to extract a service later.
 
 Do **not** introduce Kubernetes, Kafka, RabbitMQ, Redis, Elasticsearch/OpenSearch, event sourcing, CQRS frameworks, a service mesh, an API gateway, or additional databases unless an existing approved requirement makes it unavoidable. Record future scaling options in `docs/architecture/scaling-strategy.md` instead of building speculative infrastructure.
+
+## Uploads (non-negotiable)
+
+Any place that accepts a file follows [ADR-0032](docs/decisions/ADR-0032-upload-reservations-limits-exemptions.md); read its checklist before adding or changing an upload.
+
+- A failed, rejected or deleted upload frees its slot and storage **at once**; an abandoned one stops counting after an hour **in the database**, never waiting for a cleanup job.
+- Send bytes only through `uploadWithGrant(grant, file, { namespace, key })`; reserve only through the central media system; extend `public.media_upload_abandon` for a new place.
+- No private hourly or storage quota: use the admin settings and honour exemptions (`app.upload_exempt`).
 
 ## Dependency policy
 

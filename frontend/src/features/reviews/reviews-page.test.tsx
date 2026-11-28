@@ -4,6 +4,7 @@ import { renderWithI18n } from "@/test/render";
 import { createTranslator } from "@/lib/i18n/translate";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("@/server/actions/review-list", () => ({ loadMoreReviewsAction: vi.fn() }));
 
 import { ReviewsPage } from "./reviews-page";
 import { summarizeReviews } from "@/lib/reviews/summary";

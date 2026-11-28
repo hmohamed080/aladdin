@@ -13,6 +13,15 @@ eligibility without promoting verification or canonical persona.
 Frontend review precedes resuming full-stack verification. Production migration
 application and deployment remain deferred to review; see
 [engineer scope](../product/engineer-account.md).
+## 2026-10-28 — WhatsApp OTP architecture PREPARATION (not active)
+
+Proposed target: Supabase Auth issues/verifies Phone OTP → signed HTTPS Send SMS Hook → isolated `aladdin-whatsapp-otp-preview` Cloudflare Worker → Meta WhatsApp Cloud API using approved Arabic `aladdin_otp` template. **No Send SMS Hook enabled, no Worker deployment, no new phone identity or live flows.** Current installer/showroom phone+password sign-in relies on synthetic email aliases and remains unchanged. Account/phone identity compatibility and durable webhook replay/idempotency are release blockers before anyone may enable delivery. See [ADR-0025](../decisions/ADR-0027-whatsapp-otp-worker-transport.md).
+
+
+## 2026-10-17 — Approved local RC2 R2 integration
+
+The owner authorized a dedicated integration branch based on exact RC2 main8bde19c4 and163 migrations. Original R2 worktree is preserved. Scope includes forward-only schema/permission reconciliation, actual-byte receipts, mixed providers and private application delivery for existing personal media plus RC2 product images and organization logos; preserve every current tenant/audience/org.manage/ordering rule. No hosted resource, cleanup, deployment, push or merge is authorized. Both R2 flagsfalse. Architecture: [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md). Integration in progress; acceptance results must be recorded before completion.
+
 
 <!-- CANONICAL PROJECT MEMORY — the currently active architecture. Read before any code or infra change. -->
 
@@ -21,7 +30,7 @@ application and deployment remain deferred to review; see
 | **Status** | Living document (canonical project memory) |
 | **Version** | Living (canonical) · rev 2026-08-16 |
 | **Owner** | Architecture |
-| **Last updated** | 2026-08-16 (deployment targets reconciled to [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)) |
+| **Last updated** | 2026-10-28 (Vercel retired; hosting is Cloudflare, [ADR-0024](../decisions/ADR-0024-vercel-retired.md)) |
 | **Scope** | The **currently active** architecture of Aladdin — what is decided and in effect right now. |
 | **Authority** | Authoritative for the current architecture state. It **does not replace ADRs**: [ADRs](../decisions/) explain *why* a decision was made and are append-only; this guide explains *what is active now* and is updated continuously. On conflict, the newest **Accepted** ADR wins and this guide must be reconciled to it. |
 | **Update triggers** | Any change to module boundaries, data ownership, the multi-tenancy/identity/authorization model, migration ownership, the data-access approach, deployment targets, or the non-goals list. Every such change also updates an ADR, `RUNTIME_STATE.md`, and `AGENT_WORK_LOG.md`. |
@@ -61,7 +70,8 @@ Token/brand changes follow the design-system edit-order (token JSON first) and u
 - **Specialized workloads only:** AI orchestration, OCR, document processing/chunking, embeddings, RAG, AI evaluations, NLP, large-Excel processing, and background/queue handlers.
 - **Does not recreate application CRUD.** If a feature can be a Server Action / Route Handler against Supabase, it belongs in the web app, not here.
 - Talks to Supabase/Postgres via **`supabase-py`** (see [Python Data-Access Decision](#python-data-access-decision)).
-- Verifies the Supabase JWT on every request and derives identity from the token.
+- Verifies the Supabase JWT on every request and derives identity from the token (`app/auth`: local JWKS verification; `require_active_principal` also refuses suspended accounts and ended sessions).
+- Owns non-CRUD **media jobs**: the historical-media purge and the video transcode/purge worker ([ADR-0020](../decisions/ADR-0020-video-r2-hls.md)), the R2 variant backfill next ([ADR-0018 Revision 2](../decisions/ADR-0018-r2-edge-media-delivery.md#revision-2--2026-10-19-full-media-architecture)).
 
 ## Supabase Platform Responsibilities
 - **PostgreSQL** — the single shared database and the system of record.
@@ -97,12 +107,13 @@ Token/brand changes follow the design-system edit-order (token JSON first) and u
 - **Affiliation is a membership, not an account type.** A salesperson working in someone else's showroom holds an ACTIVE `memberships` row with the sales capability set — never `org.manage`, and never a business classification on their person. Requests to join (`organization_join_requests`) and referred business candidates (`organization_referrals`) are *requests*: they grant nothing, are decided through the existing `org.members.manage` capability or platform authority respectively, and converge on `app.membership_grant_sales` so "approved" means one thing. Referral provenance (`organizations.source`, `organizations.referred_by_user_id`) is write-once and confers no relationship.
 - **Effective personal persona = declared ?? canonical.** `app.effective_persona(uid)` resolves `individual_onboarding.prof_concrete_type` (declared — written by registration's account-type RPC or the professional editor) before `users.primary_account_type` (canonical — Admin-applied, trust-reviewed). Professional gates (`app.is_professional_persona`, `app.is_sales_persona`) accept either; persona-scoped writes (`user_activities_set`) and `my_profile_completion()` use the resolved value. Registration never writes the canonical column, never overrides a different canonical persona, and never creates a membership or capability (migration `20260924090011`).
 - **User identity settings are workspace-independent.** `/settings/profile` requires only application access (`access_ready` / `active_personal`) — never a personal workspace or a membership. Organization-scoped editing (organization activities/subtypes) stays on `/b2b/settings` behind `org.manage`.
-- **CAPTCHA is application-scoped.** Supabase's project-wide `[auth.captcha]` stays OFF. Create Account, Resend Signup and the Forgot Password request (canonical `/auth/*`; the installer sign-up uses the same verifier) verify a Cloudflare Turnstile token server-side via Cloudflare Siteverify (`frontend/src/server/auth/turnstile.ts`, secret in server-only `TURNSTILE_SECRET_KEY`) before calling Supabase Auth, failing closed; Sign In has no CAPTCHA.
-- **Installer phone login alias (permanent, role-specific).** `/installer/sign-up` creates ordinary installer/technician accounts whose Supabase Auth email is an internal, undeliverable alias derived from the canonical E.164 phone (`p<digits>@craftsman-login.aladdin.invalid`, `email_confirm: true`, `app_metadata.registration_source = "temporary_craftsman_password_flow"`). It is a login key, never a contact: app surfaces render the auth email only through `userFacingEmail()` and `app.mask_email` masks the alias to `•••`. Service role is used only for the phone-uniqueness read, user creation and rollback delete; everything else runs as the user under RLS. See [`../frontend/installer-phone-auth.md`](../frontend/installer-phone-auth.md).
+- **Supabase Auth verifies CAPTCHA tokens** ([ADR-0023](../decisions/ADR-0023-supabase-auth-verifies-turnstile.md), [auth-captcha.md](../frontend/auth-captcha.md)). Every Supabase Auth call that takes a token (sign up, resend, password sign in, email code, recovery) forwards the Turnstile token; hosted projects run Supabase Auth CAPTCHA protection ON (Turnstile), so direct `/auth/v1` calls are covered too. The app calls Cloudflare Siteverify (`frontend/src/server/auth/turnstile.ts`, server-only `TURNSTILE_SECRET_KEY`, hostname + action, fail closed) only for the phone sign-up's Admin-API account creation. One verifier per token. Server-side checks never use a password grant (`account_password_confirm` instead). Local `config.toml` keeps it off; CI turns it on with test secrets. Hosted CAPTCHA protection has been ON for Acceptance and Production since 2026-10-28.
+- **Phone login alias.** Accounts registered with a mobile number (any account type since 2026-10-28, [ADR-0025](../decisions/ADR-0025-one-field-sign-in-whatsapp-sign-up.md); earlier the installer and showroom pages) sign in through an internal, undeliverable Supabase Auth email derived from the canonical E.164 phone (`p<digits>@craftsman-login.aladdin.invalid`, `email_confirm: true`). It is a login key, never a contact: app surfaces render the auth email only through `userFacingEmail()` and `app.mask_email` masks it. A mobile sign-up is verified first by a WhatsApp code (Meta Cloud API; HMAC in `public.phone_verification_challenges`, service role only). `/auth/sign-in` resolves a typed mobile number or username to the auth email server-side (service role), behind the durable phone limiter. Service role is otherwise used only for phone uniqueness, user creation, the verified birthday write and rollback delete; everything else runs as the user under RLS.
 - **Authorization is enforced server-side** (RLS + explicit permission checks). The UI never implies access it cannot grant. Identity is always derived from the verified JWT, never from a request body.
 - **Platform (Admin) authority is dynamic RBAC — one source (Phase 1A, [ADR-0011](../decisions/ADR-0011-admin-rbac-platform-authority.md), Accepted).** `admin_role_assignments` is the only source of platform authority, checked by `app.has_admin_permission()` in RPCs/RLS and read by the frontend only through `admin_my_access()` (`server/authorization/admin.ts`, one route→permission table in `lib/permissions/admin.ts`, every Admin page guards its own route). `platform_role_grants` is a never-read, one-way compatibility bridge until retirement ([`ADMIN_RBAC_ARCHITECTURE.md` §6](../admin/ADMIN_RBAC_ARCHITECTURE.md)); `app.is_platform()` is a deprecated shim over the same assignments. Tenant authority (`membership_capabilities`) is unchanged.
 - **Admin Users / Organizations reads are server-side RPCs (Phase 1B-A, awaiting approval).** `admin_users_list` / `admin_user_detail` (`users.read`) and `admin_organizations_list` / `admin_organization_detail` (`organizations.read`) — platform-scoped, security-definer, deterministic (primary-key tie-break), paging/search/filter/sort over the full dataset in Postgres; the frontend reads them through `server/queries/admin-directory.ts` with one URL parser (`features/admin-preview/directory-params.ts`). Profile completion has ONE formula, `app.profile_completion(user_id)`, which `my_profile_completion()` wraps. Account email is read from `auth.users` only inside those RPCs (Installer login alias excluded). Details: [`ADMIN_USERS_ORGS_READ_AUDIT.md`](../admin/ADMIN_USERS_ORGS_READ_AUDIT.md).
 - **Suspension is enforced by the database, centrally (Admin Core Phase 1B-B, awaiting approval).** A PostgREST `db_pre_request` hook refuses every Data API request from a suspended/deactivated account except `my_account_status`; `has_capability` / `is_org_member` / `require_verified_caller` / the personal storage helpers treat such a caller as having no authority (Storage/Realtime paths). A suspended **organization** keeps only its `.read` capabilities (members untouched). The middleware routes a suspended account to `/auth/suspended`. Admin Notes (append-only), Follow-ups (derived status), internal Cases, the Entity Timeline and organization duplicate resolution are security-definer RPCs behind their own `resource.action` permissions. The hook's entry point is `pgrst_hooks.pre_request()` (migration `20260930100005`), a one-function schema that delegates to the canonical `app.api_pre_request()` so every request role (including `service_role`, which must NOT get `USAGE` on schema `app`) can resolve it; the original direct configuration broke service-role requests in Production and is currently disabled there — see [`POSTGREST_PRE_REQUEST_HOOK.md`](../admin/POSTGREST_PRE_REQUEST_HOOK.md). Details: [`ADMIN_USER_ORG_OPERATIONS.md`](../admin/ADMIN_USER_ORG_OPERATIONS.md).
+- **Per-request session reads (WP8, 2026-10-18, not deployed).** Middleware verifies the session JWT locally with `auth.getClaims()` (ES256 / JWKS) and keeps the `my_account_status` suspension redirect on every non-prefetch product-surface request; `/admin/**` still calls the network `auth.getUser()`. Server code reads identity through `server/auth/session.ts`: `getSessionIdentity()` / `readSessionIdentity(client)` (`cache()`d claims) for read-only loaders, `getCurrentUser()` (`cache()`d `getUser()`) for admin and account-security pages; privileged Server Actions keep their own `getUser()`. RLS and the DB suspension helpers remain the authority; the residual window is a revoked (not suspended) session navigating non-admin pages until `exp` (`jwt_expiry` 3600 s). Details and request counts: [auth-session-reads.md](../frontend/auth-session-reads.md).
 
 ## RLS Strategy
 - RLS is **mandatory** on every tenant/user/verification/sales/project/file/AI table; every policy ships with tests (pgTAP + isolation tests).
@@ -113,11 +124,28 @@ Token/brand changes follow the design-system edit-order (token JSON first) and u
 - Supabase Storage buckets are governed by storage policies (also SQL migrations).
 - Private design IP (`.pen`) and customer documents never enter Git; document access is authorized per-organization the same way row data is.
 
+## Media Storage & Delivery
+**Status: proposed, not in effect.** The design is [ADR-0018](../decisions/ADR-0018-r2-edge-media-delivery.md) (Proposed, needs owner approval), which refines [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md). The code is on draft PR #89, unmerged, with edge delivery off. On `main`, media is still served from Supabase Storage.
+
+- **Authority stays in Postgres.** `media_storage_locations` records the provider (`supabase` or `r2`), size, sha256, receipt and variants for each object. `media_storage_resolve` and `organization_media_resolve` decide every read, upload and delete.
+- **Store.** A private Cloudflare R2 bucket holds avatars, portfolio, certificates, product images and organization logos. **Business-verification documents stay in their own Supabase bucket, unchanged** (PR #88 contract). Purchase-request images also stay on Supabase.
+- **No media is unconditionally public.** Published portfolio photos and listed avatars are conditional: unpublishing, delisting, suspension or deletion withdraws them on the next request. Everything else is private.
+- **Delivery.** When `MEDIA_EDGE_DELIVERY_ENABLED=true`, R2 rows are served by the `media-edge` Worker (`edge/media-worker/`). Private reads need a 120 s HMAC ticket minted by the app; public reads need none. Every request calls Postgres through Hyperdrive with caching off. Otherwise, and for Supabase rows, the app proxy serves them (`/api/media/<ns>`, `/p/media/<itemId>`, `no-store`).
+- **Variants.** WebP `thumb` 320, `card` 768 and `full` 1600 px are generated from the verified original and stored at `v/<ns>/<key>/<variant>.webp`.
+- **Hosting.** The Worker is a media edge beside Supabase Storage. It is a separate Worker, not part of the web app's Worker, and not the background-worker host.
+- **Physical keys** ([ADR-0027](../decisions/ADR-0027-r2-id-keys-and-backups.md), migration `20261103090001`). New R2 uploads use ids-only keys under the owner: `u/<user>/{profile,portfolio,certificates,products}/…` or `o/<org>/{products,profile}/…`, ending `<media id>/original.<ext>`, with variants in `<folder>/v/<variant>.webp` and the upload stage at `pending/<key>`. The database mints and records the key (`storage_key`, immutable); the app reads it with `media_storage_object`. Existing rows keep `<ns>/<key>` and `v/<ns>/<key>/…`. Paths never authorize anything.
+- **Backups** (ADR-0027, `ops/backups/`, run from the private repo `aladdin-backups`): daily age-encrypted database dumps and copies of every Supabase Storage file into the locked bucket `aladdin-production-db-backups`, a monthly restore test into a throwaway stack, a daily freshness alarm. Not active until each owner GO.
+- **Hosting.** The Worker is a media edge beside Supabase Storage. It is not a Vercel service and not the background-worker host; [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md) is unchanged.
+- **Historical Supabase media is deleted, not migrated** (2026-10-19): portfolio photos and avatars before a cutoff are purged by a resumable, database-confirmed backend job; certificates and verification evidence are never touched. Products and logos stay private (no guest catalog). Media hostname `media.aladdindecore.com` (Pages + CNAME, or a Cloudflare zone). Responsibilities, costs, failure handling and rollback: ADR-0018 Revision 2.
+- **Video (proposed, [ADR-0020](../decisions/ADR-0020-video-r2-hls.md), behind `VIDEO_ENABLED=false`).** Browsers upload originals straight to the private R2 bucket in presigned multipart parts; a separate ffmpeg worker (`backend/app/workers/video_transcode.py`) writes adaptive HLS and a poster to R2; the media Worker serves `/v/` with a Postgres decision (`media_edge_video`) on every playlist and segment. No video byte passes through Supabase or the web app. The transcode host is a deployment dependency still to be approved.
+- **Session revocation on the Data API.** The `db_pre_request` hook refuses a signed-out, banned or deleted session on its next request (migration `20261021090013`), not at JWT expiry. Storage and Realtime do not run that hook, so restrictive `app.jwt_session_is_live()` policies cover them: `storage.objects` (every command) and the two Realtime-published tables `leads` and `follow_up_tasks` (migration `20261021090014`, pgTAP `103_*`). A table added to the `supabase_realtime` publication needs the same policy; pgTAP `103_*` fails without it.
+- Runbooks: [media monitoring and migration](../operations/media-monitoring.md) · [Worker setup](../../edge/media-worker/README.md) · [professional media contract](../database/professional-asset-storage.md).
+
 ## Realtime Responsibilities
 Supabase Realtime carries live status for: notifications, opportunity/pipeline status, task updates, verification status, project activity, inventory availability, and quotation status. Realtime is a delivery channel, not a source of truth — the database remains authoritative.
 
 ## Queue / Background-Job Responsibilities
-- Heavy/slow/external work runs **off the request path** via Supabase Queues + Python workers: OCR, embeddings, document chunking, Excel imports, PDF/document generation, email + operational WhatsApp delivery, and expensive analytics refreshes. No worker is implemented yet and **its host is deliberately undecided** ([ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)).
+- Heavy/slow/external work runs **off the request path** via Supabase Queues + Python workers: OCR, embeddings, document chunking, Excel imports, PDF/document generation, email + operational WhatsApp delivery, and expensive analytics refreshes. No worker is implemented yet and **its host is deliberately undecided** (a new ADR decides it with the first worker).
 - Request handlers stay fast; the UI reflects progress via Realtime. Never run blocking AI/OCR/parsing in a request event loop.
 
 ## AI, OCR, RAG & Embedding Boundaries
@@ -145,12 +173,12 @@ Current decision (ADR-0005, refining ADR-0002 for the Private Pilot MVP):
 - **Fail fast** on missing required config; **no silent defaults for secrets**. Each service ships a `.env.example`. Real `.env` files are never committed. Detail: [`../security/secrets-and-environments.md`](../security/secrets-and-environments.md).
 
 ## Deployment Targets
-- **Vercel Services** — **both** the Next.js web app (`services.frontend`) and the FastAPI service (`services.backend`, Python runtime), declared in the repository-root `vercel.json` and shipped as **one deployment unit**: one preview URL per PR covering both, one rollback restoring both. Path rewrites put FastAPI same-origin at **`/api/backend`**, so there is no absolute backend URL to configure per environment. This does not relax the boundary — FastAPI is called from the **server side** of the web app, never the browser.
-- **Worker host — undecided.** `backend/app/workers/` is interface-only; a new ADR picks between Vercel Cron/Queues and a container host when the first worker is implemented. `backend/Dockerfile` is retained as the portability exit path.
+- **Cloudflare Workers + Containers** (since 2026-10-27; Vercel retired by [ADR-0024](../decisions/ADR-0024-vercel-retired.md)) — the Next.js web app runs on the Worker `aladdin-frontend-production` (OpenNext, [ADR-0021](../decisions/ADR-0021-cloudflare-workers-frontend.md)); FastAPI runs on Cloudflare Containers behind `aladdin-backend-production` ([ADR-0022](../decisions/ADR-0022-fastapi-cloudflare-containers.md)), reached through the `BACKEND` service binding and same-origin at **`/api/backend`**. This does not relax the boundary — FastAPI is called from the **server side** of the web app, never the browser.
+- **Worker host — undecided.** `backend/app/workers/` is interface-only; a new ADR picks the host (a Cloudflare Container is the natural candidate) when the first worker is implemented. `backend/Dockerfile` is retained as the portability exit path.
 - **Supabase** — Postgres/Auth/Storage/Realtime/Queues.
 - **OpenAI** — LLM/embeddings. **Azure Document Intelligence** — OCR candidate. **Sentry** — error tracking.
 
-Staging precedes Production; migrations are backward-compatible. Detail: [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md) (supersedes [ADR-0004](../decisions/ADR-0004-deployment-platforms.md) on hosting) · [`../operations/deployment-overview.md`](../operations/deployment-overview.md).
+Staging precedes Production; migrations are backward-compatible. Detail: [ADR-0024](../decisions/ADR-0024-vercel-retired.md) (supersedes [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)) · [`../operations/deployment-overview.md`](../operations/deployment-overview.md).
 
 ## Observability
 Structured logging (`structlog` in FastAPI), Sentry for errors across web + service, and health endpoints (`/api/health` web, `/health` FastAPI). Detail: [`../operations/monitoring-and-observability.md`](../operations/monitoring-and-observability.md).
@@ -178,6 +206,10 @@ No Kubernetes, Kafka, RabbitMQ, Redis, Elasticsearch/OpenSearch, event sourcing,
 - [ADR-0003 — Agent-Instruction Hierarchy](../decisions/ADR-0003-agent-instruction-hierarchy.md)
 - [ADR-0004 — Deployment Platforms](../decisions/ADR-0004-deployment-platforms.md)
 - [ADR-0005 — Python Data Access (supabase-py; SQLAlchemy deferred)](../decisions/ADR-0005-python-data-access.md)
+- [ADR-0018 — Media delivery: R2 primary store, ticketed edge Worker (Proposed)](../decisions/ADR-0018-r2-edge-media-delivery.md)
+- [ADR-0020 — Video: R2 originals, HLS transcoding worker, per-request edge authorization (Proposed)](../decisions/ADR-0020-video-r2-hls.md)
+- [ADR-0021 — Next.js frontend on Cloudflare Workers (OpenNext)](../decisions/ADR-0021-cloudflare-workers-frontend.md)
+- Full index: [DECISION_LOG.md](../decisions/DECISION_LOG.md)
 
 ## Architecture-Change Process
 Every architecture change must, in the same session:
@@ -189,6 +221,15 @@ Every architecture change must, in the same session:
 6. Include **validation results** (the commands run and their outcomes).
 
 ## Architecture Change History
+
+### 2026-10-19 — ADR-0018 Revision 2: full media architecture, purge instead of migration, session revocation
+Proposed, not deployed (stacked on PR #89). Backend becomes the home of media jobs; historical Supabase portfolio photos and avatars are deleted, not copied; the Worker gains a content-addressed edge byte cache and the `media.aladdindecore.com` route; PostgREST refuses ended sessions on the next request; Vercel functions move to `cdg1` next to the database. See [Media Storage & Delivery](#media-storage--delivery).
+
+### 2026-10-18 — R2 media store and ticketed edge delivery proposed (ADR-0018)
+Proposed, not accepted and not deployed. R2 becomes the primary media store and a Cloudflare Worker serves R2 media with a per-request Postgres authorization, behind `MEDIA_EDGE_DELIVERY_ENABLED` (default false). See [Media Storage & Delivery](#media-storage--delivery) and [ADR-0018](../decisions/ADR-0018-r2-edge-media-delivery.md).
+
+### 2026-10-18 — Local JWT verification for per-request session reads (WP8)
+Middleware and read-only server loaders verify the session JWT locally (`getClaims`) instead of calling Auth `getUser` on every request; admin routes, account-security pages and privileged actions stay network-validated. Suspension enforcement is unchanged. See [auth-session-reads.md](../frontend/auth-session-reads.md).
 Newest first.
 
 ### 2026-09-30 — Admin RBAC becomes the single source of platform authority
@@ -212,6 +253,14 @@ Admin Core Phase 1A ([ADR-0011](../decisions/ADR-0011-admin-rbac-platform-author
 - **What:** Phone + password accounts via an internal login alias on the existing Supabase Auth email identity (no phone provider, no gate changes); one migration (`20260927090001`) makes `app.mask_email` return `•••` for the alias domain. Rollback-safe creation (admin delete on any initialization failure).
 - **Why:** Unblock craftsman registration without enabling the hosted phone provider or widening the `email_confirmed_at` verified-caller gates (a production auth change).
 - **Approved by:** User (Option B, 2026-09-27). Details: [`../frontend/installer-phone-auth.md`](../frontend/installer-phone-auth.md).
+
+### 2026-10-29 — IDs-only R2 keys and independent backups (ADR-0027)
+Owner decisions of 2026-10-29. New R2 uploads get ids-only keys under `u/<user>` or `o/<org>`, recorded by the database; existing keys stay valid and nothing is moved. Backups move to a separate private repo with encrypted, locked, restore-tested copies. Code only; each hosted activation needs its own GO.
+
+### 2026-10-26 — Supabase Auth verifies sign-in CAPTCHA (ADR-0023)
+- **What:** Supabase Auth CAPTCHA protection (Turnstile) verifies the tokens of every operation it processes, Sign In included; app Siteverify only for the phone sign-up's Admin-API creation; the Installer password-change probe uses `account_password_confirm` instead of a password grant; CI runs the auth suites with `[auth.captcha]` on and calls `/auth/v1` directly to prove missing, forged, rejected and spent tokens are refused. **Supersedes the 2026-09-24 entry below.**
+- **Why:** Since 05c4eec those tokens were forwarded to Supabase Auth with its CAPTCHA off, so they were only checked for presence, and the public key let anyone skip app-level checks.
+- **Not yet in effect on hosted projects:** the owner enables CAPTCHA protection per project after this code is live there.
 
 ### 2026-09-24 — Application-scoped CAPTCHA (Cloudflare Siteverify)
 - **What:** Turnstile tokens are verified by the app via Cloudflare Siteverify (fail closed) on Create Account and Forgot Password; Sign In's invisible CAPTCHA removed; `TURNSTILE_SECRET_KEY` added server-only; `NEXT_PUBLIC_TURNSTILE_INVISIBLE_SITE_KEY` removed; `[auth.captcha]` permanently off.

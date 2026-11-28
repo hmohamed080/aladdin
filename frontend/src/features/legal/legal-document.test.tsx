@@ -30,7 +30,7 @@ describe("published legal documents", () => {
     expect(screen.getByRole("heading", { level: 1, name: doc.title })).toBeInTheDocument();
     for (const section of doc.sections) expect(screen.getByRole("heading", { level: 2, name: section.heading })).toBeInTheDocument();
     expect(screen.getAllByText(new RegExp(PRIVACY_CONTACT_EMAIL)).length).toBeGreaterThan(0);
-    expect(document.querySelector('time[datetime="2026-10-18"]')).toBeInTheDocument();
+    expect(document.querySelector('time[datetime="2026-11-10"]')).toBeInTheDocument();
     expect(document.querySelector('a[href="/legal/privacy"]')).toBeInTheDocument();
   });
 

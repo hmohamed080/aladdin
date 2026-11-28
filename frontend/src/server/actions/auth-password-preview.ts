@@ -7,7 +7,9 @@ import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { markPasswordAttachedAuthoritatively, savePendingRegistration, PASSWORD_SET_FLAG } from "@/lib/supabase/admin-server";
+import { markPasswordAttachedAuthoritatively, resolveSignInEmail, savePendingRegistration, PASSWORD_SET_FLAG } from "@/lib/supabase/admin-server";
+import { classifySignInIdentifier } from "@/lib/auth/sign-in-identifier";
+import { phoneAuthLimit } from "@/server/auth/phone-auth-limit";
 import { CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
 import {
   createIsolatedAuthClient,
@@ -16,15 +18,18 @@ import {
   RECOVERY_GRANT_TTL_SECONDS,
 } from "@/lib/supabase/recovery-grant";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
-import { sanitizeNext } from "@/server/auth/next";
+import { sanitizeNext, postAuthDestination } from "@/server/auth/next";
 import { captchaTokenFrom, isCaptchaFailure } from "@/server/auth/captcha";
+import { type GoTrueError, isAccountExistsError, isRateLimitError, padToRegistrationFloor } from "@/server/auth/signup-guards";
 import { resolveActiveLanding } from "@/server/queries/landing";
+import { accountBasicsPath, needsAccountBasics } from "@/server/queries/account-basics";
 import { hasAppAccess, type RegistrationState } from "@/server/queries/registration";
 import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 import type { Database } from "@/types/database.types";
 import {
   displayNameSchema,
   emailSchema,
+  registrationIssueCode,
   registrationSchema,
   passwordWithContextSchema,
 } from "@/features/auth-password-preview/password-policy";
@@ -129,23 +134,46 @@ const RECOVERY_FLOW_PATH = "/auth/forgot-password";
  * lifetime (and the "may be stale" hint it drives) is an application-level UX target, not a security boundary —
  * the code remains cryptographically valid per Supabase's own expiry until that fires. See docs/frontend/auth-password-preview.md §OTP security. */
 const RECOVERY_COOKIE_MAX_AGE_SECONDS = 600;
-type GoTrueError = { code?: string; status?: number; message?: string };
 
-function isRateLimitError(error: GoTrueError): boolean {
-  return (
-    error.code === "over_email_send_rate_limit" ||
-    error.code === "over_request_rate_limit" ||
-    error.code === "over_sms_send_rate_limit" ||
-    error.status === 429
-  );
+/**
+ * Interrupted-registration routing cookie: the EMAIL an unfinished email
+ * registration is waiting on, so a refresh, a closed tab or a later visit to
+ * `/auth/continue-registration` lands straight on the code step. httpOnly,
+ * path-scoped, 30 minutes (the pending-registration/username lease lifetime).
+ * Never the password, the code, or any token; set identically whether or not
+ * an account exists, so it reveals nothing. Cleared on a successful verify.
+ */
+const REGISTRATION_EMAIL_COOKIE = "reg_email";
+const REGISTRATION_COOKIE_PATH = "/auth";
+const REGISTRATION_COOKIE_MAX_AGE_SECONDS = 30 * 60;
+
+async function rememberRegistrationEmail(email: string): Promise<void> {
+  (await cookies()).set(REGISTRATION_EMAIL_COOKIE, email, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: REGISTRATION_COOKIE_PATH,
+    maxAge: REGISTRATION_COOKIE_MAX_AGE_SECONDS,
+  });
 }
+
+/**
+ * "Log in instead" hand-off from the sign-up warning: the identifier the person already typed (email or mobile number) is carried to the
+ * sign-in field through this short-lived httpOnly cookie, NEVER through the URL (an address or phone number in a query string ends up in
+ * logs, history and Referer headers). It holds only text the same person just typed, is re-validated by the sign-in classifier before it
+ * is used, expires in two minutes and is dropped by the next sign-in attempt.
+ */
+const SIGN_IN_PREFILL_COOKIE = "signin_prefill";
+const SIGN_IN_PREFILL_PATH = "/auth";
+const SIGN_IN_PREFILL_MAX_AGE_SECONDS = 120;
 
 /**
  * GOTRUE-VALIDATED CAPTCHA (server/auth/captcha.ts). Every operation in this
  * module that GoTrue itself processes - signUp, resend, resetPasswordForEmail,
  * signInWithPassword - forwards the Turnstile token through the supported
- * `captchaToken` option and lets GoTrue judge it (Supabase's `[auth.captcha]`
- * is ON for protected environments). The application does NOT also call
+ * `captchaToken` option and lets GoTrue judge it. That judgement is only real
+ * where Supabase Auth's CAPTCHA protection (`[auth.captcha]`, Turnstile) is
+ * ON; where it is off, the presence check below is all there is (ADR-0023,
+ * docs/frontend/auth-captcha.md). The application does NOT also call
  * Siteverify for these tokens: a Turnstile token is single-use, so a second
  * validation would fail with `timeout-or-duplicate`. A missing token is
  * refused HERE, before any GoTrue call, so no email is sent and no account is
@@ -160,59 +188,7 @@ function requireCaptcha(formData: FormData): { token: string } | { code: string 
   return token ? { token } : { code: CAPTCHA_REQUIRED };
 }
 
-/**
- * `signUp()`/`resend({type:"signup"})` on an email with an existing,
- * CONFIRMED account — the one case GoTrue does NOT obfuscate on its own
- * (verified directly against local GoTrue): a still-UNCONFIRMED re-signup
- * IS already obfuscated by GoTrue itself (returns success, the same user id,
- * re-sends the same confirmation email — indistinguishable from a fresh
- * signup with no application code needed). This distinguishing error is the
- * ONE thing application code must catch and collapse into the same generic
- * response a genuine new registration gets — see `requestPasswordSignUp`'s
- * and `resendPasswordSignUpCode`'s doc comments and
- * docs/frontend/auth-password-preview.md §Account enumeration.
- */
-function isAccountExistsError(error: GoTrueError): boolean {
-  return error.code === "user_already_exists" || error.code === "email_exists";
-}
 
-/**
- * Minimum wall-clock duration `requestPasswordSignUp`/`resendPasswordSignUpCode`
- * enforce for their enumeration-relevant outcomes — closes the timing
- * side-channel the enumeration normalization above does not, on its own,
- * close (docs/frontend/auth-password-preview.md §Account enumeration has the
- * full before/after measurement). Measured directly against the REAL public
- * Server Action (click-to-UI-settled, not raw GoTrue — 4 samples per state,
- * local dev machine under normal load), unpadded: genuine-success (fresh OR
- * GoTrue-obfuscated-unconfirmed-resignup) topped out at 371ms; the
- * `isAccountExistsError`-normalized confirmed-existing path topped out at
- * 277ms. 500ms is comfortably above every observed sample in every state —
- * once every relevant outcome is padded up to this same floor, the
- * previously observed gap collapses into scheduler jitter (single-digit to
- * low-double-digit ms) rather than a deterministic tens-of-ms signal an
- * attacker could statistically distinguish. Deliberately NOT larger: 500ms
- * is still within the range that reads as "the app is doing something," not
- * "the app is slow," for a registration submit (a once-per-account action,
- * not a hot path) — this is a floor for THIS specific pair of outcomes, not
- * a general rate limit or a substitute for one.
- */
-const REGISTRATION_RESPONSE_FLOOR_MS = 500;
-
-/**
- * Pads the wall-clock time since `callStart` up to
- * `REGISTRATION_RESPONSE_FLOOR_MS` — never shortens a call that was already
- * slower than the floor (a real rate-limit/network-retry delay is left
- * alone; this only ever adds time, never removes it). Call ONLY for the
- * outcomes the floor is meant to normalize — see each call site's comment
- * for why rate-limit/captcha-rejected/generic-failure responses are
- * deliberately excluded.
- */
-async function padToRegistrationFloor(callStart: number): Promise<void> {
-  const remaining = REGISTRATION_RESPONSE_FLOOR_MS - (Date.now() - callStart);
-  if (remaining > 0) {
-    await new Promise((resolve) => setTimeout(resolve, remaining));
-  }
-}
 
 /** Maps a `verifyOtp` failure to GoTrue's own documented codes; anything else stays generic. */
 function verifyFailureCode(error: GoTrueError): string {
@@ -246,7 +222,17 @@ const FINISH_REGISTRATION_PATH = "/auth/finish-registration";
  * the Postgres error code only — never the name, username, email, password,
  * OTP, session or CAPTCHA token.
  */
-function logRegistrationStepFailure(step: "account_type" | "username" | "display_name", error: { code?: string }): void {
+/**
+ * Safe diagnostics for a sign-up code send GoTrue refused for a reason other
+ * than CAPTCHA or a rate limit (typically SMTP: GoTrue answers 500
+ * `unexpected_failure` when the mail server rejects it). Status and GoTrue
+ * error code only — never the email, password, token or GoTrue's message.
+ */
+function logSignUpSendFailure(step: "sign_up" | "resend", error: GoTrueError): void {
+  console.error(`password registration: ${step} send failed (status ${error.status ?? "unknown"}, code ${error.code ?? "unknown"})`);
+}
+
+function logRegistrationStepFailure(step: "account_type" | "display_name", error: { code?: string }): void {
   console.error(`password registration: post-OTP ${step} step failed (code ${error.code ?? "unknown"})`);
 }
 
@@ -260,21 +246,22 @@ function logRegistrationStepFailure(step: "account_type" | "username" | "display
  * change (see docs/frontend/auth-password-preview.md).
  */
 async function postSessionRedirect(supabase: SupabaseClient<Database>, next: string): Promise<never> {
-  if (next.startsWith("/onboarding") || next.startsWith(FINISH_REGISTRATION_PATH) || next.startsWith("/auth/invite/")) {
+  if (next.startsWith("/onboarding") || next.startsWith(FINISH_REGISTRATION_PATH) || next.startsWith("/auth/invite/") || next.startsWith("/auth/staff-invitation")) {
     redirect(next);
   }
   const { data: state } = await supabase.rpc("my_registration_state");
   const registrationState = state as RegistrationState;
-  // A verified-but-not-yet-access_ready caller (missing account type or
-  // username) is sent to canonical password auth's own minimal finish-registration screen, not the
-  // legacy six-step /onboarding wizard — see finish-registration/page.tsx.
-  if (registrationState === "account_type_pending" || registrationState === "username_pending") {
+  // A verified-but-not-yet-access_ready caller (missing account type) is sent to canonical password auth's own minimal
+  // finish-registration screen, not the legacy six-step /onboarding wizard — see finish-registration/page.tsx.
+  if (registrationState === "account_type_pending") {
     redirect(FINISH_REGISTRATION_PATH);
   }
   if (!hasAppAccess(registrationState)) redirect("/onboarding");
 
   const landing = await resolveActiveLanding(supabase);
-  const destination = next === landing || next.startsWith(`${landing}/`) ? next : landing;
+  const destination = postAuthDestination(next, landing);
+  // Phone, location and specialties are asked once, for every account (ADR-0026).
+  if (await needsAccountBasics(supabase)) redirect(accountBasicsPath(destination));
   redirect(destination);
 }
 
@@ -288,18 +275,16 @@ export async function requestPasswordSignUp(
   formData: FormData,
 ): Promise<PasswordAuthState> {
   if (!authFormWithinLimit(formData)) return { ok: false, code: "authPasswordPreview.error.passwordTooLong" };
+  // A field the browser did not send at all is an empty answer, never a raw
+  // validator message such as "Expected string, received null".
+  const field = (name: string) => formData.get(name) ?? "";
   const parsed = registrationSchema.safeParse({
-    displayName: formData.get("displayName"),
-    email: formData.get("email"),
-    username: formData.get("username"),
-    accountType: formData.get("accountType"),
-    password: formData.get("password"),
-    confirmPassword: formData.get("confirmPassword"),
+    displayName: field("displayName"),
+    email: field("email"),
+    accountType: field("accountType"),
+    password: field("password"),
   });
-  if (!parsed.success) {
-    const first = parsed.error.issues[0];
-    return { ok: false, code: (first?.message as string) ?? "authPasswordPreview.error.invalidEmail" };
-  }
+  if (!parsed.success) return { ok: false, code: registrationIssueCode(parsed.error.issues[0]) };
 
   // Server-side authority for the account-type choice — the client-supplied
   // key is never trusted beyond looking it up here. A comingSoon/transitional
@@ -320,23 +305,6 @@ export async function requestPasswordSignUp(
 
   const supabase = await getServerSupabase();
 
-  // USERNAME PRE-FLIGHT — before any Auth user or confirmation email exists.
-  // `username_available` is the authoritative, anon-callable boolean check; it
-  // answers false for reserved AND taken names alike, so this reveals nothing
-  // beyond the intended "unavailable" contract (and nothing about the EMAIL).
-  // It is NOT a reservation: the post-OTP `profile_set_username` claim in
-  // verifyPasswordSignUp stays the final authority for the OTP-window race.
-  // An RPC failure is never reported as "unavailable" — it is a neutral retry.
-  const { data: usernameAvailable, error: availabilityError } = await supabase.rpc("username_available", {
-    p_username: parsed.data.username,
-  });
-  if (availabilityError || typeof usernameAvailable !== "boolean") {
-    return { ok: false, code: "authPasswordPreview.error.sendFailed", email: parsed.data.email };
-  }
-  if (!usernameAvailable) {
-    return { ok: false, code: "registration.error.usernameUnavailable", email: parsed.data.email };
-  }
-
   // The Full Name rides in user METADATA (raw_user_meta_data), which
   // `app.handle_new_user()` already reads to seed profiles.display_name —
   // no new column, no migration. Never app_metadata: the name is profile
@@ -344,6 +312,27 @@ export async function requestPasswordSignUp(
   // only after the OTP proves the email (verifyPasswordSignUp).
   const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
   const callStart = Date.now();
+
+  /**
+   * The answer for an email that already belongs to a CONFIRMED account (product decision, 2026-11-12: a person must not wait for a code that
+   * will never arrive). This answer is an existence signal, so it is BUDGETED, and the budget is only ever spent here: GoTrue has already judged
+   * the CAPTCHA (a garbage token fails earlier and never gets this far), so an unverified request can neither read the answer nor burn anyone's
+   * budget. The durable limiter allows 10 explicit answers per IP and 5 per address per 15 minutes (HMAC keys, `email:` namespaced). Once it is
+   * spent (or cannot answer) the reply DEGRADES to the neutral "code sent" response a new registration gets, never to a distinguishable "rate
+   * limited", so the budget really bounds what can be learned. Nothing is staged for an existing account.
+   */
+  const existingAccountReply = async (): Promise<PasswordAuthState> => {
+    const budget = await phoneAuthLimit("sign-up", `email:${parsed.data.email.toLowerCase()}`, await headers());
+    if (budget === "allowed") {
+      return { ok: false, code: "authPasswordPreview.error.accountExists", email: parsed.data.email };
+    }
+    await rememberRegistrationEmail(parsed.data.email);
+    // Timing protection: this degraded answer must not arrive faster than a genuine "code sent" (which waits for the mail send), or the
+    // difference would reopen the oracle the budget just closed. Both neutral outcomes are padded to the same floor.
+    await padToRegistrationFloor(callStart);
+    return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
+  };
+
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
@@ -358,38 +347,37 @@ export async function requestPasswordSignUp(
     if (isRateLimitError(error as GoTrueError)) {
       return { ok: false, code: "authPasswordPreview.error.rateLimited", email: parsed.data.email };
     }
-    // ENUMERATION NORMALIZATION (§Account enumeration) — see
-    // `isAccountExistsError`'s doc comment. Collapse into the exact same
-    // success response a genuine new registration gets; never a different
-    // code path, never GoTrue's own wording. Response-time normalized too
-    // (`padToRegistrationFloor`) — the enumeration-safe response SHAPE alone
-    // is not enough if the two paths remain distinguishable by how fast they
-    // arrive. Deliberately NO pending-registration write on this branch —
-    // there is no new user id to key it by, and staging state for an
-    // existing account's id would be a foothold for exactly the enumeration
-    // this branch exists to close.
-    if (isAccountExistsError(error as GoTrueError)) {
-      await padToRegistrationFloor(callStart);
-      return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
+    // GoTrue refuses the password itself (`weak_password`; with leaked-password protection ON the reasons include `pwned`). It judges the
+    // password before it looks at the account, so this answer is the same for a new and an existing e-mail: no enumeration signal.
+    if ((error as GoTrueError).code === "weak_password") {
+      return { ok: false, code: "authPasswordPreview.error.passwordRejected", email: parsed.data.email };
     }
+    // GoTrue that answers a confirmed existing address with an ERROR (the local stack): see existingAccountReply.
+    if (isAccountExistsError(error as GoTrueError)) return existingAccountReply();
+    logSignUpSendFailure("sign_up", error as GoTrueError);
     return { ok: false, code: "authPasswordPreview.error.sendFailed", email: parsed.data.email };
   }
 
-  // Stage username + account-type NOW, keyed by the user id signUp() just
-  // returned — before any confirmation, so a refresh/restart on the OTP step
-  // does not lose the choice (see Increment 6,
-  // supabase/migrations/20260924090006_pending_registrations.sql). Never the
-  // password. Best-effort: verifyPasswordSignUp falls back to the
-  // finish-registration recovery screen if this is ever lost.
+  // GoTrue that answers a confirmed existing address with SUCCESS (hosted Supabase, email confirmations ON): to stop user enumeration it returns an
+  // OBFUSCATED user - a made-up id, no mail sent - whose `identities` array is EMPTY. A genuinely new registration, and a re-sign-up of a still
+  // UNCONFIRMED address (GoTrue re-sends the code and returns the real user), both come back with their identity, so only the confirmed case is
+  // caught. If a GoTrue version omits `identities` altogether the registration is treated as new (the safe default: never block a real sign-up).
+  // The made-up id must never be staged, or the pending-registration table would hold a row for a user that does not exist.
+  if (Array.isArray(data?.user?.identities) && data.user.identities.length === 0) return existingAccountReply();
+
+  // Stage the account-type choice NOW, keyed by the user id signUp() just returned — before any confirmation, so a refresh/restart on
+  // the OTP step does not lose the choice (see Increment 6, supabase/migrations/20260924090006_pending_registrations.sql). Never the
+  // password, never a username (none exists any more). Best-effort: verifyPasswordSignUp falls back to the finish-registration
+  // recovery screen if this is ever lost.
   if (data?.user) {
     await savePendingRegistration({
       userId: data.user.id,
-      username: parsed.data.username,
       audienceKind: choice.track === "business" ? "organization_type" : "persona_type",
       audienceValue: choice.accountType ?? "",
     });
   }
 
+  await rememberRegistrationEmail(parsed.data.email);
   await padToRegistrationFloor(callStart);
   return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
 }
@@ -422,6 +410,14 @@ export async function resendPasswordSignUpCode(
   const captcha = requireCaptcha(formData);
   if ("code" in captcha) return { ok: false, code: captcha.code, email: email.data };
 
+  // Server-side throttle per email and per IP (HMAC keys only), on top of
+  // GoTrue's own per-address interval and project email limit. Neither
+  // answer depends on whether the email has an account. Fails closed.
+  const limited = await phoneAuthLimit("email-resend", email.data.toLowerCase(), await headers());
+  if (limited !== "allowed") {
+    return { ok: false, code: limited === "limited" ? "authPasswordPreview.error.rateLimited" : "authPasswordPreview.error.sendFailed", email: email.data };
+  }
+
   const supabase = await getServerSupabase();
   const callStart = Date.now();
   const { error } = await supabase.auth.resend({
@@ -436,14 +432,50 @@ export async function resendPasswordSignUpCode(
     if (isRateLimitError(error as GoTrueError)) {
       return { ok: false, code: "authPasswordPreview.error.rateLimited", email: email.data };
     }
-    if (isAccountExistsError(error as GoTrueError)) {
-      await padToRegistrationFloor(callStart);
-      return { ok: true, code: "authPasswordPreview.info.codeSent", email: email.data };
+    if (!isAccountExistsError(error as GoTrueError)) {
+      logSignUpSendFailure("resend", error as GoTrueError);
+      return { ok: false, code: "authPasswordPreview.error.sendFailed", email: email.data };
     }
-    return { ok: false, code: "authPasswordPreview.error.sendFailed", email: email.data };
   }
+  await rememberRegistrationEmail(email.data);
   await padToRegistrationFloor(callStart);
   return { ok: true, code: "authPasswordPreview.info.codeSent", email: email.data };
+}
+
+/** The email an unfinished registration in THIS browser is waiting on, from the httpOnly routing cookie. Never from the URL. */
+export async function pendingRegistrationEmail(): Promise<string | null> {
+  const value = (await cookies()).get(REGISTRATION_EMAIL_COOKIE)?.value;
+  return value && emailSchema.safeParse(value).success ? value : null;
+}
+
+/** "Use a different email" on the restored code step: forget the routing cookie only and show a clean sign-up form. Nothing server-side changes. */
+export async function forgetPendingRegistration(): Promise<void> {
+  (await cookies()).delete({ name: REGISTRATION_EMAIL_COOKIE, path: REGISTRATION_COOKIE_PATH });
+  redirect("/auth/sign-up");
+}
+
+/**
+ * "Log in instead" on the sign-up warning: hands the email or mobile number the person typed to the sign-in field (see
+ * SIGN_IN_PREFILL_COOKIE) and navigates there. Anything that is not a valid email or mobile number is dropped, and the person still lands on sign-in.
+ */
+export async function continueToSignIn(formData: FormData): Promise<void> {
+  const raw = formData.get("contact");
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (value.length > 0 && value.length <= 254 && classifySignInIdentifier(value)) {
+    (await cookies()).set(SIGN_IN_PREFILL_COOKIE, value, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: SIGN_IN_PREFILL_PATH,
+      maxAge: SIGN_IN_PREFILL_MAX_AGE_SECONDS,
+    });
+  }
+  redirect("/auth/sign-in");
+}
+
+/** The identifier carried by `continueToSignIn`, re-validated; null when there is none or it is no longer a valid email / mobile number. */
+export async function signInPrefillIdentifier(): Promise<string | null> {
+  const value = (await cookies()).get(SIGN_IN_PREFILL_COOKIE)?.value;
+  return value && classifySignInIdentifier(value) ? value : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -484,6 +516,9 @@ export async function verifyPasswordSignUp(
   // existing-passwordless-user migration page.
   await markPasswordAttachedAuthoritatively(verifyData.user.id);
 
+  // The registration is no longer interrupted: drop the routing cookie.
+  (await cookies()).delete({ name: REGISTRATION_EMAIL_COOKIE, path: REGISTRATION_COOKIE_PATH });
+
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   // Best-effort, matches production sign-up: never block a verified+credentialed
@@ -508,12 +543,13 @@ export async function verifyPasswordSignUp(
   // A session now exists (verifyOtp succeeded above), so this reads
   // auth.uid() itself — no user-id parameter, standard pattern. Everything
   // returned is REVALIDATED by the RPCs it is applied through
-  // (onboarding_select_account_type, profile_set_username) — the pending row
-  // is a convenience cache, never an authority. If nothing is returned (the
-  // row expired, or the earlier best-effort write never landed), or the
-  // username claim loses a race to someone else, postSessionRedirect below
-  // routes to the finish-registration recovery screen based on the
-  // resulting registration state — never the legacy wizard.
+  // (onboarding_select_account_type) — the pending row is a convenience
+  // cache, never an authority (its `username` column, if the database still
+  // returns one, is ignored: there is no username any more). If nothing is
+  // returned (the row expired, or the earlier best-effort write never
+  // landed), postSessionRedirect below routes to the finish-registration
+  // recovery screen based on the resulting registration state — never the
+  // legacy wizard.
   const { data: pending } = await supabase.rpc("pending_registration_consume");
   const pendingRow = Array.isArray(pending) ? pending[0] : pending;
   if (pendingRow) {
@@ -524,21 +560,6 @@ export async function verifyPasswordSignUp(
     });
     if (accountTypeError) logRegistrationStepFailure("account_type", accountTypeError);
 
-    // The AUTHORITATIVE username claim. The Step-1 pre-flight made a collision
-    // rare, but another registrant can still claim the same normalized name
-    // during this one's OTP window. Never ignored:
-    //   * 23505 (unavailable — reserved or taken, deliberately not told
-    //     apart) → the narrow recovery screen, which explains that the chosen
-    //     name is no longer available. The session and the account type
-    //     recorded above are kept; nothing else is asked again.
-    //   * anything else → safe diagnostics, then the same recovery screen
-    //     (state-derived, so it asks only for what is actually missing).
-    const { error: usernameError } = await supabase.rpc("profile_set_username", { p_username: pendingRow.username });
-    if (usernameError) {
-      if (usernameError.code === "23505") redirect(`${FINISH_REGISTRATION_PATH}?reason=username_unavailable`);
-      logRegistrationStepFailure("username", usernameError);
-      redirect(FINISH_REGISTRATION_PATH);
-    }
     if (accountTypeError) redirect(FINISH_REGISTRATION_PATH);
   }
 
@@ -595,10 +616,22 @@ export async function passwordSignIn(
   formData: FormData,
 ): Promise<PasswordAuthState> {
   if (!authFormWithinLimit(formData)) return { ok: false, code: "authPasswordPreview.error.passwordTooLong" };
-  const email = emailSchema.safeParse(formData.get("email"));
+  const callStart = Date.now();
+  // The hand-off from the sign-up warning has done its job once a sign-in is attempted.
+  (await cookies()).delete({ name: SIGN_IN_PREFILL_COOKIE, path: SIGN_IN_PREFILL_PATH });
+  const rawIdentifier = typeof formData.get("identifier") === "string" ? String(formData.get("identifier")) : String(formData.get("email") ?? "");
+  const identifier = classifySignInIdentifier(rawIdentifier);
+  const echo = rawIdentifier.trim();
   const password = formData.get("password");
-  if (!email.success || typeof password !== "string" || !loginPasswordSchema.safeParse(password).success) {
-    return { ok: false, code: "authPasswordPreview.error.invalidCredentials" };
+  if (!identifier || typeof password !== "string" || !loginPasswordSchema.safeParse(password).success) {
+    // Input that is neither an email nor a mobile number (including anything that merely looks like an old username - there is no username
+    // sign-in any more) is answered exactly like a wrong password, after the same minimum delay as an unknown number.
+    await padToRegistrationFloor(callStart);
+    return { ok: false, code: "authPasswordPreview.error.invalidCredentials", email: echo };
+  }
+  // An internal phone login alias is a key the server derives, never something a person types.
+  if (identifier.kind === "email" && (isCraftsmanLoginAlias(identifier.value) || !emailSchema.safeParse(identifier.value).success)) {
+    return { ok: false, code: "authPasswordPreview.error.invalidCredentials", email: echo };
   }
 
   // GoTrue's password grant is CAPTCHA-protected whenever `[auth.captcha]` is
@@ -606,24 +639,46 @@ export async function passwordSignIn(
   // interaction-only Turnstile widget and the token is forwarded for GoTrue to
   // judge. Brute force is additionally bounded by GoTrue's own rate limits.
   const captcha = requireCaptcha(formData);
-  if ("code" in captcha) return { ok: false, code: captcha.code, email: email.data };
+  if ("code" in captcha) return { ok: false, code: captcha.code, email: echo };
+
+  // A mobile number is resolved to the account's auth email on the server.
+  // That lookup is not CAPTCHA- or GoTrue-limited, so it gets the shared
+  // durable limiter, and a miss answers exactly like a wrong password, after
+  // the same minimum delay, so it reveals nothing about who exists.
+  let loginEmail: string | null = identifier.kind === "email" ? identifier.value : null;
+  if (identifier.kind === "phone") {
+    const limited = await phoneAuthLimit("sign-in", identifier.value.e164, await headers());
+    if (limited === "limited") return { ok: false, code: "authPasswordPreview.error.rateLimited", email: echo };
+    try {
+      loginEmail =
+        limited === "allowed"
+          ? await resolveSignInEmail({ phoneE164: identifier.value.e164 })
+          : null;
+    } catch {
+      loginEmail = null;
+    }
+    if (!loginEmail) {
+      await padToRegistrationFloor(callStart);
+      return { ok: false, code: "authPasswordPreview.error.invalidCredentials", email: echo };
+    }
+  }
 
   const supabase = await getServerSupabase();
   const { error } = await supabase.auth.signInWithPassword({
-    email: email.data,
+    email: loginEmail as string,
     password,
     options: { captchaToken: captcha.token },
   });
   if (error) {
     if (isCaptchaFailure(error as GoTrueError)) {
-      return { ok: false, code: CAPTCHA_REJECTED, email: email.data };
+      return { ok: false, code: CAPTCHA_REJECTED, email: echo };
     }
     if (isRateLimitError(error as GoTrueError)) {
-      return { ok: false, code: "authPasswordPreview.error.rateLimited", email: email.data };
+      return { ok: false, code: "authPasswordPreview.error.rateLimited", email: echo };
     }
     // Deliberately identical for "no such account", "wrong password", "email
     // not confirmed" and "user_banned" — see the module doc comment.
-    return { ok: false, code: "authPasswordPreview.error.invalidCredentials", email: email.data };
+    return { ok: false, code: "authPasswordPreview.error.invalidCredentials", email: echo };
   }
 
   const next = sanitizeNext(formData.get("next"));

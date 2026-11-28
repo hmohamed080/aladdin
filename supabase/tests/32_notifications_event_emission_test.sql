@@ -556,7 +556,9 @@ select is(
   (select count(*)::int from public.notifications
    where subject_id = '99999999-0000-4000-8000-00000000000b'
      and params::text like '%illegible%'),
-  0, 'the free-text rejection reason is not copied into notification params');
+  (select count(*)::int from public.notifications
+   where subject_id = '99999999-0000-4000-8000-00000000000b'),
+  'the rejection reason (optional, owner-visible since 20261115090002) is carried in every owner notification of that rejection');
 select is(
   (select count(*)::int from public.audit_log
    where action = 'verification.approved'

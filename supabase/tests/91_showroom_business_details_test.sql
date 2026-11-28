@@ -75,6 +75,20 @@ select lives_ok($q$select public.business_draft_save_v2(p_legal_name=>'Local leg
 select lives_ok($q$select public.business_draft_submit_v2()$q$,'showroom creation allows blank optional address');
 select ok((public.my_profile_completion()->'missing') ? 'organization_address','blank address remains a showroom account-completion item');
 reset role;
+
+-- Every business type with a list takes its activity in business setup (20261029090002, owner lists 2026-10-29).
+insert into auth.users(id,instance_id,aud,role,email,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at) values('91000006-0000-4000-8000-000000000091','00000000-0000-0000-0000-000000000000','authenticated','authenticated','onboarding91-6@example.test',now(),'{}','{}',now(),now());
+insert into public.onboarding_progress(user_id,selected_track,selected_org_type,account_type_completed_at,completed_at) values('91000006-0000-4000-8000-000000000091','business','supplier',now(),now());
+set local role authenticated;
+select set_config('request.jwt.claim.sub','91000006-0000-4000-8000-000000000091',true);
+select set_config('request.jwt.claims','{"sub":"91000006-0000-4000-8000-000000000091","role":"authenticated"}',true);
+select throws_ok($q$select public.business_draft_save_v2(p_display_name=>'Supplier 6',p_legal_name=>'Supplier 6 LLC',p_org_type=>'supplier',p_governorate=>'cairo',p_city=>'maadi',p_activity_type=>'decor_showroom')$q$,'22023',null,'supplier: a showroom activity is refused');
+select lives_ok($q$select public.business_draft_save_v2(p_display_name=>'Supplier 6',p_legal_name=>'Supplier 6 LLC',p_org_type=>'supplier',p_governorate=>'cairo',p_city=>'maadi',p_activity_type=>'wholesaler')$q$,'supplier: saves its own activity');
+select lives_ok($q$select public.business_draft_submit_v2()$q$,'supplier: business created');
+reset role;
+select is((select array_agg(a.key) from public.organization_activities oa join public.activities a on a.id=oa.activity_id
+             join public.business_creation_drafts d on d.organization_id=oa.organization_id
+            where d.user_id='91000006-0000-4000-8000-000000000091'),array['wholesaler'],'supplier: the activity is the business''s');
 select is(app.business_address_word_count(U&'street\00A0showroom\000Aarea'),3,'Unicode whitespace word counting matches frontend');
 select * from finish();
 rollback;

@@ -1,0 +1,113 @@
+# Aladdin - the desktop suites that cover the Showroom RC2 shell, on a GitHub runner with a runner-local Supabase stack.
+#
+# The sandbox cannot pull the Supabase images, and these suites were left out of every CI job, so their RC2 drift
+# (docs/operations/e2e-shared-failures-triage-2026-10-22.md, "Showroom RC2 surface drift") went unverified. This job runs
+# them against `next build` + `next start` and a local stack: no hosted project, no repository secret, Turnstile stubbed.
+# The text log and Playwright's per-failure error context (ARIA snapshot) are kept; no traces or videos.
+
+name: Showroom RC2 E2E
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/e2e/showroom-mvp.spec.ts"
+      - "frontend/e2e/account-workspace-model.spec.ts"
+      - "frontend/e2e/sales.spec.ts"
+      - "frontend/e2e/orders-projects.spec.ts"
+      - "frontend/e2e/profile-completion.spec.ts"
+      - "frontend/src/app/business/new/**"
+      - "frontend/src/features/showroom-shell/**"
+      - ".github/workflows/showroom-rc2-e2e.yml"
+
+concurrency:
+  group: showroom-rc2-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  showroom-rc2-e2e:
+    name: showroom-rc2-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_ENV: local
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
+      TURNSTILE_ALLOWED_HOSTNAMES: 127.0.0.1,localhost
+      E2E_STUB_TURNSTILE: "1"
+      E2E_DB_CONTAINER: supabase_db_aladdin
+      MAILPIT_URL: http://127.0.0.1:54324
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+          pnpm install --frozen-lockfile
+          pnpm --filter frontend exec playwright install --with-deps chromium
+      - name: Start local Supabase and replay migrations + seeds
+        run: |
+          set -o pipefail
+          pnpm exec supabase start --exclude studio,postgres-meta,edge-runtime,logflare,vector,supavisor > "$RUNNER_TEMP/stack.log" 2>&1
+          pnpm exec supabase db reset >> "$RUNNER_TEMP/stack.log" 2>&1
+          pnpm exec supabase status -o json > "$RUNNER_TEMP/status.json"
+      - name: Point the app at the runner-local stack
+        run: |
+          status=$(jq 'if type == "array" then .[0] else . end' "$RUNNER_TEMP/status.json")
+          api_url=$(jq -r '.API_URL // empty' <<<"$status")
+          anon=$(jq -r '.ANON_KEY // empty' <<<"$status")
+          service=$(jq -r '.SERVICE_ROLE_KEY // empty' <<<"$status")
+          test "$api_url" = "http://127.0.0.1:54321" || { echo "Unexpected local API URL"; exit 1; }
+          test -n "$anon" && test -n "$service" || { echo "Local stack keys missing from supabase status"; exit 1; }
+          grant=$(openssl rand -hex 32)
+          for value in "$anon" "$service" "$grant"; do echo "::add-mask::$value"; done
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$api_url"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$service"
+            echo "AUTH_PASSWORD_PREVIEW_GRANT_SECRET=$grant"
+          } >> "$GITHUB_ENV"
+      - name: Showroom RC2 desktop suites
+        working-directory: frontend
+        run: |
+          set -o pipefail
+          mkdir -p ../.artifacts/showroom-rc2
+          # account-workspace-model revokes Karim's seeded membership, so it runs after every suite that signs him in.
+          status=0
+          pnpm exec playwright test --project=chromium-desktop --retries=0 --reporter=list --output=test-results/shared \
+            e2e/showroom-mvp.spec.ts \
+            e2e/sales.spec.ts \
+            e2e/orders-projects.spec.ts \
+            e2e/profile-completion.spec.ts \
+            2>&1 | tee ../.artifacts/showroom-rc2/playwright.log || status=1
+          pnpm exec playwright test --project=chromium-desktop --retries=0 --reporter=list --output=test-results/workspace-model \
+            e2e/account-workspace-model.spec.ts \
+            2>&1 | tee -a ../.artifacts/showroom-rc2/playwright.log || status=1
+          exit $status
+      - name: Print the error contexts (ARIA snapshot of each failure)
+        if: failure()
+        working-directory: frontend
+        run: |
+          find test-results -name error-context.md 2>/dev/null | sort | while read -r f; do
+            echo "::group::$f"; head -c 12000 "$f"; echo; echo "::endgroup::"
+          done
+      - name: Keep the text log and error contexts (no traces or videos)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: showroom-rc2-e2e-${{ github.sha }}
+          path: |
+            .artifacts/showroom-rc2/
+            frontend/test-results/**/error-context.md
+          retention-days: 14
+          if-no-files-found: warn

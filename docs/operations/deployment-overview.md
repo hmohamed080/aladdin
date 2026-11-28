@@ -2,6 +2,8 @@
 
 **Status:** Living document · 2026-08-16 · Supersedes `agents/commands/deploy.md`
 
+> **2026-10-28: Vercel is retired** ([ADR-0024](../decisions/ADR-0024-vercel-retired.md)). The web app runs on Cloudflare Workers and FastAPI on Cloudflare Containers; production deploys through `.github/workflows/cloudflare-production.yml`. The Vercel sections below are historical.
+
 ## Purpose
 
 Describe how Aladdin's services deploy and the discipline around releases ([ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md), superseding ADR-0004 on hosting).

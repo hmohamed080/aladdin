@@ -40,8 +40,10 @@ export default async function AddBusinessPage({
   // business here stays an optional in-app action governed by the organization-slot rules.
   if (!hasAppAccess(state)) redirect("/onboarding");
 
-  const { allowed, data, persona, slotOpen } = await loadBusinessCreationAccess();
+  const { allowed, entitled, data, persona, slotOpen } = await loadBusinessCreationAccess();
   if (!data) redirect("/auth/sign-in");
+  // Someone who may never create a business (a Personal account) goes home; the slot is irrelevant to them.
+  if (!entitled) redirect("/home");
   // A taken slot is explained on the applications page rather than bounced to /home.
   if (!slotOpen) redirect("/business/applications");
   if (!allowed) redirect("/home");

@@ -113,3 +113,99 @@ export async function resolveEntryOrganizationNames(
   if (error) throw error;
   return new Map((data ?? []).map((o) => [o.id, o.name]));
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// The Installer Points pages (approved design): an exact overview and a keyset-paged, filterable history.
+// ---------------------------------------------------------------------------------------------------------------
+
+export type PointsOverview = { balance: number; monthEarned: number; monthDeducted: number; entries: number };
+
+/** Balance, this month's earned / deducted totals and the entry count — exact, in SQL (`my_points_overview`). */
+export async function getPointsOverview(supabase: DB): Promise<PointsOverview> {
+  const { data, error } = await supabase.rpc("my_points_overview");
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : undefined;
+  return {
+    balance: row?.balance ?? 0,
+    monthEarned: row?.month_earned ?? 0,
+    monthDeducted: row?.month_deducted ?? 0,
+    entries: row?.entries ?? 0,
+  };
+}
+
+export type PointsHistoryFilter = {
+  /** "YYYY-MM" (an Africa/Cairo calendar month) or null for every period. */
+  month: string | null;
+  /** A known event type or null for every activity. */
+  event: "referral.organization_approved" | "admin.adjustment" | null;
+  result: "all" | "earned" | "deducted";
+};
+export type PointsHistoryCursor = { createdAt: string; id: string };
+export const POINTS_PAGE_SIZE = 20;
+
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+const KEY_TIME = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::?\d{2})?)$/;
+const KEY_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The UTC instant of 00:00 Africa/Cairo on the first day of month `m` (1-12) of year `y` (DST-aware). */
+export function cairoMonthStartUtc(y: number, m: number): string {
+  const naive = Date.UTC(y, m - 1, 1, 0, 0, 0);
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(naive));
+  const get = (type: string) => Number(parts.find((x) => x.type === type)?.value);
+  const asCairo = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"));
+  const offset = asCairo - naive; // Cairo is ahead of UTC by this many ms at that instant
+  return new Date(naive - offset).toISOString();
+}
+
+function monthBounds(month: string): { from: string; to: string } {
+  const [y, m] = month.split("-").map(Number) as [number, number];
+  return { from: cairoMonthStartUtc(y, m), to: m === 12 ? cairoMonthStartUtc(y + 1, 1) : cairoMonthStartUtc(y, m + 1) };
+}
+
+export function isValidPointsCursor(c: unknown): c is PointsHistoryCursor {
+  return !!c && typeof c === "object" && KEY_TIME.test((c as PointsHistoryCursor).createdAt ?? "") && KEY_ID.test((c as PointsHistoryCursor).id ?? "");
+}
+
+/**
+ * One page of the caller's own ledger, newest first, by KEYSET (`created_at DESC, id DESC`) with no ceiling, plus the
+ * EXACT number of rows matching the filter. RLS (owner policy) scopes every row; no user id crosses this boundary.
+ */
+export async function listPointsHistoryPage(
+  supabase: DB,
+  filter: PointsHistoryFilter,
+  after: PointsHistoryCursor | null,
+): Promise<{ rows: PointsEntryRow[]; next: PointsHistoryCursor | null; total: number }> {
+  if (filter.month !== null && !MONTH.test(filter.month)) throw new Error("invalid month");
+  if (after !== null && !isValidPointsCursor(after)) throw new Error("invalid cursor");
+
+  const bounds = filter.month ? monthBounds(filter.month) : null;
+  let rowsQuery = supabase.from("points_ledger").select("*");
+  let countQuery = supabase.from("points_ledger").select("id", { count: "exact", head: true });
+  if (bounds) {
+    rowsQuery = rowsQuery.gte("created_at", bounds.from).lt("created_at", bounds.to);
+    countQuery = countQuery.gte("created_at", bounds.from).lt("created_at", bounds.to);
+  }
+  if (filter.event) {
+    rowsQuery = rowsQuery.eq("event_type", filter.event);
+    countQuery = countQuery.eq("event_type", filter.event);
+  }
+  if (filter.result === "earned") {
+    rowsQuery = rowsQuery.gt("points_delta", 0);
+    countQuery = countQuery.gt("points_delta", 0);
+  } else if (filter.result === "deducted") {
+    rowsQuery = rowsQuery.lt("points_delta", 0);
+    countQuery = countQuery.lt("points_delta", 0);
+  }
+  if (after) rowsQuery = rowsQuery.or(`created_at.lt.${after.createdAt},and(created_at.eq.${after.createdAt},id.lt.${after.id})`);
+
+  const [{ data, error }, { count, error: countError }] = await Promise.all([
+    rowsQuery.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(POINTS_PAGE_SIZE + 1),
+    countQuery,
+  ]);
+  if (error) throw error;
+  if (countError) throw countError;
+  const fetched = data ?? [];
+  const rows = fetched.slice(0, POINTS_PAGE_SIZE);
+  const last = rows[rows.length - 1];
+  return { rows, next: fetched.length > POINTS_PAGE_SIZE && last ? { createdAt: last.created_at, id: last.id } : null, total: count ?? 0 };
+}

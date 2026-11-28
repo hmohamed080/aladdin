@@ -230,17 +230,21 @@ web3 = 30
 
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
 #
-# PERMANENTLY DISABLED — the approved architecture (2026-09-24). CAPTCHA is
-# APPLICATION-SCOPED: the password-auth preview's Create Account and Forgot
-# Password server actions verify the Cloudflare Turnstile token themselves via
-# Cloudflare Siteverify (frontend/src/server/auth/turnstile.ts, secret in the
-# server-only TURNSTILE_SECRET_KEY) BEFORE calling Supabase Auth; Sign In has
-# no CAPTCHA. This switch is a single project-wide GoTrue toggle with no
-# per-endpoint scoping — enabling it would reject every canonical passwordless
-# OTP sign-up/sign-in/recovery and password sign-in that carries no token
-# (confirmed against local GoTrue: `captcha_failed ... no captcha_token
-# found`). Do NOT enable it locally or on hosted projects.
-# [auth.captcha]  -- intentionally absent; see the comment above.
+# Supabase Auth CAPTCHA protection (ADR-0023, docs/frontend/auth-captcha.md).
+# HOSTED projects: ON, provider Turnstile, with the secret of the site key the
+# app's widget uses (Dashboard > Authentication > Attack Protection; the owner
+# changes it, after the code that forwards a token on every protected call is
+# live). Supabase Auth then verifies the token of every sign up, resend,
+# password sign in, email code and password recovery request, including
+# requests that skip the app and call /auth/v1 directly.
+# LOCAL default: OFF here, because a local GoTrue that cannot reach Cloudflare
+# would refuse every one of those requests. The Auth CAPTCHA E2E workflow turns
+# it ON for its run with Cloudflare's public test secrets
+# (scripts/ci/enable-gotrue-captcha.sh). Turning it on yourself:
+#   [auth.captcha]
+#   enabled = true
+#   provider = "turnstile"
+#   secret = "1x0000000000000000000000000000000AA"  # Cloudflare's public always-pass test secret
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.

@@ -1,7 +1,7 @@
 """Health, public-route-mounting, and configuration tests for the backend.
 
-The routing tests pin the PUBLIC contract (`/api/backend/...`) that the Vercel
-Services rewrite forwards unchanged — see ADR-0009 and `app.main.API_PREFIX`.
+The routing tests pin the PUBLIC contract (`/api/backend/...`) that the web app's
+`BACKEND` binding forwards unchanged — see ADR-0022 and `app.main.API_PREFIX`.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ def test_health_ok_on_public_prefixed_route() -> None:
 
 
 def test_public_prefix_is_the_expected_contract() -> None:
-    # The deployed contract is /api/backend/<route>; the rewrite in vercel.json
+    # The deployed contract is /api/backend/<route>; the frontend Worker's proxy
     # forwards the original path, so this literal must not drift.
     assert API_PREFIX == "/api/backend"
 
@@ -71,12 +71,12 @@ def test_schema_and_docs_are_behind_the_public_prefix() -> None:
 
 def test_settings_default_env_is_local() -> None:
     settings = Settings(_env_file=None)
-    assert settings.app_env == "local"
+    assert settings.environment == "local"
+    assert settings.missing_configuration == []
     assert settings.allowed_origins_list == ["http://localhost:3000"]
 
 
-def test_settings_fail_fast_in_production_without_secrets() -> None:
-    import pytest
-
-    with pytest.raises(ValueError, match="Missing required configuration"):
-        Settings(_env_file=None, app_env="production")
+def test_settings_report_missing_secrets_in_production() -> None:
+    # Reported, not raised: see tests/test_config.py for the deployed behaviour.
+    settings = Settings(_env_file=None, app_env="production")
+    assert settings.missing_configuration == ["SUPABASE_URL", "SUPABASE_ANON_KEY"]

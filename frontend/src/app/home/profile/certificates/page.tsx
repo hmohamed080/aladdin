@@ -23,6 +23,8 @@ export default async function CertificatesPage() {
   const data = await loadPersonalHome();
   if (!data) redirect("/auth/sign-in");
   if (data.variant !== "professional") return <NoProfessionalProfile />;
+  // Certificates are not part of the approved Installer account.
+  if (data.accountType === "installer_technician") redirect("/home/profile");
 
   return <CertificatesManager items={await listMyCertificates()} />;
 }

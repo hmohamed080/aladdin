@@ -1,0 +1,368 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { SHOWROOM_ROOT } from "@/features/showroom-shell/navigation";
+import { cookies } from "next/headers";
+import { getPageContext } from "@/server/queries/page-context";
+import { getMessages, createTranslator } from "@/lib/i18n/translate";
+import { resolveTimezone } from "@/lib/workspace/timezone";
+import { DASHBOARD_TIMEZONE_FALLBACK } from "@/lib/workspace/dashboard-period";
+import { THEME_COOKIE } from "@/lib/theme/config";
+import { allowedNavKeys } from "@/lib/nav/modules";
+import { PageHeader } from "@/components/ui/workspace-layout";
+import { Card, SectionTitle, Field, Badge } from "@/components/ui/primitives";
+import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
+import { formatCount } from "@/lib/ui/format";
+import { maskEmail } from "@/lib/ui/mask-email";
+import { isCraftsmanLoginAlias, userFacingEmail } from "@/lib/auth/craftsman-login-alias";
+import { getCurrentUser } from "@/server/auth/session";
+import { resolveBilingualText } from "@/lib/i18n/bilingual";
+import { OrganizationIdentityDialog } from "@/features/organization/organization-identity-dialog";
+import { BranchIdentityDialog } from "@/features/organization/branch-identity-dialog";
+import { BranchGovernance } from "@/features/organization/branch-governance";
+import { IdentityChangePanel } from "@/features/organization/identity-change-panel";
+import { loadIdentityState, loadManagedBranches } from "@/server/queries/organization-governance";
+import { ActivitySelector } from "@/features/profile/activity-selector";
+import { IdentityCard } from "@/features/settings/identity-card";
+import { loadOrganizationActivities, loadOrganizationActivityCatalog } from "@/server/queries/activities";
+import { loadMyIdentity } from "@/server/queries/profile-identity";
+import { setOrganizationActivitiesAction } from "@/server/actions/activities";
+import {
+  BuildingIcon,
+  SettingsIcon,
+  UsersIcon,
+  MapPinIcon,
+  ShieldIcon,
+  BadgeCheckIcon,
+  LayersIcon,
+} from "@/components/ui/icons";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * Settings — the business record, the workspace's own behaviour, and the account
+ * the caller signs in with.
+ *
+ * Organised into three groups that answer three different owners' questions:
+ * BUSINESS is about the company (its record, its verification, its branches),
+ * WORKSPACE is about this installation of the product (language, theme),
+ * ACCOUNT is about the person sitting in front of it (how they sign in, what
+ * they can open, where to get help).
+ *
+ * Read-mostly by design. Every field shown here is either already editable
+ * through an existing trusted path (people and capabilities on the Team page,
+ * contact details on the personal profile) or is server-controlled and must not
+ * become a client-side form — verification state, organization type and branch
+ * structure are decided by review and by owners, not by a text input.
+ *
+ * There is deliberately NO billing, notifications, integrations or data-export
+ * section. None of those systems exist, and a settings page of disabled
+ * placeholders tells a client the product is further along than it is.
+ */
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ section?: string }> }) {
+  const ctx = await getPageContext();
+  if (!ctx) return null;
+  // A Showroom's Settings is the sectioned V2 page (same governance backend); this route keeps old links working.
+  if (ctx.org.orgType === "showroom_dealer") {
+    const section = (await searchParams).section;
+    redirect(`${SHOWROOM_ROOT}/settings${section ? `?section=${encodeURIComponent(section)}` : ""}`);
+  }
+  const { supabase, org, locale } = ctx;
+  const m = getMessages(locale);
+  const t = createTranslator(locale);
+  const store = await cookies();
+  const theme = store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light";
+
+  const [{ data: record }, authUser, { data: branchRows }] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("name, slug, org_type, status, business_verified_at, primary_locale, name_ar, name_en, timezone, contact_phone, contact_email")
+      .eq("id", org.organizationId)
+      .maybeSingle(),
+    getCurrentUser(),
+    org.branches.length > 0
+      ? supabase
+          .from("branches")
+          .select("id, name, name_ar, name_en, address_ar, address_en, timezone")
+          .in(
+            "id",
+            org.branches.map((b) => b.id),
+          )
+      : Promise.resolve({ data: [] as never[] }),
+  ]);
+
+  const canManagePeople = org.capabilities.includes("org.members.manage");
+  const canManageOrg = org.capabilities.includes("org.manage");
+  const canManageBranches = canManageOrg || org.capabilities.includes("branch.manage");
+  const reachable = allowedNavKeys(org.capabilities).filter((k) => k !== "home" && k !== "settings");
+  // The Verified badge is business verification, not approval of the application.
+  const verified = record?.business_verified_at != null;
+  const pending = record?.status === "pending_verification";
+  // An installer phone account's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
+  const visibleEmail = userFacingEmail(authUser?.email);
+  const signInEmail = visibleEmail ? maskEmail(visibleEmail) : null;
+  const phonePasswordAccount = isCraftsmanLoginAlias(authUser?.email);
+  const branchDetails = new Map((branchRows ?? []).map((b) => [b.id, b]));
+
+  // Organization subtypes (Showroom/Supplier/Manufacturer/Importer activities).
+  // Editable only with org.manage — organization_activities_set enforces the
+  // same capability itself; the selector is simply not offered without it.
+  const [activityCatalog, orgActivities, identity, identityState, managedBranches] = await Promise.all([
+    canManageOrg && record?.org_type ? loadOrganizationActivityCatalog(record.org_type) : Promise.resolve([] as string[]),
+    canManageOrg ? loadOrganizationActivities(org.organizationId) : Promise.resolve([] as string[]),
+    loadMyIdentity(),
+    // A verified organization's name changes only through a review request (never a direct edit).
+    canManageOrg ? loadIdentityState(org.organizationId) : Promise.resolve(null),
+    canManageBranches ? loadManagedBranches(org.organizationId) : Promise.resolve([]),
+  ]);
+  const identityLocked = identityState?.locked ?? false;
+
+  return (
+    <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
+      <PageHeader locale={locale} Icon={SettingsIcon} title={m.settings.title} subtitle={m.settings.subtitle} />
+
+      {/* ---------------------------- Business ---------------------------- */}
+      <SectionTitle icon={<BuildingIcon size={18} />}>{m.settings.group.business}</SectionTitle>
+
+      <div className="grid gap-lg desktop:grid-cols-2 [&>*]:min-w-0">
+        <Card>
+          <SectionTitle
+            icon={<BuildingIcon size={18} />}
+            action={
+              canManageOrg ? (
+                <OrganizationIdentityDialog
+                  m={m}
+                  orgId={org.organizationId}
+                  nameAr={record?.name_ar ?? null}
+                  nameEn={record?.name_en ?? null}
+                  timezone={record?.timezone ?? null}
+                  locked={identityLocked}
+                />
+              ) : undefined
+            }
+          >
+            {m.settings.business}
+          </SectionTitle>
+          <dl className="mt-md grid gap-md tablet:grid-cols-2">
+            <Field label={m.settings.field.name}>
+              {resolveBilingualText(locale, record?.name ?? org.organizationName, record?.name_ar ?? null, record?.name_en ?? null)}
+            </Field>
+            <Field label={m.settings.field.type}>
+              {record?.org_type ? m.directory.orgType[record.org_type] : "—"}
+            </Field>
+            <Field label={m.settings.field.status}>
+              {record?.status ? m.settings.orgStatus[record.status] : "—"}
+            </Field>
+            {canManageOrg && record?.org_type === "showroom_dealer" ? <><Field label={m.onboarding.business.identity.phoneLabel}><span dir="ltr">{record.contact_phone ?? "—"}</span></Field><Field label={m.onboarding.business.identity.emailLabel}><span dir="ltr">{record.contact_email ?? "—"}</span></Field></> : null}
+          </dl>
+          {canManageOrg && identityState ? <IdentityChangePanel orgId={org.organizationId} view={identityState} /> : null}
+          <p className="mt-md border-t pt-sm text-label text-fg-muted">{m.settings.businessNote}</p>
+        </Card>
+
+        <Card>
+          <SectionTitle icon={<BadgeCheckIcon size={18} />}>{m.settings.verification}</SectionTitle>
+          <div className="mt-md flex flex-col gap-sm">
+            <div>
+              {verified ? (
+                <Badge tone="success">
+                  <BadgeCheckIcon size={13} />
+                  {m.directory.verified}
+                </Badge>
+              ) : (
+                <Badge tone={pending ? "warning" : "neutral"}>
+                  {pending ? m.settings.orgStatus.pending_verification : m.directory.unverified}
+                </Badge>
+              )}
+            </div>
+            {/* Verification is what puts a business in front of buyers, so the
+                consequence is stated rather than left as a coloured pill. */}
+            <p className="text-body text-fg-secondary">
+              {verified ? m.settings.verifiedBody : m.settings.unverifiedBody}
+            </p>
+            {pending ? <p className="text-label text-fg-muted">{m.settings.verificationPending}</p> : null}
+          </div>
+        </Card>
+
+        {activityCatalog.length > 0 ? (
+          <div className="desktop:col-span-2">
+            <ActivitySelector
+              catalog={activityCatalog}
+              selected={orgActivities}
+              action={setOrganizationActivitiesAction}
+              orgId={org.organizationId}
+            />
+          </div>
+        ) : null}
+
+        <Card className="desktop:col-span-2">
+          <SectionTitle icon={<MapPinIcon size={18} />}>
+            {m.settings.branches}
+            <span className="ms-2 text-label font-normal text-fg-muted">
+              {org.branches.length === 1
+                ? m.settings.branchCountOne
+                : m.settings.branchCount.replace("{count}", formatCount(org.branches.length, locale))}
+            </span>
+          </SectionTitle>
+          <div className="mt-md">
+            {canManageBranches ? (
+              <BranchGovernance
+                m={m}
+                orgId={org.organizationId}
+                rows={managedBranches}
+                orgIsApproved={record?.status === "active"}
+              />
+            ) : org.branches.length === 0 ? (
+              <p className="text-body text-fg-muted">{m.settings.noBranches}</p>
+            ) : (
+              <ul className="grid gap-1.5 tablet:grid-cols-2 desktop:grid-cols-3">
+                {org.branches.map((b) => {
+                  const detail = branchDetails.get(b.id);
+                  const displayName = resolveBilingualText(locale, b.name, detail?.name_ar ?? null, detail?.name_en ?? null);
+                  // Truthful, not just present: a branch with no override of its
+                  // own is actually governed by the ORGANIZATION's timezone
+                  // (resolveTimezone's own branch→org→fallback order), so that is
+                  // what this line names — never a bare "Not set" while a real
+                  // effective zone is in force.
+                  const branchTimezoneText =
+                    detail?.timezone ??
+                    t("settings.timezoneInherited", {
+                      tz: resolveTimezone(null, record?.timezone),
+                    });
+                  return (
+                    <li
+                      key={b.id}
+                      className="flex flex-col gap-1 rounded-sm bg-surface-2/50 px-3 py-2 text-body text-fg-secondary"
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="shrink-0 text-fg-muted" aria-hidden="true">
+                            <MapPinIcon size={15} />
+                          </span>
+                          <span className="min-w-0 truncate">{displayName}</span>
+                        </span>
+                        {canManageBranches ? (
+                          <BranchIdentityDialog
+                            m={m}
+                            branchId={b.id}
+                            branchName={displayName}
+                            nameAr={detail?.name_ar ?? null}
+                            nameEn={detail?.name_en ?? null}
+                            addressAr={detail?.address_ar ?? null}
+                            addressEn={detail?.address_en ?? null}
+                            timezone={detail?.timezone ?? null}
+                          />
+                        ) : null}
+                      </span>
+                      <span className="ms-6 text-label text-fg-muted">{branchTimezoneText}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <p className="mt-md border-t pt-sm text-label text-fg-muted">{m.settings.branchNote}</p>
+          </div>
+        </Card>
+      </div>
+
+      {/* ---------------------------- Workspace --------------------------- */}
+      <SectionTitle icon={<SettingsIcon size={18} />}>{m.settings.group.workspace}</SectionTitle>
+
+      <Card>
+        <SectionTitle icon={<SettingsIcon size={18} />}>{m.settings.preferences}</SectionTitle>
+        <div className="mt-md flex flex-col gap-md">
+          <div className="flex flex-wrap items-center justify-between gap-sm">
+            <div className="min-w-0">
+              <p className="text-body-lg text-fg">{m.nav.language}</p>
+              <p className="text-label text-fg-muted">{m.settings.languageHint}</p>
+            </div>
+            <LanguageSwitch />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-sm border-t pt-md">
+            <div className="min-w-0">
+              <p className="text-body-lg text-fg">{m.nav.theme}</p>
+              <p className="text-label text-fg-muted">{m.settings.themeHint}</p>
+            </div>
+            <ThemeSwitch current={theme} />
+          </div>
+        </div>
+      </Card>
+
+      {/* -------------------------- Account & access ---------------------- */}
+      <SectionTitle icon={<ShieldIcon size={18} />}>{m.settings.group.account}</SectionTitle>
+
+      {/* The person's own shared identity (display name / photo / phone) — the
+          same card and RPCs as /home/settings, so a business user without a
+          personal workspace can still complete their profile. */}
+      {identity ? <IdentityCard identity={identity} /> : null}
+
+      <div className="grid gap-lg desktop:grid-cols-2 [&>*]:min-w-0">
+        <Card>
+          <SectionTitle icon={<ShieldIcon size={18} />}>{m.settings.signIn}</SectionTitle>
+          <div className="mt-md flex flex-col gap-sm">
+            {signInEmail ? (
+              <Field label={m.settings.signInContact}>
+                <span dir="ltr">{signInEmail}</span>
+              </Field>
+            ) : null}
+            {/* No password row, no "change password", no 2FA toggle: email accounts
+                have no password control on this page, and a phone + password account has no
+                self-service password management yet — offering controls that do not exist would
+                misstate the security model. */}
+            <p className="text-body text-fg-secondary">
+              {phonePasswordAccount ? m.settings.signInBodyPhonePassword : m.settings.signInBody}
+            </p>
+            {/* The contact hint is about the email sign-in contact; a phone account's
+                sign-in number is not changed by a profile edit. */}
+            {phonePasswordAccount ? null : <p className="text-label text-fg-muted">{m.settings.signInContactHint}</p>}
+          </div>
+        </Card>
+
+        <Card>
+          <SectionTitle icon={<LayersIcon size={18} />}>{m.settings.access}</SectionTitle>
+          <div className="mt-md flex flex-col gap-md">
+            <div>
+              <p className="text-body-lg text-fg">{m.settings.yourAccess}</p>
+              {/* Deliberately NOT the raw capability keys: `org.members.manage` is
+                  an internal identifier that would render untranslated in Arabic
+                  and means nothing to the person reading it. The modules those
+                  capabilities unlock are the same information, in their language. */}
+              <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                {reachable.length === 0 ? (
+                  <li className="text-body text-fg-muted">{m.settings.noCapabilities}</li>
+                ) : (
+                  reachable.map((k) => (
+                    <li key={k}>
+                      <Badge tone="neutral">{m.nav[k]}</Badge>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
+            {canManagePeople ? (
+              <Link
+                href="/b2b/organization"
+                className="inline-flex min-h-9 w-fit items-center gap-2 rounded-sm border border-strong px-md py-1.5 text-label font-medium text-fg hover:bg-surface-2"
+              >
+                <UsersIcon size={16} />
+                {m.settings.manageTeam}
+              </Link>
+            ) : null}
+            <p className="border-t pt-sm text-label text-fg-muted">{m.settings.accessNote}</p>
+          </div>
+        </Card>
+
+        <Card className="desktop:col-span-2">
+          <SectionTitle icon={<UsersIcon size={18} />}>{m.settings.support}</SectionTitle>
+          <div className="mt-md flex flex-wrap items-center justify-between gap-md">
+            <p className="min-w-0 flex-1 basis-72 text-body text-fg-secondary">{m.settings.supportBody}</p>
+            <Link
+              href="/auth/support"
+              className="inline-flex min-h-9 w-fit items-center gap-2 rounded-sm border border-strong px-md py-1.5 text-label font-medium text-fg hover:bg-surface-2"
+            >
+              {m.settings.supportLink}
+            </Link>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}

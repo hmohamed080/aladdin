@@ -2,10 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { loadOrganizationContact, loadOrganizationDetail } from "@/server/queries/admin-directory";
+import { loadOrganizationDetail, loadOrganizationRegistration } from "@/server/queries/admin-directory";
+import { describeLocation } from "@/lib/location/describe-location";
 import { previewSubjectAudit } from "@/server/queries/admin-preview";
 import { localizedName } from "@/features/admin-preview/directory-mappers";
-import { can } from "@/lib/permissions/admin";
+import { can, meets } from "@/lib/permissions/admin";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatAdminDate, formatDateTime, formatNumber } from "@/lib/ui/format";
@@ -13,7 +14,9 @@ import { auditActionKey } from "@/lib/admin/audit-actions";
 import { AdminHeader, StatusBadge } from "@/features/admin/parts";
 import { Card, Badge, Field, SectionTitle, StatePanel } from "@/components/ui/primitives";
 import { TabLinks } from "@/components/ui/stat-tiles";
-import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
+import { UserVerificationControls } from "@/features/admin/user-verification-controls";
+import { VerificationHistory } from "@/features/admin/verification-history";
+import { isOpenVerificationStatus } from "@/lib/admin/verification-status";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
 import { ButtonLink } from "@/components/ui/controls";
 import { requireAdminRoute } from "@/server/authorization/admin";
@@ -43,7 +46,7 @@ const PROVENANCE_LABEL_KEY: Record<string, "provenanceSelfCreated" | "provenance
  *     dismiss resolution (duplicates.resolve; PD-006, no merge).
  *   Activity — the Entity Timeline. Admin Notes — live (notes.*).
  *   Audit — only with `audit.read` (its own RLS policy).
- *   Verify / Reject in the header stay Preview here.
+ *   Verify / Reject in the header are real (`UserVerificationControls`, the same actions as the Verifications queue).
  */
 export default async function PreviewOrgDetailPage({
   params,
@@ -63,7 +66,7 @@ export default async function PreviewOrgDetailPage({
 
   const t = m.admin.preview.organizations;
   const d = m.admin.preview.directory;
-  const [loaded, contact] = await Promise.all([loadOrganizationDetail(supabase, id), loadOrganizationContact(supabase, id)]);
+  const [loaded, registration] = await Promise.all([loadOrganizationDetail(supabase, id), loadOrganizationRegistration(supabase, id)]);
   if (!loaded.ok) {
     return (
       <div className="flex flex-col gap-lg">
@@ -78,9 +81,20 @@ export default async function PreviewOrgDetailPage({
   if (!org) notFound();
 
   const canAudit = can(access, "audit.read");
+  // The newest open organization-approval request (business verification has its own queue and permission).
+  const openRequest = org.verifications.find((v) => isOpenVerificationStatus(v.status) && v.verificationType === "organization");
+  const pendingVerification = openRequest
+    ? { id: openRequest.id, status: openRequest.status, verificationType: openRequest.verificationType }
+    : null;
+  // ONE guard for every Verify / Reject control on this page (header and Overview): a holder of `organizations.verify`, and either an
+  // open request or a still-pending organization. A rejected application is NOT final for the Admin: like a rejected user, it can be re-initiated (the same rule as users).
+  const showApprovalActions =
+    can(access, "organizations.verify") &&
+    (org.status === "pending_verification" || pendingVerification !== null);
   const typeLabels = m.orgType as Record<string, string>;
   const statusLabels = m.admin.status as Record<string, string>;
   const actionLabels = m.admin.actions as Record<string, string>;
+  const activityLabels = m.profileActivities.labels as Record<string, string>;
   const name = localizedName(org, locale);
   const provenance = t[PROVENANCE_LABEL_KEY[org.source ?? ""] ?? "provenanceSelfCreated"];
   const auditEntries = canAudit && tab === "audit" ? await previewSubjectAudit(supabase, "organization", org.id) : null;
@@ -101,15 +115,14 @@ export default async function PreviewOrgDetailPage({
           <AdminHeader locale={locale} title={name} subtitle={typeLabels[org.orgType] ?? org.orgType} />
           <div className="flex items-center gap-2">
             <StatusBadge status={org.status} label={statusLabels[org.status] ?? org.status} />
-            {org.isVerified ? <Badge tone="success">{m.admin.orgs.verified}</Badge> : null}
+            {/* The badge is business verification; approval of the application alone is the status above. */}
+            {org.businessVerifiedAt ? <Badge tone="success">{m.businessVerification.status.verified}</Badge> : null}
           </div>
         </div>
         <div className="flex flex-wrap gap-sm">
-          {org.status === "pending_verification" ? (
-            <>
-              <PreviewActionDialog trigger={t.rowActions.verify} triggerVariant="accent" title={m.admin.preview.orgOverview.availableActions} confirmLabel={t.rowActions.verify} confirmVariant="accent" />
-              <PreviewActionDialog trigger={t.rowActions.reject} triggerVariant="danger" title={m.admin.preview.review.rejectTitle} body={m.admin.preview.review.rejectBody} confirmLabel={t.rowActions.reject} confirmVariant="danger" />
-            </>
+          {/* Real decisions on the open approval request: the same actions as the Verifications queue. */}
+          {showApprovalActions ? (
+            <UserVerificationControls subjectId={org.id} pending={pendingVerification} subjectType="organization" canInitiate />
           ) : null}
           {canSuspend && org.status !== "archived" ? (
             <SuspensionAction m={m} subjectType="organization" subjectId={org.id} suspended={org.status === "suspended"} />
@@ -154,10 +167,11 @@ export default async function PreviewOrgDetailPage({
             <dl className="grid gap-md tablet:grid-cols-4">
               <Field label={t.tabs.overview}>{typeLabels[org.orgType] ?? org.orgType}</Field>
               <Field label={m.admin.orgs.status}>{statusLabels[org.status] ?? org.status}</Field>
-              <Field label={m.admin.orgs.verification}>{org.isVerified ? m.admin.orgs.verified : m.admin.orgs.notVerified}</Field>
+              <Field label={m.admin.orgs.organizationApproval}><StatusBadge status={org.approvalState} label={(m.admin.orgs.approvalState as Record<string, string>)[org.approvalState] ?? org.approvalState} /></Field>
+              <Field label={m.admin.orgs.businessVerification}>{org.businessVerifiedAt ? m.admin.orgs.verified : m.admin.orgs.notVerified}</Field>
               <Field label={m.admin.orgs.created}>{formatAdminDate(org.createdAt, locale)}</Field>
-              <Field label={m.onboarding.business.identity.phoneLabel}><span dir="ltr">{contact.phone ?? "—"}</span></Field>
-              <Field label={m.onboarding.business.identity.emailLabel}><span dir="ltr">{contact.email ?? "—"}</span></Field>
+              <Field label={m.onboarding.business.identity.phoneLabel}><span dir="ltr">{registration.phone ?? "—"}</span></Field>
+              <Field label={m.onboarding.business.identity.emailLabel}><span dir="ltr">{registration.email ?? "—"}</span></Field>
               <Field label={m.admin.orgs.members}>{formatNumber(activeMembers, locale)}</Field>
               <Field label={t.tabs.branches}>{formatNumber(org.branches.length, locale)}</Field>
               <Field label={t.ownershipTitle}>
@@ -167,7 +181,28 @@ export default async function PreviewOrgDetailPage({
             </dl>
           </Card>
 
-          {org.status === "pending_verification" ? (
+          <Card data-testid="admin-org-registration">
+            <SectionTitle>{t.registration.title}</SectionTitle>
+            <dl className="mt-md grid gap-md tablet:grid-cols-2">
+              <Field label={t.registration.legalName}><bdi dir="auto">{registration.legalName ?? t.registration.none}</bdi></Field>
+              <Field label={t.registration.activities}>
+                {registration.activities.length > 0
+                  ? registration.activities.map((key) => activityLabels[key] ?? key).join("، ")
+                  : t.registration.none}
+              </Field>
+              <Field label={t.registration.description}><bdi dir="auto">{registration.description ?? t.registration.none}</bdi></Field>
+              {registration.branches.map((b, i) => (
+                <div key={b.id} className="flex min-w-0 flex-col gap-md tablet:col-span-2 tablet:grid tablet:grid-cols-2">
+                  <Field label={`${t.registration.location}${registration.branches.length > 1 ? ` (${i + 1})` : ""}`}>
+                    {describeLocation({ governorate: b.governorate, city: b.city, cityCustomName: b.cityCustomName }, locale) ?? t.registration.none}
+                  </Field>
+                  <Field label={t.registration.address}><bdi dir="auto">{b.address ?? t.registration.none}</bdi></Field>
+                </div>
+              ))}
+            </dl>
+          </Card>
+
+          {showApprovalActions ? (
             <Card className="flex flex-col gap-sm">
               <SectionTitle>{m.admin.preview.orgOverview.availableActions}</SectionTitle>
               <div className="flex flex-wrap gap-sm">
@@ -251,6 +286,11 @@ export default async function PreviewOrgDetailPage({
 
       {tab === "verification" ? (
         <section className="flex flex-col gap-md">
+          {meets(access, ["organizations.verify", "verification.approve"]) ? (
+            <Link href={`/admin/business-verification?q=${encodeURIComponent(org.name)}`} className="text-label text-accent hover:underline">
+              {m.businessVerification.admin.title} →
+            </Link>
+          ) : null}
           {org.verifications.length === 0 ? (
             <StatePanel title={m.admin.orgs.noVerifications} />
           ) : (
@@ -265,6 +305,7 @@ export default async function PreviewOrgDetailPage({
                       {formatAdminDate(v.submittedAt, locale)}
                       {v.reason ? ` · ${v.reason}` : ""}
                     </p>
+                    <VerificationHistory events={v.events} locale={locale} labels={m.admin.review.history} />
                   </div>
                   <StatusBadge status={v.status} label={statusLabels[v.status] ?? v.status} />
                 </Card>

@@ -148,7 +148,7 @@ function OverviewMetric({ icon: Icon, value, label, tone }: { icon: ComponentTyp
 
 type MenuOption = { value: string; label: string };
 
-function MenuSelect({
+export function MenuSelect({
   label,
   value,
   placeholder,

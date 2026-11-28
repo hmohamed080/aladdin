@@ -52,12 +52,14 @@
     "title": { "family": "{families.text}", "fontSize": "1.25rem", "fontWeight": 600, "lineHeight": 1.3, "letterSpacing": "-0.01em", "usage": "Card and screen titles." },
     "body-lg": { "family": "{families.text}", "fontSize": "1rem", "fontWeight": 400, "lineHeight": 1.5, "letterSpacing": "0", "usage": "Field values, lead paragraphs. Measure 65-75ch." },
     "body": { "family": "{families.text}", "fontSize": "0.875rem", "fontWeight": 300, "lineHeight": 1.5, "letterSpacing": "0", "usage": "Default UI text and supporting copy." },
-    "label": { "family": "{families.text}", "fontSize": "0.8125rem", "fontWeight": 500, "lineHeight": 1.2, "letterSpacing": "0.02em", "usage": "Field labels, small headers." },
+    "label": { "family": "{families.text}", "fontSize": "0.8125rem", "fontWeight": 500, "lineHeight": 1.2, "letterSpacing": "0.02em", "usage": "Field labels, small headers.", "arabic": { "fontSize": "0.875rem", "lineHeight": 1.4, "letterSpacing": "0" } },
+    "caption": { "family": "{families.text}", "fontSize": "0.75rem", "fontWeight": 400, "lineHeight": 1.35, "letterSpacing": "0.01em", "usage": "Metadata below a label: dates, counts, comparison lines.", "arabic": { "fontSize": "0.8125rem", "lineHeight": 1.45, "letterSpacing": "0" } },
     "mono": { "family": "{families.mono}", "fontSize": "0.8125rem", "fontWeight": 500, "lineHeight": 1.4, "letterSpacing": "0.02em", "usage": "Figures, codes, quantities, EGP." }
   },
   "rules": {
     "matched-script": "Product UI uses Readex Pro so Arabic and Latin share metrics; Archivo/Reem Kufi are brand/headline only. Never mix a Latin-only face into Arabic UI.",
     "figures-are-mono": "EGP, RFQ/quote IDs, and quantities use JetBrains Mono; prose is never mono.",
-    "arabic-emphasis": "Never encode meaning with italics in Arabic; use weight/size/color tokens."
+    "arabic-emphasis": "Never encode meaning with italics in Arabic; use weight/size/color tokens.",
+    "arabic-small-steps": "label and caption take their `arabic` values under lang=ar (CSS variables in tokens.css): Arabic letter bodies render smaller than Latin x-height at the same size, and positive tracking breaks joining."
   }
 }

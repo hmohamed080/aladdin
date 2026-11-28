@@ -172,8 +172,9 @@ test.describe("manager — daily sales workflow", () => {
     await expect(szLink).toBeVisible(); // visible at "all branches"
     await expect(cairoLink.first()).toBeVisible();
 
-    // The shell branch selector (header, first on the page) → Cairo.
-    const branch = page.getByLabel(/branch|الفرع/i).first();
+    // The shell branch selector → Cairo. Its visible face is a button that repeats the "Branch" name, so target the
+    // native select it drives (the only one with an "all branches" option).
+    const branch = page.locator('select:has(option[value="all"])').first();
     const cairo = branch.locator("option", { hasText: /cairo|القاهرة/i });
     await branch.selectOption({ label: (await cairo.textContent())!.trim() });
 
@@ -185,14 +186,26 @@ test.describe("manager — daily sales workflow", () => {
   test("language switch flips <html dir>; theme switch flips the dark class", async ({ page }) => {
     desktopOnly();
     const html = page.locator("html");
-    const dir0 = await html.getAttribute("dir");
-    await page.getByRole("button", { name: /language|اللغة|EN|ع/i }).first().click();
-    await expect(html).not.toHaveAttribute("dir", dir0 ?? "");
 
+    // Theme first, on a settled page: the toggle flips the class at once and the choice survives a reload.
     const wasDark = (await html.getAttribute("class"))?.includes("dark") ?? false;
-    await page.getByRole("button", { name: /theme|المظهر/i }).first().click();
+    await page.getByTestId("theme-switch").filter({ visible: true }).first().click();
     if (wasDark) await expect(html).not.toHaveClass(/dark/);
     else await expect(html).toHaveClass(/dark/);
+    // The class flips before the preference is saved; reload only once the cookie holds the new choice.
+    const want = wasDark ? "light" : "dark";
+    await expect
+      .poll(async () => (await page.context().cookies()).find((c) => c.name === "aladdin-theme")?.value)
+      .toBe(want);
+    await page.reload();
+    if (wasDark) await expect(html).not.toHaveClass(/dark/);
+    else await expect(html).toHaveClass(/dark/);
+
+    // The workspace header keeps language in the account menu (one place, same cookie).
+    const dir0 = await html.getAttribute("dir");
+    await page.getByTestId("profile-menu-trigger").click();
+    await page.getByTestId(dir0 === "rtl" ? "locale-en" : "locale-ar").click();
+    await expect(html).not.toHaveAttribute("dir", dir0 ?? "");
   });
 
   test("mobile bottom navigation reaches the sections", async ({ page }) => {
@@ -212,9 +225,12 @@ test.describe("manager — daily sales workflow", () => {
 test.describe("branch-limited salesperson — scope enforcement", () => {
   test("out-of-scope record is absent from the list and its direct URL is blocked", async ({ page, request }) => {
     desktopOnly();
-    await signIn(page, request, IDENTITIES.branchLimited);
+    // Karim also holds a personal persona, so sign-in may land on either surface; the check below must run inside his
+    // business workspace, so /b2b/leads has to stay on /b2b/leads.
+    await signIn(page, request, IDENTITIES.branchLimited, /\/(b2b|home)(\/|$)/);
 
     await page.goto("/b2b/leads");
+    await expect(page).toHaveURL(/\/b2b\/leads$/);
     await expect(page.getByRole("main").getByText(/Sheikh Zayed|شيخ زايد/i)).toHaveCount(0);
 
     // Locate a Sheikh Zayed lead via service-role (test harness only) and prove the

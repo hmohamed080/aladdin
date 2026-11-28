@@ -1,5 +1,5 @@
 import { test, expect, chromium } from "@playwright/test";
-import { messageIdsFor, readNewOtp } from "./helpers/auth";
+import { messageIdsFor, readNewOtp, SIGN_IN_BUTTON, SIGN_IN_IDENTIFIER_LABEL } from "./helpers/auth";
 import { createConfirmedAccount } from "./helpers/fixtures";
 
 /**
@@ -13,7 +13,8 @@ function uniqueEmail(tag: string): string {
   return `pw-replay-${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 }
 
-const BASE_URL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${process.env.E2E_PORT ?? 3100}`;
+/** The running config's baseURL (Node on 3100, Workers on 3300); hand-made contexts do not inherit it. */
+const baseUrl = () => test.info().project.use.baseURL;
 
 /** Real local browser cookie limits this repo cares about (RFC 6265 practical minimums; Chrome/Firefox both enforce ~4096 bytes per cookie). */
 const PRACTICAL_COOKIE_BYTE_LIMIT = 4096;
@@ -23,7 +24,7 @@ async function reachRecoveryScreen3(
   request: import("@playwright/test").APIRequestContext,
   tag: string,
 ): Promise<{ email: string; context: import("@playwright/test").BrowserContext; page: import("@playwright/test").Page; grantValue: string }> {
-  const context = await browser.newContext({ baseURL: BASE_URL });
+  const context = await browser.newContext({ baseURL: baseUrl() });
   const page = await context.newPage();
 
   // An existing, confirmed account is all recovery needs; registration itself
@@ -49,13 +50,13 @@ async function reachRecoveryScreen3(
 }
 
 async function signInWorks(browser: import("@playwright/test").Browser, email: string, password: string): Promise<boolean> {
-  const context = await browser.newContext({ baseURL: BASE_URL });
+  const context = await browser.newContext({ baseURL: baseUrl() });
   const page = await context.newPage();
   await page.goto("/auth/sign-in");
-  await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+  await page.getByLabel(SIGN_IN_IDENTIFIER_LABEL).fill(email);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
   // Sign In has no CAPTCHA.
-  await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
+  await page.getByRole("button", { name: SIGN_IN_BUTTON }).click();
   await page.waitForTimeout(1500);
   const works = !/sign-in/.test(page.url());
   await context.close();
@@ -89,7 +90,7 @@ test("recovery grant: at most one of two concurrent replays (copied into isolate
   // Copy the EXACT encrypted cookie value into a second, fully isolated
   // browser context — simulating an attacker (or a duplicate tab/device)
   // who intercepted or otherwise obtained the raw grant value.
-  const ctxB = await browser.newContext({ baseURL: BASE_URL });
+  const ctxB = await browser.newContext({ baseURL: baseUrl() });
   await ctxB.addCookies([
     {
       name: "pwr_grant",

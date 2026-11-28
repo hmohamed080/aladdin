@@ -24,7 +24,7 @@ flow and private saved-item images are preserved. JPEG/PNG/WebP only, two images
 per item, 5 MB each; PDF and pre-save uploading remain unsupported. No token,
 shared-shell, schema or deployment change belongs to this entry. TypeScript, focused lint and six composer tests pass; this is not a release-readiness claim.
 
-## 1.1.0 — 2026-10-19 — Engineer account theme
+## 1.3.0 — 2026-11-28 — Engineer account theme (authored 2026-10-19)
 
 Added: owner-approved engineer palette in `tokens/engineer.json` and its scoped semantic CSS mapping. The colors are sand `#D8C7A6`, terracotta `#B96F52`, cream `#F2E9D8`, and navy `#071A2D`.
 
@@ -33,6 +33,20 @@ Changed: engineer home/profile/navigation, quotation composer, discovery and per
 Fixed: explicit hero text contrast and complete shell/canvas token mapping. Both theme variants retain the same four brand primitives.
 
 Migration notes: the theme applies only within `.engineer-surface`; other account surfaces keep their existing token values. New business response screens reuse the business theme. Browser responsive and theme checks must pass before the feature is marked ready.
+## 1.2.0 — 2026-11-15 — Brand-landing palette registered
+
+### Added
+- **`brandLanding` scope** in [`tokens/colors.json`](./tokens/colors.json): four owner-approved primitives for the public landing page `/` only — `landing-navy` `#071A2D`, `landing-sand` `#D8C7A6`, `landing-terra` `#B96F52`, `landing-cream` `#F2E9D8` — mirrored in `DESIGN.md` frontmatter, `frontend/src/styles/tokens.css` (`--landing-*`) and Tailwind `brand.landing-*`.
+- The landing consumes them through scoped `--lb-*` variables; every other tone on that page (soft grounds, hairlines, secondary text, shadows, scrims) is a `color-mix()` or an alpha of those four. No white, black or other hue.
+
+### Changed
+- `terra` measures 3.3:1 on cream, so small accent text uses the derived `terra-text` (terra mixed with navy, >= 4.5:1); terra itself is kept for icons, step numbers and fills.
+
+### Migration notes
+- Product UI is unaffected and keeps consuming the semantic tokens. The landing is light-only and Arabic-RTL by owner decision; it has no dark counterpart.
+- `tokens/colors.json` already carried `1.1.0` without a changelog entry; this entry supersedes it.
+
+---
 
 ## 1.0.0 — 2026-08-01 — Foundation finalized & hardened
 

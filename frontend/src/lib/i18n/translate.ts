@@ -1,26 +1,15 @@
 import type { Locale } from "./locales";
-import { formatNumber } from "@/lib/ui/format";
 import { en, type Messages } from "./messages/en";
 import { ar } from "./messages/ar";
+import { translatorFor, type TranslateFn } from "./translate-core";
+
+export type { TranslateFn };
 
 const CATALOGS: Record<Locale, Messages> = { en, ar };
 
 export function getMessages(locale: Locale): Messages {
   return CATALOGS[locale];
 }
-
-/** Resolve a dotted key (e.g. "leads.stages.new") against a catalog. */
-function lookup(messages: Messages, key: string): string {
-  const value = key.split(".").reduce<unknown>((acc, part) => {
-    if (acc && typeof acc === "object" && part in (acc as Record<string, unknown>)) {
-      return (acc as Record<string, unknown>)[part];
-    }
-    return undefined;
-  }, messages);
-  return typeof value === "string" ? value : key;
-}
-
-export type TranslateFn = (key: string, vars?: Record<string, string | number>) => string;
 
 /**
  * Build a `t()` bound to a locale, with `{placeholder}` interpolation.
@@ -42,15 +31,15 @@ export type TranslateFn = (key: string, vars?: Record<string, string | number>) 
  * is visible in the diff rather than an accident of a coercion.
  */
 export function createTranslator(locale: Locale): TranslateFn {
+  return translatorFor(getMessages(locale), locale);
+}
+
+/**
+ * The top-level namespaces of `locale`'s catalog, and nothing else — what a
+ * Server Component hands `I18nMessagesProvider` so the client receives only the
+ * strings its Client Components actually look up, in one language.
+ */
+export function pickMessages<K extends keyof Messages>(locale: Locale, namespaces: readonly K[]): Pick<Messages, K> {
   const messages = getMessages(locale);
-  return (key, vars) => {
-    let out = lookup(messages, key);
-    if (vars) {
-      for (const [name, val] of Object.entries(vars)) {
-        const text = typeof val === "number" ? formatNumber(val, locale) : val;
-        out = out.replaceAll(`{${name}}`, text);
-      }
-    }
-    return out;
-  };
+  return Object.fromEntries(namespaces.map((ns) => [ns, messages[ns]])) as Pick<Messages, K>;
 }

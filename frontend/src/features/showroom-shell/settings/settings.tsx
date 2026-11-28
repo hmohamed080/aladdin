@@ -11,8 +11,10 @@ import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import { formatCount } from "@/lib/ui/format";
 import { maskEmail } from "@/lib/ui/mask-email";
 import { isCraftsmanLoginAlias, userFacingEmail } from "@/lib/auth/craftsman-login-alias";
+import { getCurrentUser } from "@/server/auth/session";
 import { OrganizationIdentityDialog } from "@/features/organization/organization-identity-dialog";
 import { BranchGovernance } from "@/features/organization/branch-governance";
+import { describeLocation, type BranchLocationValue } from "@/lib/location/describe-location";
 import { IdentityChangePanel } from "@/features/organization/identity-change-panel";
 import { ActivitySelector } from "@/features/profile/activity-selector";
 import { IdentityCard } from "@/features/settings/identity-card";
@@ -22,8 +24,12 @@ import { loadMyIdentity } from "@/server/queries/profile-identity";
 import { loadOrganizationImageUrl } from "@/server/queries/organization-image";
 import { OrganizationImageField } from "@/features/organization/organization-image-field";
 import { OrganizationDescriptionField } from "@/features/organization/organization-description-field";
+import { OrganizationLegalNameField } from "@/features/organization/organization-legal-name-field";
+import { OrganizationSocialLinksField } from "@/features/organization/organization-social-links-field";
+import { OrganizationContactCard } from "@/features/organization/organization-contact-card";
+import { getOwnOrganizationContact } from "@/server/queries/contacts";
 import { setOrganizationActivitiesAction } from "@/server/actions/activities";
-import { BadgeCheckIcon, BuildingIcon, LayersIcon, MapPinIcon, SettingsIcon, ShieldIcon, TagIcon, UsersIcon, UserIcon, HelpIcon } from "@/components/ui/icons";
+import { BadgeCheckIcon, BuildingIcon, LayersIcon, MapPinIcon, PhoneIcon, SettingsIcon, ShieldIcon, TagIcon, UsersIcon, UserIcon, HelpIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/ui/cn";
 import { SHOWROOM_ROOT } from "@/features/showroom-shell/navigation";
 import type { requireShowroomContext } from "../context";
@@ -104,7 +110,7 @@ export async function ShowroomSettings({ ctx, locale, section: rawSection }: { c
           {section === "activities" ? <ActivitiesSection ctx={ctx} locale={locale} /> : null}
           {section === "branches" ? <BranchesSection ctx={ctx} locale={locale} canManageBranches={canManageBranches} /> : null}
           {section === "access" ? <AccessSection ctx={ctx} locale={locale} canManagePeople={canManagePeople} /> : null}
-          {section === "account" ? <AccountSection ctx={ctx} locale={locale} /> : null}
+          {section === "account" ? <AccountSection locale={locale} /> : null}
           {section === "appearance" ? <AppearanceSection locale={locale} /> : null}
           {section === "support" ? (
             <Card>
@@ -125,17 +131,20 @@ async function BusinessSection({ ctx, locale, canManageOrg }: { ctx: Ctx; locale
   const { supabase, org } = ctx;
   const m = getMessages(locale);
   const t = createTranslator(locale);
-  const [{ data: record }, identityState, imageUrl] = await Promise.all([
+  const [{ data: record }, identityState, imageUrl, ownContact] = await Promise.all([
     supabase
       .from("organizations")
-      .select("name, org_type, status, is_verified, name_ar, name_en, timezone, description")
+      .select("name, org_type, status, business_verified_at, name_ar, name_en, timezone, description, legal_name, contact_phone, contact_email, facebook_url, instagram_url, tiktok_url, website_url")
       .eq("id", org.organizationId)
       .maybeSingle(),
     // A verified organization's name changes only through a review request (never a direct edit).
     canManageOrg ? loadIdentityState(org.organizationId) : Promise.resolve(null),
     loadOrganizationImageUrl(supabase, org.organizationId),
+    // WhatsApp and the visibility flags (org.manage only); the phone and e-mail below come from the organization itself.
+    canManageOrg ? getOwnOrganizationContact(supabase, org.organizationId) : Promise.resolve(null),
   ]);
-  const verified = record?.is_verified ?? false;
+  // The badge is business verification, not approval of the application (status above).
+  const verified = record?.business_verified_at != null;
   const pending = record?.status === "pending_verification";
   return (
     <>
@@ -150,6 +159,16 @@ async function BusinessSection({ ctx, locale, canManageOrg }: { ctx: Ctx; locale
         </SectionTitle>
         <div className="mt-md"><OrganizationImageField orgId={org.organizationId} imageUrl={imageUrl} canManage={canManageOrg} /></div>
         <div className="mt-md"><OrganizationDescriptionField orgId={org.organizationId} description={record?.description ?? null} canManage={canManageOrg} /></div>
+        <div className="mt-md"><OrganizationLegalNameField orgId={org.organizationId} legalName={record?.legal_name ?? null} canManage={canManageOrg} locked={identityState?.locked ?? false} /></div>
+        {record?.org_type === "showroom_dealer" ? (
+          <div className="mt-md">
+            <OrganizationSocialLinksField
+              orgId={org.organizationId}
+              canManage={canManageOrg}
+              links={{ facebook: record.facebook_url ?? null, instagram: record.instagram_url ?? null, tiktok: record.tiktok_url ?? null, website: record.website_url ?? null }}
+            />
+          </div>
+        ) : null}
         <dl className="mt-md grid gap-md tablet:grid-cols-2">
           <Field label={m.settings.field.name}>{resolveBilingualText(locale, record?.name ?? org.organizationName, record?.name_ar ?? null, record?.name_en ?? null)}</Field>
           <Field label={m.settings.field.type}>{record?.org_type ? m.directory.orgType[record.org_type] : "—"}</Field>
@@ -157,6 +176,25 @@ async function BusinessSection({ ctx, locale, canManageOrg }: { ctx: Ctx; locale
         </dl>
         {canManageOrg && identityState ? <IdentityChangePanel orgId={org.organizationId} view={identityState} /> : null}
         <p className="mt-md border-t pt-sm text-label text-fg-muted">{canManageOrg ? m.settings.businessNote : t("showroomSettings.readOnlyNote")}</p>
+      </Card>
+
+      <Card>
+        <SectionTitle icon={<PhoneIcon size={18} />}>{t("showroomSettings.contact.title")}</SectionTitle>
+        <div className="mt-md">
+          <OrganizationContactCard
+            orgId={org.organizationId}
+            canManage={canManageOrg}
+            phoneRequired={record?.org_type === "showroom_dealer"}
+            contact={{
+              phone: record?.contact_phone ?? ownContact?.phone_e164 ?? null,
+              whatsapp: ownContact?.whatsapp_e164 ?? null,
+              email: record?.contact_email ?? ownContact?.contact_email ?? null,
+              showPhone: ownContact?.show_phone ?? false,
+              showWhatsapp: ownContact?.show_whatsapp ?? false,
+              showEmail: ownContact?.show_email ?? false,
+            }}
+          />
+        </div>
       </Card>
 
       <Card>
@@ -171,6 +209,11 @@ async function BusinessSection({ ctx, locale, canManageOrg }: { ctx: Ctx; locale
           </div>
           <p className="text-body text-fg-secondary">{verified ? m.settings.verifiedBody : m.settings.unverifiedBody}</p>
           {pending ? <p className="text-label text-fg-muted">{m.settings.verificationPending}</p> : null}
+          {canManageOrg ? (
+            <Link href={`${SHOWROOM_ROOT}/verification`} className={buttonLink} data-testid="settings-business-verification-link">
+              <BadgeCheckIcon size={16} />{t("businessVerification.owner.title")}
+            </Link>
+          ) : null}
         </div>
       </Card>
     </>
@@ -200,11 +243,15 @@ async function BranchesSection({ ctx, locale, canManageBranches }: { ctx: Ctx; l
   const [{ data: record }, { data: branchRows }, managed] = await Promise.all([
     supabase.from("organizations").select("status, timezone").eq("id", org.organizationId).maybeSingle(),
     org.branches.length > 0
-      ? supabase.from("branches").select("id, name, name_ar, name_en, address_ar, address_en, timezone").in("id", org.branches.map((b) => b.id))
+      ? supabase.from("branches").select("id, name, name_ar, name_en, address_ar, address_en, timezone, governorate_key, city_key, city_custom_name").in("id", org.branches.map((b) => b.id))
       : Promise.resolve({ data: [] as never[] }),
     canManageBranches ? loadManagedBranches(org.organizationId) : Promise.resolve([]),
   ]);
   const details = new Map((branchRows ?? []).map((b) => [b.id, b]));
+  // The governorate / city given at registration, per branch (read under the caller's own RLS).
+  const locations: Record<string, BranchLocationValue> = Object.fromEntries(
+    (branchRows ?? []).map((b) => [b.id, { governorate: b.governorate_key, city: b.city_key, cityCustomName: b.city_custom_name }]),
+  );
   return (
     <Card>
       <SectionTitle icon={<MapPinIcon size={18} />}>
@@ -215,7 +262,7 @@ async function BranchesSection({ ctx, locale, canManageBranches }: { ctx: Ctx; l
       </SectionTitle>
       <div className="mt-md">
         {canManageBranches ? (
-          <BranchGovernance m={m} orgId={org.organizationId} rows={managed} orgIsApproved={record?.status === "active"} />
+          <BranchGovernance m={m} orgId={org.organizationId} rows={managed} orgIsApproved={record?.status === "active"} locations={locations} />
         ) : org.branches.length === 0 ? (
           <p className="text-body text-fg-muted">{m.settings.noBranches}</p>
         ) : (
@@ -227,6 +274,7 @@ async function BranchesSection({ ctx, locale, canManageBranches }: { ctx: Ctx; l
               return (
                 <li key={b.id} className="flex flex-col gap-1 rounded-sm bg-surface-2/50 px-3 py-2 text-body text-fg-secondary">
                   <span className="flex min-w-0 items-center gap-2"><MapPinIcon size={15} /><span className="min-w-0 truncate">{name}</span></span>
+                  {describeLocation(locations[b.id], locale) ? <span className="ms-6 text-label text-fg-muted" data-testid="branch-location">{describeLocation(locations[b.id], locale)}</span> : null}
                   <span className="ms-6 text-label text-fg-muted">{tz}</span>
                 </li>
               );
@@ -262,13 +310,13 @@ function AccessSection({ ctx, locale, canManagePeople }: { ctx: Ctx; locale: Loc
   );
 }
 
-async function AccountSection({ ctx, locale }: { ctx: Ctx; locale: Locale }) {
-  const [identity, { data: auth }] = await Promise.all([loadMyIdentity(), ctx.supabase.auth.getUser()]);
+async function AccountSection({ locale }: { locale: Locale }) {
+  const [identity, authUser] = await Promise.all([loadMyIdentity(), getCurrentUser()]);
   const m = getMessages(locale);
   // An installer phone account's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
-  const visible = userFacingEmail(auth.user?.email);
+  const visible = userFacingEmail(authUser?.email);
   const signInEmail = visible ? maskEmail(visible) : null;
-  const phonePassword = isCraftsmanLoginAlias(auth.user?.email);
+  const phonePassword = isCraftsmanLoginAlias(authUser?.email);
   const t = createTranslator(locale);
   return (
     <>

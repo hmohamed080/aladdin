@@ -27,6 +27,31 @@ export const IDENTITIES = {
 
 const MAILPIT = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
 
+/**
+ * Offline sandboxes only (E2E_STUB_TURNSTILE=1): challenges.cloudflare.com is unreachable there, so the
+ * REAL widget never loads and never mints a token. This serves a stand-in `window.turnstile` that hands
+ * the widget a dummy token, the same stub pr88-admin-showroom and installer-phone-auth use. Sign In
+ * forwards the token to the local GoTrue, which has [auth.captcha] OFF; flows the APP verifies with
+ * Siteverify (Create Account, Forgot Password) still need the real network and still fail closed.
+ * Unset (the default), nothing is stubbed.
+ */
+/**
+ * E2E_STUB_TURNSTILE_DELAY_MS (default 0) makes the stand-in mint its token that much later, like the real
+ * widget does, so a test that submits before the token exists fails offline exactly as it does online.
+ */
+export const TURNSTILE_STUB_DELAY_MS = Number(process.env.E2E_STUB_TURNSTILE_DELAY_MS ?? 0) || 0;
+const TURNSTILE_STUB = `window.turnstile={render:function(el,o){setTimeout(function(){o.callback("XXXX.DUMMY.TOKEN.XXXX")},${TURNSTILE_STUB_DELAY_MS});return "local-test"},remove:function(){},reset:function(){}};`;
+const stubbedContexts = new WeakSet<object>();
+export async function stubTurnstileWhenOffline(page: Page): Promise<void> {
+  if (process.env.E2E_STUB_TURNSTILE !== "1") return;
+  const context = page.context();
+  if (stubbedContexts.has(context)) return;
+  stubbedContexts.add(context);
+  await context.route("https://challenges.cloudflare.com/turnstile/v0/api.js*", (route) =>
+    route.fulfill({ contentType: "application/javascript", body: TURNSTILE_STUB }),
+  );
+}
+
 type MailpitMessage = { ID: string; To: Array<{ Address: string }> };
 
 async function messagesFor(request: APIRequestContext, email: string): Promise<MailpitMessage[]> {
@@ -84,6 +109,11 @@ export async function readNewOtp(
  * through `/auth/sign-up` choose it themselves. Never a production credential.
  */
 export const E2E_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
+/** The one sign-in field and the sign-up contact field (ADR-0025), EN and AR. */
+export const SIGN_IN_IDENTIFIER_LABEL = /^mobile number or email$|^رقم الموبايل أو البريد الإلكتروني$/i;
+export const SIGN_UP_CONTACT_LABEL = /^mobile number or email$|^رقم الموبايل أو البريد الإلكتروني$/i;
+export const SIGN_IN_BUTTON = /^log in$|^تسجيل الدخول$/i;
+export const SIGN_UP_BUTTON = /^sign up$|^تسجيل$/i;
 
 /**
  * Sign in through the REAL canonical Email + Password flow (`/auth/sign-in`,
@@ -97,18 +127,83 @@ export async function signIn(
   expectedLanding: RegExp = /\/b2b(\/|$)/,
   password: string = E2E_PASSWORD,
 ): Promise<void> {
+  await stubTurnstileWhenOffline(page);
   await page.goto("/auth/sign-in");
-  await page.getByLabel(/^email address$|^البريد الإلكتروني$/i).fill(email);
+  await page.getByLabel(SIGN_IN_IDENTIFIER_LABEL).fill(email);
   // Anchored: the "Show password" toggle is labelled too.
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
   // PR #84: sign-in forwards a Turnstile token to GoTrue and refuses an unchallenged request, so wait for the REAL widget
   // (always-pass TEST site key locally) to produce it before submitting.
   await waitForCaptchaToken(page);
-  await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
+  await page.getByRole("button", { name: SIGN_IN_BUTTON }).click();
 
   // Wait on the URL committing, not the full "load" event — under sustained
   // full-suite load the load event can lag far behind an interactive page.
-  await page.waitForURL(expectedLanding, { waitUntil: "commit" });
+  await reachLanding(page, expectedLanding);
+}
+
+const ACCOUNT_BASICS_URL = /\/onboarding\/basics(\?|$)/;
+
+/**
+ * Waits for `landing`, completing the one-time "Complete your account" screen
+ * (ADR-0026: phone, governorate + town, specialties) through the REAL form if
+ * the account is sent there first. Only the sections the account still misses
+ * are on the page.
+ */
+export async function reachLanding(page: Page, landing: RegExp, timeout = 20_000): Promise<void> {
+  const onBasics = (url: URL) => ACCOUNT_BASICS_URL.test(url.pathname + url.search);
+  await page.waitForURL((url) => onBasics(url) || landing.test(url.href), { waitUntil: "commit", timeout });
+  if (onBasics(new URL(page.url()))) {
+    await completeAccountBasics(page);
+    await page.waitForURL(landing, { waitUntil: "commit", timeout });
+  }
+}
+
+/**
+ * Answers the basics steps (ADR-0026: one step per missing item - phone, then
+ * governorate + town, then specialties) through the REAL form. Only the steps
+ * the account still misses are shown; the last Continue saves and leaves.
+ */
+export async function completeAccountBasics(page: Page): Promise<void> {
+  await expect(page.getByText(/complete your account|أكمل حسابك/i).first()).toBeVisible();
+  const sections = page.locator("form section");
+  for (let step = 0; step < 3 && ACCOUNT_BASICS_URL.test(new URL(page.url()).pathname + new URL(page.url()).search); step++) {
+    const index = await sections.evaluateAll((els) => els.findIndex((el) => !(el as HTMLElement).hidden));
+    if (index < 0) break;
+    const current = sections.nth(index);
+    const phone = current.locator('input[name="phone"]');
+    if (await phone.count()) await phone.fill(`010${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`);
+    const governorate = current.locator('select[name="governorate"]');
+    if (await governorate.count()) {
+      await governorate.selectOption("cairo");
+      await current.locator("select#city").selectOption("new-cairo");
+    }
+    const specialty = current.locator("select#specialtyAdd");
+    if (await specialty.count()) await specialty.selectOption({ index: 1 });
+    await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
+    // The answered step hides (or the page leaves once the last one saves). The last save lands on a route that `next dev` compiles on first
+    // hit ("Rendering..."), which takes well over the 10 s default; a production build answers at once.
+    await expect(current).toBeHidden({ timeout: 60_000 });
+  }
+}
+
+/** Business setup: picks the first activity of the business type's own list, when this step asks for it. */
+export async function pickBusinessActivity(page: Page): Promise<void> {
+  const activity = page.locator("#bactivity");
+  if (!(await activity.count())) return;
+  await activity.selectOption({ index: 1 });
+}
+
+/** Business setup: answers the owner's own mobile number step, when a first business registration still owes it. */
+export async function answerBusinessContactIfAsked(page: Page): Promise<void> {
+  const heading = page.getByRole("heading", { name: /^how to reach you$|^كيف نتواصل معك$/i });
+  const branch = page.getByRole("heading", { name: /your primary branch/i });
+  await expect(heading.or(branch)).toBeVisible();
+  if (!(await heading.isVisible())) return;
+  const phone = page.locator("#ownerPhone");
+  if (await phone.count()) await phone.fill(`10${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`);
+  await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
+  await expect(branch).toBeVisible();
 }
 
 /**
@@ -166,7 +261,7 @@ export async function accountTypeOptions(page: Page): Promise<Array<{ text: stri
 
 /**
  * Register a brand-new account through the REAL canonical `/auth/sign-up`
- * (Full Name, email, username, account type, password, consents, Turnstile)
+ * (email, password, Full Name, account type, Turnstile)
  * and its OTP confirmation, then wait for the app landing. Leaves the browser
  * signed in; the account's password is `E2E_PASSWORD`.
  */
@@ -175,28 +270,23 @@ export async function registerWithPassword(
   request: APIRequestContext,
   {
     email,
-    username,
     displayName = "E2E Tester",
     accountType = /craftsmen|الصنايعية/i,
     landing = /\/(home|b2b)(\/|$|\?)/,
-  }: { email: string; username: string; displayName?: string; accountType?: RegExp; landing?: RegExp },
+  }: { email: string; displayName?: string; accountType?: RegExp; landing?: RegExp },
 ): Promise<void> {
+  await stubTurnstileWhenOffline(page);
   await page.goto("/auth/sign-up");
-  await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill(displayName);
-  await page.getByLabel(/^email address$|^البريد الإلكتروني$/i).fill(email);
-  await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
-  await selectAccountType(page, accountType);
+  await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(email);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(E2E_PASSWORD);
-  await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(E2E_PASSWORD);
-  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-  await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+  await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill(displayName);
+  await selectAccountType(page, accountType);
   const seen = await messageIdsFor(request, email);
   await waitForCaptchaToken(page);
-  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-  await expect(page.getByText(/next step|الخطوة التالية/i)).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
+  await expect(page.getByRole("heading", { name: /verify your email|تحقق من بريدك الإلكتروني/i })).toBeVisible({ timeout: 20_000 });
   const code = await readNewOtp(request, email, seen);
   await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
   await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
-  await page.waitForURL(landing, { waitUntil: "commit", timeout: 20_000 });
+  await reachLanding(page, landing);
 }

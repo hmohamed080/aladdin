@@ -33,9 +33,9 @@ function required(name: string): string {
 const PERSONAS: Persona[] = [
   {
     name: "installer / craftsman",
-    signInPath: "/installer/sign-in",
+    signInPath: "/auth/sign-in",
     fillCredentials: async (page) => {
-      await page.locator('input[name="phone"]').fill(required("SMOKE_INSTALLER_PHONE"));
+      await page.locator('input[name="identifier"]').fill(required("SMOKE_INSTALLER_PHONE"));
       await page.locator('input[name="password"]').fill(required("SMOKE_INSTALLER_PASSWORD"));
     },
     paths: ["/home", "/home/jobs", "/home/work", "/home/settings"],
@@ -44,7 +44,7 @@ const PERSONAS: Persona[] = [
     name: "business / poster",
     signInPath: "/auth/sign-in",
     fillCredentials: async (page) => {
-      await page.locator('input[name="email"]').fill(required("SMOKE_BUSINESS_EMAIL"));
+      await page.locator('input[name="identifier"]').fill(required("SMOKE_BUSINESS_EMAIL"));
       await page.locator('input[name="password"]').fill(required("SMOKE_BUSINESS_PASSWORD"));
     },
     paths: ["/b2b", "/b2b/jobs"],

@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# APPLIES the pending migrations of ONE named plan to ACCEPTANCE (nxossqhdfltcqdwvbewi) ONLY, with every gate before and after.
+# Re-pinned 2026-11-11 to the actual Acceptance history (207 applied, latest 20261107090006). Plans: see acceptance-gate.mjs.
+#   media      apply 20261110090001 only (Track C media ids-only keys)          207 -> 208
+#   m1         apply 20261110090002 only (P1 M1); media must already be applied 208 -> 209
+#   media+m1   apply both, in order, one plain push                             207 -> 209
+#   media-notify 20261121090001..003 (media caps, upload limits, notification templates), one plain push 232 -> 235. Creates tables:
+#              needs --backup-label of a FRESH restore-verified snapshot (>= 232 migrations); runs only from origin/main.
+#   registration-gate 20261122090001..002 (Admin registration state, central registration gate in the pre-request hook; ADR-0031), one plain push
+#              235 -> 237. FUNCTION-ONLY: no backup required; recovery is the pinned forward-fix. After it, run registration-gate-smoke.mjs (owner).
+#   marketplace-v2 20261123090001, 100001, 120001, 130001, 150001, 160001, 160002 (seller approval v2, product review, delivery/payment settings, publication gate v2,
+#              public catalog v2, product video; PRs #238-#241, #246, #249), one plain push 237 -> 244. Creates 6 tables, columns, constraints and seeds rows: needs
+#              --backup-label of a FRESH restore-verified snapshot (>= 237 migrations; none is pinned yet) and runs only from origin/main. Before and after the push this script
+#              also runs the read-only marketplace-v2-smoke.sql; after it the owner runs marketplace-v2-smoke.mjs http. See docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md.
+#   marketplace-slug 20261124090001 (seller public slug: 2 functions, 1 trigger, backfill of organizations.slug for approved sellers without one; PR #252), one plain push
+#              + 20261124120001 (stock notifications show the product name in the language of the text; EXPAND-only: one function replaced, 2 template DEFAULT texts), 2 migrations,
+#              244 -> 246, on top of marketplace-v2. No table DDL, only NULL slugs are filled: no backup label required (the pinned forward-fix marketplace-slug is the recovery; the
+#              backfilled slugs are data and stay). Before and after the push this script runs the read-only marketplace-slug-smoke.sql and marketplace-stock-notify-smoke.sql. See docs/operations/MARKETPLACE_SLUG_ACCEPTANCE_PLAN_20261124.md.
+#   marketplace 14 migrations (20261116100001..014), one plain push                          218 -> 232. Creates tables: needs
+#              --backup-label of a FRESH restore-verified snapshot (>= 218 migrations) and runs only from origin/main (merge #190, #192, #200 and the 20261116090001 work first).
+#   marketplace-orders the 18 migrations 20261125090001..20261126120002 (checkout and order model, invoices, payment complaints, timers, returns, publisher guard, upload
+#              limits, backup ledger, search_path), one plain push 246 -> 264. Creates 21 tables and maps the finished legacy orders to the new payment values: needs
+#              --backup-label of a FRESH restore-verified snapshot (>= 246 migrations) and runs only from origin/main. Before and after the push this script runs the
+#              read-only marketplace-orders-smoke.sql. See docs/operations/MARKETPLACE_ORDERS_ACCEPTANCE_PLAN_20261126.md.
+# NOT to be run without the owner's separate explicit GO. Production is refused. Never uses --include-all, repair or reset.
+#   bash scripts/hosted-db/acceptance-apply.sh --plan <plan> --sha <full 40-char origin/main sha> [--backup-label <pinned restore-verified snapshot>]
+#   No backup label is required: every plan's migrations are function-only (no table DDL, no DML, no stored row rewritten) and each has a
+#   locally tested forward-fix pinned by sha256 (acceptance-gate.mjs recovery), checked before the password prompt. They DO change runtime
+#   behaviour, so the forward-fix, not a data restore, is the recovery path. --backup-label is optional and only accepted for the pinned
+#   restore-verified snapshot, which is a HISTORICAL reference, not a current recovery point. A fresh restore-tested backup is mandatory
+#   before M2, M3, Auth metadata cleanup, audit-log redaction, the Track C media copy (media_migration_switch) and any Production step.
+# NOT to be run without the owner's separate explicit GO. Production is refused. Never uses --include-all, repair or reset.
+#   bash scripts/hosted-db/acceptance-apply.sh --plan <plan> --sha <full 40-char origin/main sha> [--backup-label <pinned restore-verified snapshot>]
+#   m1 and m3a need NO backup label: it is function-only and its tested forward-fix is pinned by sha256 (acceptance-gate.mjs recovery).
+#   media and media+m1 need --backup-label of a pinned restore-verified snapshot (no fresh backup required; it is a HISTORICAL reference,
+#   not a current recovery point). A fresh restore-tested backup is mandatory before M2, M3, Auth metadata cleanup, audit-log redaction.
+# Order: checkout gates -> password (hidden) -> link -> PRE checks (history, dry run, permissions vs the plan's pre contract,
+#        table counts, structure, catalog fingerprint) -> typed confirmation -> `supabase db push --linked` -> POST checks
+#        (history, permissions vs the plan's post contract, structure, counts, catalog fingerprint: exactly the plan's
+#        functions changed and nothing else). PASS is printed only when every check succeeded.
+# If the push itself fails: nothing is retried. Each migration file is its own transaction, so history stops at the first
+# failing file; the script prints the state it can read and stops. Recovery = the pinned forward-fix for the plan as a new migration (owner decision); a data restore is not the path for function-only plans.
+set -euo pipefail
+set +x
+umask 077
+export LC_ALL=C
+ACC="nxossqhdfltcqdwvbewi"; PROD="kkpkgjrweysgvhvkhzun"
+PLAN=""; SHA=""; LABEL=""
+while [ $# -gt 0 ]; do case "$1" in --plan) PLAN="${2:-}"; shift 2;; --sha) SHA="${2:-}"; shift 2;; --backup-label) LABEL="${2:-}"; shift 2;; *) echo "unknown argument $1"; exit 2;; esac; done
+[[ "$PLAN" =~ ^(media|m1|m3a|media\+m1|marketplace|marketplace-orders|media-notify|registration-gate|marketplace-v2|marketplace-slug)$ ]] || { echo "usage: --plan media|m1|m3a|media+m1|marketplace|marketplace-orders|media-notify|registration-gate|marketplace-v2|marketplace-slug --sha <40-char sha> [--backup-label <label>]"; exit 2; }
+[[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: --plan <plan> --sha <40-char sha> [--backup-label <label>]"; exit 2; }
+[ -z "$LABEL" ] || [[ "$LABEL" =~ ^aladdin-acceptance-[0-9]{8}T[0-9]{6}Z$ ]] || { echo "--backup-label must look like aladdin-acceptance-YYYYMMDDTHHMMSSZ"; exit 2; }
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# Plan facts come from acceptance-gate.mjs (single source): PRE_CONTRACT POST_CONTRACT N_PENDING POST_APPLIED LATEST EXPECT_CHANGED PENDING_VERSIONS
+eval "$(node "$HERE/acceptance-gate.mjs" describe "$PLAN")"
+
+OUT=""; STEP="start"; PUSHED=0
+cleanup() { rc=$?; [ -n "$OUT" ] && rm -rf "$OUT"; rm -rf supabase/.temp 2>/dev/null || true; unset SUPABASE_DB_PASSWORD 2>/dev/null || true
+  if [ "$rc" -ne 0 ]; then
+    if [ "$PUSHED" = 1 ]; then echo "FAIL at step '$STEP' (exit $rc) AFTER the push started. Do NOT retry blindly: check 'supabase migration list --linked', then forward-fix (scripts/hosted-db/forward-fix, owner decision)."
+    else echo "FAIL at step '$STEP' (exit $rc). The push had NOT started; nothing was changed in any database."; fi
+  fi; }
+trap cleanup EXIT
+sb() { pnpm exec supabase "$@"; }
+redact() { node -e 'let b="";process.stdin.on("data",d=>b+=d).on("end",()=>{const p=process.env.SUPABASE_DB_PASSWORD;process.stdout.write(p?b.split(p).join("[REDACTED]"):b)})'; }
+run() { STEP="$1"; local o="$2"; shift 3
+  if ! "$@" >"$o" 2>"$OUT/err.txt"; then echo "--- error output (redacted) ---" >&2; tail -n 20 "$OUT/err.txt" | redact >&2; case "$o" in *.out) redact <"$o" >&2;; esac; return 1; fi; }
+
+STEP="repo checks"
+[ -d .git ] && [ -f supabase/config.toml ] && [ -f scripts/hosted-db/acceptance-gate.mjs ] || { echo "Run from the aladdin repository root."; exit 1; }
+git config --get remote.origin.url | grep -q 'hmohamed080/aladdin' || { echo "origin is not hmohamed080/aladdin"; exit 1; }
+git fetch -q origin main
+[ "$(git rev-parse HEAD)" = "$SHA" ] || { echo "REFUSED: HEAD is not $SHA"; exit 1; }
+[ "$(git rev-parse origin/main)" = "$SHA" ] || { echo "REFUSED: $SHA is not the current origin/main"; exit 1; }
+[ -z "$(git status --porcelain --untracked-files=all)" ] || { echo "REFUSED: working tree is not clean"; exit 1; }
+for f in $PENDING_VERSIONS; do ls supabase/migrations/${f}_*.sql >/dev/null; done
+[ -f "supabase/permissions/${POST_CONTRACT}.json" ] || { echo "REFUSED: permission contract ${POST_CONTRACT} is not in this checkout"; exit 1; }
+echo "checkout OK: exact $SHA = origin/main, clean tree; plan $PLAN ($PENDING_VERSIONS)"
+STEP="recovery gate"
+node "$HERE/acceptance-gate.mjs" recovery "$PLAN" "${LABEL:-none}" "$HERE"
+OUT="$(mktemp -d)"
+
+STEP="password prompt"
+read -r -s -p "Acceptance ($ACC) database password (hidden): " SUPABASE_DB_PASSWORD; echo
+[ -n "$SUPABASE_DB_PASSWORD" ] || { echo "empty password"; exit 1; }
+export SUPABASE_DB_PASSWORD
+run "link" "$OUT/link.out" -- sb link --project-ref "$ACC"
+[ "$(cat supabase/.temp/project-ref)" = "$ACC" ] || { echo "REFUSED: not linked to Acceptance"; exit 1; }
+[ "$(cat supabase/.temp/project-ref)" != "$PROD" ] || { echo "REFUSED: linked to Production"; exit 1; }
+
+echo "--- PRE checks (read-only) ---"
+run "pre: migration list" "$OUT/list.json" -- sb migration list --linked --output-format json
+run "pre: dry run (no --include-all)" "$OUT/dry.json" -- sb db push --linked --dry-run --output-format json
+run "pre: acceptance gate" "$OUT/gate.out" -- node scripts/hosted-db/acceptance-gate.mjs "$PLAN" "$OUT/list.json" "$OUT/dry.json" supabase/migrations; cat "$OUT/gate.out"
+run "pre: history guard" "$OUT/guard.out" -- node scripts/migration-history-guard.mjs "$OUT/list.json" --expect plan --dry-run "$OUT/dry.json"
+run "pre: permissions inventory" "$OUT/perms-pre.json" -- sb db query --linked -o json -f scripts/function-permissions.sql
+run "pre: permissions vs $PRE_CONTRACT" "$OUT/perms-pre.out" -- node scripts/hosted-db/verify-permissions-readonly.mjs "$OUT/perms-pre.json" "$PRE_CONTRACT"; cat "$OUT/perms-pre.out"
+run "pre: table counts" "$OUT/counts-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/table-counts.sql
+run "pre: structure" "$OUT/struct-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/acceptance-structure.sql
+run "pre: catalog fingerprint" "$OUT/fp-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/catalog-fingerprint.sql
+if [ "$PLAN" = "marketplace-v2" ]; then
+  run "pre: marketplace-v2 facts" "$OUT/mv2-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-v2-smoke.sql
+  run "pre: marketplace-v2 smoke" "$OUT/mv2-pre.out" -- node scripts/hosted-db/marketplace-v2-smoke.mjs facts pre "$OUT/mv2-pre.json"; cat "$OUT/mv2-pre.out"
+fi
+if [ "$PLAN" = "marketplace-slug" ]; then
+  run "pre: marketplace-slug facts" "$OUT/slug-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-slug-smoke.sql
+  run "pre: marketplace-slug smoke" "$OUT/slug-pre.out" -- node scripts/hosted-db/marketplace-slug-smoke.mjs facts pre "$OUT/slug-pre.json" --applied 244 --latest 20261123160002; cat "$OUT/slug-pre.out"
+  run "pre: marketplace-stock-notify facts" "$OUT/stock-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-stock-notify-smoke.sql
+  run "pre: marketplace-stock-notify smoke" "$OUT/stock-pre.out" -- node scripts/hosted-db/marketplace-stock-notify-smoke.mjs facts pre "$OUT/stock-pre.json" --applied 244 --latest 20261123160002; cat "$OUT/stock-pre.out"
+fi
+if [ "$PLAN" = "marketplace-orders" ]; then
+  run "pre: marketplace-orders facts" "$OUT/mo-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-orders-smoke.sql
+  run "pre: marketplace-orders smoke" "$OUT/mo-pre.out" -- node scripts/hosted-db/marketplace-orders-smoke.mjs facts pre "$OUT/mo-pre.json"; cat "$OUT/mo-pre.out"
+fi
+echo "pre-checks passed. Recovery: $RECOVERY${LABEL:+ (historical snapshot reference $LABEL, not a current recovery point)}"
+
+STEP="confirmation"
+echo "About to APPLY $N_PENDING migration(s) [$PENDING_VERSIONS] (plan $PLAN) to ACCEPTANCE $ACC from $SHA."
+read -r -p "Type exactly  APPLY $PLAN TO ACCEPTANCE  to continue: " CONFIRM
+[ "$CONFIRM" = "APPLY $PLAN TO ACCEPTANCE" ] || { echo "not confirmed: nothing pushed"; exit 1; }
+
+STEP="push"; PUSHED=1
+sb db push --linked 2>"$OUT/push.err" | redact || { echo "--- push error (redacted) ---" >&2; tail -n 20 "$OUT/push.err" | redact >&2; exit 1; }
+
+echo "--- POST checks (read-only) ---"
+run "post: migration list" "$OUT/list2.json" -- sb migration list --linked --output-format json
+run "post: gate" "$OUT/gate2.out" -- node scripts/hosted-db/acceptance-gate.mjs post "$PLAN" "$OUT/list2.json"; cat "$OUT/gate2.out"
+run "post: history guard (up to date)" "$OUT/guard2.out" -- node scripts/migration-history-guard.mjs "$OUT/list2.json" --expect up-to-date; cat "$OUT/guard2.out"
+run "post: permissions inventory" "$OUT/perms-post.json" -- sb db query --linked -o json -f scripts/function-permissions.sql
+run "post: permissions vs $POST_CONTRACT" "$OUT/perms-post.out" -- node scripts/hosted-db/verify-permissions-readonly.mjs "$OUT/perms-post.json" "$POST_CONTRACT"; cat "$OUT/perms-post.out"
+run "post: table counts" "$OUT/counts-post.json" -- sb db query --linked -o json -f scripts/hosted-db/table-counts.sql
+run "post: structure" "$OUT/struct-post.json" -- sb db query --linked -o json -f scripts/hosted-db/acceptance-structure.sql
+run "post: catalog fingerprint" "$OUT/fp-post.json" -- sb db query --linked -o json -f scripts/hosted-db/catalog-fingerprint.sql
+run "post: validation" "$OUT/post.out" -- node scripts/hosted-db/acceptance-postcheck.mjs "$PLAN" "$OUT/struct-pre.json" "$OUT/counts-pre.json" "$OUT/struct-post.json" "$OUT/counts-post.json"; cat "$OUT/post.out"
+run "post: catalog diff (exactly the plan's functions changed)" "$OUT/diff.out" -- node scripts/hosted-db/catalog-diff.mjs "$OUT/fp-pre.json" "$OUT/fp-post.json" --expect-changed "$EXPECT_CHANGED"; cat "$OUT/diff.out"
+if [ "$PLAN" = "marketplace-v2" ]; then
+  run "post: marketplace-v2 facts" "$OUT/mv2-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-v2-smoke.sql
+  run "post: marketplace-v2 smoke" "$OUT/mv2-post.out" -- node scripts/hosted-db/marketplace-v2-smoke.mjs facts post "$OUT/mv2-post.json"; cat "$OUT/mv2-post.out"
+  echo "NEXT (owner): deploy the frontend matching main, then run: node scripts/hosted-db/marketplace-v2-smoke.mjs http  (docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md)"
+fi
+if [ "$PLAN" = "marketplace-slug" ]; then
+  run "post: marketplace-slug facts" "$OUT/slug-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-slug-smoke.sql
+  run "post: marketplace-slug smoke" "$OUT/slug-post.out" -- node scripts/hosted-db/marketplace-slug-smoke.mjs facts post "$OUT/slug-post.json" --applied "$POST_APPLIED" --latest "$LATEST"; cat "$OUT/slug-post.out"
+  run "post: marketplace-stock-notify facts" "$OUT/stock-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-stock-notify-smoke.sql
+  run "post: marketplace-stock-notify smoke" "$OUT/stock-post.out" -- node scripts/hosted-db/marketplace-stock-notify-smoke.mjs facts post "$OUT/stock-post.json" --applied "$POST_APPLIED" --latest "$LATEST"; cat "$OUT/stock-post.out"
+fi
+if [ "$PLAN" = "marketplace-orders" ]; then
+  run "post: marketplace-orders facts" "$OUT/mo-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-orders-smoke.sql
+  run "post: marketplace-orders smoke" "$OUT/mo-post.out" -- node scripts/hosted-db/marketplace-orders-smoke.mjs facts post "$OUT/mo-post.json"; cat "$OUT/mo-post.out"
+  echo "NEXT (owner GO): deploy the frontend matching main (docs/operations/MARKETPLACE_ORDERS_ACCEPTANCE_PLAN_20261126.md)"
+fi
+STEP="done"; PUSHED=0
+echo "PASS: plan $PLAN applied to Acceptance $ACC; history $POST_APPLIED, permissions match $POST_CONTRACT, catalog diff limited to the plan's functions, media/storage counts verified."

@@ -42,6 +42,11 @@ colors:
   workspace-pool-warm: "lumen"
   # The operational surface the cards are drawn on. Panels stay `surface`.
   workspace: "#FBFCFE"
+  # Brand-landing scope (public landing `/` only): the ONLY four colours on that page.
+  landing-navy: "#071A2D"
+  landing-sand: "#D8C7A6"
+  landing-terra: "#B96F52"
+  landing-cream: "#F2E9D8"
   limestone: "#F4F1EA"
   plaster: "#FBF9F4"
   sand: "#EAE5DB"
@@ -221,9 +226,9 @@ hosted data remains authoritative. See `docs/product/engineer-account.md`.
 | | |
 |---|---|
 | **Design System** | Aladdin — "The Aperture" |
-| **Version** | `1.1.0` |
+| **Version** | `1.3.0` |
 | **Status** | Approved · foundation hardened (pre-feature). Ready to build product UI against. |
-| **Last updated** | 2026-10-19 |
+| **Last updated** | 2026-11-28 |
 | **Maintainer** | Design-system foundation (agent-maintained under founder approval) |
 | **Changelog** | [`design/CHANGELOG.md`](design/CHANGELOG.md) |
 | **Governance** | [`design/GOVERNANCE.md`](design/GOVERNANCE.md) — source-of-truth, versioning, component & AI-agent rules |

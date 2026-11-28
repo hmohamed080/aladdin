@@ -24,7 +24,7 @@ export function ProfileCompletionBanner({ data }: { data: InstallerProfileComple
   if (!data || dismissed) return null;
 
   return (
-    <div className="relative overflow-hidden rounded-lg border border-iris-solid/20 bg-surface p-3 shadow-card tablet:px-4 tablet:py-3">
+    <div data-testid="profile-completion-banner" className="relative overflow-hidden rounded-lg border border-iris-solid/20 bg-surface p-3 shadow-card tablet:px-4 tablet:py-3">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-y-0 end-0 w-40 bg-gradient-to-l from-iris-solid/[0.07] to-transparent"
@@ -50,7 +50,7 @@ export function ProfileCompletionBanner({ data }: { data: InstallerProfileComple
                   label={locale === "ar" ? "اكتمال الملف الشخصي" : "Profile completion"}
                 />
               </div>
-              <span className="font-mono text-label font-semibold text-fg">
+              <span data-testid="profile-completion-banner-percent" className="font-mono text-label font-semibold text-fg">
                 {formatNumber(data.percent, locale)}%
               </span>
             </div>

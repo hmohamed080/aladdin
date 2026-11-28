@@ -2,18 +2,15 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
-import { PRODUCT_IMAGE_BUCKET } from "@/lib/storage/product-images";
+import { applicationMediaUrl } from "@/lib/storage/media-url";
+import { edgeConfig, privateMediaUrl } from "@/server/storage/edge-ticket";
 
 type DB = SupabaseClient<Database>;
 
 export type OwnProductImage = { id: string; objectKey: string; slot: number };
 
-/** Signed URLs are short-lived; pages are rendered per request, so an hour is ample. */
-/**
- * A signed URL cannot be revoked, so its lifetime bounds access that ends with a membership, an audience
- * change or an unpublish. Pages are rendered per request and sign again on reload, so five minutes is ample.
- */
-const SIGNED_URL_SECONDS = 300;
+// URLs identify application routes (or, for R2 rows with edge delivery on, the media
+// Worker); every byte request rechecks current workspace access in the database.
 
 /**
  * The READY images of the given products, in display order (lowest slot first),
@@ -84,19 +81,21 @@ export async function signProductImageUrls(
   const unique = [...new Set(keys.filter((k): k is string => Boolean(k)))];
   const out = new Map<string, string>();
   if (unique.length === 0) return out;
-  if (viewer) {
-    for (let i = 0; i < unique.length; i += 60) {
-      const { error: grantError } = await supabase.rpc("product_image_access_grant", {
-        p_org_id: viewer.orgId as string,
-        p_keys: unique.slice(i, i + 60),
-      });
-      if (grantError) return out;
+  const edge = edgeConfig() !== null;
+  for (let i = 0; i < unique.length; i += 60) {
+    const args = { p_namespace: "product", p_keys: unique.slice(i, i + 60), p_workspace: viewer?.orgId ?? undefined };
+    if (!edge) {
+      const { data, error } = await supabase.rpc("organization_media_read_keys", args);
+      if (error || !data) return new Map();
+      for (const key of data) out.set(key, applicationMediaUrl("product", key, viewer?.orgId));
+      continue;
     }
-  }
-  const { data, error } = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).createSignedUrls(unique, SIGNED_URL_SECONDS);
-  if (error || !data) return out;
-  for (const entry of data) {
-    if (entry.path && entry.signedUrl && !entry.error) out.set(entry.path, entry.signedUrl);
+    // Same caller-scoped resolver, plus each readable key's provider for the URL switch.
+    const { data, error } = await supabase.rpc("organization_media_read_providers", args);
+    if (error || !data || typeof data !== "object" || Array.isArray(data)) return new Map();
+    for (const [key, provider] of Object.entries(data)) {
+      out.set(key, await privateMediaUrl(supabase, "product", key, provider === "r2" ? "r2" : "supabase", { workspace: viewer?.orgId ?? null }));
+    }
   }
   return out;
 }

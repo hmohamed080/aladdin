@@ -2,8 +2,8 @@
  * THE UI FOUNDATION GUARD — pure data and regexes only.
  *
  * Split out of `eslint.config.mjs` so this module can be imported with no side
- * effects: `eslint.config.mjs` itself calls `FlatCompat#extends("next/core-web-vitals", …)`
- * at module load, which resolves Next's real ESLint config chain — fine for
+ * effects: `eslint.config.mjs` itself imports `eslint-config-next` at module
+ * load, which resolves Next's real ESLint config chain — fine for
  * ESLint's own process, but not something a Vitest run should trigger just to
  * exercise a regex. `src/lint/foundation-guard.test.ts` imports straight from
  * here.
@@ -296,4 +296,6 @@ export const FOUNDATION_FILES = [
   "src/features/showroom-shell/products/color-library.test.ts",
   "src/features/showroom-shell/products/color-ui.test.tsx",
   "src/lint/foundation-guard.test.ts",
+  // HTML email cannot read CSS tokens: the four approved palette values, for transactional mail only.
+  "src/server/email/brand.ts",
 ];

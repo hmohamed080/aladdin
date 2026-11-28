@@ -2,40 +2,54 @@ import "server-only";
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { AVATAR_BUCKET } from "@/lib/storage/avatar-assets";
-import { COVER_BUCKET } from "@/lib/storage/cover-assets";
-
-/** How long a signed avatar read URL lives. Minted per render, never stored. */
-const AVATAR_READ_URL_SECONDS = 300;
+import { readableMediaUrl } from "@/server/storage/edge-ticket";
+import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
+import { getCurrentUser } from "@/server/auth/session";
 
 export type MyIdentity = {
   displayName: string;
   /** Only an explicit profile_set_display_name call sets this — never the account-creation fallback. */
   displayNameConfirmed: boolean;
-  username: string | null;
   phoneCountryIso2: string | null;
   phoneNational: string | null;
   phoneE164: string | null;
+  /** `profiles.phone_verified_at` is set. A phone changed through the Installer flow stays UNVERIFIED (NULL) until an OTP step exists. */
+  phoneVerified: boolean;
+  /** The phone is also this account's sign-in key (phone + password accounts): changing it needs the current password. */
+  phoneIsLoginKey: boolean;
   avatarUrl: string | null;
-  /** Short-lived signed URL of the owner's ready cover photo, or null. Owner-only. */
+  /** The current profile cover (a short-lived readable URL), or null. */
   coverUrl: string | null;
-  /** ISO date (YYYY-MM-DD), self-reported, private. */
-  birthDate: string | null;
+  /** A phone + password (Craftsman) account: its main phone is its login and cannot be moved here. */
+  phoneLogin: boolean;
   gender: "female" | "male" | null;
+  /** The current unverified second phone reservation (V1, no OTP), or null. */
+  secondaryPhone: SecondaryPhone | null;
 };
+
+export type SecondaryPhone = {
+  phone: string;
+  expiresAt: string;
+  canRenew: boolean;
+};
+
+function mapSecondaryPhone(raw: unknown): SecondaryPhone | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.phone !== "string" || typeof r.expires_at !== "string" || r.status !== "active") return null;
+  return { phone: r.phone, expiresAt: r.expires_at, canRenew: r.can_renew === true };
+}
 
 /** The caller's own shared identity fields (every audience). Scoped to the session — takes no user id. */
 export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyIdentity | null> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) return null;
 
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "display_name, display_name_confirmed_at, username, phone_country_iso2, phone_national, phone_e164, avatar_media_id, cover_media_id, birth_date, gender",
+      "display_name, display_name_confirmed_at, phone_country_iso2, phone_national, phone_e164, phone_verified_at, avatar_media_id, cover_media_id, gender",
     )
     .eq("user_id", user.id)
     .maybeSingle();
@@ -51,46 +65,46 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
       .eq("state", "ready")
       .maybeSingle();
     if (upload?.object_key) {
-      const { data: signed } = await supabase.storage
-        .from(AVATAR_BUCKET)
-        .createSignedUrl(upload.object_key, AVATAR_READ_URL_SECONDS);
-      avatarUrl = signed?.signedUrl ?? null;
+      try { avatarUrl = await readableMediaUrl(supabase, "avatar", upload.object_key); }
+      catch { avatarUrl = null; }
     }
   }
 
   let coverUrl: string | null = null;
   if (profile.cover_media_id) {
-    const { data: upload } = await supabase
-      .from("cover_uploads")
+    const { data: cover } = await supabase
+      .from("avatar_uploads")
       .select("object_key")
       .eq("id", profile.cover_media_id)
       .eq("state", "ready")
       .maybeSingle();
-    if (upload?.object_key) {
-      const { data: signed } = await supabase.storage
-        .from(COVER_BUCKET)
-        .createSignedUrl(upload.object_key, AVATAR_READ_URL_SECONDS);
-      coverUrl = signed?.signedUrl ?? null;
+    if (cover?.object_key) {
+      try { coverUrl = await readableMediaUrl(supabase, "avatar", cover.object_key); }
+      catch { coverUrl = null; }
     }
   }
+
+  const { data: secondary } = await supabase.rpc("my_secondary_phone");
 
   return {
     displayName: profile.display_name,
     displayNameConfirmed: profile.display_name_confirmed_at !== null,
-    username: profile.username,
     phoneCountryIso2: profile.phone_country_iso2,
     phoneNational: profile.phone_national,
     phoneE164: profile.phone_e164,
+    phoneVerified: profile.phone_verified_at !== null,
+    phoneIsLoginKey: isCraftsmanLoginAlias(user.email),
     avatarUrl,
     coverUrl,
-    birthDate: profile.birth_date,
     gender: profile.gender === "female" || profile.gender === "male" ? profile.gender : null,
+    phoneLogin: isCraftsmanLoginAlias(user.email),
+    secondaryPhone: mapSecondaryPhone(secondary),
   };
 });
 
+// Phase 1 (account identity): the username criterion is gone. A database that still returns "username" in `missing`
+// (before migration M1) is tolerated: unknown items are dropped by `isCompletionItem` below.
 export const PROFILE_COMPLETION_ITEMS = [
-  "governorate", "city", "specialization", "services", "work_status", "readiness", "portfolio",
-  "username",
   "avatar",
   "phone",
   "locality",
@@ -100,8 +114,20 @@ export const PROFILE_COMPLETION_ITEMS = [
   "activities",
   "bio",
   "organization_address",
+  "organization_links",
   "organization_activities",
   "organization_setup",
+  // Installer items (20261024090011_installer_profile_completion.sql).
+  "availability",
+  "location",
+  "portfolio",
+  // Engineer items (20261128090005_engineer_completion_steps.sql).
+  "governorate",
+  "city",
+  "specialization",
+  "services",
+  "work_status",
+  "readiness",
 ] as const;
 export type ProfileCompletionItem = (typeof PROFILE_COMPLETION_ITEMS)[number];
 
@@ -126,5 +152,6 @@ export const loadMyProfileCompletion = cache(async function loadMyProfileComplet
   const percent = typeof raw.percent === "number" ? raw.percent : Number(raw.percent);
   if (!Number.isFinite(percent)) return null;
   const missing = Array.isArray(raw.missing) ? raw.missing.filter(isCompletionItem) : [];
-  return { percent: Math.max(0, Math.min(100, Math.round(percent))), missing, sections: Array.isArray(raw.sections) && raw.sections.length === 4 && raw.sections.every(value => typeof value === "boolean") ? raw.sections : undefined };
+  const sections = Array.isArray(raw.sections) && raw.sections.length === 4 && raw.sections.every((v) => typeof v === "boolean") ? (raw.sections as boolean[]) : undefined;
+  return { percent: Math.max(0, Math.min(100, Math.round(percent))), missing, sections };
 });

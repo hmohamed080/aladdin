@@ -1,52 +1,84 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import RootPage from "./page";
 
-const state = vi.hoisted(() => ({ environment: "staging" as string | undefined }));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "ar" }) }) }));
-// If the page ever reads the public env again, this mock hands it the value under
-// test — which is exactly what these tests prove it no longer cares about.
-vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_APP_ENV: state.environment }) }));
+const state = vi.hoisted(() => ({ users: 1200 as number | null, open: false, ordering: false, signedIn: false, items: [] as unknown[] }));
+vi.mock("server-only", () => ({}));
+vi.mock("@/server/auth/session", () => ({ getSessionIdentity: async () => (state.signedIn ? { id: "u1" } : null) }));
+vi.mock("@/lib/env", () => ({ isMarketplacePreviewEnabled: () => state.open, isMarketplaceOrderingEnabled: () => state.ordering }));
+vi.mock("@/server/queries/marketplace-public", () => ({ loadPublicCatalogPage: async () => ({ items: state.items }) }));
+vi.mock("@/server/media/marketplace-public-images", () => ({ marketplacePublicImageUrls: async () => ({}) }));
+vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({}) }));
+vi.mock("next/font/local", () => ({ default: () => ({ variable: "font-var", className: "font-cls" }) }));
+vi.mock("@/features/landing-brand/landing-brand-stats.server", () => ({
+  readLandingStats: async () => ({ users: state.users, organizations: null, products: 0 }),
+}));
 
-const ENVIRONMENTS = ["staging", "production", "local", "preview", undefined] as const;
-
-describe("homepage: one canonical Landing, whatever the environment", () => {
-  it.each(ENVIRONMENTS)("renders the approved Landing (LandingMotion > Hero + Ecosystem) for NEXT_PUBLIC_APP_ENV=%s", async (environment) => {
-    state.environment = environment;
+describe("homepage: one canonical Landing", () => {
+  it("renders the brand Landing sections in Arabic, with no language switch", async () => {
     const { container } = render(await RootPage());
-    const parts = Array.from(container.querySelectorAll("[data-landing-preview-part]")).map((n) =>
-      n.getAttribute("data-landing-preview-part"),
-    );
-    expect(parts).toEqual(expect.arrayContaining(["Header", "Hero", "Ecosystem", "FinalCta", "Footer"]));
-    expect(container.querySelectorAll('[data-content-slot="video"]').length).toBe(5);
-    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
-  });
-
-  it.each(ENVIRONMENTS)("never falls back to the old landing-v2 stack for NEXT_PUBLIC_APP_ENV=%s", async (environment) => {
-    state.environment = environment;
-    const { container } = render(await RootPage());
-    expect(container.querySelector("[data-landing-v2-part]")).toBeNull();
-  });
-
-  it("renders identical markup in every environment", async () => {
-    const html: string[] = [];
-    for (const environment of ENVIRONMENTS) {
-      state.environment = environment;
-      const { container, unmount } = render(await RootPage());
-      html.push(container.innerHTML);
-      unmount();
+    for (const id of ["top", "roles", "services", "market", "how", "why", "experience", "faq", "footer"]) {
+      expect(container.querySelector(`#${id}`), id).not.toBeNull();
     }
-    expect(new Set(html).size).toBe(1);
+    expect(screen.getAllByRole("heading", { level: 1 })[0]).toHaveTextContent("علاء الدين");
+    expect(container.textContent).not.toMatch(/English|\bEN\b/);
   });
 
-  it("the page source neither reads the environment nor imports the old landing-v2 stack", () => {
-    // Comments may explain the history; only executable code is checked.
-    const source = readFileSync(join(__dirname, "page.tsx"), "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
-    expect(source).not.toMatch(/NEXT_PUBLIC_APP_ENV|readPublicEnv|process\.env|VERCEL_ENV/);
-    expect(source).not.toMatch(/from\s+["'][^"']*landing-v2/);
+  it("shows only stats that are real: a null or zero count renders no pill", async () => {
+    state.users = 1200;
+    const { container } = render(await RootPage());
+    const pills = container.querySelectorAll("ul li strong");
+    expect(Array.from(pills).map((n) => n.textContent)).toContain("+1,200");
+    expect(container.textContent).not.toContain("250");
+  });
+
+  it("hides the whole stat row when no count is available", async () => {
+    state.users = null;
+    const { container } = render(await RootPage());
+    expect(container.querySelector("section")?.querySelectorAll("li").length).toBe(0);
+  });
+
+  it("Marketplace closed: sample cards, no cart, and the store link points at /market", async () => {
+    state.open = false;
+    const { container } = render(await RootPage());
+    expect(container.querySelector('a[href="/market/cart"]')).toBeNull();
+    expect(screen.getAllByRole("link", { name: "المتجر" })[0]).toHaveAttribute("href", "/market");
+    expect(container.querySelector('a[href="/marketplace"]')).toBeNull();
+  });
+
+  it("Marketplace open but browse-only: real products, no cart link", async () => {
+    state.open = true;
+    state.items = [{ slug: "oak-panel", name_ar: "لوح بلوط", name_en: "Oak panel", seller_name: "معرض النيل", image_id: null, from_price_egp: "1200", variant_count: 1, in_stock: true, cart_sku: "OAK-1", product_type_key: "panels" }];
+    const { container } = render(await RootPage());
+    expect(container.querySelector('a[href="/market/cart"]')).toBeNull();
+    expect(container.querySelector('a[href="/market/products/oak-panel"]')).not.toBeNull();
+    state.open = false;
+    state.items = [];
+  });
+
+  it("Marketplace open with ordering on: the header shows the cart and real products replace the samples", async () => {
+    state.open = true;
+    state.ordering = true;
+    state.items = [{ slug: "oak-panel", name_ar: "لوح بلوط", name_en: "Oak panel", seller_name: "معرض النيل", image_id: null, from_price_egp: "1200", variant_count: 1, in_stock: true, cart_sku: "OAK-1", product_type_key: "panels" }];
+    const { container } = render(await RootPage());
+    expect(container.querySelector('a[href="/market/cart"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/market/products/oak-panel"]')).not.toBeNull();
+    expect(container.textContent).toContain("لوح بلوط");
+    state.open = false;
+    state.ordering = false;
+    state.items = [];
+  });
+
+  it("offers sign-in and sign-up in the header to a guest only", async () => {
+    const guest = render(await RootPage());
+    expect(guest.container.querySelector('header a[href="/auth/sign-in"]')).not.toBeNull();
+    expect(guest.container.querySelector('header a[href="/home"]')).toBeNull();
+    guest.unmount();
+    state.signedIn = true;
+    const { container } = render(await RootPage());
+    expect(container.querySelector('header a[href="/auth/sign-in"]')).toBeNull();
+    expect(container.querySelector('header a[href="/home"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/market/orders"]')).toBeNull();
+    state.signedIn = false;
   });
 });

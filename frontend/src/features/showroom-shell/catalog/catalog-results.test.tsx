@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { CATALOG_VIEW_COOKIE } from "@/lib/ui/catalog-view";
 import type { CatalogRow } from "@/server/queries/commerce";
 import { CatalogResults } from "./catalog-results";

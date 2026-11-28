@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { readSessionIdentity } from "@/server/auth/session";
 import type { Database } from "@/types/database.types";
 
 type PersonaType = Database["public"]["Enums"]["persona_type"];
@@ -45,9 +46,7 @@ export const loadOrganizationActivityCatalog = cache(async function loadOrganiza
 /** The caller's own persona-scoped activity keys (RLS: `user_activities_select_own`). */
 export const loadMyActivities = cache(async function loadMyActivities(): Promise<string[]> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return [];
   const { data, error } = await supabase
     .from("user_activities")

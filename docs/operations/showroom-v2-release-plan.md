@@ -23,7 +23,7 @@ Status: planning only. Nothing has been pushed, merged or deployed. The user mus
 | Suite foundations | `20261007090001-03` | showroom_suite KPI layouts, `showroom_home_metrics` |
 | Products | `20261008090001`, `20261009090001`, `20261010090001`, `20261011090001` | taxonomy+images, price/colors/description, private prices (copies then drops `base_price`), color items |
 | Offers | `20261012090001`, `20261013090001`, `20261014090001`, `20261015090001`, `20261016090001-02`, `20261017090001-02` | Product Offers lifecycle, paging, color codes, description limits |
-| Network/contact | `20261018090001-02` | contact visibility, refer candidates |
+| Network/contact | `20261021090004-02` | contact visibility, refer candidates |
 | Audiences | `20261019090001-02`, `20261021090002-03` | exact-only audiences, image grant revalidation, canonical offer audience, contractor audience |
 | Shared Purchase Requests (backend only) | `20261020090001-02`, `20261021090004` | tables, RPCs, units; **no frontend ships** (Milestone D); tables stay empty |
 | Account taxonomy | `20261021090001`, `20261021090005-06` | canonical nine accounts; drops old enum types |

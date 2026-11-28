@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+
+const mode=process.argv[2];
+if(!['upgrade','fresh'].includes(mode))throw Error('Choose upgrade or fresh LOCAL replay');
+const directory=path.resolve('logs/rc2-media-'+mode);
+if(fs.existsSync(directory))throw Error('Never overwrite an existing replay');
+fs.mkdirSync(path.join(directory,'supabase/migrations'),{recursive:true});
+const cutoff='20261015090053';
+let config=fs.readFileSync('supabase/config.toml','utf8');
+config=config.replace('project_id = "aladdin"',`project_id = "aladdin_r2_rc2_${mode}"`).replaceAll(/543(\d\d)/g,(_,s)=>(mode==='upgrade'?'631':'632')+s);
+fs.writeFileSync(path.join(directory,'supabase/config.toml'),config);
+const files=fs.readdirSync('supabase/migrations').filter(f=>f.endsWith('.sql')&&(mode==='fresh'||f.slice(0,14)<=cutoff)).sort();
+if(mode==='upgrade'&&files.length!==163)throw Error('Exact163 baseline required');
+for(const f of files)fs.copyFileSync('supabase/migrations/'+f,path.join(directory,'supabase/migrations',f));
+for(const f of fs.readdirSync('supabase').filter(f=>f.startsWith('seed')&&f.endsWith('.sql')))fs.copyFileSync('supabase/'+f,path.join(directory,'supabase',f));
+fs.cpSync('supabase/templates',path.join(directory,'supabase/templates'),{recursive:true});
+fs.cpSync('supabase/tests',path.join(directory,'supabase/tests'),{recursive:true});
+fs.writeFileSync(path.join(directory,'manifest.json'),JSON.stringify({mode,source:'8bde19c4a3dea9bfd97c18c41bc20f405467ec6e',files:files.map(file=>({file,sha256:createHash('sha256').update(fs.readFileSync('supabase/migrations/'+file)).digest('hex')}))}));
+console.log(directory);

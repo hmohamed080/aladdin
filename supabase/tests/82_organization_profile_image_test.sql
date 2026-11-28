@@ -5,6 +5,7 @@
 create extension if not exists pgtap;
 
 begin;
+\ir helpers/organization_media_receipt.inc
 select plan(32);
 
 insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data,
@@ -64,7 +65,8 @@ select throws_ok(format($q$select public.organization_image_request_upload(%L, '
 
 -- 3. confirm -------------------------------------------------------------------------------------------
 set local request.jwt.claims = :'u1';
-select is(public.organization_image_confirm_upload((select v from _ids where k = 'key1')), null, 'IMG-10: the first confirm has no previous key');
+select pg_temp.attest_organization_fixture('organization',(select v from _ids where k = 'key1'));
+select is(public.organization_image_confirm_upload((select v from _ids where k = 'key1')), null, 'IMG-10: the first verified confirm has no previous key');
 select is((select count(*)::int from public.organizations where id = (select v::uuid from _ids where k = 'orgA') and logo_media_id is not null), 1,
   'IMG-11: the organization points at the new image');
 reset role;
@@ -87,6 +89,7 @@ select is(public.organization_image_current((select v::uuid from _ids where k = 
 -- 5. the pointer is not a free column ------------------------------------------------------------------
 set local request.jwt.claims = :'u3';
 insert into _ids select 'keyB', public.organization_image_request_upload((select v::uuid from _ids where k = 'orgB'), 'image/jpeg');
+select pg_temp.attest_organization_fixture('organization',(select v from _ids where k = 'keyB'));
 select public.organization_image_confirm_upload((select v from _ids where k = 'keyB'));
 set local request.jwt.claims = :'u1';
 select throws_ok(format($q$update public.organizations set logo_media_id = (select logo_media_id from public.organizations where id = %L) where id = %L$q$,
@@ -94,6 +97,7 @@ select throws_ok(format($q$update public.organizations set logo_media_id = (sele
 
 -- 6. replacement and removal ---------------------------------------------------------------------------
 insert into _ids select 'key2', public.organization_image_request_upload((select v::uuid from _ids where k = 'orgA'), 'image/webp');
+select pg_temp.attest_organization_fixture('organization',(select v from _ids where k = 'key2'));
 select is(public.organization_image_confirm_upload((select v from _ids where k = 'key2')), (select v from _ids where k = 'key1'),
   'IMG-20: a replacement returns the previous key so its bytes can be deleted');
 select is(public.organization_image_current((select v::uuid from _ids where k = 'orgA')), (select v from _ids where k = 'key2'), 'IMG-21: the new image is current');
@@ -106,7 +110,7 @@ select throws_ok(format($q$select public.organization_image_remove(%L)$q$, (sele
 set local request.jwt.claims = :'u1';
 select is(public.organization_image_remove((select v::uuid from _ids where k = 'orgA')), (select v from _ids where k = 'key2'), 'IMG-24: removal returns the key to delete');
 select is(public.organization_image_current((select v::uuid from _ids where k = 'orgA')), null, 'IMG-25: no current image after removal');
-select is(public.organization_image_remove((select v::uuid from _ids where k = 'orgA')), null, 'IMG-26: removing again is a no-op');
+select is(public.organization_image_remove((select v::uuid from _ids where k = 'orgA')), (select v from _ids where k = 'key2'), 'IMG-26: retry returns the same cleanup key without another lifecycle write');
 reset role;
 select is((select count(*)::int from public.audit_log where action = 'organization.image_removed' and organization_id = (select v::uuid from _ids where k = 'orgA')), 1,
   'IMG-27: the removal is audited');

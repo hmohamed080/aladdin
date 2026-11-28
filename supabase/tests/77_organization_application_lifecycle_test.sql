@@ -3,7 +3,7 @@
 --   A. a REJECTED first application is abandoned and replaced; the rejection history is retained
 --   B. after the first approval: exactly ONE additional application may be open at a time
 --   C. security: org_type is not client-writable; the contractor guard does not trust a session setting
---   D. Contractor / Engineer operating models at registration (Coming Soon gate preserved)
+--   D. Contractor / Engineer operating models at registration (Contractor stays Coming Soon, Engineer is open)
 --   E. a pending organization has no marketplace authority (catalog, requests, offers, RFQ, publish)
 --
 -- Every call is made as `authenticated` with the caller's own JWT claims.
@@ -241,8 +241,8 @@ select is(app.org_product_audience((select id from _ids where k = 'o6')), 'contr
 set local request.jwt.claims = :'u4';
 select throws_ok($$ select public.onboarding_select_account_type('business', 'contractor_company') $$,
   '22023', 'this account type is not available yet', 'D4: registering a new Contractor Organization stays Coming Soon');
-select throws_ok($$ select public.onboarding_select_account_type('business', 'design_office') $$,
-  '22023', 'this account type is not available yet', 'D5: registering a new Engineering Office stays Coming Soon');
+select lives_ok($$ select public.onboarding_select_account_type('business', 'design_office') $$,
+  'D5: registering a new Engineering Office is open with the Engineer account (20261128090007)');
 select lives_ok($$ select public.onboarding_select_account_type('business', 'showroom_dealer') $$, 'D6: other business types register as before');
 set local request.jwt.claims = :'u6';
 select lives_ok($$ select public.onboarding_select_account_type('business', 'contractor_company') $$,

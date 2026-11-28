@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
+import { readSessionIdentity } from "@/server/auth/session";
 import { parseAdminAccess } from "@/lib/permissions/admin";
 
 /**
@@ -18,9 +19,7 @@ import { parseAdminAccess } from "@/lib/permissions/admin";
  * guards remain the real boundary; this decides routing and chrome only.
  */
 export async function loadIsAdminStaff(supabase: SupabaseClient<Database>): Promise<boolean> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return false;
   const { data, error } = await supabase.rpc("admin_my_access");
   if (error) return false;

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   lifecycle: vi.fn(),
   push: vi.fn(),
   refresh: vi.fn(),
+  upload: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
@@ -13,14 +14,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/server/actions/purchase-requests", () => ({
   savePurchaseRequestAction: mocks.save,
   purchaseRequestLifecycleAction: mocks.lifecycle,
-  requestRequestImageUploadAction: vi.fn(),
-  confirmRequestImageUploadAction: vi.fn(),
   removeRequestImageAction: vi.fn(),
-  abortRequestImageUploadAction: vi.fn(),
 }));
-vi.mock("@/lib/supabase/client", () => ({
-  createBrowserSupabaseClient: vi.fn(),
-}));
+// The one reviewed upload path (ADR-0032): reserve, send to private storage through uploadWithGrant, verify.
+vi.mock("@/features/purchase-requests/upload-request-image", () => ({ uploadRequestImage: mocks.upload }));
 import { RequestComposer, RequestLifecycle } from "./request-composer";
 
 beforeEach(() => vi.clearAllMocks());
@@ -104,6 +101,19 @@ describe("engineer quotation journey", () => {
       "Villa finishing",
     );
     expect(mocks.push).not.toHaveBeenCalled();
+  });
+  it("attaches a reference photo only through the shared request upload path", async () => {
+    mocks.upload.mockResolvedValue("image-id");
+    const existing = {
+      request: { id: "request-id", version: 1, title: "Villa", notes: "", needed_by: null },
+      items: [{ id: "item-id", name: "Wall panels", categoryCode: "wood_alternative", quantity: 2, unit: "square_meter", specs: null, code: null, colors: [], images: [] }],
+    };
+    const { container } = renderWithI18n(<RequestComposer existing={existing as never} />, "en");
+    expect(screen.getByText(/up to 10 MB each/)).toBeInTheDocument();
+    const file = new File(["x"], "wall.jpg", { type: "image/jpeg" });
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    await waitFor(() => expect(mocks.upload).toHaveBeenCalledWith("item-id", file));
+    await waitFor(() => expect(mocks.refresh).toHaveBeenCalled());
   });
   it("requires confirmation before publication", async () => {
     mocks.lifecycle.mockResolvedValue({ ok: true });

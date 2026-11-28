@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getServerSupabase } from "@/lib/supabase/server";
+import { readSessionIdentity } from "@/server/auth/session";
 import { userFacingEmail } from "@/lib/auth/craftsman-login-alias";
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
@@ -40,9 +41,7 @@ export type OnboardingData = {
 
 export async function getOnboardingData(): Promise<OnboardingData | null> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return null;
 
   const [{ data: profile }, { data: userRow }, { data: progress }] = await Promise.all([
@@ -135,6 +134,10 @@ export type BusinessAnswers = {
   /** The city typed through "Other" (null when a catalogue city — or nothing — is chosen). */
   cityCustomName: string | null;
   primaryBranchName: string | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
+  tiktokUrl: string | null;
+  websiteUrl: string | null;
   organizationId: string | null;
   completedAt: string | null;
 };
@@ -155,9 +158,7 @@ export type BusinessOnboardingData = {
  */
 export async function getBusinessOnboardingData(): Promise<BusinessOnboardingData | null> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return null;
 
   const [{ data: progress }, { data: draft }] = await Promise.all([
@@ -196,6 +197,10 @@ export async function getBusinessOnboardingData(): Promise<BusinessOnboardingDat
       city: stored.city,
       cityCustomName: stored.cityCustomName,
       primaryBranchName: draft?.primary_branch_name ?? null,
+      facebookUrl: draft?.facebook_url ?? null,
+      instagramUrl: draft?.instagram_url ?? null,
+      tiktokUrl: draft?.tiktok_url ?? null,
+      websiteUrl: draft?.website_url ?? null,
       organizationId: draft?.organization_id ?? null,
       completedAt: draft?.completed_at ?? null,
     },
@@ -204,9 +209,7 @@ export async function getBusinessOnboardingData(): Promise<BusinessOnboardingDat
 
 export async function getIndividualOnboardingData(): Promise<IndividualOnboardingData | null> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return null;
 
   const [{ data: progress }, { data: profile }, { data: io }] = await Promise.all([

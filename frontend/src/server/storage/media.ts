@@ -1,0 +1,229 @@
+import "server-only";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
+import { readPublicEnv } from "@/lib/env";
+import { legacyStorageWritesOpen, readStorageEnv } from "@/lib/env/storage";
+import { createHash } from "node:crypto";
+import { mediaPolicy, isOrganizationMedia, isR2OnlyMedia, reencodesOriginal } from "@/lib/storage/media-policy";
+import type { MediaNamespace, StorageProviderName } from "@/lib/storage/provider-types";
+import { SupabaseStorageProvider } from "./supabase-provider";
+import { CloudflareR2StorageProvider } from "./r2-provider";
+import { verifyMediaBytes, withMediaProcessingSlot } from "./validation";
+import { isDecodeRefusal, isFinalRefusal } from "./content-refusal";
+import { runtimeImageProcessor } from "./image-processing/runtime";
+import { generateImageVariants, variantManifest, type VariantManifest } from "./public-image-variants";
+import type { StorageProvider } from "@/lib/storage/provider-types";
+import { applicationMediaUrl } from "@/lib/storage/media-url";
+import { readSessionIdentity } from "@/server/auth/session";
+import { consumeRateLimit } from "@/server/cache/rate-limit";
+import { imageMaxBytes } from "@/server/media/limits";
+
+const descriptor = z.object({ provider: z.enum(["supabase", "r2"]), contentType: z.string(),
+  reserved: z.boolean(), state: z.enum(["pending", "ready", "deleted"]), owner: z.string().uuid().nullable() });
+
+export async function resolveMedia(client: SupabaseClient, namespace: MediaNamespace, key: string, operation: "read" | "upload" | "delete", workspace?: string | null) {
+  const { data, error } = await client.rpc(isOrganizationMedia(namespace) ? "organization_media_resolve" : "media_storage_resolve", {
+    p_namespace: namespace, p_key: key, p_operation: operation,
+    ...(isOrganizationMedia(namespace) ? { p_workspace: workspace ?? null } : {}),
+  });
+  if (error || !data) throw new Error("media unavailable");
+  return descriptor.parse(data);
+}
+
+/**
+ * The provider for one reserved record. For R2 the physical key comes from the
+ * database (ids-only `u/…`/`o/…` for new uploads, the legacy key otherwise), so
+ * old and new objects are both found. Callers authorize through the resolvers first.
+ */
+export async function mediaProvider(client: SupabaseClient, namespace: MediaNamespace, provider: StorageProviderName, key: string) {
+  if (provider !== "r2") return new SupabaseStorageProvider(client, mediaPolicy(namespace).bucket);
+  const { data, error } = await privilegedStorageClient().rpc("media_storage_object", { p_namespace: namespace, p_key: key });
+  if (error || typeof data !== "string" || !data) throw new Error("media unavailable");
+  return new CloudflareR2StorageProvider(namespace, "private", data);
+}
+
+export function privilegedStorageClient() {
+  const env = readStorageEnv();
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("media verifier credentials missing");
+  return createClient(readPublicEnv().NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+function requireWriteApproval(provider: StorageProviderName) {
+  if (provider === "r2" && readPublicEnv().NEXT_PUBLIC_APP_ENV === "production"
+    && !readStorageEnv().R2_PRODUCTION_WRITES_APPROVED) throw new Error("production R2 writes are not approved");
+}
+
+/**
+ * R2 is the only home of new application media. Once R2 routing is on (or legacy writes are
+ * closed explicitly) a Supabase-backed write fails closed: there is no automatic fallback when R2
+ * is down, uploads simply pause and the user retries. Reads and deletes of legacy objects stay open.
+ */
+function requireWritableProvider(provider: StorageProviderName, namespace: MediaNamespace) {
+  // R2-only namespaces (Marketplace) never write to Supabase Storage, even while legacy writes are open.
+  if (provider === "supabase" && (isR2OnlyMedia(namespace) || !legacyStorageWritesOpen(readStorageEnv()))) {
+    throw new Error("media uploads are unavailable");
+  }
+}
+
+/** Reads of an R2-only namespace never touch Supabase Storage either. */
+export function requireR2ForRead(namespace: MediaNamespace, provider: StorageProviderName) {
+  if (isR2OnlyMedia(namespace) && provider !== "r2") throw new Error("media unavailable");
+}
+
+/** Frees a reservation that will not become a file (ADR-0032). Never throws: it must not hide the original refusal. */
+export async function releaseReservation(client: SupabaseClient, namespace: MediaNamespace, key: string): Promise<boolean> {
+  try {
+    const { data, error } = await client.rpc("media_upload_abandon", { p_namespace: namespace, p_key: key });
+    if (error) console.warn(JSON.stringify({ event: "media.release_failed", namespace }));
+    return data === true;
+  } catch {
+    console.warn(JSON.stringify({ event: "media.release_failed", namespace }));
+    return false;
+  }
+}
+
+/** Issues the upload grant. A refusal (limit, size, provider) releases the pending reservation behind the key. */
+export async function authorizeMediaUpload(client: SupabaseClient, namespace: MediaNamespace, key: string, expectedBytes?: number) {
+  try {
+    return await grantMediaUpload(client, namespace, key, expectedBytes);
+  } catch (error) {
+    await releaseReservation(client, namespace, key);
+    throw error;
+  }
+}
+
+async function grantMediaUpload(client: SupabaseClient, namespace: MediaNamespace, key: string, expectedBytes?: number) {
+  const media = await resolveMedia(client, namespace, key, "upload");
+  // An extra per-user brake ahead of the reservation quota (Redis, or per-instance memory when Redis is down).
+  const identity = await readSessionIdentity(client);
+  if (identity && (await consumeRateLimit("media-upload", identity.id)).outcome === "limited") {
+    // an account the Super Admin exempted passes this brake too; asked only when the brake would refuse
+    const { data: exempt } = await client.rpc("my_upload_exempt", { p_namespace: namespace, p_key: key });
+    if (exempt !== true) throw new Error("upload rate limited");
+  }
+  const env = readStorageEnv();
+  // Existing R2 records remain R2 when routing is disabled. Reserve is authoritative and rejects provider changes.
+  const provider = media.reserved ? media.provider : env.R2_STORAGE_ENABLED || isR2OnlyMedia(namespace) ? "r2" : "supabase";
+  requireWritableProvider(provider, namespace);
+  requireWriteApproval(provider);
+  const maxBytes = await imageMaxBytes(namespace); // the stored, admin-configurable limit
+  if (provider === "r2" && (!expectedBytes || !Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > maxBytes)) {
+    throw new Error("upload size is outside policy");
+  }
+  if (!media.reserved) {
+    const backendReservation = provider === "r2" || isOrganizationMedia(namespace);
+    const reserveClient = backendReservation ? privilegedStorageClient() : client;
+    const { error } = await reserveClient.rpc("media_storage_reserve", { p_namespace: namespace, p_key: key,
+      p_provider: provider, ...(backendReservation ? { p_owner: media.owner } : {}) });
+    if (error) throw new Error("upload limit or reservation failure");
+  }
+  return (await mediaProvider(client, namespace, provider, key)).createUploadUrl(key, media.contentType, expectedBytes);
+}
+
+/**
+ * Derived thumb/card/full WebP from the VERIFIED bytes, written beside the
+ * original by providers that store variants (R2). Best-effort by design: the
+ * original is the retained reference and renders without variants, so a busy
+ * decode slot or a variant write failure never fails the upload — the backfill
+ * regenerates from the original later.
+ */
+async function storeVariants(provider: StorageProvider, namespace: MediaNamespace, key: string, bytes: Uint8Array, contentType: string): Promise<VariantManifest | null> {
+  if (!provider.putVariant || !contentType.startsWith("image/")) return null;
+  try {
+    const variants = await generateImageVariants(bytes);
+    for (const variant of variants) await provider.putVariant(key, variant.variant, variant.bytes);
+    return variantManifest(variants);
+  } catch (error) {
+    console.warn(JSON.stringify({ event: "media.variants_skipped", namespace, reason: error instanceof Error ? error.message : "unknown" }));
+    return null;
+  }
+}
+
+/** Returns the stored variant manifest when one was produced (for the WP1 receipt column), else null. */
+export async function verifyPendingMedia(client: SupabaseClient, namespace: MediaNamespace, key: string): Promise<VariantManifest | null> {
+  // Organization reads deliberately exclude pending rows. A ready retry must
+  // still pass current membership/audience authorization before returning.
+  if (!isOrganizationMedia(namespace)) {
+    const media = await resolveMedia(client, namespace, key, "read");
+    if (media.state === "ready") return null;
+  } else {
+    try { await resolveMedia(client, namespace, key, "upload"); }
+    catch {
+      const media = await resolveMedia(client, namespace, key, "read");
+      if (media.state === "ready") return null;
+      throw new Error("media unavailable");
+    }
+  }
+  const pending = await resolveMedia(client, namespace, key, "upload");
+  if (!pending.owner) throw new Error("owner required");
+  requireWritableProvider(pending.provider, namespace);
+  if (!pending.reserved) {
+    const reserveClient = isOrganizationMedia(namespace) ? privilegedStorageClient() : client;
+    const { error: reserveError } = await reserveClient.rpc("media_storage_reserve", {
+      p_namespace: namespace, p_key: key, p_provider: pending.provider,
+      ...(isOrganizationMedia(namespace) ? { p_owner: pending.owner } : {}),
+    });
+    if (reserveError) throw new Error("reservation failed");
+  }
+  const provider = await mediaProvider(pending.provider === "supabase" ? privilegedStorageClient() : client, namespace, pending.provider, key);
+  requireWriteApproval(pending.provider);
+  const maxBytes = await imageMaxBytes(namespace); // the stored, admin-configurable limit
+  // refused content never becomes a file: free its reservation now; a failure a retry can fix keeps it
+  const releaseIf = (refused: (error: unknown) => boolean) => async (error: unknown): Promise<never> => {
+    if (refused(error)) await releaseReservation(client, namespace, key);
+    throw error;
+  };
+  const bytes = await provider.readObject(key, maxBytes).catch(releaseIf(isFinalRefusal));
+  const checked = await verifyMediaBytes(bytes, pending.contentType, maxBytes).catch(releaseIf(isDecodeRefusal));
+  // On R2 the stored original is the verified upload RE-ENCODED (sRGB, bounded edge, no personal metadata).
+  // Fail closed: an image whose metadata cannot be removed is refused, never stored as uploaded.
+  // The legacy Supabase provider cannot replace an object (keys are immutable, commit is a no-op), so there the
+  // stored bytes ARE the upload: re-encoding would make the receipt describe bytes that were never stored.
+  // The receipt must always describe the stored object, so that path attests the upload as it is.
+  const stored = pending.provider === "r2" && checked.contentType.startsWith("image/") && reencodesOriginal(namespace)
+    ? (await withMediaProcessingSlot(() => runtimeImageProcessor().reencodeOriginal(bytes, checked.contentType, maxBytes))
+        .catch(releaseIf(isFinalRefusal))).bytes
+    : bytes;
+  const verified = stored === bytes ? checked
+    : { ...checked, size: stored.byteLength, sha256: createHash("sha256").update(stored).digest("hex") };
+  await provider.commitVerifiedObject(key, stored, verified.contentType);
+  const variants = await storeVariants(provider, namespace, key, stored, verified.contentType);
+  const admin = privilegedStorageClient();
+  const { error } = await admin.rpc("media_storage_attest", {
+    p_namespace: namespace, p_key: key, p_owner: pending.owner, p_provider: pending.provider,
+    p_size: verified.size, p_content_type: verified.contentType, p_sha256: verified.sha256,
+  });
+  if (error) throw new Error("verification receipt refused");
+  // Variants are disposable: an unrecorded manifest only means originals are served
+  // until the backfill records it. Edge URLs are issued only for recorded variants.
+  if (variants && Object.keys(variants).length > 0) {
+    const { error: variantError } = await admin.rpc("media_storage_record_variants", {
+      p_namespace: namespace, p_key: key, p_owner: pending.owner, p_variants: variants,
+    });
+    if (variantError) console.warn(JSON.stringify({ event: "media.variants_unrecorded", namespace }));
+  }
+  console.info(JSON.stringify({ event: "media.verified", namespace, provider: pending.provider, bytes: verified.size, variants: variants ? Object.keys(variants).length : 0 }));
+  return variants;
+}
+
+export async function readMediaUrl(client: SupabaseClient, namespace: MediaNamespace, key: string) {
+  const media = await resolveMedia(client, namespace, key, "read");
+  if ((!isOrganizationMedia(namespace) && !media.owner) || media.state !== "ready") throw new Error("media unavailable");
+  return applicationMediaUrl(namespace, key);
+}
+
+/**
+ * Deletes the bytes (original, variants and any pending copy) of a retired record and, for R2,
+ * records that the physical cleanup finished (`cleaned_at`). Recording is what stops the retry worker
+ * and the backup eligibility rule from treating the object as still pending. It is idempotent: a
+ * repeat finds no object, deletes nothing and records the same completion. If recording fails the
+ * bytes are already gone, so the error is logged and the reconciliation job completes it later.
+ */
+export async function removeMedia(client: SupabaseClient, namespace: MediaNamespace, key: string) {
+  const media = await resolveMedia(client, namespace, key, "delete");
+  await (await mediaProvider(media.provider === "supabase" ? privilegedStorageClient() : client, namespace, media.provider, key)).deleteObject(key);
+  if (media.provider !== "r2" || !media.owner) return;
+  const { error } = await privilegedStorageClient().rpc("media_cleanup_complete", { p_namespace: namespace, p_key: key, p_owner: media.owner });
+  if (error) console.warn(JSON.stringify({ event: "media.cleanup_unrecorded", namespace }));
+}

@@ -7,7 +7,7 @@ import { CITIES_BY_GOVERNORATE } from "@/lib/installer/location-data";
 import type { MatchBreakdown } from "@/lib/installer/overall-match";
 import type { JobCardVM } from "@/features/installer-job-opportunities-preview/view-model";
 import { DEFAULT_BOARD_FILTERS } from "@/features/installer-job-opportunities-preview/view-model";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { InstallerJobsBoard } from "./installer-jobs-board";
 
 /**

@@ -6,19 +6,18 @@ import Cropper, { type Area } from "react-easy-crop";
 import { useI18n } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/controls";
 import { InlineError } from "@/components/ui/primitives";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
-import {
-  COVER_ALLOWED_TYPES,
-  COVER_ASPECT,
-  COVER_BUCKET,
-  COVER_OUTPUT_HEIGHT_PX,
-  COVER_OUTPUT_TYPE,
-  COVER_OUTPUT_WIDTH_PX,
-  validateCoverFile,
-} from "@/lib/storage/cover-assets";
+import { uploadWithGrant } from "@/lib/storage/browser-upload";
+import { AVATAR_MAX_BYTES } from "@/lib/storage/avatar-assets";
 import { confirmCoverUploadAction, requestCoverUploadAction } from "@/server/actions/profile-identity";
 
-/** Renders the chosen 4:1 region of the source image into a fixed-size JPEG. */
+/** Same cover shape and size as the Craftsman hero: the public profile draws it at 6:1. */
+const COVER_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+const COVER_ASPECT = 6;
+const COVER_OUTPUT_WIDTH_PX = 1800;
+const COVER_OUTPUT_HEIGHT_PX = 300;
+const COVER_OUTPUT_TYPE = "image/jpeg";
+
+/** Renders the chosen 6:1 region of the source image into a fixed-size JPEG. */
 async function cropToBlob(src: string, area: Area): Promise<Blob> {
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
@@ -43,14 +42,9 @@ async function cropToBlob(src: string, area: Area): Promise<Blob> {
 
 /**
  * The profile cover banner with its "Change cover" control. Select -> crop
- * (fixed 4:1) -> upload -> confirm, using the cover_uploads pending->ready
- * ownership model exactly like the avatar (see avatar-field.tsx):
- *
- *   1. cover_request_upload creates the PENDING row and returns a server-made key;
- *   2. the cropped bytes go straight from the browser to the private `covers`
- *      bucket under that key (storage refuses any key without that row);
- *   3. cover_confirm_upload flips it to ready, points profiles.cover_media_id at
- *      it and the previous object is cleaned up.
+ * (fixed 6:1) -> the shared avatar pipeline (pending row -> `uploadWithGrant`
+ * -> verified bytes -> confirm), so the failed-upload and limit rules of
+ * ADR-0032 apply with nothing cover-specific.
  *
  * With no cover yet the banner shows a neutral token-coloured surface — never an
  * invented picture. Failure leaves the current cover untouched.
@@ -82,9 +76,8 @@ export function CoverField({ coverUrl }: { coverUrl: string | null }) {
     setError(null);
     const file = e.target.files?.[0];
     if (!file) return;
-    const valid = validateCoverFile(file);
-    if (!valid.ok) {
-      setError(t(valid.code));
+    if (!(COVER_ALLOWED_TYPES as readonly string[]).includes(file.type) || file.size <= 0) {
+      setError(t("profileIdentity.cover.errorUpload"));
       if (inputRef.current) inputRef.current.value = "";
       return;
     }
@@ -97,13 +90,10 @@ export function CoverField({ coverUrl }: { coverUrl: string | null }) {
     setError(null);
     try {
       const blob = await cropToBlob(source, area);
-      const ticket = await requestCoverUploadAction(COVER_OUTPUT_TYPE);
+      if (blob.size > AVATAR_MAX_BYTES) throw new Error("too large");
+      const ticket = await requestCoverUploadAction(blob.type, blob.size);
       if (!ticket.ok) throw new Error(ticket.code);
-      const supabase = createBrowserSupabaseClient();
-      const { error: uploadError } = await supabase.storage
-        .from(COVER_BUCKET)
-        .upload(ticket.key, blob, { contentType: COVER_OUTPUT_TYPE, upsert: false });
-      if (uploadError) throw uploadError;
+      await uploadWithGrant(ticket.grant, blob, { namespace: "avatar", key: ticket.key });
       const confirmed = await confirmCoverUploadAction(ticket.key);
       if (!confirmed.ok) throw new Error(confirmed.code);
       reset();

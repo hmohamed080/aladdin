@@ -21,13 +21,14 @@
  * anything. A browser that skipped it entirely would be refused at the same three
  * places. See docs/database/professional-asset-storage.md.
  */
+import { IMAGE_MAX_BYTES } from "@/lib/media/upload-limits";
 
 /**
  * The two namespaces. They are separate BUCKETS rather than folders because
  * Supabase enforces MIME and size per bucket, and the two need different values
  * — a rule that lived only in this file would be a rule a caller could skip.
  */
-export const ASSET_NAMESPACES = ["portfolio", "certificate", "portfolio_media"] as const;
+export const ASSET_NAMESPACES = ["portfolio", "certificate"] as const;
 export type AssetNamespace = (typeof ASSET_NAMESPACES)[number];
 
 /**
@@ -44,39 +45,27 @@ type NamespacePolicy = {
   readonly bucket: string;
   readonly types: readonly string[];
   readonly maxBytes: number;
-  /** Cap for IMAGE types when it is lower than `maxBytes` (a bucket that also carries video). */
-  readonly imageMaxBytes?: number;
 };
 
 export const ASSET_POLICY: Readonly<Record<AssetNamespace, NamespacePolicy>> = {
   /**
    * Work samples. Images only: there is no video pipeline, no transcoding and no
    * player in this product, and adding the type here would be storing something
-   * nothing can play. 5 MiB is one 12 MP phone photo with room to spare.
+   * nothing can play. 5 MiB is the ceiling of the PREPARED upload: the browser
+   * fits every photo under it (`lib/media/resize-image.ts`), so a picked photo is
+   * never refused for its own size.
    */
   portfolio: {
     bucket: "professional-portfolio",
     types: ["image/jpeg", "image/png", "image/webp"],
-    maxBytes: 5 * 1024 * 1024,
+    maxBytes: IMAGE_MAX_BYTES,
   },
   /**
    * Evidence. PDF is what a certificate actually arrives as, and 10 MiB covers a
-   * scan of several pages. Images are kept because plenty of people photograph
-   * the certificate rather than scan it.
+   * scan of several pages: for a PDF it is a real limit (documents are not
+   * re-encoded). Images are kept because plenty of people photograph the
+   * certificate rather than scan it; for them 10 MiB is the prepared ceiling.
    */
-  /**
-   * The OTHER media of a work (up to four more images, or one video). A separate
-   * bucket from `portfolio` because the cover bucket's 5 MiB limit cannot admit a
-   * video, and loosening that bucket would loosen the cover rule. Owner-only: no
-   * public path exists yet. Video is MP4/MOV, never transcoded or scanned here —
-   * it is stored and played back as uploaded.
-   */
-  portfolio_media: {
-    bucket: "professional-portfolio-media",
-    types: ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime"],
-    maxBytes: 50 * 1024 * 1024,
-    imageMaxBytes: 5 * 1024 * 1024,
-  },
   certificate: {
     bucket: "professional-certificates",
     types: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
@@ -99,6 +88,7 @@ export type AssetErrorCode =
   | "assets.errors.invalidPath"
   | "assets.errors.notAllowed"
   | "assets.errors.uploadFailed"
+  | "assets.errors.prepareFailed"
   | "assets.errors.gone";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -126,7 +116,6 @@ const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
  */
 const CERTIFICATE_KEY_PATTERN = new RegExp(`^${UUID}/${UUID}\\.(jpg|png|webp|pdf)$`);
 const PORTFOLIO_KEY_PATTERN = new RegExp(`^${UUID}\\.(jpg|png|webp)$`);
-const PORTFOLIO_MEDIA_KEY_PATTERN = new RegExp(`^${UUID}\\.(jpg|png|webp|mp4|mov)$`);
 
 /** True when `key` is a well-formed portfolio key. Shape only — see below. */
 export function isPortfolioObjectKey(key: string): boolean {
@@ -158,20 +147,10 @@ export function isAssetKeyForCaller(
   key: string,
   ownerId: string,
 ): boolean {
-  if (namespace === "portfolio") return isPortfolioObjectKey(key);
-  if (namespace === "portfolio_media") return Boolean(key) && PORTFOLIO_MEDIA_KEY_PATTERN.test(key);
-  return isCertificatePathOwnedBy(key, ownerId);
+  return namespace === "portfolio"
+    ? isPortfolioObjectKey(key)
+    : isCertificatePathOwnedBy(key, ownerId);
 }
-
-/** MP4 / MOV. */
-export function isVideoType(type: string): boolean {
-  return type === "video/mp4" || type === "video/quicktime";
-}
-
-/** A work holds its cover plus up to four more files; at most one of the five is a video. */
-export const PORTFOLIO_MAX_FILES = 5;
-/** Longest accepted video, in seconds. The database repeats this (1..600). */
-export const PORTFOLIO_VIDEO_MAX_SECONDS = 600;
 
 export type AssetValidation =
   | { readonly ok: true }
@@ -188,9 +167,8 @@ export function validateAssetFile(
 ): AssetValidation {
   const policy = ASSET_POLICY[namespace];
   if (!policy.types.includes(file.type)) return { ok: false, code: "assets.errors.unsupportedType" };
-  if (file.size <= 0) return { ok: false, code: "assets.errors.empty" };
-  const cap = !isVideoType(file.type) && policy.imageMaxBytes ? policy.imageMaxBytes : policy.maxBytes;
-  if (file.size > cap) return { ok: false, code: "assets.errors.tooLarge" };
+  if (!Number.isSafeInteger(file.size) || file.size <= 0) return { ok: false, code: "assets.errors.empty" };
+  if (file.size > policy.maxBytes) return { ok: false, code: "assets.errors.tooLarge" };
   return { ok: true };
 }
 
@@ -220,13 +198,6 @@ const SIGNATURES: ReadonlyArray<{ type: string; bytes: readonly number[]; offset
 
 /** True when `head` (the first ~16 bytes) is consistent with `contentType`. */
 export function bytesMatchType(head: Uint8Array, contentType: string): boolean {
-  // ISO-BMFF family (MP4 / MOV): the 4 bytes at offset 4 name the first box.
-  // MP4 starts with `ftyp`; QuickTime may also start with a bare atom.
-  if (contentType === "video/mp4" || contentType === "video/quicktime") {
-    const box = String.fromCharCode(head[4] ?? 0, head[5] ?? 0, head[6] ?? 0, head[7] ?? 0);
-    const allowed = contentType === "video/mp4" ? ["ftyp"] : ["ftyp", "moov", "mdat", "wide", "free", "skip"];
-    return allowed.includes(box);
-  }
   const required = SIGNATURES.filter((s) => s.type === contentType);
   if (required.length === 0) return false;
   return required.every(({ bytes, offset = 0 }) =>
@@ -249,7 +220,3 @@ export function validateAssetContent(
   if (!bytesMatchType(head, file.type)) return { ok: false, code: "assets.errors.contentMismatch" };
   return { ok: true };
 }
-
-/** How long a read URL lives. Long enough to render a page, short enough that a
- * copied URL is not a lasting handout. Minted per render, never stored. */
-export const ASSET_READ_URL_SECONDS = 300;

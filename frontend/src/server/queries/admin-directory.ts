@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
+import { OPEN_VERIFICATION_STATUSES } from "@/lib/admin/verification-status";
 import type { OrgsDirectoryParams, UsersDirectoryParams } from "@/features/admin-preview/directory-params";
 import {
   mapOrgDetail,
@@ -36,7 +37,7 @@ function fail(scope: string, error: unknown): { ok: false } {
 }
 
 export async function loadUsersDirectory(supabase: Client, p: UsersDirectoryParams) {
-  const { data, error } = await supabase.rpc("admin_users_list", {
+  const { data, error } = await supabase.rpc("admin_users_directory", {
     p_search: p.search ?? undefined,
     p_status: p.status ?? undefined,
     p_account_type: p.accountType ?? undefined,
@@ -46,9 +47,9 @@ export async function loadUsersDirectory(supabase: Client, p: UsersDirectoryPara
     p_page: p.page,
     p_page_size: p.pageSize,
   });
-  if (error) return fail("admin_users_list", error);
+  if (error) return fail("admin_users_directory", error);
   const page = mapUsersPage(data);
-  return page ? ({ ok: true, data: page } as const) : fail("admin_users_list (shape)", data);
+  return page ? ({ ok: true, data: page } as const) : fail("admin_users_directory (shape)", data);
 }
 
 export async function loadOrganizationsDirectory(supabase: Client, p: OrgsDirectoryParams) {
@@ -87,20 +88,146 @@ export async function loadOrganizationDetail(supabase: Client, orgId: string): P
   return detail ? { ok: true, data: detail } : fail("admin_organization_detail (shape)", data);
 }
 
+export type OrganizationRegistration = {
+  phone: string | null;
+  email: string | null;
+  legalName: string | null;
+  description: string | null;
+  /** Activity keys (public.activities.key) the business registered with, in catalogue order. */
+  activities: string[];
+  /** Registered location and detailed address, per live branch (the first is the primary branch). */
+  branches: { id: string; governorate: string | null; city: string | null; cityCustomName: string | null; address: string | null }[];
+};
+
 /**
- * The business contact phone and email captured at onboarding. Not part of the
- * `admin_organization_detail` contract, so it is read directly under the caller's
- * own RLS (the same read the classic Organization page used); a row the caller
- * cannot see yields nulls.
+ * The business details captured at registration (and kept editable in the business's own Settings): contact,
+ * legal name, description, activities, and each branch's location and address. None of it is part of the
+ * `admin_organization_detail` contract, so it is read directly under the caller's own platform RLS
+ * (`organizations.read`, the same read the classic Organization page used); a row the caller cannot see
+ * yields empty values.
  */
-export async function loadOrganizationContact(
+export async function loadOrganizationRegistration(supabase: Client, orgId: string): Promise<OrganizationRegistration> {
+  const [org, activities, branches] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("contact_phone, contact_email, legal_name, description")
+      .eq("id", orgId)
+      .maybeSingle(),
+    supabase.from("organization_activities").select("activities(key, sort_order)").eq("organization_id", orgId),
+    supabase
+      .from("branches")
+      .select("id, governorate_key, city_key, city_custom_name, address_ar, address_en")
+      .eq("organization_id", orgId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true }),
+  ]);
+  const keyed = (activities.data ?? [])
+    .map((r) => (Array.isArray(r.activities) ? r.activities[0] : r.activities))
+    .filter((a): a is { key: string; sort_order: number } => Boolean(a?.key))
+    .sort((a, b) => a.sort_order - b.sort_order);
+  return {
+    phone: org.data?.contact_phone ?? null,
+    email: org.data?.contact_email ?? null,
+    legalName: org.data?.legal_name ?? null,
+    description: org.data?.description ?? null,
+    activities: keyed.map((a) => a.key),
+    branches: (branches.data ?? []).map((b) => ({
+      id: b.id,
+      governorate: b.governorate_key,
+      city: b.city_key,
+      cityCustomName: b.city_custom_name,
+      address: b.address_ar ?? b.address_en,
+    })),
+  };
+}
+
+/** A verification request still waiting for an administrative decision. */
+export type PendingUserVerification = { id: string; status: string; verificationType: string };
+
+/**
+ * The open administrative verification request of each given user — ONE bounded read for a directory page
+ * (at most one page of ids), never a read per row. Business verification has its own queue and is excluded.
+ * When a user has several open requests the newest wins. A user with none is simply absent from the map.
+ * RLS decides what the caller may see; a failed read returns an empty map (the row then offers no decision
+ * rather than a wrong one) and is logged.
+ */
+export async function loadPendingUserVerifications(
   supabase: Client,
-  orgId: string,
-): Promise<{ phone: string | null; email: string | null }> {
-  const { data } = await supabase
-    .from("organizations")
-    .select("contact_phone, contact_email")
-    .eq("id", orgId)
+  userIds: readonly string[],
+): Promise<Map<string, PendingUserVerification>> {
+  const out = new Map<string, PendingUserVerification>();
+  if (userIds.length === 0) return out;
+  const { data, error } = await supabase
+    .from("verifications")
+    .select("id, user_id, status, verification_type, submitted_at")
+    .eq("subject_type", "user")
+    .in("user_id", [...userIds])
+    .in("status", [...OPEN_VERIFICATION_STATUSES])
+    .neq("verification_type", "business")
+    .order("submitted_at", { ascending: false });
+  if (error) {
+    console.error("[admin-directory] pending verifications failed", error);
+    return out;
+  }
+  for (const v of data ?? []) {
+    if (v.user_id && !out.has(v.user_id)) out.set(v.user_id, { id: v.id, status: v.status, verificationType: v.verification_type });
+  }
+  return out;
+}
+
+/**
+ * The open organization-approval request of each given organization — ONE bounded read for a directory page.
+ * Business verification (its own queue and permission) is excluded, mirroring the user loader.
+ */
+export async function loadPendingOrganizationVerifications(
+  supabase: Client,
+  organizationIds: readonly string[],
+): Promise<Map<string, PendingUserVerification>> {
+  const out = new Map<string, PendingUserVerification>();
+  if (organizationIds.length === 0) return out;
+  const { data, error } = await supabase
+    .from("verifications")
+    .select("id, organization_id, status, verification_type, submitted_at")
+    .eq("subject_type", "organization")
+    .eq("verification_type", "organization")
+    .in("organization_id", [...organizationIds])
+    .in("status", [...OPEN_VERIFICATION_STATUSES])
+    .order("submitted_at", { ascending: false });
+  if (error) {
+    console.error("[admin-directory] pending organization verifications failed", error);
+    return out;
+  }
+  for (const v of data ?? []) {
+    if (v.organization_id && !out.has(v.organization_id)) out.set(v.organization_id, { id: v.id, status: v.status, verificationType: v.verification_type });
+  }
+  return out;
+}
+
+/**
+ * RECOVERY lookup (professional user approvals only: an organization approval is applied atomically by a database trigger, so it is never left unapplied): the newest request of this user that is APPROVED but whose apply step never completed
+ * (`applied_at` is null). The detail RPCs do not expose applied_at, and an account type / verified flag is not a reliable
+ * proxy (a registrant may already carry the declared type), so the page reads the request itself. RLS scopes the read to
+ * reviewers. A failed read returns null: the page then simply offers no recovery button, and the server action
+ * independently fails closed.
+ */
+export async function loadUnappliedApproval(
+  supabase: Client,
+  subjectId: string,
+): Promise<PendingUserVerification | null> {
+  if (!UUID.test(subjectId)) return null;
+  const { data, error } = await supabase
+    .from("verifications")
+    .select("id, status, verification_type")
+    .eq("subject_type", "user")
+    .eq("user_id", subjectId)
+    .eq("status", "approved")
+    .is("applied_at", null)
+    // Professional approvals only: identity approvals never set applied_at, so they must not read as an incomplete upgrade.
+    .eq("verification_type", "professional")
+    .order("submitted_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
-  return { phone: data?.contact_phone ?? null, email: data?.contact_email ?? null };
+  if (error || !data) return null;
+  return { id: data.id, status: data.status, verificationType: data.verification_type };
 }

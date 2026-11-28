@@ -69,14 +69,40 @@ export const KNOWN_NOTIFICATION_EVENTS = [
   "job.assignment.completed",
   "job.assignment.cancelled",
   "job.review.received",
+  // Admin-only operational alerts (WhatsApp OTP budget and delivery health); statistics only.
+  "whatsapp_otp.budget_warning",
+  "whatsapp_otp.budget_critical",
+  "whatsapp_otp.budget_exhausted",
+  "whatsapp_otp.failure_rate",
+  "whatsapp_otp.audit_unmatched",
+  "whatsapp_otp.delivery_unmatched",
+] as const;
+
+/**
+ * Events whose text is NOT an i18n key: the database renders both languages from an admin-managed
+ * template when it writes the row (`content`), so there is no catalog entry to look up. Kept apart from
+ * KNOWN_NOTIFICATION_EVENTS on purpose: that list is the set the catalog must have copy for.
+ */
+export const TEMPLATE_NOTIFICATION_EVENTS = [
+  "marketplace.seller.approved",
+  "marketplace.seller.rejected",
+  "marketplace.seller.suspended",
+  "marketplace.seller.reinstated",
+  "marketplace.seller.revoked",
+  "marketplace.product.rejected",
 ] as const;
 
 export type KnownNotificationEvent = (typeof KNOWN_NOTIFICATION_EVENTS)[number];
 
 const KNOWN = new Set<string>(KNOWN_NOTIFICATION_EVENTS);
+const TEMPLATE_EVENTS = new Set<string>(TEMPLATE_NOTIFICATION_EVENTS);
 
 export function isKnownNotificationEvent(value: string): value is KnownNotificationEvent {
   return KNOWN.has(value);
+}
+
+export function isTemplateNotificationEvent(value: string): boolean {
+  return TEMPLATE_EVENTS.has(value);
 }
 
 /**
@@ -97,6 +123,11 @@ export type NotificationSource = {
   title_key: string;
   body_key: string | null;
   params: unknown;
+  /**
+   * Rendered bilingual snapshot written by `app.notify_from_template`:
+   * `{ ar: { title, body }, en: { title, body } }`. Null for key-based rows.
+   */
+  content?: unknown;
   read_at: string | null;
   created_at: string;
   organization_id: string | null;
@@ -137,6 +168,16 @@ function readParams(raw: unknown): Record<string, string | number> {
     if (typeof value === "string" || typeof value === "number") out[key] = value;
   }
   return out;
+}
+
+/** The reader's language of a template snapshot, or null when the row has none (or it is malformed). */
+function readRenderedContent(raw: unknown, locale: Locale): { title: string; body: string | null } | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const entry = (raw as Record<string, unknown>)[locale];
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+  const { title, body } = entry as Record<string, unknown>;
+  if (typeof title !== "string" || title.trim() === "") return null;
+  return { title, body: typeof body === "string" && body.trim() !== "" ? body : null };
 }
 
 /**
@@ -197,6 +238,24 @@ export function toNotificationView(
   locale: Locale,
   now?: Date,
 ): NotificationView {
+  // Template-written rows carry their own rendered text in both languages. Preferred over the key
+  // lookup because the text was frozen when the event happened, even if the template was edited since.
+  const rendered = readRenderedContent(row.content, locale);
+  if (rendered) {
+    return {
+      id: row.id,
+      eventType: row.event_type,
+      title: rendered.title,
+      body: rendered.body,
+      href: safeDeepLink(row.deep_link),
+      unread: row.read_at === null,
+      timeAgo: formatRelativeTime(row.created_at, locale, now),
+      timestamp: row.created_at,
+      organizationId: row.organization_id,
+      degraded: false,
+    };
+  }
+
   const vars = interpolationVars(readParams(row.params), locale);
 
   // `t()` returns the KEY itself when the catalog has no entry, so an unresolved

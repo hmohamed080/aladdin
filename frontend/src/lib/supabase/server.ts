@@ -62,15 +62,16 @@ export const getServerSupabase = cache(async function getServerSupabase(): Promi
  * which is THIS server's, not the person's. Forwarding the caller's own makes
  * "Active sessions" show their real browser and address (and gives Auth's
  * per-IP rate limits the real client instead of one shared server address).
- * The platform edge sets `x-forwarded-for`; nothing here trusts a value the
- * caller could invent beyond what the edge already passed through.
+ * The address comes ONLY from `cf-connecting-ip`, which the Cloudflare edge
+ * sets itself. `x-forwarded-for` and `x-real-ip` can arrive pre-filled by the
+ * caller, who could then choose the address Auth rate-limits and records.
  */
 async function callerNetworkHeaders(): Promise<Record<string, string>> {
   try {
     const incoming = await headers();
     const out: Record<string, string> = {};
     const userAgent = incoming.get("user-agent");
-    const forwardedFor = incoming.get("x-forwarded-for") ?? incoming.get("x-real-ip");
+    const forwardedFor = incoming.get("cf-connecting-ip");
     if (userAgent) out["User-Agent"] = userAgent;
     if (forwardedFor) out["X-Forwarded-For"] = forwardedFor;
     return out;

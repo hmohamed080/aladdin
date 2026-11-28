@@ -1,6 +1,9 @@
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { adminSummary } from "@/server/queries/admin";
+import { loadOrganizationsDirectory, loadUsersDirectory } from "@/server/queries/admin-directory";
+import { dashboardUserCards } from "@/lib/admin/dashboard-user-counts";
+import { dashboardOrgCards } from "@/lib/admin/dashboard-org-counts";
 import { previewDashboardExtras } from "@/server/queries/admin-preview";
 import { createTranslator, getMessages } from "@/lib/i18n/translate";
 import { formatCount } from "@/lib/ui/format";
@@ -49,14 +52,24 @@ export default async function AdminPreviewDashboardPage() {
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const m = getMessages(locale);
   const t = createTranslator(locale);
-  const [s, extras] = await Promise.all([adminSummary(supabase), previewDashboardExtras(supabase)]);
+  const [s, extras, tabs, orgTabs] = await Promise.all([
+    adminSummary(supabase),
+    previewDashboardExtras(supabase),
+    // The same tab counts the Users directory shows, so each card equals the list it links to.
+    loadUsersDirectory(supabase, { search: null, status: null, accountType: null, verification: null, governorate: null, page: 1, pageSize: 10, sort: "registered:desc" }),
+    // The same tab counts the Organizations directory shows (approval), so each organization card equals the list it links to.
+    loadOrganizationsDirectory(supabase, { search: null, status: null, orgType: null, page: 1, pageSize: 10, sort: "registered:desc" }),
+  ]);
 
   const totalUsers = Object.values(s.usersByStatus).reduce((a, b) => a + b, 0);
-  const verifiedUsers = s.usersByStatus.active ?? 0;
-  const pendingUsers = s.usersByStatus.pending_verification ?? 0;
+  // Pending / Verified / Rejected are the Users directory's own tab counts (a dash when that read fails).
+  const userCards = dashboardUserCards(tabs);
+  const verifiedUsers = userCards.verified;
+  const pendingUsers = userCards.pending;
   const suspendedUsers = s.usersByStatus.suspended ?? 0;
-  const pendingOrgs = s.orgsByStatus.pending_verification ?? 0;
-  const suspendedOrgs = s.orgsByStatus.suspended ?? 0;
+  // Organization APPROVAL cards are the directory's own tab counts (a dash when that read fails); the lifecycle distribution
+  // below keeps showing the actual organizations.status values.
+  const orgCards = dashboardOrgCards(orgTabs);
   // `orgsTotal` counts every stored organization, archived ones included; the Organizations directory
   // lists non-archived ones only. Say so on the tile instead of leaving the two numbers to disagree.
   const archivedOrgs = s.orgsByStatus.archived ?? 0;
@@ -87,7 +100,7 @@ export default async function AdminPreviewDashboardPage() {
     },
     {
       label: cards.rejected,
-      value: extras.rejectedUserVerifications,
+      value: userCards.rejected,
       Icon: XIcon,
       tone: "danger",
       href: "/admin/users?status=rejected",
@@ -101,14 +114,14 @@ export default async function AdminPreviewDashboardPage() {
     },
     {
       label: cards.organizations,
-      value: s.orgsTotal,
+      value: orgCards.all,
       hint: archivedOrgs > 0 ? t("admin.preview.dashboard.cards.organizationsIncludesArchived", { n: formatCount(archivedOrgs, locale) }) : undefined,
       Icon: BuildingIcon,
       href: "/admin/organizations",
     },
     {
       label: cards.pendingOrgVerification,
-      value: pendingOrgs,
+      value: orgCards.pending,
       Icon: ClockIcon,
       tone: "warning",
       href: "/admin/organizations?status=pending",
@@ -121,8 +134,22 @@ export default async function AdminPreviewDashboardPage() {
       href: "/admin/review",
     },
     {
+      label: cards.approvedOrgs,
+      value: orgCards.approved,
+      Icon: BadgeCheckIcon,
+      tone: "success",
+      href: "/admin/organizations?status=verified",
+    },
+    {
+      label: cards.rejectedOrgs,
+      value: orgCards.rejected,
+      Icon: XIcon,
+      tone: "danger",
+      href: "/admin/organizations?status=rejected",
+    },
+    {
       label: cards.suspendedOrgs,
-      value: suspendedOrgs,
+      value: orgCards.suspended,
       Icon: ShieldIcon,
       tone: "warning",
       href: "/admin/organizations?status=suspended",

@@ -13,8 +13,6 @@ import type { ProfileCompletion, ProfileCompletionItem } from "@/server/queries/
  *   * identity items → `/settings/profile`, the workspace-independent route
  *     (a business-intent account with zero organizations has neither `/home`
  *     nor `/b2b` settings);
- *   * username → `/onboarding/username`, the only state it is ever missing in
- *     (`username_pending`);
  *   * professional items → `/home/profile/edit` — only returned for a
  *     professional persona, which always has a Personal workspace;
  *   * organization_setup → `/business/new` (any caller with app access);
@@ -25,18 +23,28 @@ import type { ProfileCompletion, ProfileCompletionItem } from "@/server/queries/
  * returned today (no locality write path exists yet).
  */
 export const ITEM_HREF: Record<ProfileCompletionItem, string> = {
-  username: "/onboarding/username",
   avatar: "/settings/profile#identity",
   phone: "/settings/profile#phone",
   display_name: "/settings/profile#display-name",
   locality: "/settings/profile",
   headline: "/home/profile/edit",
-  years_experience: "/home/profile/edit",
-  activities: "/home/profile/edit",
+  years_experience: "/home/profile#basic",
+  activities: "/home/profile#basic",
   bio: "/home/profile/edit",
   organization_address: "/b2b/settings",
+  organization_links: "/b2b/settings",
   organization_activities: "/b2b/settings",
   organization_setup: "/business/new",
+  availability: "/home/profile#availability",
+  location: "/home/profile#basic",
+  portfolio: "/home/profile#portfolio",
+  // Returned only for an Engineer, whose steps are completed on one page.
+  governorate: "/home/profile/complete",
+  city: "/home/profile/complete",
+  specialization: "/home/profile/complete",
+  services: "/home/profile/complete",
+  work_status: "/home/profile/complete",
+  readiness: "/home/profile/complete",
 };
 
 /**

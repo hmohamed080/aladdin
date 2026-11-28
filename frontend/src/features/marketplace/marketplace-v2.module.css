@@ -1,0 +1,88 @@
+/* Marketplace PR 9: the Amazon-sized product card, the delivery-details block, the vertical-thumbnail gallery, the
+   seller line / official-store badge, the seller storefront header and the closed state. Same landing/brand tokens as
+   marketplace.module.css; --info is the design system's blue (the «Official Store» badge). */
+
+/* ---- grid: Amazon-sized cards (about 240px wide), as many per row as fit ---- */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 232px), 1fr)); gap: 16px; padding: 0; margin: 0; list-style: none; }
+
+.card { position: relative; display: flex; flex-direction: column; height: 100%; border: 1px solid var(--quartz-line); border-radius: 12px; background: var(--quartz-raised); overflow: hidden; transition: border-color .15s ease; }
+.card:hover, .card:focus-within { border-color: var(--lumen); }
+.media { position: relative; display: block; aspect-ratio: 1 / 1; background: var(--sand); overflow: hidden; }
+.image { width: 100%; height: 100%; object-fit: contain; background: var(--quartz-raised); }
+.placeholder { display: grid; height: 100%; place-items: center; color: var(--stone); }
+.body { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px 14px; }
+.sellerLine { display: flex; align-items: center; gap: 6px; margin: 0; font-size: .75rem; color: var(--stone); min-width: 0; }
+.sellerLine a { color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sellerLine a:hover { text-decoration: underline; }
+.title { margin: 0; font-size: .9375rem; font-weight: 600; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.title a:hover { text-decoration: underline; }
+.meta { margin: 0; font-size: .75rem; color: var(--stone); }
+.price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; margin: 4px 0 0; }
+.price strong { font-size: 1.25rem; color: var(--ink); }
+.from { font-size: .75rem; color: var(--stone); }
+.freeBadge { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 2px 8px; border-radius: 6px; background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); font-size: .75rem; font-weight: 700; }
+.estimate { display: flex; align-items: center; gap: 6px; margin: 0; font-size: .8125rem; color: var(--ink); }
+.estimate svg { flex: none; color: var(--stone); }
+.lowStock { margin: 0; font-size: .8125rem; font-weight: 700; color: var(--danger); }
+.pickup { margin: 0; font-size: .75rem; color: var(--stone); }
+.cardAction { margin-block-start: auto; padding-block-start: 8px; display: grid; }
+
+/* ---- official store badge (blue) ---- */
+.official { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info); font-size: .75rem; font-weight: 700; white-space: nowrap; }
+a.official:hover { text-decoration: underline; }
+.officialIcon { flex: none; color: var(--info); }
+
+/* ---- product page ---- */
+.sellerBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; font-size: .9375rem; }
+.sellerBar a.sellerLink { color: var(--lumen-ink); font-weight: 700; }
+.sellerBar a.sellerLink:hover { text-decoration: underline; }
+.crumbIcon { flex: none; color: var(--stone); }
+.lowStockPage { margin: 0; font-size: .9375rem; font-weight: 700; color: var(--danger); }
+
+/* gallery: large preview with a vertical strip of thumbnails beside it (under it on small screens) */
+.galleryRow { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; align-items: start; }
+/* a product with one image (or none) has no thumbnail strip: without this the preview fell into the 76px strip column */
+.galleryRowSingle { grid-template-columns: minmax(0, 1fr); }
+.thumbCol { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; max-height: 520px; overflow-y: auto; scrollbar-width: thin; }
+.thumbCol button { display: block; width: 100%; padding: 0; border: 2px solid var(--quartz-line); border-radius: 8px; overflow: hidden; background: var(--quartz-raised); cursor: pointer; }
+.thumbCol button:focus-visible { outline: 2px solid var(--shell-deep); outline-offset: 2px; }
+.thumbCol img { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; }
+.thumbOn { border-color: var(--lumen) !important; }
+.mainFrame { position: relative; aspect-ratio: 1 / 1; border: 1px solid var(--quartz-line); border-radius: 12px; overflow: hidden; background: var(--quartz-raised); }
+.mainFrame img { width: 100%; height: 100%; object-fit: contain; }
+
+/* delivery details block */
+.delivery { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--quartz-line); border-radius: 12px; background: var(--quartz-raised); }
+.deliveryTitle { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 700; }
+.deliveryTitle svg { color: var(--stone); }
+.deliveryLine { margin: 0; font-size: .9375rem; line-height: 1.5; }
+.deliveryStrong { font-weight: 700; }
+.deliveryMuted { margin: 0; font-size: .8125rem; color: var(--stone); }
+.deliveryWarn { margin: 0; font-size: .8125rem; color: var(--danger); }
+.faster { border-block-start: 1px solid var(--quartz-line); padding-block-start: 8px; }
+.faster summary { cursor: pointer; font-size: .875rem; font-weight: 700; min-height: 32px; display: flex; align-items: center; }
+.faster p { margin: 6px 0 0; font-size: .875rem; }
+
+/* seller storefront */
+.storeHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 20px clamp(16px, 3vw, 32px); border: 1px solid var(--quartz-line); border-radius: 16px; background: var(--quartz-raised); }
+.storeName { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 1.5rem; color: var(--shell-deep); }
+.storeCount { margin: 4px 0 0; color: var(--stone); font-size: .9375rem; }
+
+/* closed state */
+.closed { display: grid; justify-items: center; gap: 8px; padding: 64px 16px; margin-block: 32px; text-align: center; border: 1px dashed var(--quartz-line-strong); border-radius: 16px; }
+.closed h1 { margin: 0; font-size: 1.5rem; }
+.closed p { margin: 0; color: var(--stone); }
+
+@media (max-width: 767px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .body { padding: 10px; }
+  .galleryRow { grid-template-columns: 1fr; }
+  .galleryRow > .thumbCol { order: 2; display: flex; max-height: none; overflow-x: auto; overflow-y: hidden; }
+  .thumbCol li { flex: 0 0 64px; }
+}
+@media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+
+/* place picker: the canonical Select, with its semantic tokens pointed at this fixed-light shell (it rendered dark in dark mode) */
+.picker { display: grid; gap: 8px; --canvas: var(--quartz-raised); --field: var(--quartz-raised); --field-fg: var(--ink); --field-line: var(--quartz-line-strong); --field-placeholder: var(--stone);
+  --surface: var(--quartz-raised); --surface-2: var(--quartz-sunk, var(--sand)); --surface-hover: var(--sand); --fg: var(--ink); --fg-secondary: var(--stone); --fg-muted: var(--stone);
+  --border: var(--quartz-line); --border-strong: var(--quartz-line-strong); color: var(--ink); }

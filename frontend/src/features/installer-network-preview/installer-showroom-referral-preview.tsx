@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { Button, Input, LabeledField, Textarea } from "@/components/ui/controls";
 import {
   BuildingIcon,
@@ -74,6 +74,9 @@ const copy = {
     submit: "إرسال الطلب",
     submitted: "تمت محاكاة إرسال الطلب",
     success: "تمت محاكاة الإرسال داخل المعاينة فقط، ولم تُحفظ أي بيانات.",
+    sending: "جارٍ الإرسال…",
+    saveError: "تعذّر إرسال الطلب. راجع البيانات وحاول مرة أخرى.",
+    typePrefix: "نوع المعرض",
     required: "هذا الحقل مطلوب.",
     phoneError: "أدخل رقم هاتف صحيحًا.",
     activities: {
@@ -106,6 +109,9 @@ const copy = {
     submit: "Send request",
     submitted: "Request simulated",
     success: "Submission was simulated in this preview only. No data was saved.",
+    sending: "Sending…",
+    saveError: "The request could not be sent. Check the details and try again.",
+    typePrefix: "Showroom type",
     required: "This field is required.",
     phoneError: "Enter a valid phone number.",
     activities: {
@@ -247,9 +253,37 @@ export function InstallerShowroomReferralPreview({
   theme: "light" | "dark";
   sidebarMode: SidebarMode;
 }) {
+  const { dir } = useI18n();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  return (
+    <div data-installer-showroom-referral-preview="" dir={dir} className="installer-surface flex min-h-dvh bg-workspace">
+      <InstallerSidebar
+        initialMode={sidebarMode}
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
+        previewActiveItemId="my-showrooms"
+      />
+
+      <div className={`${INSTALLER_SHELL_GUTTER_CLASS} flex min-w-0 flex-1 flex-col gap-4 pb-8 pt-2 tablet:pb-10 tablet:pt-3`}>
+        <InstallerTopbar theme={theme} onMenuClick={() => setMobileNavOpen(true)} />
+        <main id="top" className={`${INSTALLER_CONTENT_FRAME_CLASS} flex flex-1 flex-col gap-md`}>
+          <ShowroomReferralBody />
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The approved "Add a showroom I know" page body. Without `submitAction` (the preview) a valid submission is only
+ * simulated; with it (`/home/network/refer`) the referral is sent to the real `network_referral_create_new` path. The
+ * database has no showroom-type column, so the chosen type is recorded at the start of the note the reviewer reads.
+ */
+export function ShowroomReferralBody({ submitAction, notice }: { submitAction?: (fd: FormData) => Promise<void>; notice?: ReactNode }) {
   const { locale, dir } = useI18n();
   const c = copy[locale];
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sending, startSending] = useTransition();
   const [governorate, setGovernorate] = useState("");
   const [city, setCity] = useState("");
   const [customCity, setCustomCity] = useState("");
@@ -287,22 +321,25 @@ export function InstallerShowroomReferralPreview({
       return;
     }
 
-    setSubmitted(true);
+    if (!submitAction) {
+      setSubmitted(true);
+      return;
+    }
+    const cityLabel = city === "other" ? customCity.trim() : city;
+    const note = String(data.get("note") ?? "").trim();
+    const body = new FormData();
+    body.set("displayName", String(data.get("showroomName") ?? "").trim());
+    body.set("governorate", governorate);
+    body.set("city", cityLabel);
+    if (phone) body.set("phone", phone.e164);
+    body.set("note", [`${c.typePrefix}: ${activity ? c.activities[activity] : ""}`, note].filter(Boolean).join(" | ").slice(0, 500));
+    startSending(async () => {
+      await submitAction(body);
+    });
   };
 
   return (
-    <div data-installer-showroom-referral-preview="" dir={dir} className="installer-surface flex min-h-dvh bg-workspace">
-      <InstallerSidebar
-        initialMode={sidebarMode}
-        mobileOpen={mobileNavOpen}
-        onCloseMobile={() => setMobileNavOpen(false)}
-        previewActiveItemId="my-showrooms"
-      />
-
-      <div className={`${INSTALLER_SHELL_GUTTER_CLASS} flex min-w-0 flex-1 flex-col gap-4 pb-8 pt-2 tablet:pb-10 tablet:pt-3`}>
-        <InstallerTopbar theme={theme} onMenuClick={() => setMobileNavOpen(true)} />
-
-        <main id="top" className={`${INSTALLER_CONTENT_FRAME_CLASS} flex flex-1 flex-col gap-md`}>
+    <>
           <section className="relative isolate overflow-hidden rounded-lg border border-strong bg-surface" aria-labelledby="referral-page-title">
             <div dir="ltr" className="relative flex flex-col overflow-hidden tablet:block tablet:min-h-48 desktop:min-h-52">
               {/* Phones: a short artwork strip with the title on a solid surface
@@ -449,9 +486,10 @@ export function InstallerShowroomReferralPreview({
                   </div>
 
                   <LabeledField label={c.note} htmlFor="showroomNote">
-                    <Textarea id="showroomNote" name="note" maxLength={600} placeholder={c.notePlaceholder} className="min-h-24 resize-y" />
+                    <Textarea id="showroomNote" name="note" maxLength={440} placeholder={c.notePlaceholder} className="min-h-24 resize-y" />
                   </LabeledField>
 
+                  {notice}
                   {submitted ? (
                     <div role="status" className="flex items-start gap-sm rounded-md border border-accent/45 bg-accent/10 p-md text-body text-fg">
                       <CheckIcon size={18} className="mt-0.5 shrink-0 text-accent" />
@@ -459,9 +497,9 @@ export function InstallerShowroomReferralPreview({
                     </div>
                   ) : null}
 
-                  <Button type="submit" disabled={submitted} className="min-h-12 w-full text-body-lg">
+                  <Button type="submit" disabled={submitted || sending} aria-busy={sending} className="min-h-12 w-full text-body-lg">
                     <SendIcon size={19} />
-                    {submitted ? c.submitted : c.submit}
+                    {submitted ? c.submitted : sending ? c.sending : c.submit}
                   </Button>
                 </form>
               </div>
@@ -480,8 +518,10 @@ export function InstallerShowroomReferralPreview({
               </div>
             </div>
           </section>
-        </main>
-      </div>
-    </div>
+    </>
   );
+}
+
+export function referralSaveErrorText(locale: "ar" | "en"): string {
+  return copy[locale].saveError;
 }

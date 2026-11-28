@@ -67,7 +67,7 @@ const copyItem = {
   },
 };
 
-export function LandingHero() {
+export function LandingHero({ showCart = false }: { showCart?: boolean } = {}) {
   const { locale, dir } = useI18n();
   const copy = content[locale];
   const isArabic = locale === "ar";
@@ -84,7 +84,7 @@ export function LandingHero() {
       id="landing-top"
       data-landing-preview-part="Hero"
     >
-      <LandingHeader />
+      <LandingHeader showCart={showCart} />
       <div
         className={`${styles.heroFrame} ${headerStyles.stage}`}
         dir="ltr"
@@ -108,8 +108,16 @@ export function LandingHero() {
             alt=""
             width={1728}
             height={735}
+            // The mobile and desktop LCP element: `priority` preloads it, and
+            // `fetchPriority` puts that request (and the <img>'s) ahead of the
+            // fonts, CSS and scripts it shares the first second with. It spans
+            // the section, which stops growing at 2560 px (`landing-hero-width.module.css`). Under 768 px it is
+            // drawn `object-fit: cover` over a 640 px-tall frame, wider than
+            // the viewport; `100vw` there is a deliberate weight cap (the
+            // image sits at 38% opacity behind the copy), not an oversight.
             priority
-            sizes="100vw"
+            fetchPriority="high"
+            sizes="(min-width: 2560px) 2560px, 100vw"
           />
         </div>
 

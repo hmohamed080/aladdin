@@ -203,8 +203,9 @@ no Admin UI change is required. The Admin queue shows the raw type string for th
 
 ## Open decisions flagged for the owner
 
-1. Registration-time Contractor / Engineer **organization** choice is implemented but stays behind the existing
-   Coming Soon gate for those two accounts until M4 and an explicit go-ahead.
+1. Registration-time Contractor / Engineer **organization** choice is implemented. The Contractor stays behind the
+   existing Coming Soon gate until M4 and an explicit go-ahead. The Engineer gate was opened by the owner on
+   2026-11-28 (`20261128090007`); the `independent_commerce` flag is unchanged.
 2. Whether an Engineering Office / Contractor Organization co-owner (not an Engineer / Contractor persona) should also
    become eligible through a verified co-ownership (see B, scope note).
 3. M4 scope split: whether Direct RFQ / quotation / order / chat for an independent publisher ships with M4 or as

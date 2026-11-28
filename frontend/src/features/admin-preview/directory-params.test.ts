@@ -69,8 +69,13 @@ describe("parseUsersDirectoryParams", () => {
     expect(p).toMatchObject({ status: null, accountType: null, verification: null, governorate: null });
   });
 
-  it("does not accept a business classification as a persona filter", () => {
-    expect(parseUsersDirectoryParams({ type: "showroom_dealer" }).accountType).toBeNull();
+  it("accepts each of the nine account keys and none, never an internal organization type", () => {
+    for (const type of ["showroom_dealer", "supplier", "manufacturer", "importer", "contractor", "engineer", "installer_technician", "sales", "end_consumer", "none"]) {
+      expect(parseUsersDirectoryParams({ type }).accountType, type).toBe(type);
+    }
+    expect(parseUsersDirectoryParams({ type: "contractor_company" }).accountType).toBeNull();
+    expect(parseUsersDirectoryParams({ type: "design_office" }).accountType).toBeNull();
+    expect(parseUsersDirectoryParams({ type: "salesperson" }).accountType).toBeNull();
   });
 
   it("takes the first value of a repeated parameter", () => {
@@ -80,11 +85,13 @@ describe("parseUsersDirectoryParams", () => {
 
 describe("parseOrgsDirectoryParams", () => {
   it("accepts only the organization status tabs, types and sorts", () => {
-    expect(parseOrgsDirectoryParams({ status: "rejected", type: "importer", sort: "completeness:desc" })).toMatchObject({
+    expect(parseOrgsDirectoryParams({ status: "attention", type: "importer", sort: "completeness:desc" })).toMatchObject({
       status: null,
       orgType: "importer",
       sort: "registered:desc",
     });
+    // Rejected is a real organization tab (approval decision); "attention" belongs to Users only.
+    expect(parseOrgsDirectoryParams({ status: "rejected" }).status).toBe("rejected");
     expect(parseOrgsDirectoryParams({ status: "pending", sort: "registered:asc", page: "4" })).toMatchObject({
       status: "pending",
       sort: "registered:asc",

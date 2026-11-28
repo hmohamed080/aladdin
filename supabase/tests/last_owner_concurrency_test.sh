@@ -5,11 +5,9 @@ set -euo pipefail
 # stable organization row lock while transaction 2 enters the revoke RPC. The
 # second call must block, then re-check committed state and fail, leaving one owner.
 
-db_container="$(docker ps --filter 'name=supabase_db_aladdin' --format '{{.Names}}' | head -n 1)"
-if [[ -z "${db_container}" ]]; then
-  echo "Supabase database container not found" >&2
-  exit 1
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/db_target.sh"
+db_target_require   # explicit DB_CONTAINER only; refuses shared / ambiguous / remote targets (no auto-selection)
+db_target_mark_dirty "$(basename "$0")"   # this script changes shared/seed rows: pgTAP must not run on this database afterwards
 
 docker exec -i "${db_container}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
 insert into public.membership_capabilities (membership_id, capability_key)

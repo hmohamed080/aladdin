@@ -287,7 +287,7 @@ The earlier "requester organization must be live" condition applies **only when 
 
 ## V6. network.refer / candidates / contacts / Points
 
-Implemented in Milestone A (`20261018090001`, `20261018090002`):
+Implemented in Milestone A (`20261021090004`, `20261018090002`):
 - `network.refer` capability; owners grant it through the existing no-escalation RPC without receiving anything extra; `org.manage` implies it.
 - `network_candidates` is a **separate** table (not new columns on `network_referrals`) so the showroom approve RPC, which materialises an organization and pays the Points event, can never be reached by the new kinds. Approve/reject are status changes: no Auth user, no organization, no profile, no contact exposure, no Points.
 - `organization_contacts` + `profile_contact_visibility`: three independent flags, default false; readers `business_contact` / `craftsman_contact` need an active member workspace and a directory-eligible target; candidate contacts are never read by them.

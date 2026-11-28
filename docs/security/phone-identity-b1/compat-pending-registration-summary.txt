@@ -1,0 +1,6 @@
+db reset: ok (197 migrations applied from scratch, incl. 20261030090001)
+pgTAP focused (22 files): Files=22, Tests=873,  5 wallclock secs ( 0.28 usr  0.09 sys +  0.39 cusr  0.46 csys =  1.22 CPU) Result: PASS  -> ok
+frontend unit:  Tests 69 passed | 10 skipped (79) -> ok
+real-database integration:  Tests 10 passed (10) -> ok
+installer phone-change concurrency (existing): installer phone change concurrency proof passed -> ok
+RESULT [focused unit integration concurrency]: PASS

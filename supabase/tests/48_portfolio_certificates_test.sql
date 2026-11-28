@@ -33,6 +33,19 @@
 create extension if not exists pgtap;
 
 begin;
+
+-- Synthetic verifier evidence for existing metadata/lifecycle tests only.
+-- The missing-object and forged-receipt security regression is covered by 78.
+create function pg_temp.attest_owned_fixture() returns void language sql security definer set search_path='' as $$
+  insert into public.media_storage_locations(namespace,object_key,owner_user_id,provider,content_type,size_bytes,sha256,verified_at)
+  select ns,key,owner,'supabase',mime,100,repeat('a',64),now() from (
+    select 'portfolio' ns,object_key key,owner_user_id owner,content_type mime from public.portfolio_items where state='pending'
+    union all select 'certificate',object_path,owner_user_id,content_type from public.professional_certificates where state='pending'
+    union all select 'avatar',object_key,owner_user_id,content_type from public.avatar_uploads where state='pending'
+  ) f where owner=(select auth.uid())
+  on conflict(namespace,object_key) do nothing;
+$$;
+
 select plan(91);
 
 \set owner_a '70000009-0000-4000-8000-000000000009'
@@ -291,6 +304,7 @@ select throws_ok(
   'An UNFINISHED item cannot be published: a title and an intention are not a photo (§7)'
 );
 
+select pg_temp.attest_owned_fixture();
 select lives_ok(
   format($$select public.portfolio_item_finalize(%L)$$, current_setting('test.item')),
   'Finalizing marks it ready...'
@@ -300,6 +314,7 @@ select is(
   'private',
   '...and leaves it PRIVATE: bytes arriving is not a decision to show them to anyone (S1)'
 );
+select pg_temp.attest_owned_fixture();
 select lives_ok(
   format($$select public.portfolio_item_finalize(%L)$$, current_setting('test.item')),
   'and finalize is idempotent, so a client that lost the response simply calls again'
@@ -625,6 +640,7 @@ select is(
 set local role authenticated;
 set local request.jwt.claims to '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
 
+select pg_temp.attest_owned_fixture();
 select lives_ok(
   format($$select public.certificate_finalize(%L)$$, current_setting('test.cert')),
   'The owner finalizes their certificate'

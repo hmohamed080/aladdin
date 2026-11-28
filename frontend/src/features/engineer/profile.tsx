@@ -26,14 +26,13 @@ import {
 } from "@/server/queries/engineer-collections";
 import { loadProfilePublication } from "@/server/queries/professional-profile";
 import { listMyPortfolio } from "@/server/queries/portfolio";
-import { listMyReviews } from "@/server/queries/reviews";
+import { listMyReviewsPage, loadMyReviewSummary } from "@/server/queries/reviews";
 import { listMyNetworkOrganizations } from "@/server/queries/network";
 import {
   listMyAssignments,
   countAssignmentsByStatus,
 } from "@/server/queries/job-assignments";
 import { createAssetReadUrl } from "@/server/actions/professional-assets";
-import { summarizeReviews } from "@/lib/reviews/summary";
 import { createTranslator } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/locales";
 import { EngineerSection, EngineerEmpty } from "./sections";
@@ -49,12 +48,13 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
   const ar = locale === "ar";
   const samples = localEngineerSamples();
   const t = createTranslator(locale);
-  const [identity, publication, portfolio, reviews, network, assignments, coverage] =
+  const [identity, publication, portfolio, { reviews }, summary, network, assignments, coverage] =
     await Promise.all([
       loadMyIdentity(),
       loadProfilePublication(),
       listMyPortfolio(),
-      listMyReviews(),
+      listMyReviewsPage(),
+      loadMyReviewSummary(),
       listMyNetworkOrganizations(supabase),
       listMyAssignments(supabase),
       loadMyServiceAreas(),
@@ -67,7 +67,6 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
       return { ...p, url: result?.ok ? result.url : null };
     }),
   );
-  const summary = summarizeReviews(reviews);
   const teams = (await loadEngineerCollections()).filter(
     (collection) => collection.kind === "team",
   );

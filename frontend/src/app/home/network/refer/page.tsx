@@ -10,6 +10,9 @@ import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
 import { NetworkReferralForm } from "@/features/network/referral-form";
+import { ShowroomReferralBody, referralSaveErrorText } from "@/features/installer-network-preview/installer-showroom-referral-preview";
+import { InlineError } from "@/components/ui/primitives";
+import { createNewReferral } from "@/server/actions/network-referrals";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +40,20 @@ export default async function NetworkReferPage({
   if (home.variant !== "professional") return <NoProfessionalProfile />;
 
   const store = await cookies();
-  const t = createTranslator(resolveLocale(store.get(LOCALE_COOKIE)?.value));
+  const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
+  const t = createTranslator(locale);
 
   const { q, error } = await searchParams;
+
+  // An Installer gets the approved "Add a showroom I know" design (`/preview/installer-network/refer`), submitting to
+  // the real referral path (pending Admin review; +100 Points when a new business is approved).
+  if (home.accountType === "installer_technician") {
+    return (
+      <div className="flex w-full min-w-0 flex-col gap-md" data-installer-referral>
+        <ShowroomReferralBody submitAction={createNewReferral} notice={error ? <InlineError>{referralSaveErrorText(locale)}</InlineError> : null} />
+      </div>
+    );
+  }
   const query = (q ?? "").trim();
   const results = query.length >= 2 ? await searchOrganizationsForReferral(supabase, query) : [];
 

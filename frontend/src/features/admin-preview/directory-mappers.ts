@@ -72,13 +72,16 @@ export type UserFlag = "verification_issue";
 export type AdminDirectoryUser = {
   id: string;
   displayName: LocalizedName;
-  username: string | null;
   /** The account email, already stripped of the Installer login alias by the database. */
   email: string | null;
   /** Canonical E.164 phone. */
   phone: string | null;
   accountType: string | null;
+  /** What the person registered as: their persona, else the business type they chose or belong to. */
+  registeredAccount?: string | null;
   status: string;
+  /** Derived sign-up progress (ADR-0031): unverified | consent_pending | account_type_pending | access_ready | active_personal | manually_blocked. Null from an older database. */
+  registrationState?: string | null;
   isVerified: boolean;
   createdAt: string;
   verificationState: UserVerificationState;
@@ -103,6 +106,11 @@ function displayNameOf(o: Obj): LocalizedName {
   return { name: str(o.display_name) ?? "", nameAr: str(o.display_name_ar), nameEn: str(o.display_name_en) };
 }
 
+/**
+ * Phase 1 (account identity): the application username is no longer shown or
+ * searchable. Until migration M3 the directory RPCs may still emit a legacy
+ * `username` key (and `username` in `completion.missing`); both are ignored here.
+ */
 export function mapDirectoryUser(raw: unknown): AdminDirectoryUser | null {
   const o = obj(raw);
   const id = str(o?.id);
@@ -114,11 +122,12 @@ export function mapDirectoryUser(raw: unknown): AdminDirectoryUser | null {
   return {
     id,
     displayName: displayNameOf(o),
-    username: str(o.username),
     email: str(o.email),
     phone: str(o.phone),
     accountType: str(o.account_type),
+    registeredAccount: str(o.registered_account),
     status,
+    registrationState: str(o.registration_state),
     isVerified: bool(o.is_verified),
     createdAt,
     verificationState: verificationState(o.verification_state),
@@ -134,8 +143,15 @@ export function mapDirectoryUser(raw: unknown): AdminDirectoryUser | null {
 }
 
 export function mapUsersPage(raw: unknown): DirectoryPage<AdminDirectoryUser, UserStatusTab> | null {
-  return mapPage(raw, mapDirectoryUser, ["pending", "verified", "suspended", "rejected"] as const);
+  return mapPage(raw, mapDirectoryUser, ["pending", "verified", "suspended", "rejected", "attention"] as const);
 }
+
+export type AdminVerificationEvent = {
+  /** `verification.admin_initiated` | `.review_started` | `.changes_requested` | `.approved` | `.rejected` */
+  action: string;
+  actorName: string | null;
+  at: string;
+};
 
 export type AdminVerification = {
   id: string;
@@ -145,7 +161,20 @@ export type AdminVerification = {
   reason: string | null;
   submittedAt: string;
   decidedAt: string | null;
+  /** Decision history from the immutable Audit Log, oldest first: who did what, and when. */
+  events: AdminVerificationEvent[];
+  /** The reviewing Admin; null while nobody has claimed the request. */
+  reviewerName: string | null;
+  /** The request was started by an Admin rather than submitted by the account owner. */
+  initiatedByAdmin: boolean;
 };
+
+function mapVerificationEvent(raw: unknown): AdminVerificationEvent | null {
+  const o = obj(raw);
+  const action = str(o?.action);
+  const at = str(o?.at);
+  return o && action && at ? { action, actorName: str(o.actor_name), at } : null;
+}
 
 function mapVerification(raw: unknown): AdminVerification | null {
   const o = obj(raw);
@@ -160,6 +189,9 @@ function mapVerification(raw: unknown): AdminVerification | null {
     reason: str(o.reason),
     submittedAt,
     decidedAt: str(o.decided_at),
+    reviewerName: str(o.reviewer_name),
+    initiatedByAdmin: o.initiated_by_admin === true,
+    events: mapAll(o.events, mapVerificationEvent),
   };
 }
 
@@ -188,7 +220,7 @@ export function mapUserDetail(raw: unknown): AdminUserDetail | null {
   const completion = obj(o.completion);
   return {
     ...pick(base, [
-      "id", "displayName", "username", "email", "phone", "accountType", "status", "isVerified", "createdAt",
+      "id", "displayName", "email", "phone", "accountType", "registeredAccount", "status", "isVerified", "createdAt",
       "verificationState", "governorate", "city", "profileId", "publicProfileAvailable",
     ] as const),
     headline: str(o.headline),
@@ -196,7 +228,7 @@ export function mapUserDetail(raw: unknown): AdminUserDetail | null {
     lastSignInAt: str(o.last_sign_in_at),
     completion: {
       percent: Math.min(100, Math.max(0, num(completion?.percent) ?? 0)),
-      missing: strings(completion?.missing),
+      missing: strings(completion?.missing).filter((key) => key !== "username"),
     },
     memberships: mapAll(o.memberships, (r) => {
       const m = obj(r);
@@ -221,6 +253,36 @@ export function mapUserDetail(raw: unknown): AdminUserDetail | null {
 
 export type OrgVerificationState = "verified" | "pending" | "unverified";
 
+/**
+ * Organization APPROVAL (the decision on the organization application), separate from the LIFECYCLE `status`.
+ * The database computes `approval_state` for the directory rows AND the detail page with the same expression
+ * (20261116090001_admin_organizations_approval_state.sql) and the frontend REQUIRES it: a database without that migration yields a
+ * safe error state (shape failure), never a guessed state. `organizationApprovalState` below is the mirror the tests use to pin the
+ * SQL and the frontend rule to each other; it is not a runtime fallback.
+ *   approved - is_verified or status = 'active'
+ *   rejected - not approved and the latest ORGANIZATION request (type 'organization', newest submitted_at, created_at, id) is rejected
+ *   pending  - not approved/rejected and a request is open (submitted / under_review / needs_more_info) or status = 'pending_verification'
+ *   none     - everything else (draft, archived, an abandoned application whose latest request is cancelled, ...)
+ */
+export type OrgApprovalState = "approved" | "pending" | "rejected" | "none";
+const ORG_APPROVAL_STATES: readonly string[] = ["approved", "pending", "rejected", "none"];
+const OPEN_REQUEST = ["submitted", "under_review", "needs_more_info"];
+
+export function organizationApprovalState(i: { isVerified: boolean; status: string; latestStatus: string | null }): OrgApprovalState {
+  if (i.isVerified || i.status === "active") return "approved";
+  if (i.latestStatus === "rejected") return "rejected";
+  if ((i.latestStatus !== null && OPEN_REQUEST.includes(i.latestStatus)) || i.status === "pending_verification") return "pending";
+  return "none";
+}
+
+/** The Organizations directory tab of one organization (null = listed under All only). Mirrors the SQL in 20261116090001. */
+export function organizationDirectoryTab(i: { status: string; latestStatus: string | null }): OrgStatusTab | null {
+  if (i.status === "suspended") return "suspended";
+  if (i.status === "active") return "verified";
+  if (i.status === "pending_verification") return i.latestStatus === "rejected" ? "rejected" : "pending";
+  return null;
+}
+
 export type AdminPersonRef = { userId: string; displayName: string };
 
 function mapPersonRef(raw: unknown): AdminPersonRef | null {
@@ -235,11 +297,19 @@ export type AdminDirectoryOrg = LocalizedName & {
   status: string;
   isVerified: boolean;
   verificationState: OrgVerificationState;
+  /** The approval decision, never the lifecycle: see `organizationApprovalState`. */
+  approvalState: OrgApprovalState;
+  latestVerificationStatus: string | null;
   createdAt: string;
   source: string | null;
   memberCount: number;
   branchCount: number;
   owner: AdminPersonRef | null;
+  /** The business phone and primary-branch location given at registration (and kept current in Settings). */
+  contactPhone?: string | null;
+  governorate?: string | null;
+  city?: string | null;
+  cityCustomName?: string | null;
 };
 
 export function mapDirectoryOrg(raw: unknown): AdminDirectoryOrg | null {
@@ -249,6 +319,9 @@ export function mapDirectoryOrg(raw: unknown): AdminDirectoryOrg | null {
   const createdAt = str(o?.created_at);
   if (!o || !id || !status || !createdAt) return null;
   const isVerified = bool(o.is_verified);
+  const latestVerificationStatus = str(o.latest_verification_status);
+  const sent = str(o.approval_state);
+  if (!sent || !ORG_APPROVAL_STATES.includes(sent)) return null; // pre-migration database: refuse, do not guess
   return {
     id,
     name: str(o.name) ?? "",
@@ -258,22 +331,36 @@ export function mapDirectoryOrg(raw: unknown): AdminDirectoryOrg | null {
     status,
     isVerified,
     verificationState: isVerified ? "verified" : status === "pending_verification" ? "pending" : "unverified",
+    approvalState: sent as OrgApprovalState,
+    latestVerificationStatus,
     createdAt,
     source: str(o.source),
     memberCount: num(o.member_count) ?? 0,
     branchCount: num(o.branch_count) ?? 0,
     owner: mapPersonRef(o.owner),
+    contactPhone: str(o.contact_phone),
+    governorate: str(o.governorate),
+    city: str(o.city),
+    cityCustomName: str(o.city_custom_name),
   };
 }
 
 export function mapOrgsPage(raw: unknown): DirectoryPage<AdminDirectoryOrg, OrgStatusTab> | null {
-  return mapPage(raw, mapDirectoryOrg, ["pending", "verified", "suspended"] as const);
+  // New-schema contract (20261116090001): counts.rejected and every row's approval_state must be present. Anything else is a
+  // database that is behind this frontend; fail the shape check (safe error panel) instead of showing zeros or guessed states.
+  const o = obj(raw);
+  if (num(obj(o?.counts)?.rejected) === null) return null;
+  const page = mapPage(raw, mapDirectoryOrg, ["pending", "verified", "suspended", "rejected"] as const);
+  if (!page || page.rows.length !== list(o?.rows).length) return null;
+  return page;
 }
 
 export type AdminOrgMember = AdminPersonRef & { membershipId: string; status: string; capabilities: string[] };
 export type AdminOrgBranch = LocalizedName & { id: string; isActive: boolean };
 
 export type AdminOrgDetail = Omit<AdminDirectoryOrg, "memberCount" | "branchCount" | "owner"> & {
+  /** When the Verified badge was granted (business verification); approval alone leaves it null. */
+  businessVerifiedAt: string | null;
   referredBy: AdminPersonRef | null;
   owners: AdminPersonRef[];
   members: AdminOrgMember[];
@@ -286,7 +373,8 @@ export function mapOrgDetail(raw: unknown): AdminOrgDetail | null {
   const o = obj(raw);
   if (!base || !o) return null;
   return {
-    ...pick(base, ["id", "name", "nameAr", "nameEn", "orgType", "status", "isVerified", "verificationState", "createdAt", "source"] as const),
+    ...pick(base, ["id", "name", "nameAr", "nameEn", "orgType", "status", "isVerified", "verificationState", "approvalState", "latestVerificationStatus", "createdAt", "source"] as const),
+    businessVerifiedAt: str(o.business_verified_at),
     referredBy: mapPersonRef(o.referred_by),
     owners: mapAll(o.owners, mapPersonRef),
     members: mapAll(o.members, (r) => {

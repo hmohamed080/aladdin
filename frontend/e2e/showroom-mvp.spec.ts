@@ -89,7 +89,7 @@ test.describe("showroom workspace", () => {
     expect(errors, `console errors: ${errors.join(" | ")}`).toEqual([]);
   });
 
-  test("the sidebar is grouped into the five workspace sections", async ({ page, request }, testInfo) => {
+  test("the sidebar is grouped into the RC2 workspace sections", async ({ page, request }, testInfo) => {
     // The grouped rail is the DESKTOP/tablet chrome. Mobile deliberately collapses
     // to a five-item bottom bar, asserted separately below.
     test.skip(testInfo.project.name === "chromium-mobile", "grouped rail is tablet-and-up chrome");
@@ -97,41 +97,62 @@ test.describe("showroom workspace", () => {
     await signIn(page, request, IDENTITIES.showroom);
     await page.goto("/b2b");
 
-    const nav = page.getByRole("navigation", { name: "Workspace" }).first();
-    for (const heading of ["Buying", "Network", "Selling", "Business"]) {
-      await expect(nav.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+    // RC2 Showroom shell (features/showroom-shell/navigation.ts): Home, then six labelled groups.
+    const nav = page.getByRole("navigation", { name: "Primary navigation" }).first();
+    for (const group of ["Purchasing", "Sales", "Products", "Network", "Team", "Business management"]) {
+      await expect(nav.getByText(group, { exact: true })).toBeVisible();
     }
 
-    // The renamed modules must be reachable by their new, unambiguous labels.
+    // Every module an owner may use is one click away, under its RC2 label.
     for (const label of [
-      "Purchase requests",
-      "Incoming offers",
-      "Orders & purchases",
+      "Home",
+      "Direct RFQs",
+      "Supplier quotations received",
+      "Purchase orders",
+      "Direct RFQs received",
+      "Quotations sent to customers",
+      "Customers",
+      "Leads",
+      "Follow-ups",
+      "Browse products",
+      "Offers",
       "Saved products",
-      "Distributors",
-      "Technicians",
-      "Institutions",
-      "Reports",
+      "My products",
+      "My offers",
+      "Suppliers",
+      "Craftsmen",
+      "Job opportunities",
+      "Team & members",
+      "Projects",
+      "Reports & analytics",
+      "Points",
+      "Business verification",
       "Settings",
-      "Team",
     ]) {
       await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
+    // Shared purchase requests (Milestone D) has no screen yet, so it is never offered.
+    await expect(nav.getByRole("link", { name: "Purchase requests", exact: true })).toHaveCount(0);
   });
 
-  test("the word Supplier no longer appears in the showroom's own surfaces", async ({
+  test("no raw organization-type identifier reaches the showroom's own surfaces", async ({
     page,
     request,
   }) => {
     await prefs(page, "en");
     await signIn(page, request, IDENTITIES.showroom);
 
-    // The terminology decision is user-facing only: `supplier` survives in URLs,
-    // query parameters and DOM ids, which is why this reads TEXT, not markup.
+    // Supplier is one of the nine canonical public account types (lib/taxonomy/accounts.ts), so the directory's
+    // type labels say "Supplier", "Manufacturer" and "Importer". What must never show is the database identifier.
     for (const route of ["/b2b", "/b2b/suppliers", "/b2b/saved", "/b2b/reports", "/b2b/catalog"]) {
       await page.goto(route);
       const text = await page.locator("main").innerText();
-      expect(text, `"Supplier" leaked on ${route}`).not.toMatch(/\bSupplier/i);
+      expect(text, `raw org_type on ${route}`).not.toMatch(/\b(showroom_dealer|design_office|contractor_company)\b/);
+    }
+    await page.goto("/b2b/suppliers");
+    const table = page.locator("main").getByRole("table");
+    for (const label of ["Supplier", "Manufacturer", "Importer"]) {
+      await expect(table.getByRole("cell", { name: label, exact: true }).first()).toBeVisible();
     }
   });
 
@@ -139,17 +160,27 @@ test.describe("showroom workspace", () => {
     await prefs(page, "en");
     await signIn(page, request, IDENTITIES.showroom);
     await page.goto("/b2b");
+    await page.waitForURL(/\/showroom\/home$/);
+    await expect(page.locator("main h1")).toHaveText("Your showroom today");
 
-    // Committed spend is an aggregate of seeded orders — a live figure, never a
+    // Total purchases is an aggregate of seeded orders — a live figure, never a
     // constant in a component.
-    await expect(visibleText(page, "Committed spend")).toBeVisible();
-    await expect(page.locator("main")).toContainText("EGP");
+    const main = page.locator("main");
+    await expect(main.getByRole("heading", { name: "Total purchases", exact: true })).toBeVisible();
+    await expect(main).toContainText("EGP");
+    for (const card of ["Orders awaiting execution", "Incoming quotations", "Direct RFQs"]) {
+      await expect(main.getByRole("heading", { name: card, exact: true })).toBeVisible();
+    }
 
-    // Each chart is an accessible image with its own name, so this asserts the
+    // The seeded quotations and products are listed, not an empty state.
+    const quotations = main.getByRole("region", { name: "Latest incoming quotations" });
+    await expect(quotations.getByRole("listitem").first()).toBeVisible();
+    const discover = main.getByRole("region", { name: "Discover new products" });
+    await expect(discover.getByRole("listitem").first()).toBeVisible();
+
+    // The category chart is an accessible image with its own name, so this asserts the
     // chart EXISTS rather than that some <svg> is on the page.
-    await expect(page.getByRole("img", { name: "What you have committed, by month" })).toBeVisible();
-    await expect(page.getByRole("img", { name: "Shortlist by category" })).toBeVisible();
-    await expect(visibleText(page, "Who you buy from most")).toBeVisible();
+    await expect(main.getByRole("img", { name: "Purchasing by category" })).toBeVisible();
   });
 
   test("reports filters narrow the report and stay in the URL", async ({ page, request }) => {
@@ -180,10 +211,10 @@ test.describe("showroom workspace", () => {
     await signIn(page, request, IDENTITIES.showroom);
 
     await page.goto("/b2b/rfqs");
-    await expect(page.locator("main h1")).toHaveText("Purchase requests");
+    await expect(page.locator("main h1")).toHaveText("Direct RFQs");
     // The showroom both buys and sells, so the sell side is present — as a TAB,
     // not a second stacked list competing for the same heading.
-    const rfqTabs = page.getByRole("navigation", { name: "Purchase requests" });
+    const rfqTabs = page.getByRole("navigation", { name: "Direct RFQs" });
     await expect(rfqTabs.getByRole("link", { name: /We asked for/ })).toBeVisible();
     await expect(rfqTabs.getByRole("link", { name: /Asked of us/ })).toBeVisible();
 
@@ -194,7 +225,7 @@ test.describe("showroom workspace", () => {
     );
     await page.goto("/b2b/rfqs?view=received");
     await expect(
-      page.getByRole("navigation", { name: "Purchase requests" }).getByRole("link", {
+      page.getByRole("navigation", { name: "Direct RFQs" }).getByRole("link", {
         name: /Asked of us/,
       }),
     ).toHaveAttribute("aria-current", "page");
@@ -293,18 +324,31 @@ test.describe("showroom workspace", () => {
   test("settings covers the business, the workspace and the account", async ({ page, request }) => {
     await prefs(page, "en");
     await signIn(page, request, IDENTITIES.showroom);
-    await page.goto("/b2b/settings");
-
-    for (const heading of ["Business", "Workspace", "Account & access"]) {
-      await expect(visibleText(page, heading)).toBeVisible();
+    // RC2: one Settings page with a section rail (business, activities, branches, members, the person's own
+    // account, appearance, support); /b2b/settings is framed by the Showroom shell and lands here.
+    await page.goto("/showroom/settings");
+    await expect(page.locator("main h1")).toHaveText("Settings");
+    const sections = page.getByRole("navigation", { name: "Settings sections" });
+    for (const label of ["Business profile", "Business activities", "Branches", "Members & access", "Personal account", "Appearance & language", "Support"]) {
+      await expect(sections.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
-    await expect(visibleText(page, "Verification")).toBeVisible();
-    await expect(visibleText(page, "Sign-in & security")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Contact support" })).toBeVisible();
-    // No invented billing/notification systems.
-    const text = await page.locator("main").innerText();
-    for (const absent of ["Billing", "Subscription", "Integrations"]) {
-      expect(text, `${absent} is not a system this product has`).not.toContain(absent);
+    // The business section leads to the Verified badge request.
+    await expect(page.getByTestId("settings-business-verification-link")).toBeVisible();
+
+    await sections.getByRole("link", { name: "Personal account", exact: true }).click();
+    await page.waitForURL(/section=account/);
+    await expect(page.getByTestId("identity-card")).toBeVisible();
+
+    await page.goto("/showroom/settings?section=support");
+    await expect(page.locator("main").getByRole("link", { name: "Contact support" })).toBeVisible();
+
+    // No invented billing/notification systems, in any section.
+    for (const section of ["business", "activities", "branches", "access", "account", "appearance", "support"]) {
+      await page.goto(`/showroom/settings?section=${section}`);
+      const text = await page.locator("main").innerText();
+      for (const absent of ["Billing", "Subscription", "Integrations"]) {
+        expect(text, `${absent} is not a system this product has (${section})`).not.toContain(absent);
+      }
     }
   });
 
@@ -377,13 +421,22 @@ test.describe("showroom workspace", () => {
     await signIn(page, request, IDENTITIES.showroom);
     await page.goto("/b2b");
 
-    // The language control moved OUT of the header row and INTO the account
-    // menu, alongside appearance — the header now carries search, context and
-    // the avatar, and the loose language/theme/sign-out trio that used to sit
-    // beside them is gone from every authenticated surface. Same cookie, same
-    // action, one place to find it.
-    await page.getByTestId("profile-menu-trigger").click();
-    await page.getByTestId("locale-ar").click();
+    // RC2: the Showroom top bar carries the language toggle (named "Language", showing ع) next to the theme
+    // switch; Settings > Appearance & language has the same control.
+    const languageButton = page.locator("header").getByRole("button", { name: "Language", exact: true });
+    await expect(languageButton).toBeVisible();
+    // A press that lands before hydration is lost (the server-rendered button has no handler yet), which left <html dir>
+    // on ltr for the whole assertion window. Wait for React's props on the button; the press is never repeated, since a
+    // second press after a slow first one would toggle back to English.
+    await languageButton.evaluate(
+      (node) =>
+        new Promise<void>((resolve) => {
+          const hydrated = () => Object.keys(node).some((key) => key.startsWith("__reactProps$"));
+          const tick = () => (hydrated() ? resolve() : setTimeout(tick, 50));
+          tick();
+        }),
+    );
+    await languageButton.click();
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.locator("html")).toHaveAttribute("lang", "ar");
   });
@@ -406,7 +459,7 @@ test.describe("showroom workspace", () => {
     }
 
     await page.goto("/b2b");
-    const nav = page.getByRole("navigation", { name: "مساحة العمل" }).first();
+    const nav = page.getByRole("navigation", { name: "التنقل الرئيسي" }).first();
     const navText = (await nav.innerText()).trim();
     // Any run of three or more Latin letters in the Arabic sidebar is a leak.
     expect(navText.match(/[A-Za-z]{3,}/g) ?? [], `English in the Arabic nav: ${navText}`).toEqual([]);
@@ -426,10 +479,8 @@ test.describe("showroom workspace", () => {
       expect(heading.match(/[A-Za-z]{3,}/g) ?? [], `English heading on ${route}: ${heading}`).toEqual([]);
     }
 
-    // Arabic terminology: الموزع replaced المورّد everywhere user-facing.
+    // The directory's heading stays the Distributors page; its type labels use the canonical account names.
     await page.goto("/b2b/suppliers");
     await expect(page.locator("main h1")).toHaveText("الموزعون");
-    const body = await page.locator("main").innerText();
-    expect(body, "المورّد still appears in Arabic").not.toMatch(/مورّد|الموردين|الموردون/);
   });
 });

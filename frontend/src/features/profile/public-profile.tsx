@@ -7,6 +7,7 @@ import type { Locale } from "@/lib/i18n/locales";
 import { languageLabel } from "@/lib/i18n/language-label";
 import { tradeLabel, specializationLabel } from "@/lib/i18n/trade-label";
 import { AvailabilityBadge, AvailabilityAge } from "@/features/profile/availability-status";
+import { CITIES_BY_GOVERNORATE, GOVERNORATE_OPTIONS } from "@/lib/installer/location-data";
 
 /**
  * A professional's public page — everything a stranger may see, and nothing else.
@@ -198,7 +199,7 @@ export function PublicProfileView({
                     {/* Named areas only. The reference shows a distance in km and a
                         radius filter beside these; no geo model exists, so neither
                         is rendered rather than approximated. */}
-                    <Badge tone="neutral">{t(`onboarding.consumer.cities.${key}`)}</Badge>
+                    <Badge tone="neutral">{areaLabel(key, t, locale)}</Badge>
                   </li>
                 ))}
               </ul>
@@ -241,4 +242,18 @@ function initials(name: string): string {
     .map((w) => w[0])
     .join("")
     .toUpperCase();
+}
+
+/**
+ * A service-area key as a name. Keys come from two vocabularies: the onboarding city list and the Installer location
+ * catalogue (`lib/installer/location-data`, used by service areas). The translation is tried first; a key it does not
+ * know is looked up in the catalogue, so a visitor never sees a raw key.
+ */
+function areaLabel(key: string, t: TranslateFn, locale: Locale): string {
+  const i18nKey = `onboarding.consumer.cities.${key}`;
+  const translated = t(i18nKey);
+  if (translated !== i18nKey) return translated;
+  const option = GOVERNORATE_OPTIONS.find((g) => g.value === key)
+    ?? Object.values(CITIES_BY_GOVERNORATE).flat().find((c) => c.value === key);
+  return option ? (locale === "ar" ? option.ar : option.en) : key;
 }

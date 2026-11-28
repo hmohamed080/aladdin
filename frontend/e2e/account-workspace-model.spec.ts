@@ -1,5 +1,5 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
-import { registerWithPassword, signIn, IDENTITIES } from "./helpers/auth";
+import { answerBusinessContactIfAsked, pickBusinessActivity, registerWithPassword, signIn, IDENTITIES } from "./helpers/auth";
 
 /**
  * Pilot Account & Workspace Model — targeted acceptance.
@@ -8,10 +8,10 @@ import { registerWithPassword, signIn, IDENTITIES } from "./helpers/auth";
  * the canonical `/auth/sign-up` (Turnstile-gated: run where challenges.cloudflare.com loads):
  *
  *   1. a fresh user registers AS a showroom, creates that business (mandatory) and owns it in their own workspace;
- *   2. an existing personal professional (a seeded Engineer) adds a business without signing up again;
- *   3. the same user owns two businesses of different types and switches between;
+ *   2. an existing personal professional (a seeded Engineer) applies for a business without signing up again;
+ *   3. (RC2: a second business waits for the first application's Admin decision; covered by regression/g-org-application-flow);
  *   4. Consumer + business coexist — Personal still reaches /home;
- *   5. tenant isolation across a switch, including stale/foreign ids;
+ *   5. tenant isolation: a stale/foreign organization id grants nothing;
  *   6. a revoked membership disappears from the selector and loses access;
  *   7. an invited employee joins an existing organization — no new organization;
  *   8. the migrated pilot business owners still land and operate.
@@ -43,7 +43,6 @@ async function registerAs(
   const email = `awm-${uniq()}@example.test`;
   await registerWithPassword(page, request, {
     email,
-    username: `awm${uniq()}`.slice(0, 24),
     displayName,
     accountType,
     landing,
@@ -51,22 +50,40 @@ async function registerAs(
   return email;
 }
 
-/** Drive the business wizard from its first step through creation. */
-async function createBusiness(page: Page, name: string, branch: string, orgType?: RegExp) {
+/**
+ * Drive the business wizard from its first step through submission. RC2: every business is an APPLICATION that an
+ * Admin approves; a Showroom also needs its activity and a valid business phone, and every business needs a
+ * governorate and a city. The first application lands in that business's limited (pending) workspace.
+ */
+async function createBusiness(page: Page, name: string, branch: string, opts: { showroom?: boolean; orgType?: RegExp } = {}) {
+  const next = () => page.getByRole("button", { name: /^continue$/i }).click();
   await page.locator("#bname").fill(name);
   await page.locator("#blegal").fill(`${name} Trading LLC`);
-  await page.getByRole("button", { name: /^continue$/i }).click();
-  if (orgType) {
-    await expect(page.getByRole("heading", { name: /what kind of business/i })).toBeVisible();
-    await page.getByRole("button", { name: orgType }).click();
-    await page.getByRole("button", { name: /^continue$/i }).click();
+  if (opts.showroom) {
+    await page.locator("#bactivity").selectOption("decor_showroom");
+    await page.locator("#bphone").fill(`10${String(Date.now()).slice(-8)}`);
+    // A showroom needs at least one valid link to leave step 1.
+    await page.locator('button[aria-controls="blinks-instagram-panel"]').click();
+    await page.locator("#blinks-instagram").fill("@shop");
   }
-  await page.getByRole("button", { name: /^continue$/i }).click(); // location (optional)
+  if (!opts.showroom) await pickBusinessActivity(page);
+  await next();
+  if (opts.orgType) {
+    await expect(page.getByRole("heading", { name: /what kind of business/i })).toBeVisible();
+    await page.getByText(opts.orgType).first().click();
+    // Each business type answers its own activity list.
+    await pickBusinessActivity(page);
+    await next();
+  }
+  await page.locator("#bgov").selectOption("cairo");
+  await page.locator("#bcity").selectOption("maadi");
+  await next();
+  await answerBusinessContactIfAsked(page);
   await page.locator("#bbranch").fill(branch);
-  await page.getByRole("button", { name: /^continue$/i }).click();
+  await next();
   await expect(page.getByRole("heading", { name: /review and create/i })).toBeVisible();
-  await page.getByRole("button", { name: /create business/i }).click();
-  await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
+  await page.getByRole("button", { name: /submit for review/i }).click();
+  await page.waitForURL(/\/(b2b|showroom)(\/|$)/, { waitUntil: "commit" });
 }
 
 // The B2B shell renders the switcher twice — a desktop slot and a mobile row —
@@ -85,15 +102,13 @@ async function signOutFromAccountMenu(page: Page) {
 }
 const workplaceMenu = (page: Page) => page.locator('[data-testid="workplace-menu"]:visible').first();
 
+// A press that lands before hydration does nothing, so press again until the menu opens.
 async function openSwitcher(page: Page) {
-  await switcher(page).click();
-  await expect(page.locator('[data-testid="workspace-menu"]:visible').first()).toBeVisible();
-}
-
-async function switchTo(page: Page, name: RegExp, landing: RegExp) {
-  await openSwitcher(page);
-  await page.locator('[data-testid="workspace-menu"]:visible').first().getByRole("menuitem", { name }).click();
-  await page.waitForURL(landing, { waitUntil: "commit" });
+  const menu = page.locator('[data-testid="workspace-menu"]:visible').first();
+  await expect(async () => {
+    if (!(await menu.isVisible())) await switcher(page).click();
+    await expect(menu).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
 }
 
 test.describe("1 — new business registration", () => {
@@ -112,85 +127,68 @@ test.describe("1 — new business registration", () => {
     // Creating the first business is the mandatory continuation of the registration. Copy speaks about a BUSINESS,
     // not an "organization", and the registered type is preset (no type step).
     await expect(page.getByRole("heading", { name: /set up your business/i })).toBeVisible();
-    await createBusiness(page, "Hala Ceramics", "Nasr City HQ");
+    await createBusiness(page, "Hala Ceramics", "Nasr City HQ", { showroom: true });
 
+    // RC2: the first application opens the Showroom's limited workspace while Admin reviews it.
     await expect(page.getByText("Hala Ceramics", { exact: true }).first()).toBeAttached();
-    // The creator is the OWNER, stated by the switcher.
     await openSwitcher(page);
     const menu = page.locator('[data-testid="workspace-menu"]:visible').first();
-    await expect(menu.getByRole("menuitem", { name: /Hala Ceramics/ })).toContainText(/owner/i);
+    await expect(menu.getByRole("menuitem", { name: /Hala Ceramics/ })).toContainText(/showroom/i);
     // No fake Personal workspace: they never claimed a personal persona.
     await expect(menu.getByRole("menuitem", { name: /^Personal$/ })).toHaveCount(0);
     await noOverflow(page);
   });
 });
 
-test.describe("2 + 3 + 5 — an existing professional adds businesses", () => {
-  test("adds a business, switches contexts, then adds a second of another type", async ({
+test.describe("2 + 5 — an existing professional applies for a business", () => {
+  test("applies for an organization from the workspace menu, keeps their personal identity, and stays isolated", async ({
     page,
     request,
   }) => {
     await prefs(page, "en", "light");
-    // A PERSONAL persona - the seeded Engineer (Engineer is not yet a registrable type, so this identity is the
-    // existing-professional fixture). He stays an Engineer throughout.
-    const tag = uniq();
-    const first = `AH Design Studio ${tag}`;
-    const second = `AH Import ${tag}`;
+    // A PERSONAL persona - the seeded Engineer, also a member of Horizon Contracting. He stays an Engineer throughout.
+    const office = `AH Engineering Office ${uniq()}`;
     await signIn(page, request, "yasser@example.test", /\/home(\/|$|\?)/);
     await expect(page.getByRole("heading", { name: /welcome, yasser fouad/i })).toBeVisible();
 
-    // ---- 2. Add a business from the authenticated product UI. No Sign Up. ----
+    // ---- 2. Apply for a business from the authenticated product UI. No Sign Up. ----
+    // RC2: the menu offers Personal, the organizations he works in, and "Request New Organization".
     await openSwitcher(page);
-    await page.getByRole("menuitem", { name: /add business/i }).click();
-    await page.waitForURL(/\/business\/new$/, { waitUntil: "commit" });
+    const menu = page.locator('[data-testid="workspace-menu"]:visible').first();
+    await expect(menu.getByRole("menuitem", { name: /Yasser Fouad.*Personal/ })).toBeVisible();
+    await expect(menu.getByRole("menuitem", { name: /Horizon Contracting/ })).toBeVisible();
+    await menu.getByRole("menuitem", { name: /request new organization/i }).click();
+    await page.waitForURL(/\/business\/new/, { waitUntil: "commit" });
     await expect(page.getByText(/sign up|create account/i)).toHaveCount(0);
 
-    // An existing Engineer is NOT bound to a registration type: the picker is shown (this is the unchanged
-    // "second business" behaviour, not the mandatory first-business flow).
-    await createBusiness(page, first, "Zayed HQ", /^showroom \/ dealer/i);
-    await expect(page.getByText(first, { exact: true }).first()).toBeAttached();
+    // An Engineer first chooses how he operates; an organization is an application an Admin approves.
+    await expect(page.getByRole("heading", { name: "How do you work?" })).toBeVisible();
+    // A press that lands before hydration only focuses the option, so retry until the choice enables Continue.
+    const proceed = page.getByRole("button", { name: /^continue$/i });
+    await expect(async () => {
+      await page.getByText("Engineering Office").first().click();
+      await expect(proceed).toBeEnabled({ timeout: 1_000 });
+    }).toPass();
+    await proceed.click();
+    await page.waitForURL(/model=organization/);
+    await createBusiness(page, office, "Zayed HQ", { orgType: /^Engineer$/ });
 
-    // Switching to the business did NOT change who he is.
-    await switchTo(page, /^Yasser Fouad|^Personal/, /\/home$/);
+    // The application is tracked; it is not yet an approved workspace.
+    await page.goto("/business/applications");
+    await expect(page.getByTestId("application-pending_review")).toContainText(office);
+
+    // Applying did NOT change who he is: Personal is still his, with the Engineer persona.
+    await page.goto("/home");
     await expect(page.getByRole("heading", { name: /welcome, yasser fouad/i })).toBeVisible();
     await expect(page.getByText("Engineer").first()).toBeVisible();
 
-    // ---- 3. A SECOND business, of a DIFFERENT type. ----
-    await openSwitcher(page);
-    await page.getByRole("menuitem", { name: /add business/i }).click();
-    await page.waitForURL(/\/business\/new$/, { waitUntil: "commit" });
-    await createBusiness(page, second, "Port Said", /^importer/i);
-    await expect(page.getByText(second, { exact: true }).first()).toBeAttached();
-
-    // Both new businesses AND the personal context are offered - one login, several
-    // places to work, one identity.
-    await openSwitcher(page);
-    const menu = page.locator('[data-testid="workspace-menu"]:visible').first();
-    await expect(menu.getByRole("menuitem", { name: first })).toBeVisible();
-    await expect(menu.getByRole("menuitem", { name: second })).toBeVisible();
-    await expect(menu.getByRole("menuitem", { name: /Yasser Fouad|^Personal$/ })).toBeVisible();
-    await page.keyboard.press("Escape");
-
-    // ---- 5. Tenant isolation across a switch. ----
-    await switchTo(page, new RegExp(first), /\/b2b(\/|$)/);
-    await expect(page.getByText(first, { exact: true }).first()).toBeAttached();
-    await expect(page.getByText(second, { exact: true })).toHaveCount(0);
-    await switchTo(page, new RegExp(second), /\/b2b(\/|$)/);
-    await expect(page.getByText(second, { exact: true }).first()).toBeAttached();
-
-    // A stale/foreign organization id in the context cookie grants nothing - it
-    // resolves to a workspace this caller actually has.
+    // ---- 5. Tenant isolation: a stale/foreign organization id in the context cookie grants nothing. ----
     await page.context().addCookies([
       { name: "aladdin-org", value: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", url: "http://127.0.0.1" },
     ]);
     await page.goto("/b2b");
     await expect(page.getByText("Nile Finishing Supplies", { exact: true })).toHaveCount(0);
     await noOverflow(page);
-
-    // Sign back in later: the same identity still holds both businesses.
-    await signOutFromAccountMenu(page);
-    await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
-    await signIn(page, request, "yasser@example.test", /\/(b2b|home)(\/|$)/);
   });
 });
 
@@ -206,7 +204,8 @@ test.describe("4 — consumer and business creation", () => {
     await expect(page.getByText(/add business/i)).toHaveCount(0);
     await page.goto("/business/new");
     await expect(page).toHaveURL(/\/home$/);
-    await expect(page.getByRole("heading", { name: /welcome, omar zaki/i })).toBeVisible();
+    // profile-completion.spec renames this seeded consumer, so match the greeting rather than the name.
+    await expect(page.getByRole("heading", { level: 1, name: /^welcome,/i })).toBeVisible();
   });
 });
 

@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { readSessionIdentity } from "@/server/auth/session";
 import type { Database } from "@/types/database.types";
 
 /**
@@ -99,9 +100,7 @@ export type ProfilePublication = {
  */
 export const loadProfilePublication = cache(async function loadProfilePublication(): Promise<ProfilePublication> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return { profileId: null, listed: false };
 
   const { data } = await supabase

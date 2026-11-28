@@ -113,8 +113,8 @@ function ProfileHero({ locale }: { locale: Locale }) {
     setError(null);
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!(["image/jpeg", "image/png", "image/webp"] as const).includes(file.type as "image/jpeg" | "image/png" | "image/webp") || file.size > 10 * 1024 * 1024) {
-      setError(ar ? "اختر صورة JPG أو PNG أو WebP بحجم لا يزيد عن 10 ميجابايت." : "Choose a JPG, PNG, or WebP image up to 10 MB.");
+    if (!(["image/jpeg", "image/png", "image/webp"] as const).includes(file.type as "image/jpeg" | "image/png" | "image/webp") || file.size <= 0) {
+      setError(ar ? "اختر صورة JPG أو PNG أو WebP." : "Choose a JPG, PNG, or WebP image.");
       event.target.value = "";
       return;
     }

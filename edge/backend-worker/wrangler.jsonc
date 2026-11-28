@@ -1,0 +1,90 @@
+{
+  // FastAPI backend on Cloudflare Containers (ADR-0022). Not deployed by CI:
+  // every hosted step (preview included) needs the owner's approval, and
+  // Containers need the Workers Paid plan.
+  //
+  // No public hostname in any environment: `workers_dev` is off and there are
+  // no routes. The frontend Worker reaches this one through its `BACKEND`
+  // service binding (frontend/wrangler.jsonc). Secrets are Worker secrets
+  // (`wrangler secret put`), never values in this file; see README.md.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aladdin-backend",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "BackendContainer",
+      "image": "../../backend/Dockerfile",
+      "image_build_context": "../../backend",
+      // basic = 1/4 vCPU, 1 GiB, 4 GB disk. The app idles at about 60 MB, but a
+      // cold start takes 26 s on `lite` (1/16 vCPU) and 4.5 s on `basic`.
+      "instance_type": "basic",
+      "max_instances": 4,
+      // Supabase is in eu-west-3 (Paris).
+      "constraints": { "regions": ["WEUR"] }
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "BACKEND_CONTAINER", "class_name": "BackendContainer" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BackendContainer"] }],
+  "vars": { "APP_ENV": "local", "BACKEND_INSTANCES": "1" },
+
+  "env": {
+    // Isolated acceptance preview: aladdin-r2-acceptance Supabase project only
+    // (nxossqhdfltcqdwvbewi). Bound by the `preview` frontend Worker.
+    "preview": {
+      "name": "aladdin-backend-preview",
+      "workers_dev": false,
+      "containers": [
+        {
+          "class_name": "BackendContainer",
+          "image": "../../backend/Dockerfile",
+          "image_build_context": "../../backend",
+          "instance_type": "basic",
+          "max_instances": 2,
+          "constraints": { "regions": ["WEUR"] }
+        }
+      ],
+      "durable_objects": {
+        "bindings": [{ "name": "BACKEND_CONTAINER", "class_name": "BackendContainer" }]
+      },
+      "vars": {
+        "APP_ENV": "staging",
+        "BACKEND_INSTANCES": "1",
+        "SUPABASE_URL": "https://nxossqhdfltcqdwvbewi.supabase.co",
+        "REDIS_KEY_ENV": "cf-preview"
+      },
+      // Checked by `wrangler deploy`: the deploy fails if one is not set.
+      "secrets": { "required": ["SUPABASE_ANON_KEY"] }
+    },
+    // Production: deployed only after the owner approves the cutover.
+    "production": {
+      "name": "aladdin-backend-production",
+      "workers_dev": false,
+      "containers": [
+        {
+          "class_name": "BackendContainer",
+          "image": "../../backend/Dockerfile",
+          "image_build_context": "../../backend",
+          "instance_type": "basic",
+          "max_instances": 4,
+          "constraints": { "regions": ["WEUR"] }
+        }
+      ],
+      "durable_objects": {
+        "bindings": [{ "name": "BACKEND_CONTAINER", "class_name": "BackendContainer" }]
+      },
+      "vars": {
+        "APP_ENV": "production",
+        // Two instances so one cold start or rollout never takes the API down.
+        "BACKEND_INSTANCES": "2",
+        "ALLOWED_ORIGINS": "https://aladdindecore.com,https://www.aladdindecore.com"
+      },
+      // The production project URL is set at cutover, as a secret like the key.
+      "secrets": { "required": ["SUPABASE_URL", "SUPABASE_ANON_KEY"] }
+    }
+  }
+}

@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getRegistrationState } from "@/server/queries/registration";
 import { activeLandingPath } from "@/server/queries/landing";
 import { OnboardingPanel } from "@/features/onboarding/onboarding-panel";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { ACCOUNT_BASICS_PATH, needsAccountBasics } from "@/server/queries/account-basics";
 
 export const dynamic = "force-dynamic";
 
@@ -9,9 +11,9 @@ export const dynamic = "force-dynamic";
  * Post-registration handoff / resume entry. Increment 7
  * (20260924090007_registration_state_access_ready.sql) removed the
  * profile/contact/track-substate gates this switch used to route through —
- * my_registration_state() now only ever asks for consent, an account type,
- * and (Increment 7's later correction) a username, in that order, before
- * reaching access_ready/active_personal. There is no longer a mandatory
+ * my_registration_state() now only ever asks for consent and an account type,
+ * in that order, before reaching access_ready/active_personal (the username
+ * step was removed in Phase 1 of the account-identity plan). There is no longer a mandatory
  * multi-step wizard to resume into; the old profile/contact/consumer/
  * professional/business sub-pages remain reachable by direct navigation
  * (their own guards were updated to use hasAppAccess) but nothing routes a
@@ -25,18 +27,15 @@ export default async function OnboardingPage() {
       redirect("/auth/sign-in");
     case "active_personal":
     case "access_ready":
+      // Phone, location and specialties are asked once, for every account (ADR-0026).
+      if (await needsAccountBasics(await getServerSupabase())) redirect(ACCOUNT_BASICS_PATH);
       redirect(await activeLandingPath());
     case "account_type_pending":
       redirect("/onboarding/account-type");
-    case "username_pending":
-      // A minimal "choose a username" screen — NEVER the legacy wizard. See
-      // that page's own doc comment and correction #2 of the staging-prep
-      // plan: a verified user with no username may not bypass this via
-      // refresh or direct navigation, since the state is re-derived from the
-      // database on every call.
-      redirect("/onboarding/username");
     default:
-      // consent_pending, manually_blocked
+      // consent_pending, manually_blocked, and (before migration M1) a legacy
+      // "username_pending" the database may still return: the username step no
+      // longer exists, so the panel shows a neutral notice instead of crashing.
       return <OnboardingPanel state={state} />;
   }
 }

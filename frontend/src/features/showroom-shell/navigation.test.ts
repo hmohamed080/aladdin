@@ -1,3 +1,4 @@
+import { MARKETPLACE_REQUEST_ENTITLEMENT, MARKETPLACE_SELL_ENTITLEMENT } from "@/lib/nav/modules";
 import { SHOWROOM_PENDING_MARKER } from "./navigation";
 import { describe, expect, it } from "vitest";
 import { activeShowroomItem, canNavigate, showroomNavigation, SHOWROOM_GROUPS, SHOWROOM_ROOT } from "./navigation";
@@ -9,8 +10,8 @@ import { FEED_READY_AUDIENCES } from "@/features/offers/offer-model";
 describe("showroom phase 1 navigation", () => {
   const items = SHOWROOM_GROUPS.flatMap((group) => group.items);
   it("has the agreed group order, directional commerce and no institutions", () => {
-    expect(SHOWROOM_GROUPS.map((group) => group.label.ar)).toEqual(["", "المشتريات", "المبيعات", "المنتجات", "الشبكة", "الفريق", "إدارة النشاط"]);
-    expect(items.map((item) => item.id)).toEqual(["home", "purchase-requests", "pricing-requests-sent", "quotes-received", "purchase-orders", "customer-rfqs", "customer-quotes", "customers", "leads", "follow-ups", "catalog", "offers", "saved", "my-products", "my-offers", "suppliers", "craftsmen", "jobs", "sales-team", "projects", "reports", "activity", "points", "settings"]);
+    expect(SHOWROOM_GROUPS.map((group) => group.label.ar)).toEqual(["", "المشتريات", "المبيعات", "المنتجات", "الماركت", "الشبكة", "الفريق", "إدارة النشاط"]);
+    expect(items.map((item) => item.id)).toEqual(["home", "purchase-requests", "pricing-requests-sent", "quotes-received", "purchase-orders", "customer-rfqs", "customer-quotes", "customers", "leads", "follow-ups", "catalog", "offers", "saved", "my-products", "my-offers", "marketplace-approval", "marketplace-products", "marketplace-orders", "marketplace-returns", "marketplace-areas", "marketplace-delivery", "marketplace-payments", "suppliers", "craftsmen", "jobs", "sales-team", "projects", "reports", "activity", "points", "verification", "settings"]);
     // Suite pages live under the suite root; finished modules keep their existing routes inside the same shell.
     for (const item of items) expect(item.href.startsWith(`${SHOWROOM_ROOT}/`) || item.href.startsWith("/b2b/")).toBe(true);
   });
@@ -18,8 +19,9 @@ describe("showroom phase 1 navigation", () => {
     const visible = showroomNavigation([]).flatMap((group) => group.items);
     expect(visible.map((item) => item.id)).toEqual(["home", "suppliers", "craftsmen", "points", "settings"]);
     for (const item of items) expect(visible.includes(item)).toBe(canNavigate(item, []));
-    // org.manage unlocks every visible module except the exact-capability activity log; hidden placeholders never show.
-    expect(showroomNavigation(["org.manage"]).flatMap((group) => group.items)).toEqual(items.filter((item) => !item.hidden && item.id !== "activity"));
+    // org.manage unlocks every visible module except the exact-capability ones (the activity log and the admin-granted
+    // Marketplace selling items); hidden placeholders never show.
+    expect(showroomNavigation(["org.manage"]).flatMap((group) => group.items)).toEqual(items.filter((item) => !item.hidden && item.id !== "activity" && !item.id.startsWith("marketplace-")));
     expect(showroomNavigation(["job.manage"]).flatMap((group) => group.items).some((item) => item.id === "jobs")).toBe(true);
     expect(showroomNavigation(["sales.manage"]).flatMap((group) => group.items).some((item) => item.id === "sales-team")).toBe(false);
   });
@@ -28,7 +30,7 @@ describe("showroom phase 1 navigation", () => {
 describe("no placeholder in primary navigation", () => {
   const all = SHOWROOM_GROUPS.flatMap((g) => g.items);
   it("hides exactly the unfinished Shared Purchase Requests entry", () => {
-    expect(all.filter((i) => i.hidden).map((i) => i.id)).toEqual(["purchase-requests", "offers", "my-offers"]); // rc1: Offers are not in the first release
+    expect(all.filter((i) => i.hidden).map((i) => i.id)).toEqual(["purchase-requests"]);
     expect(showroomNavigation(["org.manage"]).flatMap((g) => g.items).some((i) => i.id === "purchase-requests")).toBe(false);
   });
   it("never routes a visible item to the placeholder page", () => {
@@ -70,9 +72,9 @@ describe("product offers navigation", () => {
   });
   it("shows the feed with browse rights and the management page with product rights", () => {
     const ids = (caps: string[]) => showroomNavigation(caps).flatMap((g) => g.items).map((i) => i.id);
-    expect(ids(["catalog.read"])).not.toContain("offers"); // rc1: hidden
+    expect(ids(["catalog.read"])).toContain("offers");
     expect(ids(["catalog.read"])).not.toContain("my-offers");
-    expect(ids(["catalog.write"])).not.toContain("my-offers"); // rc1: hidden
+    expect(ids(["catalog.write"])).toContain("my-offers");
   });
 });
 
@@ -104,5 +106,55 @@ describe("a pending application's limited workspace (rc2 product decision)", () 
     const ids = showroomNavigation(["org.manage"]).flatMap((g) => g.items).map((i) => i.id);
     expect(ids).toContain("catalog");
     expect(ids).toContain("customers");
+  });
+});
+
+describe("Marketplace group in the showroom account", () => {
+  const ids = (caps: string[]) => showroomNavigation(caps).flatMap((g) => g.items).map((i) => i.id);
+  const MARKETPLACE = ["marketplace-products", "marketplace-orders", "marketplace-returns", "marketplace-areas", "marketplace-delivery", "marketplace-payments"];
+
+  it("lists products, orders, returns, delivery areas, delivery prices and payment methods, in that order, under الماركت / Marketplace", () => {
+    const group = SHOWROOM_GROUPS.find((g) => g.label.en === "Marketplace")!;
+    expect(group.label.ar).toBe("الماركت");
+    expect(group.items.map((i) => [i.id, i.href, i.label.ar, i.label.en])).toEqual([
+      ["marketplace-approval", "/showroom/marketplace", "اعتماد المتجر", "Marketplace approval"],
+      ["marketplace-products", "/showroom/marketplace/products", "منتجات الماركت", "Marketplace products"],
+      ["marketplace-orders", "/showroom/marketplace/orders", "طلبات الماركت", "Marketplace orders"],
+      ["marketplace-returns", "/showroom/marketplace/returns", "المرتجعات", "Returns"],
+      ["marketplace-areas", "/showroom/marketplace/areas", "المناطق", "Delivery areas"],
+      ["marketplace-delivery", "/showroom/marketplace/delivery", "توصيل المناطق", "Delivery prices"],
+      ["marketplace-payments", "/showroom/marketplace/payments", "طرق الدفع", "Payment methods"],
+    ]);
+  });
+
+  it("appears only for an organization the admin approved as a seller - owning the showroom (org.manage) is not enough", () => {
+    for (const id of MARKETPLACE) expect(ids(["org.manage"])).not.toContain(id);
+    for (const id of MARKETPLACE) expect(ids(["org.manage", MARKETPLACE_SELL_ENTITLEMENT])).toContain(id);
+    expect(showroomNavigation(["org.manage"]).map((g) => g.label.en)).not.toContain("Marketplace");
+    expect(showroomNavigation(["org.manage", MARKETPLACE_SELL_ENTITLEMENT]).map((g) => g.label.en)).toContain("Marketplace");
+  });
+
+  it("an unapproved owner reaches the approval request from the sidebar and the search model (request entitlement only)", () => {
+    expect(ids(["org.manage", MARKETPLACE_REQUEST_ENTITLEMENT])).toContain("marketplace-approval");
+    for (const id of MARKETPLACE) expect(ids(["org.manage", MARKETPLACE_REQUEST_ENTITLEMENT])).not.toContain(id);
+    expect(showroomNavigation(["org.manage", MARKETPLACE_REQUEST_ENTITLEMENT]).map((g) => g.label.en)).toContain("Marketplace");
+  });
+
+  it("the approval item is not unlocked by org.manage alone, is gone for an approved seller, and never offered to a pending showroom", () => {
+    expect(ids(["org.manage"])).not.toContain("marketplace-approval");
+    expect(ids(["org.manage", MARKETPLACE_SELL_ENTITLEMENT])).not.toContain("marketplace-approval");
+    expect(ids(["org.manage", MARKETPLACE_REQUEST_ENTITLEMENT, SHOWROOM_PENDING_MARKER])).not.toContain("marketplace-approval");
+  });
+
+  it("is never offered to a pending (not yet approved) showroom", () => {
+    expect(ids(["org.manage", MARKETPLACE_SELL_ENTITLEMENT, SHOWROOM_PENDING_MARKER]).filter((id) => id.startsWith("marketplace-"))).toEqual([]);
+  });
+
+  it("highlights the item that owns each seller page, including its sub-pages", () => {
+    const visible = showroomNavigation(["org.manage", MARKETPLACE_SELL_ENTITLEMENT]).flatMap((g) => g.items);
+    expect(activeShowroomItem("/showroom/marketplace/products", "", visible)?.id).toBe("marketplace-products");
+    expect(activeShowroomItem("/showroom/marketplace/products/new", "", visible)?.id).toBe("marketplace-products");
+    expect(activeShowroomItem("/showroom/marketplace/areas", "", visible)?.id).toBe("marketplace-areas");
+    expect(activeShowroomItem("/showroom/marketplace/delivery", "", visible)?.id).toBe("marketplace-delivery");
   });
 });

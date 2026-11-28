@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Credential isolation of the backup workflows (offline). The Supabase service-role key can call the run-ledger and
+schedule RPCs; the age restore identity decrypts every backup. They must never meet:
+
+  * the service-role key appears only in jobs bound to the dedicated environment `backup-control-<label>`, and
+    those jobs hold nothing else secret (no R2 token, no database URL, no age identity);
+  * the age restore identity appears only in the restore job, in the `restore-test-<label>` environment, and that
+    job holds no service-role key;
+  * the backup (data) job holds neither the service-role key nor any age private key (it encrypts to public keys);
+  * no `secrets: inherit`, no step passes a secret on the command line.
+
+  python3 ops/backups/workflow-isolation-test.py
+"""
+import pathlib
+import re
+import sys
+
+import yaml
+
+HERE = pathlib.Path(__file__).resolve().parent
+# Source layout: ops/backups/workflows. Backup-repo layout: backup/ next to ../.github/workflows.
+WF = HERE / "workflows" if (HERE / "workflows").is_dir() else HERE.parent / ".github" / "workflows"
+SERVICE = "SUPABASE_SERVICE_ROLE_KEY"
+AGE = "AGE_RESTORE_TEST_IDENTITY"
+OTHER_SECRETS = re.compile(r"secrets\.(R2_[A-Z_]+|BACKUP_DB_URL|AGE_[A-Z_]+|RESEND_API_KEY)")
+failures = []
+
+
+def check(ok, what):
+    print(("PASS  " if ok else "FAIL  ") + what)
+    if not ok:
+        failures.append(what)
+
+
+def secrets_in(node):
+    return set(re.findall(r"secrets\.([A-Za-z0-9_]+)", yaml.safe_dump(node)))
+
+
+total_service_jobs = 0
+for path in sorted(WF.glob("*.yml")):
+    doc = yaml.safe_load(path.read_text())
+    text = path.read_text()
+    check("secrets: inherit" not in text, f"{path.name}: no `secrets: inherit`")
+    for name, job in doc["jobs"].items():
+        used = secrets_in(job)
+        env = str(job.get("environment", ""))
+        where = f"{path.name}:{name}"
+        if SERVICE in used:
+            total_service_jobs += 1
+            check(env.startswith("backup-control-"), f"{where}: the service-role key is only in a backup-control-<label> environment ({env})")
+            check(not (used - {SERVICE}), f"{where}: a service-role job holds no other secret ({sorted(used - {SERVICE})})")
+        if AGE in used:
+            check(name == "restore" and env.startswith("restore-test-"), f"{where}: the age restore identity is only in the restore job")
+            check(SERVICE not in used, f"{where}: the restore job holds no service-role key")
+        if name == "backup":
+            check(SERVICE not in used and AGE not in used, f"{where}: the backup job holds neither the service-role key nor an age private key")
+        if env.startswith("backup-control-"):
+            check(not job.get("steps") or all(not re.search(r"backup/db-backup|restore-test\.sh|freshness\.sh", str(s)) for s in job["steps"]),
+                  f"{where}: a control job runs no backup or restore code")
+check(total_service_jobs >= 3, f"service-role key is used by the control jobs and the reconciler only ({total_service_jobs} jobs)")
+
+# The reconciler reads job names; they must exist exactly as report-run.py looks them up.
+daily = yaml.safe_load((WF / "daily-backup.yml").read_text())["jobs"]
+restore = yaml.safe_load((WF / "restore-test.yml").read_text())["jobs"]
+src = (HERE / "report-run.py").read_text()
+check("name: control (${{ matrix.label }})" in (WF / "daily-backup.yml").read_text() and "f'control ({label})'" in src,
+      "report-run.py finds the backup's control job by the name the workflow gives it")
+check("name: restore-control (" in (WF / "restore-test.yml").read_text() and "f'restore-control ({label})'" in src,
+      "report-run.py finds the restore's control job by the name the workflow gives it")
+check("Claim run" in [s.get("name") for s in daily["control"]["steps"]] and "Claim run" in [s.get("name") for s in restore["restore-control"]["steps"]],
+      "both control jobs have the `Claim run` step the reconciler looks for")
+claims = [next(x for x in job["steps"] if x.get("name") == "Claim run") for job in (daily["control"], restore["restore-control"])]
+# workflow_run.name is the RUN NAME when a workflow sets run-name, not the workflow name. Both workflows set one
+# ("backup (<label>) ..." / "restore (<label>) ..."), so comparing it to 'Daily backup' was always false and every
+# backup reconciled as a restore_test (job not found -> silent return -> the ledger row stayed open and blocked the
+# next scheduled claim, 2026-11-24). The kind must be derived from the run-name prefix.
+reconcile_text = (WF / "reconcile-runs.yml").read_text()
+check("run-name: backup (" in (WF / "daily-backup.yml").read_text() and "run-name: restore (" in (WF / "restore-test.yml").read_text(),
+      "both workflows set a run-name that starts with `backup (` / `restore (`")
+check("workflow_run.name == 'Daily backup'" not in reconcile_text and "startsWith(github.event.workflow_run.name, 'backup')" in reconcile_text,
+      "the reconciler derives the kind from the run-name prefix, not by comparing the run name to the workflow name")
+check(all(x.get("if") == "steps.control.outputs.run == 'true'" for x in claims),
+      "a run is claimed only when the schedule decision is true (a paused or not-due poll leaves no ledger row)")
+check("Verify complete coverage" in [s.get("name") for s in daily["backup"]["steps"]] and "Verify complete coverage" in [s.get("name") for s in restore["restore"]["steps"]],
+      "both data jobs end with `Verify complete coverage`")
+# The data jobs are gated on their control job and fail closed when it fails or does not authorize.
+check("needs.control.result == 'success'" in str(daily["backup"]["if"]), "the backup job runs only after a successful control job")
+check("needs.restore-control.result == 'success'" in str(restore["restore"]["if"]), "the restore job runs only after a successful control job")
+# The freshness alarm follows the Admin console too: the same split, and it still checks when the console cannot be read.
+fresh = yaml.safe_load((WF / "freshness.yml").read_text())["jobs"]
+fresh_text = (WF / "freshness.yml").read_text()
+check({"control", "gate", "check"} == set(fresh), "freshness.yml: control reads the console, gate builds the list, check reads the bucket")
+check(str(fresh.get("control", {}).get("environment", "")).startswith("backup-control-") and "backup/runtime-schedule.py" in str(fresh.get("control", {})),
+      "freshness.yml: the age limit comes from the Admin console, read in a backup-control job")
+check("PRODUCTION_BACKUP_ENABLED" not in fresh_text and "ACCEPTANCE_BACKUP_SCHEDULE" not in fresh_text,
+      "freshness.yml: no repository variable decides what is watched")
+check(all("always()" in str(fresh.get(j, {}).get("if", "")) for j in ("gate", "check")),
+      "freshness.yml: a failed console read does not skip the check")
+check(not secrets_in(fresh.get("gate", {})), "freshness.yml: the gate holds no secret")
+sys.exit(1 if failures else 0)

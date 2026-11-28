@@ -170,6 +170,8 @@ export async function listVerifications(
     .select(
       "id, subject_type, user_id, organization_id, verification_type, requested_account_type, status, reason, submitted_at, decided_at",
     )
+    // Business verification (the Verified badge) has its own queue and RPCs; review_* refuses it.
+    .neq("verification_type", "business")
     .order("submitted_at", { ascending: false })
     .limit(200);
   if (pendingOnly) query = query.in("status", ["submitted", "under_review"]);

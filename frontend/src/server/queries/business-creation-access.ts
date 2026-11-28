@@ -20,6 +20,8 @@ import { slotAllowsNewApplication, type ApplicationSlot } from "@/lib/workspace/
  */
 export async function loadBusinessCreationAccess(): Promise<{
   allowed: boolean;
+  /** The persona/workspace entitlement alone, before the application slot is considered. */
+  entitled: boolean;
   data: BusinessOnboardingData | null;
   persona: string | null;
   /** The one-open-application rule's verdict. */
@@ -33,7 +35,7 @@ export async function loadBusinessCreationAccess(): Promise<{
     loadOrganizationApplications(),
   ]);
   const persona = personalEntry(entries)?.persona ?? null;
-  if (!data) return { allowed: false, data: null, persona, slot, slotOpen: false };
+  if (!data) return { allowed: false, entitled: false, data: null, persona, slot, slotOpen: false };
 
   const decision = decideBusinessCreation({
     persona,
@@ -45,5 +47,5 @@ export async function loadBusinessCreationAccess(): Promise<{
   // An otherwise-entitled caller is still refused while the slot is taken, unless they are
   // finishing the draft they already hold.
   const slotOpen = slotAllowsNewApplication(slot) || data.draftId !== null;
-  return { allowed: decision.allowed && slotOpen, data, persona, slot, slotOpen };
+  return { allowed: decision.allowed && slotOpen, entitled: decision.allowed, data, persona, slot, slotOpen };
 }

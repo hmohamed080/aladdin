@@ -13,10 +13,15 @@ import {
   BadgeCheckIcon,
   ShieldIcon,
   MoneyIcon,
+  PhoneIcon,
   UserIcon,
   BarChartIcon,
   ScrollIcon,
   SettingsIcon,
+  PackageIcon,
+  StorefrontIcon,
+  CameraIcon,
+  BellIcon,
 } from "@/components/ui/icons";
 
 type Item = { href: string; key: string; exact: boolean; Icon: ComponentType<{ size?: number }> };
@@ -29,10 +34,25 @@ const items: Item[] = [
   // Verification, referral and organization decisions are still taken here; the
   // Review Center's Approve / Reject remain Preview until they are wired.
   { href: "/admin/verifications", key: "admin.nav.verifications", exact: false, Icon: ShieldIcon },
+  // The Verified badge: its own queue, separate from approving an organization's application.
+  { href: "/admin/business-verification", key: "businessVerification.admin.title", exact: false, Icon: BadgeCheckIcon },
+  { href: "/admin/phone-cooldowns", key: "phoneCooldown.title", exact: false, Icon: PhoneIcon },
+  { href: "/admin/whatsapp-otp", key: "whatsappOtp.title", exact: false, Icon: PhoneIcon },
   { href: "/admin/points", key: "admin.preview.nav.points", exact: false, Icon: MoneyIcon },
   { href: "/admin/staff", key: "admin.preview.nav.staff", exact: false, Icon: UserIcon },
   { href: "/admin/analytics", key: "admin.preview.nav.analytics", exact: false, Icon: BarChartIcon },
+  // Marketplace seller approval and media moderation. Unlisted in the route table, so the console door (any staff)
+  // applies to the link; each page's RPCs re-check marketplace_sellers.* and refuse without the permission.
+  { href: "/admin/marketplace", key: "admin.nav.marketplace", exact: true, Icon: StorefrontIcon },
+  { href: "/admin/marketplace/media", key: "admin.nav.marketplaceMedia", exact: false, Icon: CameraIcon },
+  { href: "/admin/marketplace/videos", key: "admin.nav.marketplaceVideos", exact: false, Icon: CameraIcon },
+  // Gated by its own grantable permission through the route table (hidden for admins without it).
+  { href: "/admin/marketplace/payment-complaints", key: "admin.nav.marketplaceComplaints", exact: false, Icon: MoneyIcon },
+  { href: "/admin/marketplace/returns", key: "admin.nav.marketplaceReturns", exact: false, Icon: PackageIcon },
   { href: "/admin/audit", key: "admin.preview.nav.audit", exact: false, Icon: ScrollIcon },
+  { href: "/admin/backups", key: "backups.title", exact: false, Icon: PackageIcon },
+  { href: "/admin/media-limits", key: "mediaLimits.title", exact: false, Icon: CameraIcon },
+  { href: "/admin/notification-templates", key: "notificationTemplates.title", exact: false, Icon: BellIcon },
   { href: "/admin/settings", key: "admin.preview.nav.settings", exact: false, Icon: SettingsIcon },
 ];
 

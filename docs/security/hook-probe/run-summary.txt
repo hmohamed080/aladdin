@@ -1,0 +1,9 @@
+== ci110 / confirm-on: 2.110.0
+ci110/confirm-on: [sec] {"suite":"r2-hook-probe","toolchain":"ci110","mode":"confirm-on","gotrue":"v2.193.0","PASS":31,"FAIL":0,"XFAIL":0,"XPASS":0,"EVAL":8,"N/A":0,"total":39}
+== ci110 / confirm-off: 2.110.0
+ci110/confirm-off: [sec] {"suite":"r2-hook-probe","toolchain":"ci110","mode":"confirm-off","gotrue":"v2.193.0","PASS":31,"FAIL":0,"XFAIL":0,"XPASS":0,"EVAL":8,"N/A":0,"total":39}
+== local / confirm-on: 2.122.0
+local/confirm-on: [sec] {"suite":"r2-hook-probe","toolchain":"local","mode":"confirm-on","gotrue":"v2.197.0","PASS":31,"FAIL":0,"XFAIL":0,"XPASS":0,"EVAL":8,"N/A":0,"total":39}
+== local / confirm-off: 2.122.0
+local/confirm-off: [sec] {"suite":"r2-hook-probe","toolchain":"local","mode":"confirm-off","gotrue":"v2.197.0","PASS":31,"FAIL":0,"XFAIL":0,"XPASS":0,"EVAL":8,"N/A":0,"total":39}
+RESULT: all cells clean (no FAIL)

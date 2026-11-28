@@ -1,0 +1,17 @@
+{
+  "rules": [
+    {
+      "id": "browser-direct-upload",
+      "allowed": {
+        "origins": [
+          "https://aladdin-frontend-preview.bstalent9.workers.dev",
+          "http://127.0.0.1:3187"
+        ],
+        "methods": ["PUT"],
+        "headers": ["content-type", "content-length"]
+      },
+      "exposeHeaders": ["ETag"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

@@ -30,6 +30,11 @@ select is(
      join pg_namespace n on n.oid = c.relnamespace
     where c.relkind = 'v'
       and n.nspname = 'public'
+      -- pgTAP creates diagnostic views under hosted-style creator defaults.
+      -- These are test-extension objects, not application API views.
+      and not exists (select 1 from pg_depend d join pg_extension e on e.oid=d.refobjid
+        where d.classid='pg_class'::regclass and d.objid=c.oid and d.deptype='e'
+          and e.extname='pgtap')
       and not coalesce(c.reloptions::text[] @> array['security_invoker=true'], false)),
   0, 'no SECURITY DEFINER view remains in the exposed public schema (Advisor rule 0010)');
 

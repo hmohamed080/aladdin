@@ -41,7 +41,7 @@ The register of reusable UI components. **Search this file before creating any c
 | **Dialog (modal)** | Blocking decision | Proposed | opening, open (focus-trap), closing | Trap+restore; Esc/backdrop; no native alert | Never nest; scroll-lock |
 | **Drawer** | Contextual side task | Proposed | opening, open, closing | Trap+restore; RTL edge | — |
 | **Bottom sheet** | Mobile focused task | Proposed | opening, open, closing, drag | Trap+restore; reduced-motion | Drag affordance/limits |
-| **Toast** | Transient confirmation | Proposed | enter, shown, pausable, exit | `aria-live` polite; not color-only | Critical-action items don't toast |
+| **Toast** | Transient confirmation | Built (`frontend/src/components/ui/toast.tsx`; one `<Toaster />` in the root layout; ConfirmDialog success codes) | enter, shown, pausable, exit | `aria-live` polite; not color-only | Critical-action items don't toast |
 | **Banner** | Persistent contextual state | Proposed | info/success/warning/danger; dismissible | Role/severity by icon+text | Placement rules |
 | **Empty state** | Nothing-here surface | Proposed | empty vs no-results vs error variants | Heading + primary action | Per-surface copy |
 | **Loading state** | Skeletons / spinners | Proposed | skeleton, inline spinner, button loading | Not full-screen block; `aria-busy` | Skeleton shapes per surface |

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getServerSupabase } from "@/lib/supabase/server";
+import { cachedReference } from "@/server/cache/reference";
 import type {
   IndependentProductRow,
   IndependentPublisherView,
@@ -60,11 +61,13 @@ export async function loadIndependentProducts(publisherId: string): Promise<Inde
 }
 
 export async function loadCategoryOptions(): Promise<CategoryOption[]> {
-  const supabase = await getServerSupabase();
-  const { data } = await supabase
-    .from("product_categories")
-    .select("code, label_en, label_ar")
-    .eq("is_active", true)
-    .order("sort_order");
-  return (data ?? []).map((c) => ({ code: c.code, labelEn: c.label_en, labelAr: c.label_ar }));
+  return cachedReference("product-categories", async () => {
+    const supabase = await getServerSupabase();
+    const { data } = await supabase
+      .from("product_categories")
+      .select("code, label_en, label_ar")
+      .eq("is_active", true)
+      .order("sort_order");
+    return (data ?? []).map((c) => ({ code: c.code, labelEn: c.label_en, labelAr: c.label_ar }));
+  });
 }

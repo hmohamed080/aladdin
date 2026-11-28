@@ -12,12 +12,10 @@ set -euo pipefail
 #     quotation is no longer a draft): exactly one 'quotation.submitted' audit row and one version
 #     bump, so a duplicate attempt can never create a duplicate business record or notification.
 
-db_container="$(docker ps --filter 'name=supabase_db_aladdin' --format '{{.Names}}' | head -n 1)"
-if [[ -z "${db_container}" ]]; then
-  echo "Supabase database container not found" >&2
-  exit 1
-fi
-if [[ -n "${E2E_DB_CONTAINER:-}" ]]; then db_container="${E2E_DB_CONTAINER}"; fi
+DB_CONTAINER="${DB_CONTAINER:-${E2E_DB_CONTAINER:-}}"   # the E2E harness names its own isolated stack
+source "$(dirname "${BASH_SOURCE[0]}")/lib/db_target.sh"
+db_target_require   # explicit DB_CONTAINER only; refuses shared / ambiguous / remote targets (no auto-selection)
+db_target_mark_dirty "$(basename "$0")"   # this script changes shared/seed rows: pgTAP must not run on this database afterwards
 
 psql_q() { docker exec -i "${db_container}" psql -U postgres -d postgres -qAt -v ON_ERROR_STOP=1 "$@"; }
 

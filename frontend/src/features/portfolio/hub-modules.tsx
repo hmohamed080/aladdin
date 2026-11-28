@@ -5,7 +5,8 @@ import { LayersIcon, ScrollIcon } from "@/components/ui/icons";
 import { ChipList } from "@/features/home/parts";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import type { ProfessionalAssetSummary } from "@/server/queries/portfolio";
-import { MediaFrame } from "./media-frame";
+import { MediaFrame, MediaImage } from "./media-frame";
+import type { MediaSource } from "@/lib/media/image-variants";
 
 /**
  * The Portfolio and Certificates modules on the profile hub.
@@ -31,11 +32,14 @@ import { MediaFrame } from "./media-frame";
 export function PortfolioModule({
   summary,
   publicItemId,
+  publicItemMedia,
   t,
 }: {
   summary: ProfessionalAssetSummary;
   /** A PUBLISHED item id, or null. Only published items resolve through /p/media. */
   publicItemId: string | null;
+  /** Optional URLs (with variants) for that same published item, from the URL issuer. */
+  publicItemMedia?: MediaSource | null;
   t: TranslateFn;
 }) {
   return (
@@ -48,15 +52,13 @@ export function PortfolioModule({
 
       {publicItemId ? (
         <MediaFrame className="aspect-[16/9]">
-          {/* The media route streams bytes behind a short-lived signed URL;
-              next/image would need a loader that caches it past the moment the
-              item stops being published. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`/p/media/${publicItemId}`}
+          {/* The media route re-proves publication per request; next/image
+              would cache it past the moment the item stops being published. */}
+          <MediaImage
+            source={publicItemMedia ?? { src: `/p/media/${publicItemId}` }}
             alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
+            width={768}
+            height={432}
           />
         </MediaFrame>
       ) : null}

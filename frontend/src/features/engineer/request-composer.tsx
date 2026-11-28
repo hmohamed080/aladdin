@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { parseQuantity } from "@/features/purchase-requests/model";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
@@ -32,16 +32,12 @@ import {
 import {
   savePurchaseRequestAction,
   purchaseRequestLifecycleAction,
-  requestRequestImageUploadAction,
-  confirmRequestImageUploadAction,
   removeRequestImageAction,
-  abortRequestImageUploadAction,
 } from "@/server/actions/purchase-requests";
-import {
-  REQUEST_IMAGE_BUCKET,
-  validateRequestImageFile,
-} from "@/lib/storage/request-images";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { validateRequestImageFile } from "@/lib/storage/request-images";
+import { formatLimit } from "@/lib/media/limits";
+import { imageHintBytes, loadMediaLimitHints } from "@/lib/media/limits-client";
+import { uploadRequestImage } from "@/features/purchase-requests/upload-request-image";
 import type { OwnRequest } from "@/server/queries/purchase-requests";
 import type { CatalogRow } from "@/server/queries/commerce";
 
@@ -92,6 +88,14 @@ export function RequestComposer({
   const saving = useRef(false);
   const errorRef = useRef<HTMLParagraphElement>(null);
   const [invalidQuantities, setInvalidQuantities] = useState<string[]>([]);
+  // The photo limit is the administrator's (/admin/media-limits); this is only the browser's copy of it.
+  const [imageLimit, setImageLimit] = useState(() => imageHintBytes("request"));
+  useEffect(() => {
+    void loadMediaLimitHints().then(() => setImageLimit(imageHintBytes("request")));
+  }, []);
+  const imageRules = ar
+    ? `صورتان لكل منتج · JPG، PNG، WebP · حتى ${formatLimit(imageLimit)} للصورة`
+    : `Two images per item · JPG, PNG, WebP · up to ${formatLimit(imageLimit)} each`;
   const quantityHelp = ar
     ? "أدخل كمية أكبر من صفر وحتى ١٬٠٠٠٬٠٠٠، بحد أقصى ٣ أرقام عشرية."
     : "Enter a quantity greater than zero and up to 1,000,000, with at most 3 decimal places.";
@@ -189,41 +193,18 @@ export function RequestComposer({
       setError(t(valid.code));
       return;
     }
+    if (file.size > imageHintBytes("request")) {
+      setError(ar ? `الصورة أكبر من الحد المسموح (${formatLimit(imageHintBytes("request"))}).` : `This image is larger than the ${formatLimit(imageHintBytes("request"))} limit.`);
+      return;
+    }
     setError("");
     start(async () => {
-      let pendingKey: string | null = null;
       try {
-        const ticket = await requestRequestImageUploadAction(itemId, file.type);
-        if (!ticket.ok) {
-          setError(t(ticket.code));
-          return;
-        }
-        pendingKey = ticket.key;
-        const client = createBrowserSupabaseClient();
-        const { error: uploadError } = await client.storage
-          .from(REQUEST_IMAGE_BUCKET)
-          .upload(ticket.key, file, { contentType: file.type, upsert: false });
-        if (uploadError) {
-          setError(t("states.genericRetry"));
-          return;
-        }
-        const done = await confirmRequestImageUploadAction(ticket.key);
-        if (!done.ok) {
-          setError(t(done.code));
-          return;
-        }
-        pendingKey = null;
+        await uploadRequestImage(itemId, file);
         router.refresh();
-      } catch {
-        setError(t("states.genericRetry"));
-      } finally {
-        if (pendingKey) {
-          try {
-            await abortRequestImageUploadAction(pendingKey);
-          } catch {
-            setError(t("states.genericRetry"));
-          }
-        }
+      } catch (failure) {
+        // The shared path throws an i18n key.
+        setError(t(failure instanceof Error && failure.message.includes(".") ? failure.message : "states.genericRetry"));
       }
     });
   }
@@ -300,8 +281,8 @@ export function RequestComposer({
           </section>
           <section className="request-section">
             <div className="request-section-heading"><span className="request-step">4</span><div><h2>{ar ? "صور مرجعية (اختياري)" : "Reference images (optional)"}</h2><p>{ar ? "أضف صور الموقع أو الخامات لتوضيح احتياجاتك." : "Show your space or materials to make requirements clear."}</p></div></div>
-            {!existing && <div className="request-upload-hint"><UploadIcon size={28} /><strong>{ar ? "احفظ المسودة لإرفاق صورك" : "Save your draft to attach images"}</strong><span>{ar ? "صورتان لكل منتج · JPG، PNG، WebP · حتى 5 ميجابايت للصورة" : "Two images per item · JPG, PNG, WebP · up to 5 MB each"}</span></div>}
-            {existing && <p>{ar ? "صورتان لكل منتج · JPG، PNG، WebP · حتى 5 ميجابايت للصورة" : "Two images per item · JPG, PNG, WebP · up to 5 MB each"}</p>}
+            {!existing && <div className="request-upload-hint"><UploadIcon size={28} /><strong>{ar ? "احفظ المسودة لإرفاق صورك" : "Save your draft to attach images"}</strong><span>{imageRules}</span></div>}
+            {existing && <p>{imageRules}</p>}
             {existing?.items.map((item) => (
               <div key={item.id} className="flex flex-col gap-3 border-t pt-3">
                 <label className="text-label">

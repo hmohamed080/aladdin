@@ -6,9 +6,10 @@ import { Card, InlineError, InlineSuccess } from "@/components/ui/primitives";
 import { Input, LabeledField, SubmitButton, Button } from "@/components/ui/controls";
 import { PhoneField } from "@/components/ui/phone-field";
 import type { CanonicalPhone } from "@/lib/contact/phone";
-import { setDisplayNameAction, setPhoneAction, type IdentityFieldState } from "@/server/actions/profile-identity";
+import { changeLoginPhoneAction, setDisplayNameAction, setPhoneAction, type IdentityFieldState } from "@/server/actions/profile-identity";
 import type { MyIdentity } from "@/server/queries/profile-identity";
 import { AvatarField } from "./avatar-field";
+import { SecondaryPhoneSection } from "./secondary-phone";
 
 const INITIAL: IdentityFieldState = { ok: false };
 
@@ -33,7 +34,7 @@ export function IdentityCard({ identity, compact = false, afterName, showSaveBar
     return result;
   }, INITIAL);
   const [phoneState, submitPhone] = useActionState(async (previous: IdentityFieldState, data: FormData) => {
-    const result = await setPhoneAction(previous, data);
+    const result = await (identity.phoneIsLoginKey ? changeLoginPhoneAction : setPhoneAction)(previous, data);
     if (result.ok) setSavedPhone(`${data.get("countryIso2")}:${data.get("national")}`);
     return result;
   }, INITIAL);
@@ -89,6 +90,11 @@ export function IdentityCard({ identity, compact = false, afterName, showSaveBar
             onChange={setPhone}
           />
           <p className="text-label text-fg-muted">{t("profileIdentity.phone.hint")}</p>
+          {identity.phoneIsLoginKey ? (
+            <LabeledField label={t("profileIdentity.phone.passwordLabel")} htmlFor="phone-current-password" hint={t("profileIdentity.phone.loginKeyHint")}>
+              <Input id="phone-current-password" name="currentPassword" type="password" autoComplete="current-password" maxLength={200} required />
+            </LabeledField>
+          ) : null}
           <input type="hidden" name="countryIso2" value={phone?.countryIso2 ?? ""} />
           <input type="hidden" name="national" value={phone?.national ?? ""} />
           <input type="hidden" name="e164" value={phone?.e164 ?? ""} />
@@ -101,6 +107,8 @@ export function IdentityCard({ identity, compact = false, afterName, showSaveBar
           </div>
         </form>
         )}
+
+        {compact ? null : <SecondaryPhoneSection secondary={identity.secondaryPhone ?? null} phoneLogin={identity.phoneLogin ?? false} />}
         {showSaveBar && (name !== savedName || (phone && `${phone.countryIso2}:${phone.national}` !== savedPhone)) && <div className="engineer-profile-savebar flex flex-wrap items-center gap-sm" role="status">
           <span className="me-auto">{locale === "ar" ? "لديك تغييرات غير محفوظة" : "You have unsaved changes"}</span>
           <Button type="button" onClick={() => {

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { THEME_COOKIE } from "@/lib/theme/config";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { getMessages } from "@/lib/i18n/translate";
 import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import { Brand } from "@/components/layout/brand";

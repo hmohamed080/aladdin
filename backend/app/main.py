@@ -6,6 +6,8 @@ documents, embeddings, and workers — NOT the product's CRUD backend.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -14,8 +16,8 @@ from app.config import get_settings
 
 # Public path prefix this service is addressed by.
 #
-# The service is deployed as the `backend` Vercel Service (root vercel.json,
-# ADR-0009), where `/api/backend(/.*)?` is rewritten to it. Vercel Services
+# The service runs on Cloudflare Containers (ADR-0022), reached through the
+# frontend Worker's `BACKEND` binding for `/api/backend(/.*)?`. The Worker
 # forwards the ORIGINAL request path — it does not strip the matched prefix —
 # so the app genuinely receives `/api/backend/health` and its routes must be
 # declared that way. (`root_path` is deliberately NOT used: that is for proxies
@@ -28,6 +30,14 @@ API_PREFIX = "/api/backend"
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    if settings.missing_configuration:
+        # Deliberately not a crash: the service starts, /api/backend/health answers
+        # 503 `misconfigured` and authenticated endpoints refuse (app.auth).
+        logging.getLogger(__name__).error(
+            "backend misconfigured for %s; missing: %s",
+            settings.environment,
+            ", ".join(settings.missing_configuration),
+        )
     app = FastAPI(
         title="Aladdin AI/Document Service",
         version="0.1.0",

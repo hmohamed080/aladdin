@@ -107,7 +107,7 @@ export function businessOrgTypeFromAccountType(
  * names are unchanged from before to avoid a wider blast radius — only the
  * MEMBERSHIP of this list and its i18n labels changed:
  *
- *   1. Showroom (showroom_dealer, business)      6. Engineer — Coming Soon
+ *   1. Showroom (showroom_dealer, business)      6. Engineer
  *   2. Supplier (business)                       7. Tradespeople & Technicians
  *   3. Manufacturer (business)                       (key: installer_technician —
  *   4. Importer (business)                            relabeled only, never a
@@ -120,7 +120,7 @@ export function businessOrgTypeFromAccountType(
 export const ACCOUNT_TYPE_CHOICES: AccountTypeChoice[] = [
   // ---- Personal: a persona the person claims for themselves. ----
   { key: "end_consumer", track: "consumer", accountType: "end_consumer", comingSoon: true },
-  { key: "engineer", track: "professional", accountType: "engineer", comingSoon: true },
+  { key: "engineer", track: "professional", accountType: "engineer" },
   { key: "installer_technician", track: "professional", accountType: "installer_technician" },
   { key: "contractor", track: "professional", accountType: "contractor", comingSoon: true },
   { key: "salesperson", track: "professional", accountType: "sales" },
@@ -138,21 +138,15 @@ export const CHOICES_BY_KEY: Record<string, AccountTypeChoice> = Object.fromEntr
 );
 
 /**
- * The selection UI, as a direct Personal-or-Business question. Order is preserved
- * and transitional keys are excluded — a new registration is never offered
- * "Organization owner / manager", because owner is a relationship created by
- * making a business, not something to pick from a list.
+ * Shared order for the landing-page account menu and the sign-up select.
+ * Keep the canonical order within each availability group, but show every
+ * currently selectable type before all Coming Soon types. Never modify the
+ * canonical PUBLIC_ACCOUNTS order or the server-side eligibility rules here.
  */
-/**
- * The 9 approved top-level audiences in the exact order the streamlined
- * registration screen (sign-up-form.tsx) presents them as a single flat
- * ChoiceCard grid — not grouped by personal/business the way the legacy
- * onboarding wizard's `CHOICE_GROUPS` still is. Membership is identical to
- * `CHOICE_GROUPS` flattened; only the presentation order differs, per the
- * approved registration-screen ordering (Showroom, Supplier, Manufacturer,
- * Importer, Contractor, Engineer, Tradespeople, Sales, Personal).
- */
-export const REGISTRATION_CHOICE_ORDER: string[] = [...REGISTRATION_ORDER];
+export const REGISTRATION_CHOICE_ORDER: string[] = [
+  ...REGISTRATION_ORDER.filter((key) => CHOICES_BY_KEY[key]?.comingSoon !== true),
+  ...REGISTRATION_ORDER.filter((key) => CHOICES_BY_KEY[key]?.comingSoon === true),
+];
 
 export const CHOICE_GROUPS: { group: "personal" | "business"; keys: string[] }[] = [
   {

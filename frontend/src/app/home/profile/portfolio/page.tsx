@@ -1,9 +1,14 @@
 import { redirect } from "next/navigation";
 import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { loadPersonalHome } from "@/server/queries/personal-home";
-import { loadPortfolioCards } from "@/server/queries/portfolio-cards";
+import { listMyPortfolio } from "@/server/queries/portfolio";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { readableMediaSource } from "@/server/storage/edge-ticket";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
-import { PortfolioManager } from "@/features/portfolio/portfolio-manager";
+import { PortfolioManager, type PortfolioCard } from "@/features/portfolio/portfolio-manager";
+import { VideoManager } from "@/features/video/video-manager";
+import { listManagedVideos } from "@/server/queries/videos";
+import { videoEnabled } from "@/server/video/playback";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +36,26 @@ export default async function PortfolioPage() {
   if (!data) redirect("/auth/sign-in");
   if (data.variant !== "professional") return <NoProfessionalProfile />;
 
-  const cards = await loadPortfolioCards();
+  // Work inside a portfolio project is managed with its project (/home/profile/edit#portfolio).
+  const [all, supabase] = await Promise.all([listMyPortfolio(), getServerSupabase()]);
+  const items = all.filter((item) => !item.projectId);
+  const cards: PortfolioCard[] = await Promise.all(
+    items.map(async (item) => {
+      // A pending item has no bytes yet, so there is nothing to sign and asking
+      // would cost a round trip to be told NoSuchKey.
+      if (item.pending) return { ...item, previewUrl: null };
+      // Same caller-scoped resolve as createAssetReadUrl, plus edge variant URLs.
+      const source = await readableMediaSource(supabase, "portfolio", item.objectKey).catch(() => null);
+      return { ...item, previewUrl: source?.src ?? null, previewVariants: source?.variants ?? null };
+    }),
+  );
 
-  return <PortfolioManager items={cards} />;
+  // Video appears only while uploads go to R2 and playback runs at the edge.
+  const videos = videoEnabled() ? (await listManagedVideos({ scope: "portfolio" })).filter((v) => !v.projectId) : null;
+  return (
+    <>
+      <PortfolioManager items={cards} videos={videos ?? []} />
+      {videos && <div className="mt-xl"><VideoManager scope="portfolio" videos={videos} canPublish showList={false} /></div>}
+    </>
+  );
 }

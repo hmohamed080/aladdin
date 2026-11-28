@@ -310,7 +310,9 @@
 
 @media (max-width: 1023px) {
   /* Button-styled links (cards' "Details", "Complete profile", "View all"). */
-  .installer-surface a:is([class*="rounded"], [class*="border"], [class*="hover:underline"]) {
+  /* `.hidden` links stay hidden: this rule's display must never reveal a link a breakpoint hides (it did, on the
+     phone header's service-area link, which then pushed the account button onto a second line). */
+  .installer-surface a:is([class*="rounded"], [class*="border"], [class*="hover:underline"]):not(.hidden) {
     min-height: 2.5rem;
     display: inline-flex;
     align-items: center;
@@ -388,4 +390,22 @@
   --primary: var(--warm-sand);
   --primary-foreground: var(--deep-navy);
   --danger: var(--muted-terracotta);
+}
+
+/* ------------------------------------------------------------------
+ * SETTINGS — DARK MODE EDGES
+ *
+ * Same layout as light mode. In dark the flat palette made every surface and
+ * hairline the same navy, so the section card and its summary panel lost their
+ * edges. Dark mode keeps them, in palette colours: a sand hairline around each
+ * section and a summary panel one step lighter than the card.
+ * ------------------------------------------------------------------ */
+.dark .installer-surface[data-installer-theme="flat"] [data-settings-section] {
+  border-color: color-mix(in srgb, var(--warm-sand) 35%, transparent);
+}
+.dark .installer-surface[data-installer-theme="flat"] [data-settings-summary] {
+  background: color-mix(in srgb, var(--warm-sand) 12%, var(--deep-navy));
+}
+.dark .installer-surface[data-installer-theme="flat"] [data-settings-summary-icon] {
+  background: color-mix(in srgb, var(--warm-sand) 22%, var(--deep-navy));
 }

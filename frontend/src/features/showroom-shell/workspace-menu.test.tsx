@@ -6,7 +6,8 @@ import { ar } from "@/lib/i18n/messages/ar";
 import { en } from "@/lib/i18n/messages/en";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
-vi.mock("./workspace-action", () => ({ selectShowroomWorkspace: vi.fn(async () => ({ ok: true })) }));
+const action = vi.hoisted(() => ({ select: vi.fn(async () => ({ error: false })) }));
+vi.mock("./workspace-action", () => ({ selectShowroomWorkspace: action.select }));
 
 const entries = [
   { kind: "business" as const, organizationId: "org-1", name: "Cairo Ceramics Showroom", orgType: "showroom_dealer", relationship: "owner" as never },
@@ -45,5 +46,21 @@ describe("workspace switcher terminology", () => {
     expect(en.orgApplications.title).toBe("My Organizations & Applications");
     expect(ar.workspace.addBusiness).toBe("طلب إضافة مؤسسة جديدة");
     expect(en.workspace.addBusiness).toBe("Request New Organization");
+  });
+
+  it("offers Personal first when the caller has a Personal workspace, and switches to it", async () => {
+    renderWithI18n(<ShowroomWorkspaceMenu entries={[{ kind: "personal", name: "Ahmed", persona: "engineer" }, ...entries]} activeKey="org-1" canCreate={false} />, "en");
+    fireEvent.click(screen.getByRole("button", { name: en.workspace.switch }));
+    const items = screen.getAllByRole("menuitem");
+    expect(items).toHaveLength(2);
+    expect(items[0]!.textContent).toBe(en.workspace.personal);
+    fireEvent.click(items[0]!);
+    await vi.waitFor(() => expect(action.select).toHaveBeenCalledWith("personal"));
+  });
+
+  it("never shows Personal to a business-only identity", () => {
+    renderWithI18n(<ShowroomWorkspaceMenu entries={entries} activeKey="org-1" canCreate />, "en");
+    fireEvent.click(screen.getByRole("button", { name: en.workspace.switch }));
+    expect(screen.queryByRole("menuitem", { name: en.workspace.personal })).toBeNull();
   });
 });

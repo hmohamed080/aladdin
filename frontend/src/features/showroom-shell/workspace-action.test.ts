@@ -11,7 +11,7 @@ import { selectShowroomWorkspace } from "./workspace-action";
 const id = "12345678-1234-4123-8123-123456789012";
 beforeEach(() => { vi.clearAllMocks(); state.registration = "access_ready"; state.entries = []; });
 describe("showroom switch authority", () => {
-  it.each(["personal", "invalid", "", "engineer"])("rejects non-organization target %s", async (value) => {
+  it.each(["invalid", "", "engineer", "Personal"])("rejects non-organization target %s", async (value) => {
     expect(await selectShowroomWorkspace(value)).toEqual({ error: true });
     expect(state.load).not.toHaveBeenCalled();
     expect(state.set).not.toHaveBeenCalled();
@@ -31,6 +31,25 @@ describe("showroom switch authority", () => {
     state.entries = [{ kind: "business", organizationId: id, name: "Business", orgType, relationship: "member" }];
     await expect(selectShowroomWorkspace(id)).rejects.toThrow("redirect:/showroom/home");
     expect(state.set).toHaveBeenCalledWith("aladdin-org", id, expect.objectContaining({ path: "/", sameSite: "lax" }));
+    expect(state.remove).toHaveBeenCalledWith("aladdin-branch");
+  });
+  it("rejects Personal for a business-only identity that has no Personal workspace", async () => {
+    state.entries = [{ kind: "business", organizationId: id, name: "Business", orgType: "showroom_dealer", relationship: "owner" }];
+    expect(await selectShowroomWorkspace("personal")).toEqual({ error: true });
+    expect(state.set).not.toHaveBeenCalled();
+  });
+  it("rejects Personal for an anonymous caller without resolving workspaces", async () => {
+    state.registration = "unverified";
+    expect(await selectShowroomWorkspace("personal")).toEqual({ error: true });
+    expect(state.load).not.toHaveBeenCalled();
+  });
+  it("switches to the caller's real Personal workspace, clears branch context and lands on /home", async () => {
+    state.entries = [
+      { kind: "personal", name: "Ahmed", persona: "engineer" },
+      { kind: "business", organizationId: id, name: "Business", orgType: "showroom_dealer", relationship: "owner" },
+    ];
+    await expect(selectShowroomWorkspace("personal")).rejects.toThrow("redirect:/home");
+    expect(state.set).toHaveBeenCalledWith("aladdin-org", "personal", expect.objectContaining({ path: "/", sameSite: "lax" }));
     expect(state.remove).toHaveBeenCalledWith("aladdin-branch");
   });
 });

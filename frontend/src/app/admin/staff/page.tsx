@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/server/auth/session";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatAdminDate, formatCount } from "@/lib/ui/format";
@@ -29,7 +30,10 @@ import { Badge, Card, StatePanel } from "@/components/ui/primitives";
 import { DataTable, RecordCell, Monogram, type Column } from "@/components/ui/data-table";
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
+import { ButtonLink } from "@/components/ui/controls";
+import { createTranslator } from "@/lib/i18n/translate";
+import { listStaffInvitations } from "@/server/queries/staff-invitations";
+import { StaffInvitationsPanel } from "@/features/admin-staff-invitations/invitations-panel";
 import { LabeledField, Input, Select } from "@/components/ui/controls";
 import { AutoFilters } from "@/features/admin-preview/auto-filters";
 import { TablePagination } from "@/features/admin-preview/table-pagination";
@@ -37,7 +41,7 @@ import { clampPageSize, paginate } from "@/features/admin-preview/table-state";
 
 export const dynamic = "force-dynamic";
 
-type TabKey = "staff" | "roles" | "permissions";
+type TabKey = "staff" | "invitations" | "roles" | "permissions";
 
 /**
  * Admin Staff · Roles · Permissions — Admin Core 1A (PD-008, PD-016).
@@ -69,15 +73,13 @@ export default async function AdminStaffPage({
 
   // Tabs the caller may open; an unpermitted ?tab= falls back to the first allowed.
   const allowed: TabKey[] = [
-    ...(can(access, "admin_staff.read") ? (["staff"] as const) : []),
+    ...(can(access, "admin_staff.read") ? (["staff", "invitations"] as const) : []),
     ...(can(access, "roles.read") ? (["roles", "permissions"] as const) : []),
   ];
   const requested = (tabParam || "staff") as TabKey;
   const tab: TabKey = allowed.includes(requested) ? requested : allowed[0]!;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   const callerId = user?.id ?? "";
 
   const [staff, roles, catalog] = await Promise.all([
@@ -87,6 +89,9 @@ export default async function AdminStaffPage({
     can(access, "roles.read") ? listAdminRoles(supabase) : Promise.resolve(null),
     tab !== "staff" ? listAdminPermissions(supabase) : Promise.resolve(null),
   ]);
+
+  const invitations = tab === "invitations" ? await listStaffInvitations(supabase) : null;
+  const ti = createTranslator(locale);
 
   const roleNames = t.roleNames as Record<string, string>;
   const roleDescriptions = t.roleDescriptions as Record<string, string>;
@@ -100,14 +105,9 @@ export default async function AdminStaffPage({
       <div className="flex flex-wrap items-center justify-between gap-md">
         <AdminHeader locale={locale} title={t.title} subtitle={t.subtitle} />
         {tab === "staff" && can(access, "admin_staff.manage") ? (
-          <PreviewActionDialog trigger={t.invite} triggerVariant="accent" title={t.inviteTitle} body={t.inviteBody} confirmLabel={t.invite} confirmVariant="accent">
-            <LabeledField label={t.nameLabel} htmlFor="invite-name">
-              <Input id="invite-name" placeholder={t.nameLabel} />
-            </LabeledField>
-            <LabeledField label={t.emailLabel} htmlFor="invite-email">
-              <Input id="invite-email" type="email" dir="ltr" placeholder="name@aladdin.eg" />
-            </LabeledField>
-          </PreviewActionDialog>
+          <ButtonLink href="/admin/staff?tab=invitations" variant="accent">
+            {t.invite}
+          </ButtonLink>
         ) : tab === "roles" && can(access, "roles.manage") && catalog ? (
           <RoleEditor
             role={null}
@@ -130,7 +130,7 @@ export default async function AdminStaffPage({
         current={tab === "staff" ? "" : tab}
         locale={locale}
         label={t.title}
-        tabs={allowed.map((k) => ({ value: k === "staff" ? "" : k, label: t.tabs[k] }))}
+        tabs={allowed.map((k) => ({ value: k === "staff" ? "" : k, label: k === "invitations" ? ti("staffInvitation.admin.tab") : t.tabs[k] }))}
       />
 
       <p role="note" className="-mt-2 rounded-sm border border-info/40 bg-info/10 px-md py-2 text-label text-fg-secondary">
@@ -172,6 +172,28 @@ export default async function AdminStaffPage({
             resourceLabels={resourceLabels}
             scopeLabels={scopeLabels}
             permissionDesc={permissionDesc}
+          />
+        )
+      ) : null}
+
+      {tab === "invitations" ? (
+        invitations === null ? (
+          <StatePanel title={ti("staffInvitation.admin.unavailable")} />
+        ) : (
+          <StaffInvitationsPanel
+            canManage={can(access, "admin_staff.manage")}
+            roles={assignableRoles(access, roles ?? [])
+              .filter((r) => r.key !== "super_admin")
+              .map((r) => ({ id: r.id, name: nameOf(r) }))}
+            rows={invitations.map((r) => ({
+              id: r.id,
+              emailMasked: r.emailMasked,
+              roleName: r.roleName,
+              status: r.status,
+              expiresLabel: formatAdminDate(r.expiresAt, locale),
+              invitedByName: r.invitedByName,
+              inviterAuthorized: r.inviterAuthorized,
+            }))}
           />
         )
       ) : null}
@@ -399,7 +421,7 @@ function StaffTab({
   return (
     <>
       {!manages ? <p className="text-label text-fg-muted">{t.readOnlyNote}</p> : null}
-      <AutoFilters fields={[{ kind: "text", name: "q", placeholder: m.admin.preview.users.searchPlaceholder }]} />
+      <AutoFilters fields={[{ kind: "text", name: "q", placeholder: t.searchPlaceholder }]} />
       <DataTable
         columns={columns}
         rows={slice.rows}
@@ -407,7 +429,7 @@ function StaffTab({
         caption={t.title}
         minWidth="68rem"
         stackBelow="desktop"
-        empty={<StatePanel title={m.admin.preview.duplicates.none} />}
+        empty={<StatePanel title={t.empty} />}
       />
       {filtered.length > 0 ? <TablePagination {...slice} pageSize={clampPageSize(pageSizeParam)} /> : null}
     </>

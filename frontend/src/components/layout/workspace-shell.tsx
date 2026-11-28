@@ -15,6 +15,10 @@ import { AppShell } from "@/components/layout/app-shell";
 import { SalesRealtime } from "@/features/sales/sales-realtime";
 import { SIDEBAR_MODE_COOKIE, resolveSidebarMode } from "@/lib/ui/sidebar-mode";
 import { commerceStance } from "@/lib/workspace/supply-side";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { loadMarketplaceSellerStatus } from "@/server/queries/marketplace-seller";
+import { MARKETPLACE_REQUEST_ENTITLEMENT, MARKETPLACE_SELL_ENTITLEMENT } from "@/lib/nav/modules";
+import { isMarketplacePreviewEnabled } from "@/lib/env";
 
 /**
  * The B2B WORKSPACE assembly — what fills the shared shell for an organization.
@@ -59,6 +63,23 @@ export async function WorkspaceShell({
   // classification on the server, so the first paint is already correct — it is a
   // navigation ORDER, and rewriting the rail after hydration is a visible jump.
   const stance = commerceStance(active.orgType);
+  // Marketplace selling is an ADMIN-GRANTED entitlement of the organization, not a
+  // membership capability: the module is drawn only for an approved seller. The
+  // membership capabilities themselves are passed on untouched everywhere else.
+  const sellerStatus = await loadMarketplaceSellerStatus(await getServerSupabase(), active.organizationId);
+  // An owner of an active showroom that is not an approved seller sees the one "Marketplace approval" module instead,
+  // where the standing is shown and approval can be requested (the database re-checks owner authority and eligibility).
+  const canAskForApproval =
+    isMarketplacePreviewEnabled() &&
+    active.orgType === "showroom_dealer" &&
+    active.capabilities.includes("org.manage") &&
+    sellerStatus !== "approved";
+  const navCapabilities =
+    sellerStatus === "approved"
+      ? [...active.capabilities, MARKETPLACE_SELL_ENTITLEMENT]
+      : canAskForApproval
+        ? [...active.capabilities, MARKETPLACE_REQUEST_ENTITLEMENT]
+        : active.capabilities;
 
   return (
     <AppShell
@@ -70,13 +91,13 @@ export async function WorkspaceShell({
         <SidebarShell
           mode={sidebarMode}
           appName={m.common.appName}
-          nav={<WorkspaceNavPanel allowed={active.capabilities} stance={stance} />}
+          nav={<WorkspaceNavPanel allowed={navCapabilities} stance={stance} />}
         />
       }
       header={
         <AppHeader
           appName={m.common.appName}
-          capabilities={active.capabilities}
+          capabilities={navCapabilities}
           stance={stance}
           hasWorkspace
           workspaceLabel={orgDisplayName ?? active.organizationName}
@@ -136,7 +157,7 @@ export async function WorkspaceShell({
           actions={<SalesRealtime orgId={active.organizationId} branchId={active.activeBranchId} />}
         />
       }
-      mobileNav={<MobileNav allowed={active.capabilities} stance={stance} />}
+      mobileNav={<MobileNav allowed={navCapabilities} stance={stance} />}
     >
       {children}
     </AppShell>

@@ -11,6 +11,7 @@ import {
   type WorkspaceEntry,
 } from "@/lib/workspace/model";
 import { loadWorkspaces, businessEntries } from "@/server/queries/workspace";
+import { readSessionIdentity } from "@/server/auth/session";
 
 /**
  * Derives the caller's ACTIVE organization/branch context from real membership +
@@ -122,15 +123,13 @@ export const loadWorkspaceContext = cache(async function loadWorkspaceContext(
   // other, so both are STARTED together rather than chained — but the identity is
   // still what gates everything below, so an anonymous caller returns exactly as
   // before and never has the workspaces result (or its failure) affect that.
-  const userPromise = supabase.auth.getUser();
+  const userPromise = readSessionIdentity(supabase);
   const workspacesPromise = loadWorkspaces(supabase);
 
   // A manager can SEE other members' rows via RLS, so we MUST filter to the
   // caller's own memberships — otherwise the org list duplicates and the
   // capability lookup could resolve another member's row.
-  const {
-    data: { user },
-  } = await userPromise;
+  const user = await userPromise;
   if (!user) {
     void workspacesPromise.catch(() => {});
     return { organizations: [], active: null, entries: [] };

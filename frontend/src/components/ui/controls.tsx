@@ -192,7 +192,7 @@ export function Checkbox({
   checked: boolean;
   onChange: (checked: boolean) => void;
   children: ReactNode;
-} & Pick<InputHTMLAttributes<HTMLInputElement>, "aria-invalid" | "aria-describedby">) {
+} & Pick<InputHTMLAttributes<HTMLInputElement>, "aria-invalid" | "aria-describedby" | "aria-required" | "value">) {
   return (
     <label htmlFor={id} className="flex cursor-pointer items-start gap-2.5 text-body text-fg">
       <input
@@ -223,7 +223,7 @@ export function ResendButton({ cooldown }: { cooldown: number }) {
   const { pending } = useFormStatus();
   const waiting = cooldown > 0;
   return (
-    <Button type="submit" variant="ghost" size="sm" disabled={waiting || pending} aria-busy={pending}>
+    <Button type="submit" variant="ghost" size="sm" className="whitespace-nowrap" disabled={waiting || pending} aria-busy={pending}>
       {pending ? (
         <>
           <Spinner />
@@ -450,6 +450,14 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
           setLocal(event.target.value);
           onChange?.(event);
         }}
+        // A click on this field's <label> is forwarded to the hidden native select, and a browser answers it by opening ITS OWN picker:
+        // a white list with the page's light text on it (unreadable in dark mode), drawn outside the design system. Cancel that default
+        // and hand the focus to the visible button instead; real pointer clicks never reach this element (pointer-events-none).
+        onClick={(event) => {
+          event.preventDefault();
+          buttonRef.current?.focus();
+        }}
+        onMouseDown={(event) => event.preventDefault()}
         onFocus={(event) => {
           buttonRef.current?.focus();
           onFocus?.(event);

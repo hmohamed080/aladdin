@@ -14,9 +14,8 @@ create extension if not exists pgtap;
 begin;
 select plan(103);
 -- rc2: this fixture activates / approves showrooms directly, bypassing the seller-readiness triggers PR #84 added
--- (showroom_review_complete / showroom_activation_complete / showroom_product_publish_complete). They are disabled for this
+-- (showroom_activation_complete / showroom_product_publish_complete). They are disabled for this
 -- transaction only (rolled back with it); the readiness rules themselves are asserted in tests 92-94.
-alter table public.verifications disable trigger showroom_review_complete;
 alter table public.organizations disable trigger showroom_activation_complete;
 alter table public.products disable trigger showroom_product_publish_complete;
 
@@ -144,7 +143,7 @@ select is(app.publisher_audience((select id from _ids where k = 'pc')), 'contrac
 select is(app.publisher_audience((select id from _ids where k = 'pe')), 'engineer', 'A19: independent Engineer audience');
 select is((select count(*)::int from public.audit_log where action = 'publisher.approved'), 2, 'A20: approvals are audited');
 select is((select organization_id from public.publishers where id = (select id from _ids where k = 'pc')), null, 'A21: no organization is created for an independent professional');
-select ok(app.coming_soon_account_types() @> array['contractor', 'engineer']::text[], 'A22: Contractor / Engineer registration stays Coming Soon');
+select ok(app.coming_soon_account_types() @> array['contractor']::text[] and not (app.coming_soon_account_types() @> array['engineer']::text[]), 'A22: Contractor registration stays Coming Soon; Engineer is open');
 
 -- ===========================================================================
 -- W. ownership and write authority
@@ -250,6 +249,11 @@ set local request.jwt.claims = :'u2';
 select throws_ok(format($q$select public.product_image_request_upload(%L, 'image/png')$q$, (select id from _ids where k = 'iprod')), '42501', null,
   'I3: another professional cannot upload to it');
 reset role;
+-- R2 (20261021090005): an image becomes ready only after its stored bytes were attested; record that attestation first.
+insert into public.media_storage_locations (namespace, object_key, owner_user_id, provider, content_type, size_bytes, sha256, verified_at)
+select 'product', pi.object_key, pi.created_by, 'supabase', pi.content_type, 1, repeat('0', 64), now()
+  from public.product_images pi where pi.product_id = (select id from _ids where k = 'iprod')
+on conflict (namespace, object_key) do update set verified_at = now(), size_bytes = 1, sha256 = repeat('0', 64);
 update public.product_images set state = 'ready' where product_id = (select id from _ids where k = 'iprod');
 set local role authenticated;
 set local request.jwt.claims = :'u5';

@@ -28,6 +28,11 @@ export const publicEnvSchema = z.object({
   // [auth.captcha] stays OFF. Optional: unset locally falls back to
   // Cloudflare's published always-pass TEST site key.
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().trim().min(1).optional(),
+  // Release gate for the public Marketplace (ADR-0028). OPTIONAL and OFF by default:
+  // only the exact value "true" opens /market and the seller pages' public side;
+  // anything else shows the "coming soon" page, so Production stays closed until it
+  // is set deliberately. A UI gate, not a security boundary — the database decides.
+  NEXT_PUBLIC_MARKETPLACE_PREVIEW: z.enum(["true", "false"]).optional(),
 });
 
 export const serverEnvSchema = z.object({
@@ -35,7 +40,7 @@ export const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   // Base URL of the FastAPI AI/document service. No runtime caller exists yet —
   // the web app reaches Postgres only through @supabase/ssr — so this stays
-  // optional and is NOT provisioned for the first staging deployment.
+  // optional. The web app reaches the backend same-origin at /api/backend (ADR-0022).
   AI_SERVICE_URL: z.string().url().optional(),
   // Symmetric key for canonical Forgot Password's recovery-grant cookie
   // (AES-256-GCM — see lib/supabase/recovery-grant.ts). Required wherever
@@ -53,7 +58,25 @@ export const serverEnvSchema = z.object({
   // unset the request's own host is used (server/auth/turnstile.ts). Pin it in
   // staging/production.
   TURNSTILE_ALLOWED_HOSTNAMES: z.string().trim().min(1).optional(),
+  // Resend API key for transactional email (the optional contact-email verification link). Server-only. Optional:
+  // locally an unset key writes the message to `.dev-mail/` instead of sending it; in staging/production an unset key
+  // makes the send fail closed (the pending claim is cancelled, nothing is verified).
+  RESEND_API_KEY: z.string().trim().min(1).optional(),
+  // The verified Resend sender, e.g. "Aladdin <no-reply@aladdindecore.com>". Required wherever RESEND_API_KEY is set.
+  EMAIL_FROM: z.string().trim().min(3).optional(),
+  // The public origin emailed links point at (e.g. "https://aladdindecore.com"). Never taken from a request header
+  // outside local development, so a forged Host cannot redirect a verification link.
+  APP_PUBLIC_ORIGIN: z.string().url().optional(),
 });
+
+/** Server-only email configuration (contact-email verification links). */
+export function readEmailEnv(): Pick<ServerEnv, "RESEND_API_KEY" | "EMAIL_FROM" | "APP_PUBLIC_ORIGIN"> {
+  return parseServerEnv({
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    EMAIL_FROM: process.env.EMAIL_FROM,
+    APP_PUBLIC_ORIGIN: process.env.APP_PUBLIC_ORIGIN,
+  });
+}
 
 /**
  * Names that must never appear on a browser-exposed variable. `NEXT_PUBLIC_*` is
@@ -95,6 +118,24 @@ export function parseServerEnv(source: Record<string, string | undefined>): Serv
  * The single sanctioned read of `process.env` for public config. Application
  * code calls this (or the Supabase factory) instead of touching `process.env`.
  */
+/**
+ * Release flag of the public Marketplace (ADR-0028). Unlike `readPublicEnv` it reads only this one
+ * NEXT_PUBLIC_ value and never throws, so Client Components can use it. Only the exact value "true"
+ * turns the Marketplace on; anything else keeps it closed.
+ */
+export function isMarketplacePreviewEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_MARKETPLACE_PREVIEW === "true";
+}
+
+/**
+ * Ordering flag of the public Marketplace. The first launch is browse-only: buyers see products, delivery details and
+ * showrooms, but no add-to-cart / cart entry point. Only the exact value "true" shows them (the ordering PR turns it on).
+ * Like `isMarketplacePreviewEnabled` it reads only this NEXT_PUBLIC_ value and never throws.
+ */
+export function isMarketplaceOrderingEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_MARKETPLACE_ORDERING === "true";
+}
+
 export function readPublicEnv(): PublicEnv {
   return parsePublicEnv({
     NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
@@ -102,6 +143,7 @@ export function readPublicEnv(): PublicEnv {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_SUPPORT_CONTACT: process.env.NEXT_PUBLIC_SUPPORT_CONTACT,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    NEXT_PUBLIC_MARKETPLACE_PREVIEW: process.env.NEXT_PUBLIC_MARKETPLACE_PREVIEW,
   });
 }
 

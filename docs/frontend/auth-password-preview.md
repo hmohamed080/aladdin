@@ -1,5 +1,7 @@
 # Canonical password authentication (historical name: password authentication preview)
 
+> **Update 2026-10-28 (ADR-0025):** sign-in takes one "Mobile number, username or email" field; sign-up drops Confirm Password, adds Birthday (18+, private) and accepts a mobile number verified by WhatsApp code. See [ADR-0025](../decisions/ADR-0025-one-field-sign-in-whatsapp-sign-up.md).
+
 > **Status (2026-09-28): LIVE.** Merged to `main` (PR #66) and smoke-tested
 > on Production — see *Post-rollout audit* below.
 >
@@ -391,7 +393,9 @@ canonical `server/actions/auth.ts`) already surfaces this correctly as the
 "expired" copy — there is no GoTrue signal available to show a more specific
 "that code is wrong" message instead.
 
-### Account enumeration — normalized (implemented, tested)
+### Account enumeration — normalized (implemented, tested) — SUPERSEDED for sign-up on 2026-11-12
+
+> **Superseded (owner decision, 2026-11-12).** Sign-up no longer hides an already-registered email or mobile number. A confirmed account's email now answers `authPasswordPreview.error.accountExists`, and a taken mobile number answers `phoneExists`, both **at once, under the field**, with a "Sign in" link that opens `/auth/sign-in` with the same email / number filled in. Reason: a person must not wait for a code that will never arrive. What stays: an UNCONFIRMED email is still obfuscated by GoTrue itself (success, same user id), so an interrupted registration simply continues; sign-in, forgot-password and resend are unchanged and stay neutral. What was added to bound the oracle: CAPTCHA first (GoTrue judges it inside `signUp()` for email, Siteverify for mobile). Mobile: the durable limiter (`phone_auth_consume_limit('sign-up')`, 10 per IP and 5 per number per 15 minutes, HMAC keys, fail closed) runs before the lookup and every outcome spends it. Email: the budget (same function, keys namespaced `email:`) is spent ONLY when GoTrue answers `user_already_exists`, i.e. after the CAPTCHA passed, so a garbage token can neither read the answer nor burn a victim's budget; once spent (or unavailable) an existing address degrades to the neutral "code sent" reply, never to a distinguishable error, so the budget really caps what can be learned; nothing is staged, sealed or sent for an existing account; the 500 ms response floor on sign-up was dropped (it only existed to hide this answer; resend keeps it). The "Sign in" hand-off carries the typed value in an httpOnly, `path=/auth`, 120-second cookie (`signin_prefill`), never the URL. **Hosted GoTrue note (2026-11-12):** the local stack answers a confirmed existing email with the error `user_already_exists`, but hosted Supabase (email confirmations ON) answers with SUCCESS and an obfuscated user (made-up id, no mail, EMPTY `identities`). `requestPasswordSignUp` handles both: the error, and `identities.length === 0` on a successful response (a real new or unconfirmed registration always carries its identity; a response without `identities` is treated as new). Both go through the same budgeted answer. The text below documents the previous neutral design and is kept for history.
 
 `signUp()`'s two sub-cases (revision 3's investigation, re-confirmed by
 direct `curl` probing this revision, same local GoTrue image the CLI
@@ -580,6 +584,48 @@ Revision 4's two open items are now addressed:
    post-acceptance membership/landing resolution, a different subsystem)
    and appears environment/ordering-related rather than caused by this
    revision's changes.
+
+## Interrupted registration and the pending-username lease (2026-10-28)
+
+### Root cause — why repeat sign-ups did not reliably send another code
+
+Evidence from Acceptance (`nxossqhdfltcqdwvbewi`) and Production (`kkpkgjrweysgvhvkhzun`) auth logs, `auth.users`, Resend's API log, and the local GoTrue + Mailpit stack. Each cause is separate and leaves a different trace:
+
+| Cause | Evidence | How it reaches the person |
+|---|---|---|
+| **SMTP authentication failure** | Production `/recover` 15:21:52 and 15:35:46 UTC 2026-10-28: `500 unexpected_failure`, `535 "Authentication credentials invalid"`. Config reload at 15:36:22, next `/recover` 15:36:33 → 200. Resend had received no `resend-smtp` request since 2026-10-22; every older API key had been removed when `aladdin-production` was created at 08:28 UTC, so both projects' stored SMTP password was a deleted key. A rejected SMTP login never appears in Resend's log. | `sendFailed`, no email. To the person it looks like nothing happened. |
+| **Project email rate limit** | Acceptance log 14:59:59 UTC: `updating Email limiter from 2/1h to 30`. Until custom SMTP was enabled the project could send 2 auth emails per hour in total. | `429 over_email_send_rate_limit` → `rateLimited`. |
+| **Per-address minimum interval** | Local GoTrue: a `signup`/`resend` for the same address inside `max_frequency` returns `429 {"error_code":"over_email_send_rate_limit","msg":"For security purposes, you can only request this after N seconds."}`. Hosted: 60 s. | `rateLimited`; the UI cooldown hides most of it. |
+| **CAPTCHA** | Hosted CAPTCHA protection is ON: `400 captcha_failed` (`no captcha_token found`, `invalid-input-response`) in both projects' logs. Turnstile tokens are single-use. | `captchaRejected` / `captchaRequired`; no email. |
+| **Application behaviour** | The code step lived only in React state. A refresh, closed tab or lost connection dropped it, and the only way back was to submit the whole sign-up form again. Verified locally: a repeat `signUp()` for an unconfirmed address re-sends the code but **keeps the ORIGINAL password and `user_metadata`** (the first password signs in after verification; the second gets 400). The person believes they set a new password; they did not. | Lost code step; a confusing "wrong password" after a "successful" re-registration. |
+| **Built-in mailer template** (Acceptance, before 15:00 UTC) | The 14:56 UTC confirmation was completed by `GET /verify` (a link, not the 6-digit code) and is absent from Resend: it went through Supabase's default mailer and default template. | Works, but bypasses the app's code UX. |
+
+### What changed
+
+* **~~`/auth/continue-registration`~~ — retired 2026-11-12.** The page, its form, the footer links and the "didn't finish" notice are gone; the route redirects to `/auth/sign-up`. `/auth/sign-up` reopens the email code step by itself when this browser has the routing cookie (below), with Resend (GoTrue `resend()`, never a second `signUp()`) and "Use a different email" (forgets the cookie, shows a clean form).
+* **Routing cookie `reg_email`** — httpOnly, `path=/auth`, 30 minutes. It holds the email only, is set identically whether or not the address has an account, and is cleared on a successful verify. A refresh or a later visit lands on the code step. Never the password, the code or any token; nothing in the URL or browser storage.
+* **Server-side throttle** — `phone_auth_consume_limit('email-resend', …)`: 5 per email and 20 per IP per 15 minutes (HMAC keys), on top of GoTrue's own per-address interval and project limit. Fails closed. CAPTCHA is checked before the throttle is spent.
+* **Diagnostics** — a send failure that is not CAPTCHA or a rate limit (typically SMTP 535) is logged as `status` + GoTrue `code` only.
+* **Restore after verification** — unchanged path: `pending_registration_consume()` restores account type + username; anything missing (expired staging, lost lease) goes to finish-registration, which asks only for what is missing.
+
+### Pending-username lease (`20261028090003_registration_username_lease.sql`)
+
+`app.pending_registrations` doubles as a **30-minute lease** on its username:
+
+* Granted by `pending_registration_save` (service_role only, now returns `boolean`) when the name is well-formed, not reserved, not owned by a profile, and not under another user's active lease. Not granted → the row keeps the account type with a NULL username.
+* **Staged once, never replaced.** Only a user that is still unconfirmed and was created in the last 10 minutes (the FIRST `signUp()` of that address) can stage, and an existing row is never overwritten. A repeat `signUp()` is answered by GoTrue with the account's REAL user id for anyone who knows the email, so letting it restage would let a stranger rename another person's pending username or change their account type (an overwrite that existed before this change). Consequences: no lease outlives `created_at` + 30 minutes, it can never be renewed or moved, and a person who signs up again keeps everything they entered first, just as GoTrue keeps the first password. One row per user = at most one lease per account. Creating more accounts to squat more names is bounded by CAPTCHA, GoTrue's sign-up and email limits, and the 30-minute expiry.
+* **Concurrency** — every lease grant and every final claim takes `pg_advisory_xact_lock` on the normalized name (`app.lock_username`), then checks. Proven with two real sessions (`supabase/tests/registration_username_lease_concurrency_test.sh`).
+* **Final claim stays authoritative** — `profile_set_username` refuses a reserved name, another user's active lease, or a taken name with the same `23505 username is unavailable`; the unique index on `profiles.username_normalized` is still the last word. A successful claim releases the caller's own lease. `username_available` also reads `false` for a leased name (indistinguishable from taken).
+* **Lease lost → choose again** — `pending_registration_consume` returns a NULL username when no active lease backs it; `verifyPasswordSignUp` applies the account type and sends the person to `finish-registration?reason=username_unavailable`. Registration is never restarted.
+* **Compatibility** — additive. Existing profiles and their index are untouched; existing pending rows get `username_reserved_at = created_at` (rows older than 30 minutes simply hold no lease). An old frontend ignores the new boolean return. No grant is widened; the three new `app.*` helpers are callable by no client role (`supabase/permissions/20261028090003.json`).
+
+### Security review
+
+* **Enumeration** — every send answers "if this email has an unfinished registration, we've sent a code". Unknown, unconfirmed and confirmed addresses get the same response, the same cookie and the same 500 ms floor. GoTrue's `resend` answers `{}` 200 for an unknown address (verified locally). The throttle keys on the email whether or not it exists. Lease state reads exactly like "taken".
+* **No secrets at rest or sent to the client** — the password is submitted once, to `signUp()`; the code travels only in the verify POST. Neither is in cookies, URLs, browser storage, logs or staging tables.
+* **Email verification never bypassed** — the session still comes only from `verifyOtp({type:"signup"})`.
+* **Abuse** — CAPTCHA (GoTrue-verified) + app throttle + GoTrue per-address interval + project email limit. The lease cannot be renewed, moved or hijacked (stage-once, found by the automated commit security review) and blocks nobody after 30 minutes.
+* **Known gap** — the WhatsApp/phone sign-up keeps its pending username in a sealed cookie and does not take a lease; its username is still decided by the final claim. Follow-up.
 
 ## Authoritative password-state tracking (revision 3 — replaces `user_metadata`)
 
@@ -1045,7 +1091,11 @@ caller here already proved the current credential).
   `aladdin-staging` or production, which keep GoTrue's real, unmodified
   defaults.
 
-## CAPTCHA — implemented architecture (application-scoped, 2026-09-24)
+## CAPTCHA — current behaviour (2026-10-26)
+
+**Superseded:** the 2026-09-24 section below is history. The approved behaviour is [ADR-0023](../decisions/ADR-0023-supabase-auth-verifies-turnstile.md), described in [auth-captcha.md](auth-captcha.md): Supabase Auth verifies the token of every operation it processes (Sign In included; interaction-only widget), hosted projects run Supabase Auth CAPTCHA protection ON, and the app verifies with Siteverify only the phone sign-up's Admin-API account creation.
+
+## CAPTCHA — implemented architecture (application-scoped, 2026-09-24) (HISTORY, superseded by ADR-0023)
 
 **This section is authoritative; the two sections below are history.** The
 "Option B" recommendation below was approved and is implemented:

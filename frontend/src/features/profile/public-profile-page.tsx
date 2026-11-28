@@ -8,14 +8,15 @@ import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { contentColumnClass } from "@/components/layout/content-column";
 import { PublicProfileView } from "@/features/profile/public-profile";
-import { PublicPortfolio } from "@/features/profile/public-portfolio";
+import { PublicPortfolio, PublicPortfolioProjects } from "@/features/profile/public-portfolio";
+import { loadPublicPortfolioProjects } from "@/server/queries/portfolio-projects";
+import { loadPublicPortfolioVideos } from "@/server/queries/videos";
+import { getServerSupabase } from "@/lib/supabase/server";
 import { PublicReviews } from "@/features/profile/public-reviews";
 import { cn } from "@/lib/ui/cn";
 import { PublicEngineerPortfolio } from "@/features/profile/public-engineer-portfolio";
 import { THEME_COOKIE } from "@/lib/theme/config";
 import { publicPortfolioSamplesEnabled } from "@/features/profile/public-portfolio-samples";
-
-
 
 /**
  * A professional's PUBLIC profile — the destination the technicians directory has
@@ -64,26 +65,47 @@ export async function PublicProfileContent({
   // Only ever the published items of a currently listed profile: the projection
   // itself carries that test, so this page adds no filter of its own and cannot
   // disagree with the media route about what is public.
-  const [portfolio, reviews] = await Promise.all([
+  // The cover of a currently listed profile (the same listing test as this page); NULL draws no banner.
+  const supabase = await getServerSupabase();
+  const { data: coverKey } = await supabase.rpc("public_profile_cover_key", { p_profile_id: profileId });
+  const coverSrc = typeof coverKey === "string" ? `/p/cover/${profileId}` : null;
+
+  const [allPortfolio, reviews, allVideos, projects] = await Promise.all([
     loadPublicPortfolio(profileId),
     // Unsuppressed reviews of a currently listed professional. The projection
     // carries that test, so this page adds no filter and cannot disagree with
     // the professional's own view of what is public.
     loadPublicReviews(profileId),
+    // Published videos of the same listed profile; the Worker re-checks
+    // publication on every playlist and segment request.
+    loadPublicPortfolioVideos(profileId),
+    // Published portfolio projects; their photos and videos are drawn with the
+    // project, so the flat list below keeps only work outside any project.
+    loadPublicPortfolioProjects(profileId),
   ]);
+  const inProjects = new Set(projects.flatMap((p) => p.order.map((m) => m.id)));
+  const portfolio = allPortfolio.filter((item) => !inProjects.has(item.id));
+  const videos = allVideos.filter((video) => !inProjects.has(video.id));
 
   if (profile.persona === "engineer") {
     const sample = publicPortfolioSamplesEnabled(profileId, (await headers()).get("host") ?? "");
-    return <PublicEngineerPortfolio profile={profile} portfolio={portfolio} reviews={reviews} locale={locale} sample={sample} theme={store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light"} />;
+    return <PublicEngineerPortfolio profile={profile} portfolio={portfolio} videos={videos} grouped={projects} coverSrc={coverSrc} reviews={reviews} locale={locale} sample={sample} theme={store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light"} />;
   }
 
   return (
     <main className={cn(contentColumnClass, "flex flex-col gap-xl py-xl")} id="main">
+      {coverSrc ? (
+        <div className="relative aspect-[6/1] w-full overflow-hidden rounded-md border border-strong bg-surface-2" data-testid="public-profile-cover">
+          {/* eslint-disable-next-line @next/next/no-img-element -- streamed through /p/cover, which re-proves publication */}
+          <img src={coverSrc} alt="" className="h-full w-full object-cover" />
+        </div>
+      ) : null}
       <PublicProfileView profile={profile} t={t} locale={locale} />
       {/* Rendered only when there is something published. An empty section would
           tell a visitor that work exists and is being withheld, which is exactly
           the distinction the whole surface refuses to draw. */}
-      <PublicPortfolio items={portfolio} t={t} />
+      <PublicPortfolioProjects projects={projects} t={t} />
+      <PublicPortfolio items={portfolio} videos={videos} t={t} />
       {/* Reviews after the work, for the same reason the work comes after the
           identity: a visitor decides who this is, sees what they have done, and
           then reads what other organizations said about it. Rendered only when

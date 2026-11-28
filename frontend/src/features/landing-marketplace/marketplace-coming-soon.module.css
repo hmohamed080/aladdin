@@ -1,0 +1,7 @@
+.panel { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 96px 24px; text-align: center; color: var(--ink); }
+.eyebrow { margin: 0; font-size: .875rem; font-weight: 600; color: var(--lumen-ink); }
+.title { margin: 0; font-size: clamp(1.75rem, 4vw, 2.75rem); line-height: 1.2; font-weight: 700; }
+.text { max-width: 520px; margin: 0; font-size: 1rem; line-height: 1.6; color: var(--stone); }
+.back { display: inline-flex; align-items: center; min-height: 44px; margin-top: 8px; padding: 8px 24px; border-radius: 999px; background: var(--lumen); box-shadow: 0 0 0 1px var(--accent-edge); color: var(--on-accent); font-weight: 600; }
+.back:hover { background: var(--lumen-deep); }
+.back:focus-visible { outline: 2px solid var(--lumen-ink); outline-offset: 3px; }

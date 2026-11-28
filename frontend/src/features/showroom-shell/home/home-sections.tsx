@@ -181,7 +181,7 @@ export function IncomingQuotations({ rows, imageUrls, locale, t, href }: {
             <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-sm bg-surface-2 text-fg-muted">
               {q.productId && imageUrls[q.productId] ? (
                 // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
-                <img src={imageUrls[q.productId]} alt="" className="h-full w-full object-cover" />
+                <img src={imageUrls[q.productId]} alt="" width={44} height={44} loading="lazy" decoding="async" className="h-full w-full object-cover" />
               ) : (
                 <PackageIcon size={18} />
               )}

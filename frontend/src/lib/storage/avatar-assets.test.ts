@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AVATAR_SOURCE_MAX_BYTES, validateAvatarFile } from "./avatar-assets";
+import { validateAvatarFile } from "./avatar-assets";
 
 describe("validateAvatarFile", () => {
   it("accepts JPEG, PNG and WebP", () => {
@@ -14,12 +14,8 @@ describe("validateAvatarFile", () => {
     }
   });
 
-  it("enforces the source-size limit and refuses an empty file", () => {
-    expect(validateAvatarFile({ type: "image/jpeg", size: AVATAR_SOURCE_MAX_BYTES })).toEqual({ ok: true });
-    expect(validateAvatarFile({ type: "image/jpeg", size: AVATAR_SOURCE_MAX_BYTES + 1 })).toEqual({
-      ok: false,
-      code: "profileIdentity.avatar.errorSize",
-    });
+  it("never refuses the selected photo for its size, only an empty file", () => {
+    expect(validateAvatarFile({ type: "image/jpeg", size: 80 * 1024 * 1024 })).toEqual({ ok: true });
     expect(validateAvatarFile({ type: "image/jpeg", size: 0 })).toEqual({
       ok: false,
       code: "profileIdentity.avatar.errorSize",

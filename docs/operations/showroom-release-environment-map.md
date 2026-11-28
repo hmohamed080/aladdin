@@ -34,4 +34,4 @@ Before production: verify recoverable backup/restore in disposable infrastructur
 
 ## Deferred and related files
 
-Deferred: hosted writes, target classification without evidence, staging deployment, production backup execution, promotion and paid/provider changes. The owner has not accepted direct-GoTrue/distributed account-attempt risk. Local diagnostics and CI evidence are documented in [work log](AGENT_WORK_LOG.md); the [CI workflow](../../.github/workflows/showroom-acceptance.yml) touches only runner-owned resources. No global Docker restart or shared-volume cleanup is part of recovery.
+Deferred: hosted writes, target classification without evidence, staging deployment, production backup execution, promotion and paid/provider changes. The owner has not accepted direct-GoTrue/distributed account-attempt risk. Local diagnostics and CI evidence are documented in [work log](AGENT_WORK_LOG.md); the CI workflow (showroom-acceptance.yml, retired 2026-10-28 with the showroom phone pages) touched only runner-owned resources. No global Docker restart or shared-volume cleanup is part of recovery.

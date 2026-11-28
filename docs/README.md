@@ -54,6 +54,7 @@ The five files above are **persistent project memory and part of the core archit
 - [`product/BACKLOG.md`](product/BACKLOG.md) — prioritized backlog (MoSCoW)
 - [`product/client-brief.md`](product/client-brief.md) — client brief
 - [`product/design-idea.md`](product/design-idea.md) — original founder brief (Arabic)
+- [`product/marketplace-order-model-contract-20261124.md`](product/marketplace-order-model-contract-20261124.md) — Marketplace order model contract for PRs 12-15 (entities, state machine, RPCs, timers, notifications, migration blocks)
 
 ## Architecture
 
@@ -64,6 +65,7 @@ The five files above are **persistent project memory and part of the core archit
 - [`architecture/data-flow.md`](architecture/data-flow.md)
 - [`architecture/realtime-and-background-jobs.md`](architecture/realtime-and-background-jobs.md)
 - [`architecture/scaling-strategy.md`](architecture/scaling-strategy.md)
+- [`architecture/ACCOUNT_IDENTITY_LIFECYCLE_MASTER_PLAN.md`](architecture/ACCOUNT_IDENTITY_LIFECYCLE_MASTER_PLAN.md) — account identity and lifecycle master plan (Phase 1: retire username and date of birth); working documents in [`operations/account-identity/`](operations/account-identity/README.md)
 
 ## Decisions (ADRs)
 
@@ -75,7 +77,8 @@ The five files above are **persistent project memory and part of the core archit
 - [`decisions/ADR-0006-repository-governance.md`](decisions/ADR-0006-repository-governance.md)
 - [`decisions/ADR-0007-identity-and-tenancy-model.md`](decisions/ADR-0007-identity-and-tenancy-model.md)
 - [`decisions/ADR-0008-b2b-sales-domain-model.md`](decisions/ADR-0008-b2b-sales-domain-model.md)
-- [`decisions/ADR-0009-vercel-services-deployment.md`](decisions/ADR-0009-vercel-services-deployment.md) — Vercel Services for the web app **and** FastAPI
+- [`decisions/ADR-0009-vercel-services-deployment.md`](decisions/ADR-0009-vercel-services-deployment.md) — Vercel Services for the web app **and** FastAPI (superseded by ADR-0024)
+- [`decisions/ADR-0024-vercel-retired.md`](decisions/ADR-0024-vercel-retired.md) — Vercel retired; Cloudflare Workers and Containers host both services
 - [`decisions/DECISION_LOG.md`](decisions/DECISION_LOG.md) — **one-screen index of all ADRs**
 - [`decisions/agent-instruction-migration.md`](decisions/agent-instruction-migration.md) — source→destination map
 
@@ -107,12 +110,17 @@ The five files above are **persistent project memory and part of the core archit
 - [`operations/staging-deployment-runbook.md`](operations/staging-deployment-runbook.md) — first cloud STAGING setup: agent/code work vs. owner manual steps
 - [`operations/staging-demo-accounts.md`](operations/staging-demo-accounts.md) — the 26 STAGING demo identities: persona, organization, landing route, visible data, and what to demo from each (generated; carries no email addresses)
 - [`operations/monitoring-and-observability.md`](operations/monitoring-and-observability.md)
+- [`operations/cloudflare-cost-scalability-2026-10-22.md`](operations/cloudflare-cost-scalability-2026-10-22.md) — estimated monthly cost at 1k / 10k / 100k DAU for the Cloudflare target architecture vs Vercel
+- [`operations/e2e-shared-failures-triage-2026-10-22.md`](operations/e2e-shared-failures-triage-2026-10-22.md) — the 51 E2E failures shared by the Node and Workers runs, by cause and owner
+- [`operations/cloudflare-migration-status-2026-10-22.md`](operations/cloudflare-migration-status-2026-10-22.md) — Cloudflare migration status, blockers and GO/NO-GO (PR #97)
+- [`operations/showroom-admin-handoff/`](operations/showroom-admin-handoff/README.md) — Showroom V2, Admin and R2 working reports (release readiness, R2 plan, Supabase audit, E2E results)
 
 ## Guides
 
 - [`guides/frontend-setup.md`](guides/frontend-setup.md)
 - [`guides/backend-setup.md`](guides/backend-setup.md)
 - [`guides/supabase-setup.md`](guides/supabase-setup.md)
+- [`guides/upstash-setup.md`](guides/upstash-setup.md)
 
 ## UI/UX
 

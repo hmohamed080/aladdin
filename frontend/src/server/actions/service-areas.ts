@@ -49,8 +49,9 @@ export async function setServiceAreasAction(_prev: AreasState, fd: FormData): Pr
   }
   revalidatePath("/home/profile");
   revalidatePath("/home/profile/edit");
-  revalidatePath("/home");
   revalidatePath("/home/jobs");
+  // The installer header ("Cairo, Giza") is drawn by the /home LAYOUT, so the layout itself must refresh.
+  revalidatePath("/home", "layout");
   return { ok: true };
 }
 

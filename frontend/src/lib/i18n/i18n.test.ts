@@ -28,6 +28,27 @@ const ARABIC = /[؀-ۿ]/;
 // Values that are intentionally identical technical samples in both locales
 // (neutral placeholders), so they carry Latin/digits and no Arabic script.
 const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
+  // "SKU" is the stock-keeping-unit code sellers type and search by; it stays
+  // in Latin in the Arabic UI, as on their own spreadsheets and labels.
+  "marketplaceSeller.searchPlaceholder",
+  "marketplaceSeller.col.sku",
+  "marketplaceSeller.form.sku",
+  "marketplaceSeller.form.variantsHint",
+  "marketplaceSeller.error.duplicate_sku_in_form",
+  "marketplaceSeller.error.sku_invalid",
+  "marketplaceSeller.error.sku_taken",
+  // Image file formats (JPG / PNG / WebP) are named as the seller sees them on their files.
+  "marketplaceSeller.image.hint",
+  "marketplaceSeller.error.image_type_invalid",
+  // Bulk import: the spreadsheet / archive / image FORMAT names (CSV, ZIP, JPG, PNG, WebP).
+  "marketplaceSeller.imports.step1Hint",
+  // attribute keys (key=value, attr:<key>) are the machine keys the seller types
+  "marketplaceSeller.imports.fixedAttributesHint",
+  "marketplaceSeller.imports.attrColumns",
+  "marketplaceSeller.imports.step4Hint",
+  "marketplaceSeller.imports.chooseImages",
+  "marketplaceSeller.imports.errors.format",
+  "marketplaceSeller.imports.errors.unreadable",
   // Showroom/Installer entry pages: the provider brand names (Google, Facebook)
   // stay as the providers write them, and the email sample is a literal address.
   "entryAuth.continueWithGoogle",
@@ -35,6 +56,9 @@ const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   "entryAuth.oauthConsentPrefix",
   "entryAuth.emailPlaceholder",
   "entryAuth.error.oauth",
+  // Video: file-format names (MP4, MOV, WebM) are what the file picker shows.
+  "video.fileHint",
+  "video.error.type",
   // Admin: a permission VOCABULARY token ("resource.action" is the literal shape
   // of every permission key, e.g. users.read) and the fixed date-entry FORMAT
   // hint (DD/MM/YYYY — the field is LTR by design, so the hint stays literal).
@@ -50,6 +74,11 @@ const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   // Arabic sentence — technical samples, not translated prose.
   "authPasswordPreview.error.passwordSequential",
   "onboarding.contact.phonePlaceholder",
+  // Showroom links: literal link / handle samples inside left-to-right inputs.
+  "onboarding.business.links.placeholder.facebook",
+  "onboarding.business.links.placeholder.instagram",
+  "onboarding.business.links.placeholder.tiktok",
+  "onboarding.business.links.placeholder.website",
   // A KEYCAP legend, not prose. The Enter key is engraved "Enter" on Arabic
   // keyboards too, so translating it would name a key the user cannot find.
   "search.enter",
@@ -58,6 +87,9 @@ const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   "commerce.canonicalCategories.spc_flooring",
   "showroomProducts.fields.codeHint",
   "showroomProducts.images.errorType",
+  // Business verification: PDF/JPG/PNG/WebP are file format names.
+  "businessVerification.owner.documentsBody",
+  "businessVerification.errors.fileType",
   // Purchase request reference images: the accepted image format names (JPEG / PNG / WebP).
   "purchaseRequests.errors.imageType",
   "showroomProducts.fields.colorHex",
@@ -68,6 +100,9 @@ const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   // Same reasoning, for the avatar upload's accepted image formats.
   "profileIdentity.avatar.errorType",
   "profileIdentity.cover.errorType",
+  // Software product names, written in Latin in Arabic usage.
+  "onboarding.professional.serviceItems.tool_autocad",
+  "onboarding.professional.serviceItems.tool_3ds_max",
   "showroomSettings.image.errorType",
   // HDF is a board-material name, written HDF in Arabic trade usage.
   "onboarding.professional.specializations.hdf_flooring_installation",
@@ -201,6 +236,7 @@ describe("Sprint 7.4 individual onboarding copy", () => {
 
   it("every persona Arabic value is present, non-empty, and real Arabic", () => {
     const bad = all
+      .filter(([key]) => !LATIN_IN_ARABIC_WHITELIST.has(key))
       .map(([key]) => [key, arMap.get(key)] as const)
       .filter(([, v]) => !v || v.trim().length === 0 || !ARABIC.test(v))
       .map(([key]) => key);

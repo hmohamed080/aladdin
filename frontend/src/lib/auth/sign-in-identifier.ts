@@ -1,0 +1,33 @@
+import { toAsciiDigits } from "@/lib/contact/phone";
+import { parsePhone } from "@/features/installer-phone-auth/validation";
+import type { CanonicalPhone } from "@/lib/contact/phone";
+
+/**
+ * The one sign-in field ("Mobile number or email"). Pure and
+ * client-safe; the server action re-classifies from scratch.
+ *
+ *   * anything with "@"                        → email
+ *   * digits with an optional leading "+"/"00",
+ *     spaces, dashes or brackets               → mobile number (Egypt default)
+ *   * anything else                            → username
+ *
+ * A username always starts with a letter (ck_profiles_username_shape), so a
+ * digits-only value can never be a username and the split is unambiguous.
+ */
+export type SignInIdentifier =
+  | { kind: "email"; value: string }
+  | { kind: "phone"; value: CanonicalPhone };
+
+const PHONE_SHAPE = /^\+?[0-9][0-9\s\-().]{5,}$/;
+
+export function classifySignInIdentifier(input: unknown): SignInIdentifier | null {
+  if (typeof input !== "string") return null;
+  const raw = toAsciiDigits(input).trim();
+  if (raw.length === 0 || raw.length > 254) return null;
+  if (raw.includes("@")) return { kind: "email", value: raw.toLowerCase() };
+  if (PHONE_SHAPE.test(raw)) {
+    const phone = parsePhone(raw);
+    return phone.ok ? { kind: "phone", value: phone.value } : null;
+  }
+  return null;
+}

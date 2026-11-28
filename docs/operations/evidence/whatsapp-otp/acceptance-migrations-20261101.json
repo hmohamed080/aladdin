@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-11-01T11:30:55.317Z",
+  "read_only": true,
+  "reports": [
+    {
+      "environment": "acceptance",
+      "project_ref_suffix": "bewi",
+      "scope": "migrations-only",
+      "migration_diff": {
+        "applied_count": 197,
+        "repo_count": 199,
+        "latest_applied": "20261029090002",
+        "applied_not_in_repo": [],
+        "repo_not_applied": [
+          "20261030090001",
+          "20261030090002"
+        ],
+        "out_of_order_missing": [],
+        "plain_push_possible": true,
+        "r2_markers": {
+          "20261028090001": true,
+          "20261030090001": false,
+          "20261030090002": false,
+          "20261031090001": false
+        }
+      },
+      "errors": []
+    }
+  ]
+}

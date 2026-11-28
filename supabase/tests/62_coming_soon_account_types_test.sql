@@ -34,16 +34,14 @@ values ('62000000-0000-4000-8000-000000000004', 'contractor');
 --    (frontend/src/lib/onboarding/coming-soon-parity.test.ts)
 -- ===========================================================================
 select is((select array_agg(k order by k) from unnest(app.coming_soon_account_types()) k),
-  array['contractor', 'end_consumer', 'engineer']::text[],
-  'Coming Soon = Contractor, Personal Account (end_consumer), Engineer');
+  array['contractor', 'end_consumer']::text[],
+  'Coming Soon = Contractor, Personal Account (end_consumer); Engineer is open since 20261128090007');
 
 -- ===========================================================================
 -- 2. Fresh selection of every Coming Soon type is refused, atomically
 -- ===========================================================================
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"62000000-0000-4000-8000-000000000001","role":"authenticated"}';
-select throws_ok($$ select public.onboarding_select_account_type('professional', 'engineer') $$,
-  '22023', 'this account type is not available yet', 'fresh ENGINEER is refused');
 select throws_ok($$ select public.onboarding_select_account_type('professional', 'contractor') $$,
   '22023', 'this account type is not available yet', 'fresh CONTRACTOR is refused');
 select throws_ok($$ select public.onboarding_select_account_type('consumer', null) $$,
@@ -64,9 +62,10 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"62000000-0000-4000-8000-000000000001","role":"authenticated"}';
 select lives_ok($$ select public.onboarding_select_account_type('professional', 'installer_technician') $$,
   'Tradespeople succeeds');
-select throws_ok($$ select public.onboarding_select_account_type('professional', 'engineer') $$,
-  '22023', 'this account type is not available yet', 'and does not open a path to switch into ENGINEER afterwards');
+select throws_ok($$ select public.onboarding_select_account_type('professional', 'contractor') $$,
+  '22023', 'this account type is not available yet', 'and does not open a path to switch into CONTRACTOR afterwards');
 set local request.jwt.claims = '{"sub":"62000000-0000-4000-8000-000000000002","role":"authenticated"}';
+select lives_ok($$ select public.onboarding_select_account_type('professional', 'engineer') $$, 'a fresh ENGINEER registration succeeds');
 select lives_ok($$ select public.onboarding_select_account_type('professional', 'sales') $$, 'Sales Team succeeds');
 select lives_ok($$ select public.onboarding_select_account_type('business', 'showroom_dealer') $$, 'Showroom succeeds');
 select lives_ok($$ select public.onboarding_select_account_type('business', 'supplier') $$, 'Supplier succeeds');
@@ -117,7 +116,7 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"62000000-0000-4000-8000-000000000005","role":"authenticated"}';
 select lives_ok($$ select public.onboarding_select_account_type('consumer', null) $$,
   'a legacy Personal Account holder may resume the consumer track');
-select throws_ok($$ select public.onboarding_select_account_type('professional', 'engineer') $$,
+select throws_ok($$ select public.onboarding_select_account_type('professional', 'contractor') $$,
   '22023', 'this account type is not available yet', 'but cannot pick a Coming Soon professional type');
 select lives_ok($$ select public.onboarding_select_account_type('professional', 'installer_technician') $$,
   'and can still choose an ACTIVE type');

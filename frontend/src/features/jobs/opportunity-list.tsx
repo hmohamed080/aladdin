@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { Card, Badge, StatePanel } from "@/components/ui/primitives";
 import { ButtonLink } from "@/components/ui/controls";
@@ -81,6 +82,12 @@ export function OpportunityCard({
 }) {
   const { t } = useI18n();
   const place = placeLabel(locale, o.governorate, o.city);
+  // "Posted 3 minutes ago" is relative to NOW, so the server render and the hydration render a moment later can
+  // straddle a rounding boundary and print different text (a React #418 hydration error). Same remedy as
+  // `AvailabilityControl`: tolerate the difference on that one line, then key it by `mounted` so the node is
+  // REPLACED with the browser's own reading after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
     <Card pad="sm" className="flex h-full flex-col gap-sm">
@@ -133,7 +140,7 @@ export function OpportunityCard({
             {formatMoney(o.offered_amount, locale)}
           </p>
           {o.published_at ? (
-            <p className="text-caption text-fg-muted">
+            <p key={mounted ? "client" : "server"} className="text-caption text-fg-muted" suppressHydrationWarning>
               {t("jobs.opportunities.published", {
                 when: formatRelativeTime(o.published_at, locale),
               })}

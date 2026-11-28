@@ -2,6 +2,9 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
+const revalidate = vi.hoisted(() => vi.fn());
+vi.mock("next/cache", () => ({ revalidatePath: revalidate }));
+
 const rpc = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({
   getServerSupabase: vi.fn(async () => ({ rpc })),
@@ -44,6 +47,11 @@ describe("saveProfessional", () => {
     expect(await saveProfessional(valid)).toEqual({ ok: true });
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(rpc.mock.calls[0]![0]).toBe("individual_save_professional");
+  });
+
+  it("refreshes the /home layout so the installer header shows the saved governorate / city", async () => {
+    await saveProfessional(valid);
+    expect(revalidate).toHaveBeenCalledWith("/home", "layout");
   });
 
   it("sends NO user id — ownership is auth.uid()'s to decide", async () => {

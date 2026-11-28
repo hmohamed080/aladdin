@@ -13,6 +13,7 @@ export function InstallerDashboardShell({
   theme,
   sidebarMode,
   displayName,
+  avatarUrl = null,
   location,
   searchJobs,
 }: {
@@ -20,6 +21,8 @@ export function InstallerDashboardShell({
   theme: "light" | "dark";
   sidebarMode: SidebarMode;
   displayName: string;
+  /** The account's profile photo (short-lived signed URL), or null to show the initial. */
+  avatarUrl?: string | null;
   location: string | null;
   /** Real, bounded opportunities the shared search overlay can jump to. */
   searchJobs: readonly InstallerOpportunityVM[];
@@ -42,6 +45,7 @@ export function InstallerDashboardShell({
           theme={theme}
           onMenuClick={() => setMobileNavOpen(true)}
           displayName={displayName}
+          avatarUrl={avatarUrl}
           location={location}
           searchJobs={searchJobs}
           production

@@ -7,11 +7,9 @@ set -euo pipefail
 #   B. a revocation is already in flight (uncommitted) when the publisher tries to publish:
 #      the publish WAITS, then sees the revoked status and is refused -> the item stays unpublished.
 
-db_container="$(docker ps --filter 'name=supabase_db_aladdin' --format '{{.Names}}' | head -n 1)"
-if [[ -z "${db_container}" ]]; then
-  echo "Supabase database container not found" >&2
-  exit 1
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/db_target.sh"
+db_target_require   # explicit DB_CONTAINER only; refuses shared / ambiguous / remote targets (no auto-selection)
+db_target_mark_dirty "$(basename "$0")"   # this script changes shared/seed rows: pgTAP must not run on this database afterwards
 psql_run() { docker exec -i "${db_container}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -At "$@"; }
 
 run="$(python3 -c 'import uuid;print(uuid.uuid4().hex[:8])')"

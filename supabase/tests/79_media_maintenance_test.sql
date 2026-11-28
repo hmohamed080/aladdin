@@ -1,0 +1,25 @@
+create extension if not exists pgtap;
+begin;
+select plan(12);
+select ok(not has_function_privilege('authenticated','public.media_migration_switch(text,text,uuid,bigint,text,text)','EXECUTE'),'clients cannot switch providers');
+select ok(not has_function_privilege('authenticated','public.media_cleanup_complete(text,text,uuid)','EXECUTE'),'clients cannot claim cleanup success');
+select ok(not has_function_privilege('anon','public.media_source_inventory_summary()','EXECUTE'),'source inventory is private');
+set local role authenticated;
+set local request.jwt.claim.sub='70000009-0000-4000-8000-000000000009';
+set local request.jwt.claims='{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
+select item_id as item,object_key as key from public.portfolio_item_create('maintenance test',null,'image/png') \gset
+reset role;
+set local request.jwt.claims='{"role":"service_role"}';
+select public.media_storage_reserve('portfolio',:'key','r2','70000009-0000-4000-8000-000000000009');
+select throws_ok(format('select public.media_storage_attest(%L,%L,%L,%L,null,%L,%L)','portfolio',:'key','70000009-0000-4000-8000-000000000009','r2','image/png',repeat('a',64)),'42501','invalid verification receipt','null size cannot forge proof');
+select throws_ok(format('select public.media_cleanup_complete(%L,%L,%L)','portfolio',:'key','70000009-0000-4000-8000-000000000009'),'42501','cleanup requires retired metadata','live pending is not cleanup-complete');
+update public.portfolio_items set created_at=now()-interval '2 days' where id=:'item';
+select is((select count(*)::int from public.media_cleanup_candidates(100) where object_key=:'key'),1,'stale R2 pending is selected');
+select lives_ok(format('select public.media_cleanup_retire(%L,%L,%L)','portfolio',:'key','70000009-0000-4000-8000-000000000009'),'stale pending retires safely');
+select lives_ok(format('select public.media_cleanup_complete(%L,%L,%L)','portfolio',:'key','70000009-0000-4000-8000-000000000009'),'verified physical cleanup records completion');
+select is((select count(*)::int from public.media_cleanup_candidates(100) where object_key=:'key'),0,'completed tombstone cannot starve next batch');
+select is((select count(*)::int from public.portfolio_items where id=:'item'),1,'cleanup preserves canonical record');
+select is((select state::text from public.portfolio_items where id=:'item'),'deleted','cleanup revokes metadata');
+select throws_ok(format('select public.media_migration_rollback(%L,%L,%L)','portfolio',:'key',repeat('a',64)),'42501','no verified legacy migration','native R2 object cannot roll back to nonexistent legacy object');
+select * from finish();
+rollback;

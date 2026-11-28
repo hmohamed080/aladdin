@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { PackageIcon } from "@/components/ui/icons";
 import { ShowroomPageHero } from "@/features/showroom-shell/page-hero";
 import { ProductStatCards } from "./stat-cards";
