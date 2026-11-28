@@ -37,6 +37,8 @@
         // Public Marketplace (ADR-0028) is open on this isolated preview ONLY: acceptance data, no custom domain.
         // Production deliberately has no such variable, so it keeps serving the "coming soon" page until a separate approval.
         "NEXT_PUBLIC_MARKETPLACE_PREVIEW": "true",
+        // Ordering is ON here only (acceptance data). The preview workflow also sets it at build time; Production has neither.
+        "NEXT_PUBLIC_MARKETPLACE_ORDERING": "true",
         // Redis is OFF on the preview (owner decision 2026-11-15): the whole Free command quota goes to production.
         "REDIS_CACHE_ENABLED": "false",
         // R2 (stage 2): the acceptance private bucket only. R2_ACCOUNT_ID comes from the

@@ -8042,3 +8042,7 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 ## 2026-11-28 - Marketplace orders applied to Acceptance and frontend deployed
 - Owner ran preflight and apply of `marketplace-orders` (246 -> 264): PASS. Frontend `d96b440e` deployed from `45e19ebb` on the owner's GO.
 - Open: enable ordering on Acceptance, timers Worker secrets and deploy, WhatsApp secrets, browser testing. Details in RUNTIME_STATE.md.
+
+## 2026-11-28 - Marketplace ordering switched on for Acceptance (configuration, not yet deployed)
+- Owner approved preparing it. Preview workflow and `wrangler.jsonc` set `NEXT_PUBLIC_MARKETPLACE_ORDERING`; a test keeps Production without it.
+- Open: merge and deploy (owner approval each), then the order test round with the three verified accounts. Timers Worker and its two secrets before testing reminders.
