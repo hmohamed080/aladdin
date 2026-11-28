@@ -81,6 +81,33 @@ beforeEach(() => {
   signOut.mockClear();
 });
 
+describe("middleware — known-device cookies", () => {
+  const DEVICE = "11111111-1111-4111-8111-111111111111";
+  const SESSION = "22222222-2222-4222-8222-222222222222";
+  const token = `h.${Buffer.from(JSON.stringify({ session_id: SESSION })).toString("base64url")}.s`;
+  const written = (res: Response) => (res.headers.get("set-cookie") ?? "").match(/aladdin_device(_seen)?(?==)/g) ?? [];
+
+  beforeEach(() => {
+    claims = SIGNED_IN;
+    networkUser = { id: "u1" };
+    accountStatus = { status: "active", suspended: false };
+    sessionToken = token;
+  });
+
+  it("writes them on the first page load of the day, then leaves them alone", async () => {
+    expect(written(await at("/home"))).toEqual(["aladdin_device", "aladdin_device_seen"]);
+    const marker = `${SESSION}:${new Date().toISOString().slice(0, 10)}`;
+    const again = await at("/home", { headers: { cookie: `aladdin_device=${DEVICE}; aladdin_device_seen=${marker}` } });
+    expect(written(again)).toEqual([]);
+  });
+
+  // A cookie here would make Next re-render the page under the Server Action that is being served.
+  it("never writes them on a Server Action request", async () => {
+    expect(written(await at("/onboarding/business", { method: "POST", headers: { "next-action": "x" } }))).toEqual([]);
+    expect(rpc).not.toHaveBeenCalledWith("touch_known_device", expect.anything());
+  });
+});
+
 describe("middleware — account suspension", () => {
   it("sends a suspended account from every product surface to /auth/suspended", async () => {
     claims = SIGNED_IN;

@@ -149,7 +149,8 @@ test.describe("2 + 5 — an existing professional applies for a business", () =>
     // A PERSONAL persona - the seeded Engineer, also a member of Horizon Contracting. He stays an Engineer throughout.
     const office = `AH Engineering Office ${uniq()}`;
     await signIn(page, request, "yasser@example.test", /\/home(\/|$|\?)/);
-    await expect(page.getByRole("heading", { name: /welcome, yasser fouad/i })).toBeVisible();
+    // An Engineer's home is the Engineer dashboard: it names them on the profile card, with no "Welcome" heading.
+    await expect(page.getByRole("heading", { level: 2, name: "Yasser Fouad" })).toBeVisible();
 
     // ---- 2. Apply for a business from the authenticated product UI. No Sign Up. ----
     // RC2: the menu offers Personal, the organizations he works in, and "Request New Organization".
@@ -179,7 +180,8 @@ test.describe("2 + 5 — an existing professional applies for a business", () =>
 
     // Applying did NOT change who he is: Personal is still his, with the Engineer persona.
     await page.goto("/home");
-    await expect(page.getByRole("heading", { name: /welcome, yasser fouad/i })).toBeVisible();
+    // An Engineer's home is the Engineer dashboard: it names them on the profile card, with no "Welcome" heading.
+    await expect(page.getByRole("heading", { level: 2, name: "Yasser Fouad" })).toBeVisible();
     await expect(page.getByText("Engineer").first()).toBeVisible();
 
     // ---- 5. Tenant isolation: a stale/foreign organization id in the context cookie grants nothing. ----

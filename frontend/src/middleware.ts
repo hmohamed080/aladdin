@@ -97,8 +97,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // Record this browser against the account once per session per day (best effort, never blocks).
+  // Device cookies are written on page loads only, and only when something changed: Next counts any cookie
+  // set here as a mutation by the Server Action being served, and re-renders the page under a flow in progress.
+  const pageLoad = request.method === "GET";
   let seenMarker: string | null = null;
-  if (userId && !prefetch) {
+  if (userId && !prefetch && pageLoad) {
     const { data: sessionData } = await supabase.auth.getSession();
     const sessionId = sessionIdFromAccessToken(sessionData.session?.access_token);
     if (sessionId) {
@@ -113,6 +116,7 @@ export async function middleware(request: NextRequest) {
     }
   }
   const withDeviceCookies = (res: NextResponse): NextResponse => {
+    if (!pageLoad || (deviceId === existingDevice && !seenMarker)) return res;
     const base = { httpOnly: true, sameSite: "lax" as const, secure: env.NEXT_PUBLIC_APP_ENV !== "local", path: "/", maxAge: DEVICE_COOKIE_MAX_AGE_SECONDS };
     res.cookies.set(DEVICE_COOKIE, deviceId, base);
     if (seenMarker) res.cookies.set(DEVICE_SEEN_COOKIE, seenMarker, base);

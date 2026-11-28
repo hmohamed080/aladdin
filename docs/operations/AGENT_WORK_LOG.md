@@ -8312,3 +8312,7 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Settings save bar clears only when a form announces a successful save; the gender choice is no longer reset on submit.
 - Unavailable periods: the UI no longer claims they hide opportunities; job discovery does not read them (filtering is an open owner decision).
 - Open before release: confirm on the hosted project that secure email change is on and that the email-change template carries `{{ .Token }}` (not checked).
+
+## 2026-11-28 - Engineer PR #296: two failed e2e checks
+- Real defect from the port: the middleware set the device cookie on every response. Next treats that as a cookie mutation by the Server Action being served and re-renders the page; in business setup the finished basics step then vanished and the branch step was skipped. Device cookies are now written on page loads only, when something changed.
+- Outdated expectations: the sign-up list (Engineer is open) and the seeded Engineer's home (Engineer dashboard, no "Welcome" heading). Unit tests, typecheck and lint ran locally; the e2e suites run in CI only.
