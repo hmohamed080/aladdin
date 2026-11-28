@@ -1,3 +1,12 @@
+## Acceptance at 266: marketplace-clarity applied, frontend c905580f - 2026-11-28
+
+Supersedes, for Acceptance only, the migration count and frontend version in the entries below.
+
+- **Acceptance** (`nxossqhdfltcqdwvbewi`): 266 migrations, latest `20261128120001`. Plan `marketplace-clarity` (PR #294) applied by the owner from `main` `98f60d52`; post smoke OK.
+- **Acceptance frontend**: `aladdin-frontend-preview` version `c905580f-cc66-4dab-91fe-7ed4f52bff49` (workflow run 46152497141, `main` `98f60d52`); smoke answered 200 (`/showroom` 307). Rollback target: `ac701361-fdd1-4931-81cd-3b6fc0eb4fec`.
+- Signed-in browser check: `/` offers "My account" only; the `MP-000013` waybill collects nothing and labels the address.
+- Still off: the timers Worker (no reminders, escalations or automatic cancellation) and WhatsApp sending. **Production** is unchanged.
+
 ## Marketplace clarity apply plan prepared; Acceptance frontend ac701361 - 2026-11-28
 
 Supersedes the frontend version and the migration status of the entry below.
@@ -12,7 +21,7 @@ Supersedes the frontend version and the migration status of the entry below.
 - Migration `20261128090001` is in a branch only: **not merged, not applied** to Acceptance or Production, and has no apply plan yet. The frontend of that branch also runs against the current Acceptance database (new fields are optional).
 - The timers Worker is still not deployed, so no reminder, escalation or automatic cancellation runs.
 
-## Engineer account port and registration opening (local branch, not pushed or deployed) - 2026-11-28
+## Engineer account port and registration opening (PR #296 open; not merged or deployed) - 2026-11-28
 
 - Branch `feat/engineer-account-port-20261128`: the Engineer account ported onto `main` `98f60d52` (through #294); migrations `20261128130001`-`20261128130007`; permission contracts `20261128130001`-`20261128130006`.
 - **No hosted change.** Acceptance and Production still refuse a fresh Engineer registration.

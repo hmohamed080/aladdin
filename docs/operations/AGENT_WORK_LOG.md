@@ -8294,6 +8294,11 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Prepared plan `marketplace-clarity` (264 -> 266) for `20261128090001` and `20261128120001`: gate, smoke, pinned forward-fix, scratch proof OK; live Acceptance function definitions equal the replayed pre-state (read-only).
 - Open: merge (owner), owner preflight and apply, frontend deploy, retest, timers Worker secrets and deploy.
 
+## 2026-11-28 - marketplace-clarity applied to Acceptance and frontend deployed
+- Owner ran preflight and apply (264 -> 266): PASS. Frontend `c905580f` deployed from `98f60d52` on the owner's GO.
+- Browser check: home actions (F25) and waybill (F26) confirmed. New: F27, waybill wording on a refunded order.
+- Open: retest the items in the test log, timers Worker secrets and deploy, WhatsApp secrets, Production plan.
+
 ## 2026-11-28 - Engineer account ported onto main and registration opened (local commit; not pushed or deployed)
 - Owner asked to port the whole account. Branch `feat/engineer-account-port-20261128` merges `main` (through #294, `98f60d52`) into `feature/engineer-account` `da4367de` (the original branch is unchanged). Migrations are `20261128130001`-`20261128130007`: #293 took `20261128090001` and #294 added `20261128120001` while the port was in progress.
 - Owner decisions: no date of birth anywhere (the date picker and birth-date storage were not ported; gender stays); uploads go to R2 only with Admin-controlled size limits (the request composer now uses the shared upload grant path); Engineer registration open (also opens the Engineering Office application).
