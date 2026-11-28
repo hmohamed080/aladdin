@@ -627,7 +627,18 @@ select pg_temp.as_user(current_setting('t.super'));
 select is((public.admin_marketplace_returns() -> 'counts' ->> 'escalated')::int, 1, 'H6. the queue holds the escalated return');
 select is(jsonb_array_length(public.admin_marketplace_returns('open', 'all') -> 'items') >= 2, true, 'H7. the full list shows the others');
 select is(public.admin_marketplace_return_get(current_setting('t.rid6')::uuid) -> 'buyer' ->> 'name', (select buyer_name from public.marketplace_orders where id = current_setting('t.o4')::uuid), 'H8. the admin sees the names');
-select is(public.admin_marketplace_return_get(current_setting('t.rid6')::uuid) ? 'phone', false, 'H9. never a phone number');
+select is(public.admin_marketplace_return_get(current_setting('t.rid6')::uuid) -> 'buyer' ->> 'phone',
+  (select buyer_phone from public.marketplace_orders where id = current_setting('t.o4')::uuid), 'H9. the admin sees the buyer''s phone to follow the case up');
+reset role;
+update public.organizations set contact_phone = '+201001112222'
+ where id = (select seller_organization_id from public.marketplace_return_requests where id = current_setting('t.rid6')::uuid);
+select pg_temp.as_user(current_setting('t.super'));
+select is(public.admin_marketplace_return_get(current_setting('t.rid6')::uuid) -> 'seller' ->> 'phone', '+201001112222', 'H9b. ...and the showroom''s business phone');
+select pg_temp.as_user(current_setting('t.buyer'));
+select is(public.marketplace_buyer_return_get(current_setting('t.rid6')::uuid) -> 'seller' ->> 'phone', null, 'H9c. the buyer never gets the showroom''s phone');
+select pg_temp.as_user(current_setting('t.seller'));
+select is(public.marketplace_seller_return_get(current_setting('t.rid6')::uuid) -> 'seller' ->> 'phone', null, 'H9d. the showroom document carries no showroom phone');
+select pg_temp.as_user(current_setting('t.super'));
 select is(public.admin_marketplace_return_get(current_setting('t.rid6')::uuid) -> 'actions', '["remind_seller", "approve", "reject"]'::jsonb, 'H10. the admin actions come from the database');
 select is(public.admin_marketplace_return_remind_seller(current_setting('t.rid6')::uuid) ->> 'status', 'requested', 'H11. the admin reminds the showroom');
 select is((select count(*)::int from public.notifications where event_type = 'marketplace.return.admin_reminder' and subject_id = current_setting('t.rid6')::uuid

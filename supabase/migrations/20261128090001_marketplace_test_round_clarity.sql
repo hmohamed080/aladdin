@@ -459,10 +459,10 @@ begin
     'id', r.id, 'request_number', r.request_number, 'order_id', r.order_id, 'order_number', o.order_number,
     'kind', r.kind, 'claim_type', r.claim_type, 'status', r.status, 'remedy', r.remedy, 'viewer', p_for,
     'payment_method', o.payment_method,
-    -- the showroom already sees its buyer's number on the order; nobody else gets a phone from this document
-    'seller', jsonb_build_object('name', (select org.name from public.organizations org where org.id = r.seller_organization_id)),
-    'buyer', case when v_seller then jsonb_build_object('name', o.buyer_name,
-      'phone', case when p_for = 'seller' then o.buyer_phone end) end,
+    -- phones: the showroom gets its buyer's number, a reviewing admin gets both sides; the buyer never gets the showroom's
+    'seller', jsonb_build_object('name', (select org.name from public.organizations org where org.id = r.seller_organization_id),
+      'phone', case when p_for = 'admin' then (select org.contact_phone from public.organizations org where org.id = r.seller_organization_id) end),
+    'buyer', case when v_seller then jsonb_build_object('name', o.buyer_name, 'phone', o.buyer_phone) end,
     'reason', jsonb_build_object('label_ar', r.reason_label_ar, 'label_en', r.reason_label_en, 'transit_damage', r.transit_damage),
     'buyer_note', r.buyer_note,
     'partial_refund_egp', r.partial_refund_egp,

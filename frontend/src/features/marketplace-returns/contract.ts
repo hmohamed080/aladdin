@@ -111,8 +111,9 @@ export type ReturnDocument = {
   remedy: ReturnRemedy;
   viewer: "buyer" | "seller" | "admin";
   payment_method: string;
-  seller: { name: string };
-  /** The phone is filled for the showroom only. */
+  /** The showroom's business phone is filled for the admin only. */
+  seller: { name: string; phone?: string | null };
+  /** The buyer's phone is filled for the showroom and the admin. */
   buyer?: { name: string; phone?: string | null } | null;
   reason: { label_ar: string; label_en: string; transit_damage: boolean };
   buyer_note: string | null;

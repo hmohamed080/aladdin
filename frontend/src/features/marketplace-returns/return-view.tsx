@@ -56,12 +56,18 @@ export function ReturnDetail({ doc, role, locale }: { doc: ReturnDocument; role:
   const orderHref = ORDER_HREF[role];
   const order = <bdi dir="ltr">{doc.order_number}</bdi>;
   const state = returnStateText(doc, role, locale, (iso) => returnDateTime(iso, locale), (n) => fmtEgp(n, locale));
+  const party = (p: { name: string; phone?: string | null }) => (
+    <>
+      {p.name}
+      {p.phone ? <> · <a href={`tel:${p.phone}`} dir="ltr" className="underline underline-offset-2">{p.phone}</a></> : null}
+    </>
+  );
   const facts: [string, React.ReactNode][] = [
     [t("order"), orderHref ? <Link href={`${orderHref}/${doc.order_id}`} className="underline underline-offset-2">{order}</Link> : order],
     ...(role !== "buyer" && doc.buyer
-      ? ([[t("buyer"), <>{doc.buyer.name}{doc.buyer.phone ? <> · <bdi dir="ltr">{doc.buyer.phone}</bdi></> : null}</>]] as [string, React.ReactNode][])
+      ? ([[t("buyer"), party(doc.buyer)]] as [string, React.ReactNode][])
       : []),
-    ...(role !== "seller" ? ([[t("showroom"), doc.seller.name]] as [string, React.ReactNode][]) : []),
+    ...(role !== "seller" ? ([[t("showroom"), party(doc.seller)]] as [string, React.ReactNode][]) : []),
     [t("sentAt"), returnDateTime(doc.timestamps.created_at, locale)],
     ...(doc.return_tracking ? ([[t("trackingNumber"), <bdi key="t" dir="ltr">{doc.return_tracking}</bdi>]] as [string, React.ReactNode][]) : []),
     ...(doc.partial_refund_egp !== null ? ([[t("partialProposed"), fmtEgp(Number(doc.partial_refund_egp), locale)]] as [string, React.ReactNode][]) : []),
