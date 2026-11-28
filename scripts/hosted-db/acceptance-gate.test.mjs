@@ -457,7 +457,7 @@ test("production scripts: Production only, plan prod-catchup only, hidden passwo
     assert.ok(sh.includes('REFUSED: linked to Acceptance'), f);
     assert.ok(sh.includes("read -r -s -p"), f);
     assert.ok(sh.includes('acceptance-gate.mjs" drift "$PLAN"'), `${f} refuses a plan that does not match main`);
-    assert.ok(sh.includes("(prod-catchup|prod-marketplace-v2)") && !sh.includes("prod-batch1"), f);
+    assert.ok(sh.includes("(prod-catchup|prod-marketplace-v2|prod-marketplace-orders)") && !sh.includes("prod-batch1"), f);
     assert.ok(!/(sb|supabase)[^\n"]*--include-all|migration repair|db reset/.test(sh.replace(/^#.*$/gm, "")), f);
   }
   const apply = readFileSync(here("./production-apply.sh"), "utf8");

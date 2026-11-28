@@ -1,4 +1,4 @@
--- READ-ONLY. Facts for the plan "marketplace-retest" (Acceptance 266 -> 267). acceptance-apply.sh runs it before and after the push; marketplace-retest-smoke.mjs
+-- READ-ONLY. Facts for the plans "marketplace-retest" (Acceptance 266 -> 267) and, after the push only, "prod-marketplace-orders" (Production 246 -> 267). The apply scripts run it; marketplace-retest-smoke.mjs
 -- judges the output. One row, one jsonb column `facts`. Only SELECTs; objects that may not exist before the plan are looked up by name. No user data: counts only.
 select jsonb_build_object(
   'applied_migrations', (select count(*) from supabase_migrations.schema_migrations),

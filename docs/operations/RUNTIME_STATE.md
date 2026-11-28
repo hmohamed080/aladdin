@@ -1,3 +1,10 @@
+## Production Marketplace orders plan prepared (246 -> 267), not applied - 2026-11-28
+
+- Plan `prod-marketplace-orders` and its [runbook](MARKETPLACE_ORDERS_PRODUCTION_PLAN_20261128.md) are on branch `feat/production-plan-marketplace-266-20261128`. Nothing was applied, deployed or written on any hosted project.
+- **Production**, read live on 2026-11-28 (read-only): 246 migrations, latest `20261124120001`, 21 pending on `main` `52789fe7`; 0 Marketplace orders and products; 1 approved seller; Marketplace switch open; 31 of 1108 profiles with a verified mobile; the database records WhatsApp delivery switched on 2026-11-10 (app switches not read).
+- Includes `20261128150001` (PR #298). Acceptance must apply and pass `marketplace-retest` first.
+- Blocking the apply: no restore-tested Production snapshot taken at 246 is pinned. Open owner decisions D1-D9 are in the runbook.
+
 ## Marketplace retest fixes in a branch (F07, F09, F27-F29) - 2026-11-28
 
 Nothing hosted changed; the Acceptance versions in the entry below stay current.
