@@ -8319,4 +8319,5 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 
 ## 2026-11-28 - Hosted email-change template set on Acceptance and Production
 - Owner asked for it. This closes the "confirm on the hosted project" item above: secure email change was already on; both templates were link-only and now carry the code. Details in `RUNTIME_STATE.md`.
-- Open: send a real two-address email change after the release; decide whether to turn on the "Email address changed" notification (the branch enables it in the local config only).
+- Later, on the owner's request: the "Email address changed" notification was turned on for both projects with the repository subject and body.
+- Open: send a real two-address email change after the release (also checks the notice reaches the old address). The owner asked for an easier flow (code to the new address only); secure email change stays on, and nothing was built for that.
