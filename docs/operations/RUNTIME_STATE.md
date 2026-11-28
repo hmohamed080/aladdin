@@ -1,3 +1,10 @@
+## Hosted Auth email-change template switched to codes (Acceptance and Production) - 2026-11-28
+
+- **Changed in the Supabase dashboard on the owner's GO, on Acceptance (`nxossqhdfltcqdwvbewi`) and Production (`kkpkgjrweysgvhvkhzun`):** the "Change email address" subject and body now match `subject` in `supabase/config.toml` and `supabase/templates/email_change.html` on PR #296 (`{{ .Token }}`, no link). After a reload, each stored body matched the repository file by SHA-256 and the subject matched.
+- Before the change both projects had Supabase's default link-only template (subject "Confirm your new email address"); "Reset template" is the dashboard's way back to the default (not exercised). No email-change call was found on `main` or in its history (searched `frontend/src` and `supabase/functions`).
+- Read on both, unchanged: secure email change **on**, email code length 6, expiry 3600 s. The "Email address changed" security notification is **off** on both, so the old address gets no after-change notice there.
+- **No test email was sent.** The code screen is not deployed anywhere; delivery is unverified until PR #296 is released.
+
 ## Acceptance at 266: marketplace-clarity applied, frontend c905580f - 2026-11-28
 
 Supersedes, for Acceptance only, the migration count and frontend version in the entries below.

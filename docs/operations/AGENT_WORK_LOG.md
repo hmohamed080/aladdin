@@ -8316,3 +8316,7 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 ## 2026-11-28 - Engineer PR #296: two failed e2e checks
 - Real defect from the port: the middleware set the device cookie on every response. Next treats that as a cookie mutation by the Server Action being served and re-renders the page; in business setup the finished basics step then vanished and the branch step was skipped. Device cookies are now written on page loads only, when something changed.
 - Outdated expectations: the sign-up list (Engineer is open) and the seeded Engineer's home (Engineer dashboard, no "Welcome" heading). Unit tests, typecheck and lint ran locally; the e2e suites run in CI only.
+
+## 2026-11-28 - Hosted email-change template set on Acceptance and Production
+- Owner asked for it. This closes the "confirm on the hosted project" item above: secure email change was already on; both templates were link-only and now carry the code. Details in `RUNTIME_STATE.md`.
+- Open: send a real two-address email change after the release; decide whether to turn on the "Email address changed" notification (the branch enables it in the local config only).
