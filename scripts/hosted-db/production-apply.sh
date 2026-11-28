@@ -4,9 +4,9 @@
 # Plan: prod-marketplace-v2 = the COMBINED plan (owner decision 2026-11-24): the seven Marketplace migrations 20261123090001 .. 20261123160002 plus the seller public slug migration
 # 20261124090001 and the stock-notify migration 20261124120001, 237 -> 246, one plain push, on top of Production at 237 (prod-catchup already applied). Recovery: the pinned forward-fixes marketplace-stock-notify-restore-previous.sql, marketplace-slug-remove.sql THEN
 # marketplace-v2-remove.sql; needs a restore-verified PRODUCTION snapshot taken at >= 237 migrations; runs the read-only marketplace-v2-smoke.sql, marketplace-slug-smoke.sql and marketplace-stock-notify-smoke.sql before and after the push.
-# Plan: prod-marketplace-orders = the 18 Marketplace orders migrations 20261125090001 .. 20261126120002 plus 20261128090001 and 20261128120001, 246 -> 266, one plain push, on top of Production at
-# 246 (prod-marketplace-v2 already applied). Recovery: the pinned forward-fixes marketplace-clarity-restore-previous.sql (only if 20261128090001 is applied) THEN marketplace-orders-remove.sql; needs a
-# restore-verified PRODUCTION snapshot taken at >= 246 migrations; runs the read-only marketplace-orders-smoke.sql before and after the push and marketplace-clarity-smoke.sql after it.
+# Plan: prod-marketplace-orders = the 18 Marketplace orders migrations 20261125090001 .. 20261126120002 plus 20261128090001, 20261128120001 and 20261128150001, 246 -> 267, one plain push, on top of Production at
+# 246 (prod-marketplace-v2 already applied). Recovery: the pinned forward-fixes marketplace-retest-restore-previous.sql (only if 20261128150001 is applied), marketplace-clarity-restore-previous.sql (only if 20261128090001 is applied), THEN marketplace-orders-remove.sql; needs a
+# restore-verified PRODUCTION snapshot taken at >= 246 migrations; runs the read-only marketplace-orders-smoke.sql before and after the push, and marketplace-clarity-smoke.sql and marketplace-retest-smoke.sql after it.
 # See docs/operations/MARKETPLACE_ORDERS_PRODUCTION_PLAN_20261128.md, docs/operations/MARKETPLACE_V2_PRODUCTION_PLAN_20261124.md and docs/operations/PRODUCTION_CATCHUP_PLAN_20261123.md and acceptance-gate.mjs (the plan is marked target "production").
 # NOT to be run without the owner's separate explicit GO for Production. Acceptance is refused. Never uses --include-all, repair or reset.
 #   bash scripts/hosted-db/production-apply.sh --plan prod-catchup|prod-marketplace-v2|prod-marketplace-orders --sha <full 40-char origin/main sha> --backup-label <aladdin-production-YYYYMMDDTHHMMSSZ>
@@ -125,6 +125,8 @@ if [ "$PLAN" = "prod-marketplace-orders" ]; then
   run "post: marketplace-orders smoke" "$OUT/mo-post.out" -- node scripts/hosted-db/marketplace-orders-smoke.mjs facts post "$OUT/mo-post.json" --plan "$PLAN"; cat "$OUT/mo-post.out"
   run "post: marketplace-clarity facts" "$OUT/mc-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-clarity-smoke.sql
   run "post: marketplace-clarity smoke" "$OUT/mc-post.out" -- node scripts/hosted-db/marketplace-clarity-smoke.mjs facts post "$OUT/mc-post.json" --plan "$PLAN"; cat "$OUT/mc-post.out"
+  run "post: marketplace-retest facts" "$OUT/mr-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-retest-smoke.sql
+  run "post: marketplace-retest smoke" "$OUT/mr-post.out" -- node scripts/hosted-db/marketplace-retest-smoke.mjs facts post "$OUT/mr-post.json" --plan "$PLAN"; cat "$OUT/mr-post.out"
   echo "NEXT (owner): deploy the matching frontend (same commit, flags as decided) upload-only, then 10% and 100% by hand  (docs/operations/MARKETPLACE_ORDERS_PRODUCTION_PLAN_20261128.md)"
 fi
 STEP="done"; PUSHED=0

@@ -1,8 +1,9 @@
-## 2026-11-28 - Production plan for the Marketplace order flow (246 -> 266): prepared, not applied
+## 2026-11-28 - Production plan for the Marketplace order flow (246 -> 267): prepared, not applied
 
 - Scope: branch `feat/production-plan-marketplace-266-20261128`. Plan `prod-marketplace-orders` in `acceptance-gate.mjs` (pending list, catalog changes and forward-fixes derived from `marketplace-orders` and `marketplace-clarity`), `--plan` option on the two smokes, `production-apply.sh` / `production-preflight.sh`, tests, scratch proof, [runbook](MARKETPLACE_ORDERS_PRODUCTION_PLAN_20261128.md). No migration, no frontend change, no hosted write.
-- Validation: script tests 513 (511 pass, 0 fail); scratch proof OK (27 checks: 727 objects, forward-fixes from every partial state, 3 refusals); local rehearsal of the apply steps OK (permissions 954 before, 1092 after); `bash -n` on both scripts; doc links checked.
-- Not verified: the two scripts against Production; a restore-tested snapshot at 246 (none exists); the old frontend on 266.
+- Extended the same day after PR #298 merged (`52789fe7` merged into the branch; one conflict in `RUNTIME_STATE.md`, both entries kept): plan now also covers `20261128150001`, with the retest forward-fix first and its post smoke (`--plan` added); the scratch proof now records the migration history.
+- Validation (267): script tests 532 (530 pass, 2 skipped, 0 fail); scratch proof OK (30 checks: 728 objects, forward-fixes from every partial state, 4 refusals); local rehearsal of the apply steps OK (permissions 954 before, 1093 after); `bash -n` on `production-apply.sh`; doc links checked.
+- Not verified: the two scripts against Production; a restore-tested snapshot at 246 (none exists); the old frontend on 267.
 - Unfinished: owner decisions D1-D9; frontend flag PR; Production timers Worker configuration; Acceptance retest (another session).
 
 ## 2026-11-25 - Marketplace plan PR 15: returns and exchanges (draft PR, not applied anywhere hosted)
@@ -8072,3 +8073,14 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Owner ran preflight and apply (264 -> 266): PASS. Frontend `c905580f` deployed from `98f60d52` on the owner's GO.
 - Browser check: home actions (F25) and waybill (F26) confirmed. New: F27, waybill wording on a refunded order.
 - Open: retest the items in the test log, timers Worker secrets and deploy, WhatsApp secrets, Production plan.
+
+## 2026-11-28 - Marketplace retest on Acceptance, then fixes for F07, F09, F27, F28, F29 (nothing hosted changed)
+- Retest with `MP-000014` / `INV-000002` / `RT-000002`; results in the test log. The admin rejection of `RT-000002` ran on the first press (F29), by the testing agent.
+- F07: new invoices fall back to the showroom branch address. F09: notifications and two pages write "EGP 150". F27: waybill says why nothing is collected. F28: thank-you page labels the address. F29: admin decisions ask for confirmation.
+- Validation: local `supabase test db` Files=202 Tests=10212 PASS; `node --test scripts/*.test.mjs scripts/hosted-db/*.test.mjs` 493 pass; vitest 5548 pass, 1 timeout under load that passed when run alone; tsc only the existing `edge/media-worker` `postgres` error. No browser check of these changes.
+- Open: owner merge, gated Acceptance plan for `20261128150001`, apply, frontend deploy, retest F18-F21 with an approved return, F30 decision.
+
+## 2026-11-28 - Gated Acceptance plan marketplace-retest prepared (nothing hosted changed)
+- Plan 266 -> 267 for `20261128150001` on PR 298: gate entry, apply/preflight wiring, read-only smoke, pinned forward-fix, scratch proof, [runbook](MARKETPLACE_RETEST_ACCEPTANCE_PLAN_20261128.md).
+- Scratch proof OK (7 functions); `node --test scripts/*.test.mjs scripts/hosted-db/*.test.mjs` 511 pass, 2 skipped. Read-only on Acceptance: pre-state matches.
+- Open: owner merge, owner apply, frontend deploy, retest.

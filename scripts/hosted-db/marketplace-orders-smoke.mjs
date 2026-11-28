@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Read-only smoke test for the Acceptance plan "marketplace-orders" (246 -> 264) and the Production plan "prod-marketplace-orders" (246 -> 266).
+ * Read-only smoke test for the Acceptance plan "marketplace-orders" (246 -> 264) and the Production plan "prod-marketplace-orders" (246 -> 267).
  *
  *   node marketplace-orders-smoke.mjs facts pre  <facts.json>    judge marketplace-orders-smoke.sql output taken BEFORE the push
  *   node marketplace-orders-smoke.mjs facts post <facts.json>    judge it AFTER the push
- *   ... [--plan prod-marketplace-orders]                         PRODUCTION: history ends at 266, 39 templates after; "pre" also pins the template and preset counts
+ *   ... [--plan prod-marketplace-orders]                         PRODUCTION: history ends at 267, 39 templates after; "pre" also pins the template and preset counts
  * "pre" refuses while any order of the old model is still open: the new application cannot act on it (owner decision: legacy orders by data check).
  * It reads only (the SQL has no write verb, see the unit test) and cannot see the Worker, the timers Worker or the deployed frontend.
  */

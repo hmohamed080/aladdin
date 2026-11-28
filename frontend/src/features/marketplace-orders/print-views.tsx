@@ -102,6 +102,8 @@ export function WaybillView({ waybill, backHref }: { waybill: OrderWaybill; back
   const gov = waybill.governorate_key;
   const area = gov && waybill.area_key ? areaName(gov, waybill.area_key, locale) : null;
   const collect = Number(waybill.payment.collect_on_delivery_egp);
+  const paid = waybill.payment.status;
+  const settled = paid === "refunded" ? w.refunded : paid === "refund_due" ? w.refundDue : w.nothingToCollect;
   const hasPin = waybill.latitude !== null && waybill.longitude !== null;
   return (
     <div className="grid gap-md py-md">
@@ -142,7 +144,7 @@ export function WaybillView({ waybill, backHref }: { waybill: OrderWaybill; back
           {collect > 0 ? (
             <>{w.collect}: <strong className="tabular-nums">{money(collect, locale)}</strong></>
           ) : (
-            w.nothingToCollect
+            settled
           )}
         </p>
       </article>

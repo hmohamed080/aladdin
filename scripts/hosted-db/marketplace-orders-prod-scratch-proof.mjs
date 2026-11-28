@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Scratch proof for the Production plan `prod-marketplace-orders` (246 -> 266). Touches ONLY throwaway databases (mpo_base, mpo_run) that it creates inside a local
+ * Scratch proof for the Production plan `prod-marketplace-orders` (246 -> 267). Touches ONLY throwaway databases (mpo_base, mpo_run) that it creates inside a local
  * Supabase container (SCRATCH_CONTAINER) from a pg_dump of that container's own database, and drops again at the end. The container's own database is never
  * written; it must hold exactly the migrations Production has (a local stack started with the migrations up to 20261124120001, seed off). It never connects to a
- * hosted database and needs no secret. Like `supabase db push`, all pending files run in ONE session, each in its own transaction.
+ * hosted database and needs no secret. Like `supabase db push`, all pending files run in ONE session, each in its own transaction and recorded in the migration history.
  *   SCRATCH_CONTAINER=<db container> node scripts/hosted-db/marketplace-orders-prod-scratch-proof.mjs
- * (1) snapshots the catalog (catalog-fingerprint.sql), every row and every function ACL, and judges the "pre" smoke, (2) applies the 20 pending migrations,
- * (3) checks the catalog diff is exactly PLANS["prod-marketplace-orders"].changed and both "post" smokes pass, (4) runs the pinned forward-fixes in the plan's
- * undo order and compares everything with the pre-state, (5) repeats (4) from every partly applied state (the clarity fix only once 20261128090001 is applied),
+ * (1) snapshots the catalog (catalog-fingerprint.sql), every row and every function ACL, and judges the "pre" smoke, (2) applies the 21 pending migrations,
+ * (3) checks the catalog diff is exactly PLANS["prod-marketplace-orders"].changed and the three "post" smokes pass, (4) runs the pinned forward-fixes in the plan's
+ * undo order and compares everything with the pre-state, (5) repeats (4) from every partly applied state (the retest and clarity fixes only once their migrations are applied),
  * (6) proves what happens once the new application has written data: the first fix that refuses changes nothing.
  */
 import { readdirSync, readFileSync } from "node:fs";
@@ -18,6 +18,7 @@ import { PLANS, FORWARD_FIX } from "./acceptance-gate.mjs";
 import { load, diff, checkExpected } from "./catalog-diff.mjs";
 import * as orders from "./marketplace-orders-smoke.mjs";
 import * as clarity from "./marketplace-clarity-smoke.mjs";
+import * as retest from "./marketplace-retest-smoke.mjs";
 
 const C = process.env.SCRATCH_CONTAINER;
 if (!C) { console.error("set SCRATCH_CONTAINER to the local Supabase database container that is at the Production history"); process.exit(2); }
@@ -30,7 +31,7 @@ const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort().filter((
 const read = (f) => readFileSync(join(here, f), "utf8");
 const fingerprint = read("catalog-fingerprint.sql");
 const fixes = P.fixes.map((name) => ({ name, sql: read(FORWARD_FIX[name].file) })); // the plan's undo order
-const CLARITY_FIRST = files.findIndex((f) => f.startsWith(PLANS["marketplace-clarity"].pending[0]));
+const firstOf = (plan) => files.findIndex((f) => f.startsWith(PLANS[plan].pending[0]));
 
 const docker = (args, input) => spawnSync("docker", args, { input, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
 const psql = (db, sql) => {
@@ -38,10 +39,11 @@ const psql = (db, sql) => {
   return { ok: r.status === 0, out: r.stdout.trim(), err: r.stderr };
 };
 const must = (db, sql) => { const r = psql(db, sql); if (!r.ok) throw new Error(`${db}: ${r.err}`); return r.out; };
-const apply = (db, list) => must(db, list.map((f) => `begin;\n${readFileSync(join(dir, f), "utf8")}\n;\ncommit;\n`).join("\n"));
+const record = (f) => `insert into supabase_migrations.schema_migrations (version) values ('${f.slice(0, 14)}');`;
+const apply = (db, list) => must(db, list.map((f) => `begin;\n${readFileSync(join(dir, f), "utf8")}\n;\n${record(f)}\ncommit;\n`).join("\n"));
 const clone = (from, to) => { must("postgres", `drop database if exists ${to};`); must("postgres", `create database ${to} template ${from};`); };
 /** The forward-fixes that apply to a state holding the first k pending files, in the plan's undo order. */
-const fixesFor = (k) => fixes.filter((f) => f.name !== "marketplace-clarity" || k > CLARITY_FIRST);
+const fixesFor = (k) => fixes.filter((f) => f.name === "marketplace-orders" || k > firstOf(f.name));
 /** Runs them one by one and stops at the first refusal or error, like an operator would. */
 function undo(db, list) {
   for (const f of list) { const r = psql(db, f.sql); if (!r.ok) return { ok: false, at: f.name, err: r.err }; }
@@ -63,8 +65,7 @@ function compare(pre, now) {
   for (const f of new Set([...Object.keys(pre.acl), ...Object.keys(now.acl)])) if (pre.acl[f] !== now.acl[f]) p.push(`grants or comment differ: ${f} ${pre.acl[f]} -> ${now.acl[f]}`);
   return p;
 }
-/** The smoke facts of a scratch database. A scratch database records no migration history, so those two facts are supplied. */
-const facts = (smoke, db, applied, latest) => ({ ...smoke.parseFacts(must(db, read(smoke === orders ? "marketplace-orders-smoke.sql" : "marketplace-clarity-smoke.sql"))), applied_migrations: applied, latest_migration: latest });
+const facts = (smoke, name, db) => smoke.parseFacts(must(db, read(`marketplace-${name}-smoke.sql`)));
 const judged = (r) => (r.ok ? [] : r.lines.filter((l) => l.startsWith("FAIL")));
 
 let ok = true;
@@ -78,15 +79,14 @@ try {
   const dump = docker(["exec", C, "sh", "-c", `pg_dump -U supabase_admin -Fc postgres > /tmp/mpo.dump && pg_restore -U supabase_admin -d ${BASE} /tmp/mpo.dump 2>&1 | grep -E '^pg_restore: error' | head -5; true`]);
   if (dump.status !== 0 || dump.stdout.trim()) throw new Error(`dump/restore failed: ${dump.stdout}${dump.stderr}`);
   const pre = snapshot(BASE);
-  const preSmoke = orders.judgeFacts("pre", facts(orders, BASE, P.applied, P.latest), NAME);
+  const preSmoke = orders.judgeFacts("pre", facts(orders, "orders", BASE), NAME);
   report("pre smoke", judged(preSmoke));
 
   clone(BASE, RUN);
   apply(RUN, files);
   const { touched } = diff(pre.catalog, load(must(RUN, fingerprint)));
   report(`pre -> post (${files.length} files, one session): ${touched.size} objects, exactly the plan's list`, checkExpected(touched, P.changed));
-  report("post smoke (orders)", judged(orders.judgeFacts("post", facts(orders, RUN, P.applied + P.pending.length, P.pending.at(-1)), NAME)));
-  report("post smoke (clarity)", judged(clarity.judgeFacts("post", facts(clarity, RUN, P.applied + P.pending.length, P.pending.at(-1)), NAME)));
+  for (const [name, smoke] of [["orders", orders], ["clarity", clarity], ["retest", retest]]) report(`post smoke (${name})`, judged(smoke.judgeFacts("post", facts(smoke, name, RUN), NAME)));
   const full = undo(RUN, fixes);
   report(`forward-fixes ${P.fixes.join(" then ")} after the full plan give back the pre-state`, full.ok ? compare(pre, snapshot(RUN)) : [`${full.at}: ${full.err}`]);
 
@@ -100,6 +100,7 @@ try {
 
   const replica = "set session_replication_role = replica; ";
   for (const [name, sql, stopsAt] of [
+    ["a later migration is recorded", "insert into supabase_migrations.schema_migrations (version) values ('20270101000000');", "marketplace-retest"],
     ["a refund confirmation timer exists", replica + "insert into public.marketplace_timers (subject_type, subject_id, kind, started_at, expires_at) values ('return', gen_random_uuid(), 'return_refund_confirm', now(), now() + interval '7 days');", "marketplace-clarity"],
     ["an upload limit changed", "update public.upload_limit_settings set hourly_uploads = 60;", "marketplace-orders"],
     ["an orders-plan template edited", "update public.notification_templates set version = 2 where event_type like 'marketplace.return%' and key not in ('marketplace.return.shipped', 'marketplace.return.complaint_filed', 'marketplace.return.refund_confirm_reminder');", "marketplace-orders"],

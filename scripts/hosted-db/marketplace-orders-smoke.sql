@@ -1,4 +1,4 @@
--- READ-ONLY. Facts for the plans "marketplace-orders" (Acceptance 246 -> 264) and "prod-marketplace-orders" (Production 246 -> 266). The apply scripts run it before and after the push; marketplace-orders-smoke.mjs
+-- READ-ONLY. Facts for the plans "marketplace-orders" (Acceptance 246 -> 264) and "prod-marketplace-orders" (Production 246 -> 267). The apply scripts run it before and after the push; marketplace-orders-smoke.mjs
 -- judges the output. One row, one jsonb column `facts`. Only SELECTs; objects that may not exist before the plan are looked up by name. No user data: counts and booleans.
 with new_tables(t) as (values ('marketplace_buyer_address_events'), ('marketplace_buyer_addresses'), ('marketplace_cart_items'), ('marketplace_cart_merges'),
   ('marketplace_checkout_sessions'), ('marketplace_order_cancellations'), ('marketplace_order_invoices'), ('marketplace_order_refunds'), ('marketplace_order_shipments'),
