@@ -242,7 +242,7 @@ set local request.jwt.claims = :'u4';
 select throws_ok($$ select public.onboarding_select_account_type('business', 'contractor_company') $$,
   '22023', 'this account type is not available yet', 'D4: registering a new Contractor Organization stays Coming Soon');
 select lives_ok($$ select public.onboarding_select_account_type('business', 'design_office') $$,
-  'D5: registering a new Engineering Office is open with the Engineer account (20261128090007)');
+  'D5: registering a new Engineering Office is open with the Engineer account (20261128100007)');
 select lives_ok($$ select public.onboarding_select_account_type('business', 'showroom_dealer') $$, 'D6: other business types register as before');
 set local request.jwt.claims = :'u6';
 select lives_ok($$ select public.onboarding_select_account_type('business', 'contractor_company') $$,

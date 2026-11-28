@@ -1,6 +1,6 @@
 {
- "version": "20261128090005",
- "source": "Exact function permission contract after 20261128090005_engineer_completion_steps.sql: the contract of 20261128090004 plus this migration's reviewed function changes (Engineer account port).",
+ "version": "20261128100005",
+ "source": "Exact function permission contract after 20261128100005_engineer_completion_steps.sql: the contract of 20261128100004 plus this migration's reviewed function changes (Engineer account port).",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.marketplace_public_browse(text,text,text,text,integer,integer,numeric,numeric,jsonb,boolean,integer,text,text,text)",

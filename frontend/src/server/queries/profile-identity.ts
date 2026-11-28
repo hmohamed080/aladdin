@@ -121,7 +121,7 @@ export const PROFILE_COMPLETION_ITEMS = [
   "availability",
   "location",
   "portfolio",
-  // Engineer items (20261128090005_engineer_completion_steps.sql).
+  // Engineer items (20261128100005_engineer_completion_steps.sql).
   "governorate",
   "city",
   "specialization",

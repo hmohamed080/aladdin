@@ -35,7 +35,7 @@ values ('62000000-0000-4000-8000-000000000004', 'contractor');
 -- ===========================================================================
 select is((select array_agg(k order by k) from unnest(app.coming_soon_account_types()) k),
   array['contractor', 'end_consumer']::text[],
-  'Coming Soon = Contractor, Personal Account (end_consumer); Engineer is open since 20261128090007');
+  'Coming Soon = Contractor, Personal Account (end_consumer); Engineer is open since 20261128100007');
 
 -- ===========================================================================
 -- 2. Fresh selection of every Coming Soon type is refused, atomically
