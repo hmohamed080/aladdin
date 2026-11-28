@@ -5,33 +5,35 @@ import {
   listOrganizations,
   listProfessionals,
 } from "@/server/queries/directory";
-import { listCatalog } from "@/server/queries/commerce";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { Input, Button } from "@/components/ui/controls";
 import {
   ShowroomCards,
   ProfessionalCards,
-  ProductCards,
   InspirationCards,
 } from "@/features/engineer/sections";
-import { isUuid } from "@/features/purchase-requests/model";
+import { EngineerCatalog } from "@/features/engineer/catalog";
 export const dynamic = "force-dynamic";
 export default async function EngineerDirectory({
   params,
   searchParams,
 }: {
   params: Promise<{ section: string }>;
-  searchParams: Promise<{ q?: string; supplier?: string }>;
+  searchParams: Promise<{ q?: string; supplier?: string; category?: string }>;
 }) {
   const { supabase } = await requireEngineer();
   const { section } = await params;
-  const { q, supplier } = await searchParams;
+  const { q, supplier, category } = await searchParams;
   const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
   const ar = locale === "ar";
   if (
     !["showrooms", "products", "professionals", "inspiration"].includes(section)
   )
     notFound();
+  // Products is the showroom's "Browse products" screen, not a page of its own: same header, filters and cards.
+  if (section === "products") {
+    return <EngineerCatalog supabase={supabase} locale={locale} searchParams={{ q, category, supplier }} />;
+  }
   const title =
     section === "inspiration"
       ? ar
@@ -41,13 +43,9 @@ export default async function EngineerDirectory({
         ? ar
           ? "اكتشف المعارض"
           : "Explore showrooms"
-        : section === "products"
-          ? ar
-            ? "منتجات لمشاريعك"
-            : "Materials for your projects"
-          : ar
-            ? "المهندسون والصنايعية"
-            : "Engineers & craftspeople";
+        : ar
+          ? "المهندسون والصنايعية"
+          : "Engineers & craftspeople";
   const content =
     section === "inspiration" ? (
       <InspirationCards locale={locale} search={q} />
@@ -56,14 +54,6 @@ export default async function EngineerDirectory({
         rows={await listOrganizations(supabase, {
           types: ["showroom_dealer"],
           search: q,
-        })}
-        locale={locale}
-      />
-    ) : section === "products" ? (
-      <ProductCards
-        rows={await listCatalog(supabase, null, {
-          search: q,
-          supplierOrgId: supplier && isUuid(supplier) ? supplier : undefined,
         })}
         locale={locale}
       />
@@ -89,7 +79,6 @@ export default async function EngineerDirectory({
             placeholder={ar ? "ابحث بالاسم…" : "Search by name…"}
           />
         </label>
-        {supplier && <input type="hidden" name="supplier" value={supplier} />}
         <Button type="submit">{ar ? "بحث" : "Search"}</Button>
       </form>
       {content}

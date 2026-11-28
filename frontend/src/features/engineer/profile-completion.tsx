@@ -5,7 +5,7 @@ import { useState, useEffect, type ReactNode } from "react";
 
 import { Button, ButtonLink } from "@/components/ui/controls";
 import { ProgressMeter } from "@/components/ui/primitives";
-import { UserIcon, BriefcaseIcon, CalendarIcon, LayersIcon, ArrowUpRightIcon } from "@/components/ui/icons";
+import { CheckIcon, UserIcon, BriefcaseIcon, CalendarIcon, LayersIcon, ArrowUpRightIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
 import type { ProfileCompletion } from "@/server/queries/profile-identity";
 import "./profile-completion.css";
@@ -13,7 +13,7 @@ import "./profile-completion.css";
 const steps = [
   { ar: "المعلومات الأساسية", en: "Basic information", Icon: UserIcon, hintAr: "أضف صورتك واسمك وبيانات التواصل.", hintEn: "Add your photo, name and contact details." },
   { ar: "الخبرات ونطاق العمل", en: "Expertise & work areas", Icon: BriefcaseIcon, hintAr: "عرّف العملاء بخبراتك وخدماتك والمناطق التي تعمل بها.", hintEn: "Describe your experience, services and the areas you cover." },
-  { ar: "إتاحة العمل", en: "Work availability", Icon: CalendarIcon, hintAr: "حدّد إذا كنت تستقبل مشاريع جديدة ومواعيد تفرغك.", hintEn: "Let clients know whether you are taking new projects and when you are free." },
+  { ar: "إتاحة العمل", en: "Work availability", Icon: CalendarIcon, hintAr: "حدد حالتك الحالية وموعد جاهزيتك لاستقبال المشاريع الجديدة.", hintEn: "Set your current status and when you can start new projects." },
   { ar: "سابقة الأعمال", en: "Work history", Icon: LayersIcon, hintAr: "أضف أعمالك الحقيقية واختر ما تريد نشره في ملفك العام.", hintEn: "Add your own work and choose what to publish on your public profile." },
 ] as const;
 
@@ -63,19 +63,18 @@ export function EngineerProfileCompletion({ name, avatar, completion, panels, in
             </div> : <p className="mt-2 text-label text-fg-secondary">{ar ? "تعذّر تحميل نسبة الاكتمال. يمكنك متابعة التعديل." : "Completion is unavailable. You can still edit your profile."}</p>}
             <nav aria-label={ar ? "خطوات استكمال الملف" : "Profile completion steps"} className="mt-lg grid grid-cols-2 gap-2 desktop:grid-cols-1">
               {steps.map((step, index) => <button key={step.en} type="button" aria-current={index === active ? "step" : undefined} onClick={() => select(index)} className={`flex min-h-12 items-center gap-sm rounded-sm px-3 py-2 text-left rtl:text-right text-label transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring focus-visible:ring-offset-2 ${index === active ? "bg-primary text-primary-foreground" : "text-fg-secondary hover:bg-surface-2"}`}>
-                <span className="grid size-7 shrink-0 place-items-center rounded-pill border border-strong">{index + 1}</span><span>{ar ? step.ar : step.en}</span>
+                <span className="grid size-7 shrink-0 place-items-center rounded-pill border border-strong" aria-label={completion?.sections?.[index] ? (ar ? "مكتمل" : "Complete") : undefined}>{completion?.sections?.[index] ? <CheckIcon size={17} /> : index + 1}</span><span>{ar ? step.ar : step.en}</span>
               </button>)}
             </nav>
           </div>
           <p className="px-1 text-label leading-relaxed text-fg-secondary">{ar ? "احفظ التغييرات داخل كل قسم. يمكنك التنقل بين الخطوات والعودة لإكمال ملفك في أي وقت. اكتمال الملف لا يعني توثيق الحساب." : "Save changes within each section. Move between steps and return whenever you like. Profile completion does not verify your account."}</p>
         </aside>
         <div className="engineer-edit-content min-w-0">
-          {steps.map((step, index) => <section className="engineer-edit-section" key={step.en} hidden={active !== index} aria-labelledby={`completion-step-${index}`}>
+          {steps.map((step, index) => <section className="engineer-edit-section" data-step={index} key={step.en} hidden={active !== index} aria-labelledby={`completion-step-${index}`}>
             <div className="engineer-edit-section-heading mb-lg flex items-start gap-sm border-b pb-md">
               <span className="grid size-8 shrink-0 place-items-center rounded-pill bg-primary text-label font-semibold text-primary-foreground">{index + 1}</span>
               <div><h2 id={`completion-step-${index}`} className="text-title font-semibold">{ar ? step.ar : step.en}</h2><p className="mt-1 text-label text-fg-secondary">{ar ? step.hintAr : step.hintEn}</p></div>
             </div>
-            {index === 2 && <div id="engineer-availability-slot" className="mb-lg" />}
             {panels[index]}
             {index === 0 && <div id="engineer-location-slot" />}
           </section>)}

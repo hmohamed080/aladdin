@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { readPublicEnv } from "@/lib/env";
 import type { Database } from "@/types/database.types";
 
@@ -37,6 +37,7 @@ export const getServerSupabase = cache(async function getServerSupabase(): Promi
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
+      global: { headers: await callerNetworkHeaders() },
       cookieOptions: { secure: env.NEXT_PUBLIC_APP_ENV !== "local", sameSite: "lax", path: "/" },
       cookies: {
         getAll() {
@@ -55,6 +56,28 @@ export const getServerSupabase = cache(async function getServerSupabase(): Promi
     },
   );
 });
+
+/**
+ * Auth records each session's user agent and IP from the request it receives,
+ * which is THIS server's, not the person's. Forwarding the caller's own makes
+ * "Active sessions" show their real browser and address (and gives Auth's
+ * per-IP rate limits the real client instead of one shared server address).
+ * The platform edge sets `x-forwarded-for`; nothing here trusts a value the
+ * caller could invent beyond what the edge already passed through.
+ */
+async function callerNetworkHeaders(): Promise<Record<string, string>> {
+  try {
+    const incoming = await headers();
+    const out: Record<string, string> = {};
+    const userAgent = incoming.get("user-agent");
+    const forwardedFor = incoming.get("x-forwarded-for") ?? incoming.get("x-real-ip");
+    if (userAgent) out["User-Agent"] = userAgent;
+    if (forwardedFor) out["X-Forwarded-For"] = forwardedFor;
+    return out;
+  } catch {
+    return {};
+  }
+}
 
 /**
  * Explicit-token variant for trusted server/worker paths that already hold a

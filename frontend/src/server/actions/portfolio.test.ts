@@ -4,8 +4,15 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const rpc = vi.fn();
+/** The extras' keys deletePortfolioItemAction reads (owner's own RLS view) before purging. */
+let extraKeys: string[] = [];
 vi.mock("@/lib/supabase/server", () => ({
-  getServerSupabase: async () => ({ rpc }),
+  getServerSupabase: async () => ({
+    rpc,
+    from: () => ({
+      select: () => ({ eq: async () => ({ data: extraKeys.map((object_key) => ({ object_key })) }) }),
+    }),
+  }),
 }));
 
 const createAssetUploadTicket = vi.fn();
@@ -18,6 +25,9 @@ vi.mock("@/server/actions/professional-assets", () => ({
 }));
 
 import {
+  finishPortfolioMediaUpload,
+  removePortfolioMediaAction,
+  startPortfolioMediaUpload,
   deleteCertificateAction,
   deletePortfolioItemAction,
   finishPortfolioUpload,
@@ -42,6 +52,7 @@ const calls = () => rpc.mock.calls.map((c) => c[0] as string);
 
 beforeEach(() => {
   rpc.mockReset();
+  extraKeys = [];
   createAssetUploadTicket.mockReset();
   deleteProfessionalAsset.mockReset();
   createAssetReadUrl.mockReset();
@@ -173,6 +184,90 @@ describe("deletePortfolioItemAction", () => {
       ok: true,
     });
     expect(calls()).toEqual(["portfolio_item_delete"]);
+  });
+});
+
+describe("deletePortfolioItemAction - a work with extra media", () => {
+  const EXTRA_A = "bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb.mp4";
+  const EXTRA_B = "cccccccc-1111-4111-8111-cccccccccccc.png";
+
+  it("removes the cover AND every extra object before purging", async () => {
+    extraKeys = [EXTRA_A, EXTRA_B];
+    rpc.mockResolvedValue({ data: null, error: null });
+    expect(await deletePortfolioItemAction({ ok: false }, fd({ itemId: ITEM, objectKey: KEY }))).toEqual({ ok: true });
+    expect(deleteProfessionalAsset).toHaveBeenCalledWith("portfolio", KEY);
+    expect(deleteProfessionalAsset).toHaveBeenCalledWith("portfolio_media", EXTRA_A);
+    expect(deleteProfessionalAsset).toHaveBeenCalledWith("portfolio_media", EXTRA_B);
+    expect(calls()).toEqual(["portfolio_item_delete", "portfolio_item_purge"]);
+  });
+
+  it("does NOT purge while any extra object is still there - a retry must still find its key", async () => {
+    extraKeys = [EXTRA_A];
+    rpc.mockResolvedValue({ data: null, error: null });
+    deleteProfessionalAsset.mockImplementation(async (ns: string) =>
+      ns === "portfolio_media" ? { ok: false, code: "assets.errors.uploadFailed" } : { ok: true },
+    );
+    expect(await deletePortfolioItemAction({ ok: false }, fd({ itemId: ITEM, objectKey: KEY }))).toEqual({ ok: true });
+    expect(calls()).toEqual(["portfolio_item_delete"]);
+  });
+});
+
+describe("extra media actions", () => {
+  const MEDIA = "22222222-2222-4222-8222-222222222222";
+  const MEDIA_KEY = "dddddddd-1111-4111-8111-dddddddddddd.mp4";
+
+  it("refuses an unsupported file before touching the database", async () => {
+    const r = await startPortfolioMediaUpload({ itemId: ITEM, contentType: "image/gif", size: 10, durationSeconds: null });
+    expect(r).toEqual({ ok: false, code: "assets.errors.unsupportedType" });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("creates the pending row first, then asks for a ticket bound to that key, and returns the MEDIA id", async () => {
+    rpc.mockResolvedValue({ data: [{ media_id: MEDIA, object_key: MEDIA_KEY }], error: null });
+    const r = await startPortfolioMediaUpload({ itemId: ITEM, contentType: "video/mp4", size: 1000, durationSeconds: 24 });
+    expect(calls()).toEqual(["portfolio_media_create"]);
+    expect(rpc).toHaveBeenCalledWith("portfolio_media_create", {
+      p_item_id: ITEM,
+      p_content_type: "video/mp4",
+      p_size: 1000,
+      p_duration: 24,
+    });
+    expect(createAssetUploadTicket).toHaveBeenCalledWith("portfolio_media", MEDIA_KEY);
+    expect(r).toMatchObject({ ok: true, itemId: MEDIA, objectPath: MEDIA_KEY, token: "t0k3n" });
+  });
+
+  it("removes the pending row again when no upload ticket could be issued (no bytes exist yet)", async () => {
+    rpc.mockResolvedValue({ data: [{ media_id: MEDIA, object_key: MEDIA_KEY }], error: null });
+    createAssetUploadTicket.mockResolvedValue({ ok: false, code: "assets.errors.notAllowed" });
+    const r = await startPortfolioMediaUpload({ itemId: ITEM, contentType: "video/mp4", size: 1000, durationSeconds: 24 });
+    expect(r).toEqual({ ok: false, code: "assets.errors.notAllowed" });
+    expect(calls()).toEqual(["portfolio_media_create", "portfolio_media_remove"]);
+  });
+
+  it("translates the database ceilings into readable codes", async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: "22023", message: "a work can hold at most 5 files" } });
+    expect(await startPortfolioMediaUpload({ itemId: ITEM, contentType: "image/png", size: 10, durationSeconds: null })).toEqual({
+      ok: false,
+      code: "portfolio.errors.tooManyFiles",
+    });
+    rpc.mockResolvedValue({ data: null, error: { code: "22023", message: "a work can hold only one video" } });
+    expect(await startPortfolioMediaUpload({ itemId: ITEM, contentType: "video/mp4", size: 10, durationSeconds: 5 })).toEqual({
+      ok: false,
+      code: "portfolio.errors.oneVideo",
+    });
+  });
+
+  it("finishing is a single idempotent RPC", async () => {
+    rpc.mockResolvedValue({ data: null, error: null });
+    expect(await finishPortfolioMediaUpload(MEDIA)).toEqual({ ok: true });
+    expect(rpc).toHaveBeenCalledWith("portfolio_media_finalize", { p_media_id: MEDIA });
+  });
+
+  it("removing deletes the row first, then the object it names (best-effort)", async () => {
+    rpc.mockResolvedValue({ data: MEDIA_KEY, error: null });
+    expect(await removePortfolioMediaAction(MEDIA)).toEqual({ ok: true });
+    expect(deleteProfessionalAsset).toHaveBeenCalledWith("portfolio_media", MEDIA_KEY);
+    expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(deleteProfessionalAsset.mock.invocationCallOrder[0]!);
   });
 });
 

@@ -145,6 +145,9 @@ describe("PersonalSettings", () => {
     phoneNational: null,
     phoneE164: null,
     avatarUrl: null,
+    coverUrl: null,
+    birthDate: null,
+    gender: null,
   };
 
   it("offers the shared identity fields to EVERY audience, consumers included", () => {

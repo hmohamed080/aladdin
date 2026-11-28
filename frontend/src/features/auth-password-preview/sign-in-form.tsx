@@ -4,7 +4,9 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { passwordSignIn, type PasswordAuthState } from "@/server/actions/auth-password-preview";
+import type { OAuthAvailability } from "@/server/auth/entry-oauth";
 import { AuthCard } from "@/features/auth/auth-card";
+import { GeneralOAuthButtons } from "@/features/entry-auth/oauth-buttons";
 import { Input, LabeledField, SubmitButton } from "@/components/ui/controls";
 import { PasswordInput } from "./password-input";
 import { TurnstileWidget } from "./turnstile-widget";
@@ -32,12 +34,19 @@ const GENERIC_ERROR_CODES = new Set([
 export function PasswordSignInForm({
   next,
   installerSignInHref = "/installer/sign-in",
+  providers = { google: false, facebook: false },
+  oauthError,
 }: {
   next: string;
   installerSignInHref?: string;
+  /** Google / Facebook switched on in Supabase Auth; each one that is off renders no button. */
+  providers?: OAuthAvailability;
+  /** `?error=` the OAuth callback came back with (allow-listed here, never shown raw). */
+  oauthError?: string;
 }) {
   const { t } = useI18n();
   const [state, dispatch] = useActionState(passwordSignIn, initial);
+  const oauthErrorKey = oauthError === "oauth" ? "entryAuth.error.oauth" : oauthError === "oauth_email" ? "entryAuth.error.oauthEmail" : null;
 
   return (
     <AuthCard
@@ -65,7 +74,13 @@ export function PasswordSignInForm({
         </div>
       }
     >
-      <form action={dispatch} className="flex flex-col gap-md" noValidate>
+      {oauthErrorKey ? (
+        <p role="alert" className="mb-md rounded-md border border-danger/40 bg-danger/10 px-md py-2.5 text-body text-danger">
+          {t(oauthErrorKey)}
+        </p>
+      ) : null}
+      <GeneralOAuthButtons next={next === "/b2b" ? undefined : next} providers={providers} />
+      <form action={dispatch} className={providers.google || providers.facebook ? "mt-md flex flex-col gap-md" : "flex flex-col gap-md"} noValidate>
         <input type="hidden" name="next" value={next} />
         {state.code && GENERIC_ERROR_CODES.has(state.code) ? (
           <p role="alert" className="rounded-md border border-danger/40 bg-danger/10 px-md py-2.5 text-body text-danger">

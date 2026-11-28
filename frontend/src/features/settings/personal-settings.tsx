@@ -29,8 +29,8 @@ export type SignInMethod = "email_code" | "phone_password";
  * `/b2b/settings` groups a business's.
  *
  * NOTHING INVENTED. No notification preferences (no preference model exists
- * anywhere in the repo), no password/2FA controls (Aladdin is passwordless —
- * see `signInBody` below), no privacy toggles with nothing behind them.
+ * anywhere in the repo), no 2FA controls (there is no 2FA yet), no privacy
+ * toggles with nothing behind them. How the account signs in is `signInBody` below.
  *
  * REACHABLE BY BOTH VARIANTS. Locale, appearance, sign-in identity and
  * sign-out are not a professional-only need — only the Profile/Availability
@@ -55,8 +55,8 @@ export function PersonalSettings({
   /**
    * How this account actually signs in, decided on the server from the auth
    * identity (never from the email string in the client). Installer phone +
-   * password accounts get their own copy — the passwordless one-time-code
-   * text would be false for them.
+   * password accounts get their own copy — the email-code text would be
+   * false for them.
    */
   signInMethod?: SignInMethod;
   theme: "light" | "dark";

@@ -15,6 +15,7 @@ import {
   UserIcon,
 } from "@/components/ui/icons";
 import { ShowroomSearch } from "./search";
+import { useMobileNav } from "./mobile-nav-context";
 
 import { signOut } from "@/server/actions/auth";
 
@@ -70,6 +71,8 @@ export function ShowroomTopbar({
   showLocation?: boolean;
 }) {
   const { locale } = useI18n();
+  const mobileNav = useMobileNav();
+  const openMenu = onMenuClick ?? mobileNav?.openMenu;
   const resolvedName = displayName || (locale === "ar" ? "حسابي" : "My account");
   const initial = resolvedName.charAt(0);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -100,9 +103,9 @@ export function ShowroomTopbar({
         "h-auto min-h-14 flex-wrap py-1.5 tablet:h-14 tablet:min-h-0 tablet:flex-nowrap tablet:py-0",
       )}
     >
-      {onMenuClick && <button
+      {openMenu && <button
         type="button"
-        onClick={onMenuClick}
+        onClick={openMenu}
         aria-label={locale === "ar" ? "فتح القائمة" : "Open menu"}
         className="grid h-10 w-10 shrink-0 place-items-center rounded-sm text-fg-secondary hover:bg-surface-2 hover:text-fg desktop:hidden"
       >

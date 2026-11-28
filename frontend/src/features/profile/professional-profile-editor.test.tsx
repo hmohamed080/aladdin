@@ -87,7 +87,7 @@ describe("ProfessionalProfileEditor", () => {
   });
   it("saves in place when embedded in profile completion", async () => {
     renderWithI18n(<ProfessionalProfileEditor answers={answers} concreteType="engineer" embedded />, "en");
-    fireEvent.change(screen.getByLabelText(/headline/i), { target: { value: "Updated headline" } });
+    fireEvent.change(screen.getByLabelText(/tagline/i), { target: { value: "Updated headline" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(push).not.toHaveBeenCalled();
@@ -106,7 +106,7 @@ describe("ProfessionalProfileEditor", () => {
   it("keeps unsaved status when saving coverage fails", async () => {
     saveAreas.mockResolvedValue({ ok: false });
     renderWithI18n(<ProfessionalProfileEditor answers={answers} concreteType="engineer" embedded />, "en");
-    fireEvent.change(screen.getByLabelText(/headline/i), { target: { value: "Updated headline" } });
+    fireEvent.change(screen.getByLabelText(/tagline/i), { target: { value: "Updated headline" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeVisible());
     expect(screen.getByText("You have unsaved changes")).toBeVisible();
@@ -128,7 +128,7 @@ describe("ProfessionalProfileEditor", () => {
       <ProfessionalProfileEditor answers={answers} concreteType="installer_technician" />,
       "en",
     );
-    expect((screen.getByLabelText(/headline/i) as HTMLInputElement).value).toBe("Finishing specialist");
+    expect((screen.getByLabelText(/tagline/i) as HTMLInputElement).value).toBe("Finishing specialist");
     expect((screen.getByLabelText(/years of experience/i) as HTMLInputElement).value).toBe("12");
   });
 
@@ -149,7 +149,7 @@ describe("ProfessionalProfileEditor", () => {
       "en",
     );
 
-    fireEvent.change(screen.getByLabelText(/headline/i), { target: { value: "Gypsum and paint expert" } });
+    fireEvent.change(screen.getByLabelText(/tagline/i), { target: { value: "Gypsum and paint expert" } });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     });

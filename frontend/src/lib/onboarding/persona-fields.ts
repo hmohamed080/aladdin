@@ -93,7 +93,7 @@ export const ADDITIONAL_SERVICES: Record<string, readonly string[]> = {
 export const LANGUAGES = ["arabic", "english", "french"] as const;
 
 /** 05.2.2 — availability. */
-export const AVAILABILITIES = ["within_week", "within_month", "flexible"] as const;
+export const AVAILABILITIES = ["immediate", "within_week", "within_month", "flexible"] as const;
 export type Availability = (typeof AVAILABILITIES)[number];
 
 /* ---------------------------------- Location ---------------------------------- */

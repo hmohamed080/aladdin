@@ -11,21 +11,29 @@ import { cn } from "@/lib/ui/cn";
 const initial: SaveState = { ok: false };
 
 /**
- * Save / unsave a catalog product for the whole buying team.
- *
- * Deliberately an icon TOGGLE, not an "add to cart": a saved product is a
- * shortlist entry that leads to a quote request. It carries no price, no
- * reservation and no commitment — Aladdin is consultation-first, and a cart
- * affordance here would promise a transaction the product does not offer.
+ * The bookmark button itself: icon, label, pressed state, size. PRESENTATION ONLY, shared by every
+ * audience that saves a product (a business's team list and an engineer's personal collection) so
+ * the control looks and behaves identically; what happens on press is the caller's concern.
+ * Without `onClick` it is a form submit (the business flow); with it, a plain button.
  */
-function Toggle({ saved, compact }: { saved: boolean; compact: boolean }) {
+export function SaveToggleButton({
+  saved,
+  compact,
+  pending,
+  onClick,
+}: {
+  saved: boolean;
+  compact: boolean;
+  pending: boolean;
+  onClick?: () => void;
+}) {
   const { t } = useI18n();
-  const { pending } = useFormStatus();
   const label = saved ? t("saved.remove") : t("saved.add");
   const Icon = saved ? BookmarkFilledIcon : BookmarkIcon;
   return (
     <button
-      type="submit"
+      type={onClick ? "button" : "submit"}
+      onClick={onClick}
       disabled={pending}
       aria-label={label}
       title={label}
@@ -46,6 +54,19 @@ function Toggle({ saved, compact }: { saved: boolean; compact: boolean }) {
   );
 }
 
+function Toggle({ saved, compact }: { saved: boolean; compact: boolean }) {
+  const { pending } = useFormStatus();
+  return <SaveToggleButton saved={saved} compact={compact} pending={pending} />;
+}
+
+/**
+ * Save / unsave a catalog product for the whole buying team.
+ *
+ * Deliberately an icon TOGGLE, not an "add to cart": a saved product is a
+ * shortlist entry that leads to a quote request. It carries no price, no
+ * reservation and no commitment — Aladdin is consultation-first, and a cart
+ * affordance here would promise a transaction the product does not offer.
+ */
 export function SaveProductButton({
   orgId,
   productId,

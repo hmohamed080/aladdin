@@ -22,7 +22,7 @@ const INITIAL: IdentityFieldState = { ok: false };
  * account-creation trigger filled in automatically is shown, but flagged as
  * not yet confirmed.
  */
-export function IdentityCard({ identity, compact = false, afterName, showSaveBar = false }: { identity: MyIdentity; compact?: boolean; showSaveBar?: boolean; /** Rendered between the display-name and phone forms (compact layouts). */ afterName?: ReactNode }) {
+export function IdentityCard({ identity, compact = false, afterName, showSaveBar = false, header }: { identity: MyIdentity; compact?: boolean; showSaveBar?: boolean; /** Replaces the default avatar block (e.g. the engineer cover + avatar hero). */ header?: ReactNode; /** Rendered between the display-name and phone forms (compact layouts). */ afterName?: ReactNode }) {
   const { t, locale } = useI18n();
   const [name, setName] = useState(identity.displayName);
   const [savedName, setSavedName] = useState(identity.displayName);
@@ -43,7 +43,7 @@ export function IdentityCard({ identity, compact = false, afterName, showSaveBar
     <Card className="flex flex-col gap-lg">
       {/* id/test hook on a real element — Card forwards neither. */}
       <div id="identity" data-testid="identity-card" className="flex flex-col gap-lg">
-        {compact ? null : <AvatarField avatarUrl={identity.avatarUrl} displayName={identity.displayName} />}
+        {header ? <div data-testid="identity-header">{header}</div> : compact ? null : <AvatarField avatarUrl={identity.avatarUrl} displayName={identity.displayName} />}
 
         <form action={submitName} className="flex flex-col gap-sm border-t pt-md" id="display-name">
           <LabeledField

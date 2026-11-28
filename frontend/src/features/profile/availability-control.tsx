@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { Card, InlineError } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/controls";
+import { ClockIcon, MinusCircleIcon } from "@/components/ui/icons";
 import { formatRelativeTime } from "@/lib/ui/format";
 import { setAvailabilityAction, type AvailabilityState } from "@/server/actions/availability";
 import type { Availability } from "@/server/queries/personal-home";
@@ -45,9 +46,9 @@ const INITIAL: AvailabilityState = { ok: false };
  * and renders the age on the server, where a per-request `force-dynamic` render
  * makes it accurate at delivery.
  */
-export function AvailabilityControl({ availability }: { availability: Availability }) {
+export function AvailabilityControl({ availability, variant = "default" }: { availability: Availability; /** "cards": two side-by-side choice cards (engineer profile completion). Same server round trip and states. */ variant?: "default" | "cards" }) {
   const { t, locale } = useI18n();
-  const [state, submit] = useActionState(setAvailabilityAction, INITIAL);
+  const [state, submit, pending] = useActionState(setAvailabilityAction, INITIAL);
   // The age is relative to NOW, and the page is server-rendered then hydrated a moment later (often across a minute
   // boundary). Hydration tolerates the difference on that one line; keying it by `mounted` then REPLACES the node after
   // mount, so it shows the browser's own clock. (Re-rendering alone would leave React's stale server text in place.)
@@ -57,6 +58,63 @@ export function AvailabilityControl({ availability }: { availability: Availabili
   const { state: current, updatedAt } = availability;
   const available = current === "available";
   const unknown = current === "unknown";
+
+  if (variant === "cards") {
+    const unavailableChosen = current === "unavailable";
+    // A radio ring appears on both cards whenever the person is NOT currently available (nothing, or "unavailable", chosen).
+    const rings = !available;
+    const ring = (on: boolean) => (rings ? <span className="engineer-status-ring" data-on={on} aria-hidden="true" /> : null);
+    const availableBody = (
+      <>
+        {ring(false)}
+        <span className="engineer-status-text">
+          <span className="engineer-status-title">
+            <span aria-hidden="true" className="engineer-status-dot" data-tone="available" />
+            <span data-availability-state={available ? "available" : undefined}>{t("profile.availability.available")}</span>
+          </span>
+          {updatedAt ? (
+            <span key={mounted ? "client" : "server"} className="engineer-status-sub" suppressHydrationWarning>
+              <ClockIcon size={16} aria-hidden="true" />
+              {t("profile.availability.updated", { when: formatRelativeTime(updatedAt, locale) })}
+            </span>
+          ) : null}
+        </span>
+      </>
+    );
+    const unavailableBody = (
+      <>
+        {ring(unavailableChosen)}
+        <span className="engineer-status-title" data-availability-state={unavailableChosen ? "unavailable" : undefined}>
+          <MinusCircleIcon size={26} aria-hidden="true" />
+          {t("profile.availability.markUnavailable")}
+        </span>
+      </>
+    );
+    return (
+      <div className="flex flex-col gap-sm" data-testid="availability-cards">
+        <div role="radiogroup" aria-label={t("profile.availability.title")} className="engineer-status-grid">
+          {available ? (
+            <div role="radio" aria-checked="true" className="engineer-status-card" data-tone="available" data-selected="true">{availableBody}</div>
+          ) : (
+            <form action={submit} className="contents">
+              <input type="hidden" name="available" value="1" />
+              <button type="submit" role="radio" aria-checked="false" disabled={pending} className="engineer-status-card" data-tone="available" data-selected="false">{availableBody}</button>
+            </form>
+          )}
+          {unavailableChosen ? (
+            <div role="radio" aria-checked="true" className="engineer-status-card" data-tone="unavailable" data-selected="true">{unavailableBody}</div>
+          ) : (
+            <form action={submit} className="contents">
+              <input type="hidden" name="available" value="0" />
+              <button type="submit" role="radio" aria-checked="false" disabled={pending} className="engineer-status-card" data-tone="unavailable" data-selected="false">{unavailableBody}</button>
+            </form>
+          )}
+        </div>
+        {unknown ? <p className="text-label text-fg-secondary">{t("profile.availability.notSpecifiedHint")}</p> : null}
+        {!state.ok && state.code ? <InlineError>{t(state.code)}</InlineError> : null}
+      </div>
+    );
+  }
 
   return (
     <Card className="flex flex-col gap-md">

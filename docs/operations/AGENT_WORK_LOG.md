@@ -1,3 +1,9 @@
+## 2026-11-28 — Owner-requested full worktree checkpoint
+
+- Owner explicitly requested committing all current work in this worktree, including existing auth/settings, engineer, portfolio, showroom, SQL and test changes.
+- Saved as a work-in-progress checkpoint, not a production-readiness claim. Earlier unfinished profile work and deferred WhatsApp OTP integration still require review. No deployment or push performed.
+- Validation limited to changed-file credential-pattern screening and Git whitespace checks. No full test suite or browser tests run for this checkpoint.
+
 ## 2026-11-28 — Remove username from engineer account UI
 
 - User requested removing username throughout the account. Removed the remaining username editor from engineer settings; completion and profile no longer render a username field. Display name stays editable.

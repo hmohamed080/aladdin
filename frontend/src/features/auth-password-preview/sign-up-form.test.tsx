@@ -6,6 +6,8 @@ import { ar } from "@/lib/i18n/messages/ar";
 import { en } from "@/lib/i18n/messages/en";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
 
+vi.mock("@/server/actions/general-oauth", () => ({ startGeneralOAuth: vi.fn() }));
+vi.mock("@/server/actions/entry-oauth", () => ({ startEntryOAuth: vi.fn() }));
 vi.mock("@/server/actions/auth-password-preview", () => ({
   requestPasswordSignUp: vi.fn(),
   resendPasswordSignUpCode: vi.fn(),

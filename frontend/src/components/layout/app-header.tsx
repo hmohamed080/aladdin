@@ -7,6 +7,7 @@ import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { Brand } from "@/components/layout/brand";
 import { GlobalSearch } from "@/components/layout/global-search";
+import { EngineerSearch } from "@/features/engineer/navigation";
 import { ProfileMenu } from "@/components/layout/profile-menu";
 import { ThemeSwitch } from "@/components/layout/switchers";
 import { loadAccountIdentity, initialsOf } from "@/server/queries/identity";
@@ -102,6 +103,7 @@ export async function AppHeader({
   workspaceLabel,
   preferencesHref,
   orgId,
+  location,
   variant = "bar",
 }: {
   appName: string;
@@ -145,6 +147,8 @@ export async function AppHeader({
   /** Localized name of the active work context, shown in the profile menu. */
   workspaceLabel?: string | null;
   preferencesHref?: string;
+  /** The reader's service area, shown beside the workspace switcher (engineer variant). */
+  location?: string | null;
   /**
    * The active organization, for scoping the notification list to the work
    * context the reader is actually in. UX ONLY — `notifications` is governed by
@@ -204,8 +208,8 @@ export async function AppHeader({
         workspaceSwitch={context}
         profileHref="/home/profile"
         settingsHref="/home/settings"
-        showLocation={false}
-        search={<GlobalSearch capabilities={capabilities} stance={stance} hasWorkspace={false} canAdmin={canAdmin} size="lead" />}
+        location={location}
+        search={<EngineerSearch />}
         notifications={<NotificationsMenu items={notifications} unreadCount={unreadCount} orgId={orgId} />}
         chat={<ChatMenu items={conversations} unreadCount={chatUnread} activeOrgId={orgId} activeOrgName={workspaceLabel} currentUserId={identity?.userId ?? null} />}
       />

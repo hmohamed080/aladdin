@@ -26,7 +26,7 @@ export type OAuthProvider = (typeof OAUTH_PROVIDERS)[number];
 export type OAuthAvailability = Record<OAuthProvider, boolean>;
 
 export const ENTRY_CALLBACK_PATH = "/auth/callback";
-const CONSENT_TYPES = ["terms", "privacy", "pilot"] as const;
+export const CONSENT_TYPES = ["terms", "privacy", "pilot"] as const;
 type Client = SupabaseClient<Database>;
 
 export function isEntryKind(value: unknown): value is EntryKind {

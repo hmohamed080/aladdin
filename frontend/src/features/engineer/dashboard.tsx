@@ -73,13 +73,6 @@ export function EngineerDashboard({
   ];
   return (
     <div className="engineer-home flex flex-col gap-lg">
-      {samples && (
-        <p className="engineer-sample-note">
-          {ar
-            ? "بيانات وصور توضيحية للمراجعة المحلية"
-            : "Illustrative data and images for local design review"}
-        </p>
-      )}
       {progress && progress.percent < 100 && (
         <section
           aria-labelledby="complete-profile-heading"
@@ -138,7 +131,7 @@ export function EngineerDashboard({
           alt=""
           fill
           priority
-          sizes="100vw"
+          sizes="(min-width: 1024px) 75vw, 100vw"
           className="object-cover"
         />
         <div className="absolute inset-0 bg-shell/30" />

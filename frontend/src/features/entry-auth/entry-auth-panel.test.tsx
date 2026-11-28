@@ -5,6 +5,7 @@ import { ar } from "@/lib/i18n/messages/ar";
 import { EntryAuthPanel, entryErrorKey } from "./entry-auth-panel";
 import { EntryEmailSignInForm, EntryEmailSignUpForm, signUpErrorField } from "./email-forms";
 
+vi.mock("@/server/actions/general-oauth", () => ({ startGeneralOAuth: vi.fn() }));
 vi.mock("@/server/actions/entry-oauth", () => ({ startEntryOAuth: vi.fn() }));
 vi.mock("@/server/actions/showroom-phone-auth", () => ({ showroomEmailSignIn: vi.fn(async () => ({ ok: false })), showroomEmailSignUp: vi.fn(async () => ({ ok: false })) }));
 vi.mock("@/server/actions/installer-phone-auth", () => ({ craftsmanEmailSignIn: vi.fn(async () => ({ ok: false })), craftsmanEmailSignUp: vi.fn(async () => ({ ok: false })) }));

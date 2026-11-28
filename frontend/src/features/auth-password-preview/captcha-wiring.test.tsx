@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
 
+vi.mock("@/server/actions/general-oauth", () => ({ startGeneralOAuth: vi.fn() }));
+vi.mock("@/server/actions/entry-oauth", () => ({ startEntryOAuth: vi.fn() }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => "/auth",

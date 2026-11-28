@@ -22,7 +22,8 @@ import {
   XIcon,
 } from "@/components/ui/icons";
 import { pick } from "@/features/installer-dashboard-preview/localized";
-import { activeShowroomItem, showroomNavigation, type ShowroomNavItem } from "./navigation";
+import { activeShowroomItem, showroomNavigation, type ShowroomNavGroup, type ShowroomNavItem } from "./navigation";
+import { useMobileNav } from "./mobile-nav-context";
 import { signOut } from "@/server/actions/auth";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
@@ -36,16 +37,26 @@ const MENU_HOVER_DELAY_MS = 350;
  */
 export function ShowroomSidebar({
   initialMode,
-  mobileOpen,
-  onCloseMobile,
-  capabilities,
+  mobileOpen: mobileOpenProp,
+  onCloseMobile: onCloseMobileProp,
+  capabilities = [],
+  groups: customGroups,
+  pointsHref = "/b2b/points",
 }: {
-  capabilities: readonly string[];
+  /** Showroom navigation is derived from these; ignored when `groups` is given. */
+  capabilities?: readonly string[];
+  /** Another account's destinations, in the same sidebar (the Engineer's, for instance). */
+  groups?: readonly ShowroomNavGroup[];
+  pointsHref?: string;
   initialMode: SidebarMode;
-  mobileOpen: boolean;
-  onCloseMobile: () => void;
+  /** Both default to the surrounding `MobileNavProvider` when the shell does not own the drawer state. */
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }) {
   const { locale, dir, t } = useI18n();
+  const mobileNav = useMobileNav();
+  const mobileOpen = mobileOpenProp ?? mobileNav?.open ?? false;
+  const onCloseMobile = onCloseMobileProp ?? mobileNav?.closeMenu ?? (() => {});
   const pathname = usePathname();
   const search = useSearchParams().toString();
   const [mode, setMode] = useState<SidebarMode>(initialMode);
@@ -106,7 +117,7 @@ export function ShowroomSidebar({
           )}
         >
           {(() => {
-            const groups = showroomNavigation(capabilities);
+            const groups = customGroups ?? showroomNavigation(capabilities);
             const current = activeShowroomItem(pathname, search, groups.flatMap((group) => group.items));
             return groups.map((group, index) => (
             <div key={index}>
@@ -121,7 +132,7 @@ export function ShowroomSidebar({
 
         <div className={cn("shrink-0 pb-2.5 pt-2", narrow ? "px-2" : "px-3")}>
           <Link
-              href="/b2b/points"
+              href={pointsHref}
               title={locale === "ar" ? "نقاطي ومكافآتي" : "My points and rewards"}
               className={cn(
                 "flex rounded-md border border-iris-solid/30 bg-iris-solid/15 p-2 transition-colors hover:bg-iris-solid/20",

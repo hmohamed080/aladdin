@@ -4,6 +4,8 @@ import { renderWithI18n } from "@/test/render";
 import { PasswordSignInForm } from "./sign-in-form";
 import { ar } from "@/lib/i18n/messages/ar";
 
+vi.mock("@/server/actions/general-oauth", () => ({ startGeneralOAuth: vi.fn() }));
+vi.mock("@/server/actions/entry-oauth", () => ({ startEntryOAuth: vi.fn() }));
 vi.mock("@/server/actions/auth-password-preview", () => ({
   passwordSignIn: vi.fn(),
 }));

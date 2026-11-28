@@ -734,6 +734,44 @@ export type Database = {
           },
         ]
       }
+      cover_uploads: {
+        Row: {
+          content_type: string
+          created_at: string
+          id: string
+          object_key: string
+          owner_user_id: string
+          state: Database["public"]["Enums"]["professional_asset_state"]
+          updated_at: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          id?: string
+          object_key: string
+          owner_user_id: string
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          updated_at?: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          id?: string
+          object_key?: string
+          owner_user_id?: string
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cover_uploads_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branches: {
         Row: {
           address_ar: string | null
@@ -1800,6 +1838,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      known_devices: {
+        Row: {
+          device_id: string
+          first_seen_at: string
+          last_seen_at: string
+          last_session_id: string | null
+          user_agent: string
+          user_id: string
+        }
+        Insert: {
+          device_id: string
+          first_seen_at?: string
+          last_seen_at?: string
+          last_session_id?: string | null
+          user_agent?: string
+          user_id: string
+        }
+        Update: {
+          device_id?: string
+          first_seen_at?: string
+          last_seen_at?: string
+          last_session_id?: string | null
+          user_agent?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       jobs: {
         Row: {
@@ -3505,6 +3570,61 @@ export type Database = {
           },
         ]
       }
+      portfolio_item_media: {
+        Row: {
+          content_type: string
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          item_id: string
+          kind: string | null
+          object_key: string
+          owner_user_id: string
+          position: number
+          state: Database["public"]["Enums"]["professional_asset_state"]
+          updated_at: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          item_id: string
+          object_key: string
+          owner_user_id: string
+          position: number
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          updated_at?: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          item_id?: string
+          object_key?: string
+          owner_user_id?: string
+          position?: number
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_item_media_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "portfolio_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portfolio_item_media_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portfolio_items: {
         Row: {
           content_type: string
@@ -4164,6 +4284,9 @@ export type Database = {
           availability_updated_at: string | null
           available_for_work: boolean
           avatar_media_id: string | null
+          cover_media_id: string | null
+          birth_date: string | null
+          gender: string | null
           bio: string | null
           created_at: string
           deleted_at: string | null
@@ -4188,6 +4311,9 @@ export type Database = {
           availability_updated_at?: string | null
           available_for_work?: boolean
           avatar_media_id?: string | null
+          cover_media_id?: string | null
+          birth_date?: string | null
+          gender?: string | null
           bio?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -4212,6 +4338,9 @@ export type Database = {
           availability_updated_at?: string | null
           available_for_work?: boolean
           avatar_media_id?: string | null
+          cover_media_id?: string | null
+          birth_date?: string | null
+          gender?: string | null
           bio?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -4238,6 +4367,13 @@ export type Database = {
             columns: ["avatar_media_id"]
             isOneToOne: false
             referencedRelation: "avatar_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_profiles_cover_media_id"
+            columns: ["cover_media_id"]
+            isOneToOne: false
+            referencedRelation: "cover_uploads"
             referencedColumns: ["id"]
           },
           {
@@ -7395,6 +7531,11 @@ export type Database = {
         Args: { p_content_type: string }
         Returns: string
       }
+      cover_confirm_upload: { Args: { p_object_key: string }; Returns: string }
+      cover_request_upload: {
+        Args: { p_content_type: string }
+        Returns: string
+      }
       branch_assign: {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: string
@@ -8493,6 +8634,23 @@ export type Database = {
         Returns: undefined
       }
       portfolio_item_purge: { Args: { p_item_id: string }; Returns: undefined }
+      portfolio_media_create: {
+        Args: {
+          p_content_type: string
+          p_duration?: number
+          p_item_id: string
+          p_size: number
+        }
+        Returns: {
+          media_id: string
+          object_key: string
+        }[]
+      }
+      portfolio_media_finalize: {
+        Args: { p_media_id: string }
+        Returns: undefined
+      }
+      portfolio_media_remove: { Args: { p_media_id: string }; Returns: string }
       portfolio_item_set_visibility: {
         Args: { p_item_id: string; p_public: boolean }
         Returns: undefined
@@ -8529,6 +8687,33 @@ export type Database = {
           p_show_whatsapp: boolean
         }
         Returns: undefined
+      }
+      profile_set_personal_details: {
+        Args: { p_birth_date: string; p_gender: string }
+        Returns: undefined
+      }
+      my_active_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          user_agent: string | null
+          ip: string | null
+          created_at: string | null
+          last_active_at: string | null
+          is_current: boolean
+        }[]
+      }
+      revoke_my_session: {
+        Args: { p_session_id: string }
+        Returns: boolean
+      }
+      touch_known_device: {
+        Args: { p_device_id: string; p_user_agent: string }
+        Returns: undefined
+      }
+      forget_known_device: {
+        Args: { p_device_id: string }
+        Returns: boolean
       }
       profile_set_display_name: {
         Args: { p_display_name: string }

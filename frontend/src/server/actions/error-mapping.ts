@@ -310,6 +310,12 @@ export function mapPortfolioError(error: unknown): string {
   const code = e.code ?? "";
   const msg = (e.message ?? "").toLowerCase();
 
+  if (msg.includes("at most 5 files")) return "portfolio.errors.tooManyFiles";
+  if (msg.includes("only one video")) return "portfolio.errors.oneVideo";
+  if (msg.includes("video length")) return "portfolio.errors.videoLength";
+  if (msg.includes("file is too large")) return "assets.errors.tooLarge";
+  if (msg.includes("cover image must finish")) return "portfolio.errors.notReady";
+  if (msg.includes("portfolio media not found")) return "portfolio.errors.notFound";
   if (code === "22023" && msg.includes("description")) return "portfolio.errors.descriptionTooLong";
   if (msg.includes("professional persona is required"))
     return "portfolio.errors.notProfessional";

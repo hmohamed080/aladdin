@@ -155,9 +155,55 @@ describe("the namespace policy", () => {
     }
   });
 
-  it("admits no video, because nothing in this product could play one", () => {
+  it("admits video ONLY in the extra-media namespace - the cover and certificates stay image/PDF", () => {
     for (const ns of ASSET_NAMESPACES) {
-      expect(ASSET_POLICY[ns].types.some((t) => t.startsWith("video/"))).toBe(false);
+      const hasVideo = ASSET_POLICY[ns].types.some((t) => t.startsWith("video/"));
+      expect(hasVideo).toBe(ns === "portfolio_media");
+    }
+    expect(ASSET_POLICY.portfolio_media.types).toEqual(
+      expect.arrayContaining(["video/mp4", "video/quicktime", "image/jpeg", "image/png", "image/webp"]),
+    );
+  });
+
+  it("caps an extra IMAGE at 5 MiB and a VIDEO at 50 MiB in the same bucket", () => {
+    expect(validateAssetFile("portfolio_media", { type: "image/png", size: 5242881 })).toEqual({
+      ok: false,
+      code: "assets.errors.tooLarge",
+    });
+    expect(validateAssetFile("portfolio_media", { type: "image/png", size: 5242880 })).toEqual({ ok: true });
+    expect(validateAssetFile("portfolio_media", { type: "video/mp4", size: 40 * 1024 * 1024 })).toEqual({ ok: true });
+    expect(validateAssetFile("portfolio_media", { type: "video/mp4", size: 50 * 1024 * 1024 + 1 })).toEqual({
+      ok: false,
+      code: "assets.errors.tooLarge",
+    });
+  });
+
+  it("refuses a video in the cover namespace", () => {
+    expect(validateAssetFile("portfolio", { type: "video/mp4", size: 1000 })).toEqual({
+      ok: false,
+      code: "assets.errors.unsupportedType",
+    });
+  });
+
+  it("recognises MP4 / MOV by the box at byte 4, and refuses a script named .mp4", () => {
+    const head = (box: string) =>
+      new Uint8Array([0, 0, 0, 24, ...[...box].map((c) => c.charCodeAt(0)), 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(bytesMatchType(head("ftyp"), "video/mp4")).toBe(true);
+    expect(bytesMatchType(head("moov"), "video/mp4")).toBe(false);
+    expect(bytesMatchType(head("moov"), "video/quicktime")).toBe(true);
+    expect(bytesMatchType(head("ftyp"), "video/quicktime")).toBe(true);
+    const script = new Uint8Array([0x3c, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x3e, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(bytesMatchType(script, "video/mp4")).toBe(false);
+  });
+
+  it("shapes the extra-media key as uuid + image/video extension and nothing else", () => {
+    const owner = "11111111-1111-4111-8111-111111111111";
+    const key = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+    for (const ext of ["jpg", "png", "webp", "mp4", "mov"]) {
+      expect(isAssetKeyForCaller("portfolio_media", `${key}.${ext}`, owner)).toBe(true);
+    }
+    for (const bad of [`${key}.exe`, `${key}.gif`, `${owner}/${key}.mp4`, `../${key}.mp4`, "x.mp4", ""]) {
+      expect(isAssetKeyForCaller("portfolio_media", bad, owner)).toBe(false);
     }
   });
 

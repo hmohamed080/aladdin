@@ -129,6 +129,75 @@ export async function finishPortfolioUpload(itemId: string): Promise<ActionState
 }
 
 // ---------------------------------------------------------------------------
+// Portfolio — extra media (more images, one video)
+// ---------------------------------------------------------------------------
+
+/**
+ * Step one for ONE extra file of a work that already exists and is ready. Same
+ * shape as the cover: pending row first (`portfolio_media_create` enforces the
+ * persona, the 4-extra and one-video ceilings and the size caps), then a
+ * single-use upload token bound to that exact key.
+ *
+ * `itemId` in the returned ticket is the MEDIA row id — the value the matching
+ * finish step needs — so the shared client uploader works unchanged.
+ */
+export async function startPortfolioMediaUpload(input: {
+  itemId: string;
+  contentType: string;
+  size: number;
+  durationSeconds: number | null;
+}): Promise<UploadTicket> {
+  const valid = validateAssetFile("portfolio_media", { type: input.contentType, size: input.size });
+  if (!valid.ok) return { ok: false, code: valid.code };
+
+  const { data, error } = await rpc("portfolio_media_create", {
+    p_item_id: input.itemId,
+    p_content_type: input.contentType,
+    p_size: input.size,
+    p_duration: input.durationSeconds ?? undefined,
+  });
+  if (error) return { ok: false, code: mapPortfolioError(error) };
+
+  const row = (data as Array<{ media_id: string; object_key: string }> | null)?.[0];
+  if (!row) return { ok: false, code: "states.genericRetry" };
+
+  const ticket = await createAssetUploadTicket("portfolio_media", row.object_key);
+  if (!ticket.ok) {
+    // No bytes exist yet, so removing the pending row is the one safe early exit.
+    await rpc("portfolio_media_remove", { p_media_id: row.media_id });
+    return { ok: false, code: ticket.code };
+  }
+  return {
+    ok: true,
+    itemId: row.media_id,
+    bucket: ASSET_POLICY.portfolio_media.bucket,
+    objectPath: row.object_key,
+    token: ticket.token,
+  };
+}
+
+/** Step two for an extra file. Idempotent in the database. */
+export async function finishPortfolioMediaUpload(mediaId: string): Promise<ActionState> {
+  const { error } = await rpc("portfolio_media_finalize", { p_media_id: mediaId });
+  if (error) return { ok: false, code: mapPortfolioError(error) };
+  refreshOwnerSurfaces("portfolio");
+  return { ok: true };
+}
+
+/**
+ * Removes one extra file: row first (it stops being usable at once), then the
+ * bytes, best-effort. A leftover object is unreachable by every policy once its
+ * row is gone, so a failed cleanup is never reported as a failed removal.
+ */
+export async function removePortfolioMediaAction(mediaId: string): Promise<ActionState> {
+  const { data, error } = await rpc("portfolio_media_remove", { p_media_id: mediaId });
+  if (error) return { ok: false, code: mapPortfolioError(error) };
+  if (typeof data === "string" && data) await deleteProfessionalAsset("portfolio_media", data);
+  refreshOwnerSurfaces("portfolio");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
 // Portfolio — managing
 // ---------------------------------------------------------------------------
 export async function updatePortfolioItemAction(
@@ -195,6 +264,14 @@ export async function deletePortfolioItemAction(
   const itemId = String(fd.get("itemId") ?? "");
   const objectKey = String(fd.get("objectKey") ?? "");
 
+  // The extras' keys are only readable while their rows exist, and purging the
+  // work cascades them away — so list them FIRST. Still the owner's own RLS view.
+  const supabase = await getServerSupabase();
+  const { data: extras } = await supabase
+    .from("portfolio_item_media")
+    .select("object_key")
+    .eq("item_id", itemId);
+
   const { error } = await rpc("portfolio_item_delete", { p_item_id: itemId });
   if (error) return { ok: false, code: mapPortfolioError(error) };
 
@@ -203,7 +280,14 @@ export async function deletePortfolioItemAction(
   // saying "could not delete" about an item the person can no longer see would be
   // the one genuinely confusing outcome.
   const removed = await deleteProfessionalAsset("portfolio", objectKey);
-  if (removed.ok) await rpc("portfolio_item_purge", { p_item_id: itemId });
+  let extrasRemoved = true;
+  for (const extra of extras ?? []) {
+    const gone = await deleteProfessionalAsset("portfolio_media", extra.object_key);
+    if (!gone.ok) extrasRemoved = false;
+  }
+  // Purge (which cascades the extra rows) only once EVERY object is gone, so a
+  // retry of this same sequence can still find the keys of anything left behind.
+  if (removed.ok && extrasRemoved) await rpc("portfolio_item_purge", { p_item_id: itemId });
 
   refreshOwnerSurfaces("portfolio");
   return { ok: true };

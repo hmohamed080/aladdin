@@ -177,7 +177,7 @@ enable_signup = true
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
-enable_manual_linking = false
+enable_manual_linking = true
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
 # Set to 10 for the password-auth preview (docs/frontend/auth-password-preview.md):
 # length-first policy PLUS application-level weak-password rejection (common /
@@ -246,8 +246,10 @@ web3 = 30
 # Allow/disallow new user signups via email to your project.
 enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
-# addresses. If disabled, only the new email is required to confirm.
-double_confirm_changes = true
+# addresses. If disabled, only the new email is required to confirm. Disabled here: the in-app change
+# flow (features/engineer/email-change.tsx) first re-checks the current password, then confirms the new
+# address with a 6-digit code, and the old address gets an email_changed notice instead.
+double_confirm_changes = false
 # If enabled, users need to confirm their email address before signing in.
 # REVISION 4 — Architecture B is now the implemented registration flow for
 # the password-auth preview (docs/frontend/auth-password-preview.md
@@ -315,6 +317,12 @@ content_path = "./supabase/templates/recovery.html"
 subject = "رمز تأكيد إنشاء الحساب في علاء الدين"
 content_path = "./supabase/templates/confirmation.html"
 
+# Email-change template: the 6-digit {{ .Token }} sent to the NEW address, verified with
+# `verifyOtp({ type: "email_change" })` after the app has re-checked the account password.
+[auth.email.template.email_change]
+subject = "رمز تأكيد تغيير بريدك في علاء الدين"
+content_path = "./supabase/templates/email_change.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
@@ -335,6 +343,12 @@ subject = "تم تغيير كلمة مرور حسابك في علاء الدين
 # when this used the same "./supabase/templates/..." convention as the
 # template sections).
 content_path = "./templates/password_changed.html"
+
+# Tells the OLD address that the sign-in email was changed (never contains a code).
+[auth.email.notification.email_changed]
+enabled = true
+subject = "تم تغيير بريد حسابك في علاء الدين"
+content_path = "./templates/email_changed.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.

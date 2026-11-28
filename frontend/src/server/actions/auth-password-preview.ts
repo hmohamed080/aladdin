@@ -35,7 +35,7 @@ import {
  * now PROMOTED to the canonical `/auth/*` routes (sign-up, sign-in,
  * forgot-password/*, finish-registration). The module keeps its historical
  * name; the old `/preview/auth-password/*` URLs are server-side redirects to
- * the canonical ones. The legacy passwordless actions in
+ * the canonical ones. The one-time-code actions in
  * `server/actions/auth.ts` still serve `/auth/verify` and `/auth/recovery`,
  * plus the shared `signOut` (see docs/frontend/auth-password-preview.md
  * §Legacy code audit). It deliberately reuses the

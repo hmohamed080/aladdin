@@ -23,6 +23,7 @@ export function ProfileSelect({
   icon,
   customEntry,
   placeholder,
+  disabled = false,
 }: {
   id: string;
   label: string;
@@ -31,6 +32,8 @@ export function ProfileSelect({
   onChange: (value: string) => void;
   icon?: ReactNode;
   placeholder?: string;
+  /** Not openable (e.g. City until a governorate is chosen). */
+  disabled?: boolean;
   customEntry?: {
     optionValue: string;
     value: string;
@@ -61,8 +64,9 @@ export function ProfileSelect({
         aria-labelledby={`${id}-label ${id}`}
         aria-haspopup="listbox"
         aria-expanded={open}
+        disabled={disabled}
         onClick={() => setOpen((current) => !current)}
-        className="flex min-h-11 w-full items-center justify-between gap-sm rounded-md border border-strong bg-canvas px-3 text-start text-body-lg text-fg transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        className="flex min-h-11 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-canvas w-full items-center justify-between gap-sm rounded-md border border-strong bg-canvas px-3 text-start text-body-lg text-fg transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         <span className="flex min-w-0 items-center gap-sm">
           {icon ? <span className="shrink-0 text-fg-secondary">{icon}</span> : null}

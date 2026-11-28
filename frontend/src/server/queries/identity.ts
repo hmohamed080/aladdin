@@ -15,8 +15,8 @@ import { userFacingEmail } from "@/lib/auth/craftsman-login-alias";
  * every authenticated page.
  *
  * WHY THE CONTACT IS EITHER/OR
- * Authentication is passwordless and a user verifies exactly ONE primary contact
- * at sign-up — WhatsApp OTP or email (see the canonical auth model). So a real
+ * A user verifies exactly ONE primary contact at sign-up — email, or a phone
+ * for installer accounts (see the canonical auth model). So a real
  * account may legitimately have no email at all, and a menu that renders an
  * "email" row unconditionally would show an empty line to every phone-verified
  * user. What is shown is whichever contact the account actually has.

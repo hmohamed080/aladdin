@@ -6,10 +6,10 @@ import { type CatalogView } from "@/lib/ui/catalog-view";
 import { Pager } from "@/components/ui/pager";
 import { type PagedLoad } from "@/lib/pagination/batches";
 import { usePagedList } from "@/lib/pagination/use-paged-list";
-import { loadCatalogBatchAction } from "@/server/actions/catalog-feed";
+import { loadCatalogBatchAction, type CatalogBatchResult } from "@/server/actions/catalog-feed";
 import type { CatalogRow } from "@/server/queries/commerce";
 import { ViewToggle } from "@/features/showroom-shell/view-toggle";
-import { GridCard, ListRow, isRenderable, type Product } from "./product-cards";
+import { GridCard, ListRow, isRenderable, type CatalogMode, type Product } from "./product-cards";
 
 /**
  * The showroom's product results: one result set, two presentations.
@@ -28,6 +28,8 @@ export function CatalogResults({
   savedIds,
   initialView,
   imageUrls: initialImageUrls = {},
+  mode = "showroom",
+  loadMore = loadCatalogBatchAction,
 }: {
   /** The FIRST batch (server-rendered); further batches are bounded server reads. */
   products: CatalogRow[];
@@ -37,9 +39,18 @@ export function CatalogResults({
   filters: { q?: string; category?: string; supplier?: string };
   /** Product id -> resolved image URL (signed primary photo, else the legacy reference). */
   imageUrls?: Record<string, string>;
-  orgId: string;
+  /** The viewing organization; `null` for an engineer, who has none. */
+  orgId: string | null;
   savedIds: string[];
   initialView: CatalogView;
+  /** Who is browsing — see `CatalogMode`. Defaults to the showroom. */
+  mode?: CatalogMode;
+  /**
+   * The "Show more" read. Defaults to the showroom's own; another audience passes its server action
+   * (server actions can be handed from a server page to this client component), so this file never
+   * has to know about it.
+   */
+  loadMore?: (filters: { q?: string; category?: string; supplier?: string }, offset: number) => Promise<CatalogBatchResult>;
 }) {
   const { t } = useI18n();
   const [view, setView] = useState<CatalogView>(initialView);
@@ -49,7 +60,7 @@ export function CatalogResults({
   // The server action is the only thing that knows the viewer's organization; a failed batch keeps the list.
   const load = useCallback<PagedLoad<Product>>(
     async (offset) => {
-      const res = await loadCatalogBatchAction(filters, offset);
+      const res = await loadMore(filters, offset);
       if (!res.ok) return null;
       setImageUrls((prev) => ({ ...prev, ...res.imageUrls }));
       // The batch's own save state is authoritative (it may have changed since an earlier load).
@@ -61,7 +72,7 @@ export function CatalogResults({
       });
       return { items: res.products.filter(isRenderable), total: res.total };
     },
-    [filters],
+    [filters, loadMore],
   );
   const list = usePagedList(products.filter(isRenderable), total, load);
   const items = list.items;
@@ -84,7 +95,7 @@ export function CatalogResults({
         <ul className="grid grid-cols-2 gap-sm tablet:grid-cols-3 tablet:gap-md desktop:grid-cols-4 wide:grid-cols-5" data-testid="showroom-catalog-grid">
           {items.map((p) => (
             <li key={p.id} className="min-w-0">
-              <GridCard product={p} orgId={orgId} saved={saved.has(p.id)} image={imageUrls[p.id] ?? p.image_ref} onSavedChange={onSavedChange(p.id)} />
+              <GridCard product={p} orgId={orgId} mode={mode} saved={saved.has(p.id)} image={imageUrls[p.id] ?? p.image_ref} onSavedChange={onSavedChange(p.id)} />
             </li>
           ))}
         </ul>
@@ -92,7 +103,7 @@ export function CatalogResults({
         <ul className="flex flex-col gap-sm" data-testid="showroom-catalog-list">
           {items.map((p) => (
             <li key={p.id} className="min-w-0">
-              <ListRow product={p} orgId={orgId} saved={saved.has(p.id)} image={imageUrls[p.id] ?? p.image_ref} onSavedChange={onSavedChange(p.id)} />
+              <ListRow product={p} orgId={orgId} mode={mode} saved={saved.has(p.id)} image={imageUrls[p.id] ?? p.image_ref} onSavedChange={onSavedChange(p.id)} />
             </li>
           ))}
         </ul>

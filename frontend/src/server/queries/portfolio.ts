@@ -181,3 +181,35 @@ export async function loadProfessionalAssetSummary(): Promise<ProfessionalAssetS
     previewItemId: published[0]?.id ?? null,
   };
 }
+
+/** One extra file of a work (beyond its cover image), owner's own view. */
+export type PortfolioMedia = {
+  id: string;
+  itemId: string;
+  objectKey: string;
+  contentType: string;
+  kind: "image" | "video";
+  durationSeconds: number | null;
+  position: number;
+  /** `pending` means the bytes never arrived. */
+  pending: boolean;
+};
+
+/** The caller's extra media for all their works, in display order. RLS scopes it to the owner and hides `deleted`. */
+export const listMyPortfolioMedia = cache(async function listMyPortfolioMedia(): Promise<PortfolioMedia[]> {
+  const supabase = await getServerSupabase();
+  const { data } = await supabase
+    .from("portfolio_item_media")
+    .select("id, item_id, object_key, content_type, kind, duration_seconds, position, state")
+    .order("position", { ascending: true });
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    itemId: row.item_id,
+    objectKey: row.object_key,
+    contentType: row.content_type,
+    kind: row.kind === "video" ? "video" : "image",
+    durationSeconds: row.duration_seconds,
+    position: row.position,
+    pending: row.state === "pending",
+  }));
+});

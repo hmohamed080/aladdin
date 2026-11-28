@@ -110,3 +110,72 @@ export async function confirmAvatarUploadAction(objectKey: string): Promise<Avat
   revalidateIdentity();
   return { ok: true };
 }
+
+/** Step 1 of the cover upload — pending metadata row + server-generated key (mirrors the avatar flow). */
+export async function requestCoverUploadAction(contentType: string): Promise<AvatarUploadTicket> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("cover_request_upload", { p_content_type: contentType });
+  if (error || !data) {
+    return { ok: false, code: "profileIdentity.cover.errorUpload" };
+  }
+  return { ok: true, key: data };
+}
+
+/** Step 3 — flips the uploaded cover to ready, points profiles.cover_media_id at it, then best-effort removes the previous object. */
+export async function confirmCoverUploadAction(objectKey: string): Promise<AvatarConfirmResult> {
+  const supabase = await getServerSupabase();
+  const { data: previousKey, error } = await supabase.rpc("cover_confirm_upload", {
+    p_object_key: objectKey,
+  });
+  if (error) {
+    return { ok: false, code: "profileIdentity.cover.errorUpload" };
+  }
+  if (previousKey) {
+    // Best-effort: the confirm already committed; a failure only orphans one
+    // object in a private bucket only its owner could read.
+    await supabase.storage.from("covers").remove([previousKey]);
+  }
+  revalidateIdentity();
+  return { ok: true };
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Birth date and gender — both optional; an empty field clears the stored value. */
+export async function setPersonalDetailsAction(
+  _prev: IdentityFieldState,
+  fd: FormData,
+): Promise<IdentityFieldState> {
+  const birthDate = String(fd.get("birthDate") ?? "").trim();
+  const gender = String(fd.get("gender") ?? "").trim();
+  if (birthDate && !ISO_DATE.test(birthDate)) return { ok: false, code: "profileIdentity.personal.invalidDate" };
+  if (gender && gender !== "female" && gender !== "male") return { ok: false, code: "profileIdentity.personal.error" };
+
+  const supabase = await getServerSupabase();
+  // The generated arg types are `string` (no nullability in codegen); the RPC takes NULL to clear a value.
+  const { error } = await supabase.rpc("profile_set_personal_details", {
+    p_birth_date: (birthDate || null) as unknown as string,
+    p_gender: (gender || null) as unknown as string,
+  });
+
+  if (error) {
+    return { ok: false, code: error.code === "22023" ? "profileIdentity.personal.invalidDate" : "profileIdentity.personal.error" };
+  }
+  revalidateIdentity();
+  return { ok: true };
+}
+
+/** Username change: the shape/reserved/taken rules live in `profile_set_username`; a taken and a reserved name answer identically. */
+export async function setUsernameAction(
+  _prev: IdentityFieldState,
+  fd: FormData,
+): Promise<IdentityFieldState> {
+  const username = String(fd.get("username") ?? "").trim();
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.rpc("profile_set_username", { p_username: username });
+  if (error) {
+    return { ok: false, code: error.code === "23505" ? "profileIdentity.username.unavailable" : "profileIdentity.username.invalid" };
+  }
+  revalidateIdentity();
+  return { ok: true };
+}

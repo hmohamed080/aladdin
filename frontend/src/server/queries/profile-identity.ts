@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { AVATAR_BUCKET } from "@/lib/storage/avatar-assets";
+import { COVER_BUCKET } from "@/lib/storage/cover-assets";
 
 /** How long a signed avatar read URL lives. Minted per render, never stored. */
 const AVATAR_READ_URL_SECONDS = 300;
@@ -16,6 +17,11 @@ export type MyIdentity = {
   phoneNational: string | null;
   phoneE164: string | null;
   avatarUrl: string | null;
+  /** Short-lived signed URL of the owner's ready cover photo, or null. Owner-only. */
+  coverUrl: string | null;
+  /** ISO date (YYYY-MM-DD), self-reported, private. */
+  birthDate: string | null;
+  gender: "female" | "male" | null;
 };
 
 /** The caller's own shared identity fields (every audience). Scoped to the session — takes no user id. */
@@ -29,7 +35,7 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "display_name, display_name_confirmed_at, username, phone_country_iso2, phone_national, phone_e164, avatar_media_id",
+      "display_name, display_name_confirmed_at, username, phone_country_iso2, phone_national, phone_e164, avatar_media_id, cover_media_id, birth_date, gender",
     )
     .eq("user_id", user.id)
     .maybeSingle();
@@ -52,6 +58,22 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
     }
   }
 
+  let coverUrl: string | null = null;
+  if (profile.cover_media_id) {
+    const { data: upload } = await supabase
+      .from("cover_uploads")
+      .select("object_key")
+      .eq("id", profile.cover_media_id)
+      .eq("state", "ready")
+      .maybeSingle();
+    if (upload?.object_key) {
+      const { data: signed } = await supabase.storage
+        .from(COVER_BUCKET)
+        .createSignedUrl(upload.object_key, AVATAR_READ_URL_SECONDS);
+      coverUrl = signed?.signedUrl ?? null;
+    }
+  }
+
   return {
     displayName: profile.display_name,
     displayNameConfirmed: profile.display_name_confirmed_at !== null,
@@ -60,10 +82,14 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
     phoneNational: profile.phone_national,
     phoneE164: profile.phone_e164,
     avatarUrl,
+    coverUrl,
+    birthDate: profile.birth_date,
+    gender: profile.gender === "female" || profile.gender === "male" ? profile.gender : null,
   };
 });
 
 export const PROFILE_COMPLETION_ITEMS = [
+  "governorate", "city", "specialization", "services", "work_status", "readiness", "portfolio",
   "username",
   "avatar",
   "phone",
@@ -79,7 +105,7 @@ export const PROFILE_COMPLETION_ITEMS = [
 ] as const;
 export type ProfileCompletionItem = (typeof PROFILE_COMPLETION_ITEMS)[number];
 
-export type ProfileCompletion = { percent: number; missing: ProfileCompletionItem[] };
+export type ProfileCompletion = { percent: number; missing: ProfileCompletionItem[]; sections?: boolean[] };
 
 function isCompletionItem(value: unknown): value is ProfileCompletionItem {
   return typeof value === "string" && (PROFILE_COMPLETION_ITEMS as readonly string[]).includes(value);
@@ -96,9 +122,9 @@ export const loadMyProfileCompletion = cache(async function loadMyProfileComplet
   const { data, error } = await supabase.rpc("my_profile_completion");
   if (error || !data || typeof data !== "object" || Array.isArray(data)) return null;
 
-  const raw = data as { percent?: unknown; missing?: unknown };
+  const raw = data as { percent?: unknown; missing?: unknown; sections?: unknown };
   const percent = typeof raw.percent === "number" ? raw.percent : Number(raw.percent);
   if (!Number.isFinite(percent)) return null;
   const missing = Array.isArray(raw.missing) ? raw.missing.filter(isCompletionItem) : [];
-  return { percent: Math.max(0, Math.min(100, Math.round(percent))), missing };
+  return { percent: Math.max(0, Math.min(100, Math.round(percent))), missing, sections: Array.isArray(raw.sections) && raw.sections.length === 4 && raw.sections.every(value => typeof value === "boolean") ? raw.sections : undefined };
 });

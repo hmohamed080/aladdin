@@ -7,7 +7,7 @@ import { Button, Input, LabeledField, SubmitButton } from "@/components/ui/contr
 import { CountedTextarea } from "@/components/ui/counted-textarea";
 import { DESCRIPTION_MAX_CHARS, isAcceptableEdit } from "@/lib/text/description-limit";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { LayersIcon, AlertIcon, ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
+import { LayersIcon, AlertIcon, BriefcaseIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, PlusIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
 import type { PortfolioItem } from "@/server/queries/portfolio";
 import {
@@ -15,14 +15,19 @@ import {
   finishPortfolioUpload,
   movePortfolioItemAction,
   setPortfolioVisibilityAction,
-  startPortfolioUpload,
   updatePortfolioItemAction,
 } from "@/server/actions/portfolio";
-import { AddPanel, AssetFileField, MediaFrame, QuickAction, VisibilityBadge } from "./parts";
-import { uploadAsset } from "./upload";
+import { AddPanel, MediaFrame, QuickAction, VisibilityBadge } from "./parts";
+import { AddWorkForm } from "./add-work-form";
+import { formatClock } from "./media-picker";
+import "./portfolio-add.css";
 
 /** One item plus the short-lived URL the server minted for its preview. */
-export type PortfolioCard = PortfolioItem & { previewUrl: string | null };
+export type PortfolioCard = PortfolioItem & {
+  previewUrl: string | null;
+  /** The work's other files (more images, or one video), already signed for preview. */
+  extras?: Array<{ id: string; kind: "image" | "video"; durationSeconds: number | null; previewUrl: string | null }>;
+};
 
 /**
  * The Portfolio manager.
@@ -37,20 +42,49 @@ export type PortfolioCard = PortfolioItem & { previewUrl: string | null };
  * person comes to this page to check, so it is a badge on the image rather than a
  * line of text below the fold.
  */
-export function PortfolioManager({ items }: { items: PortfolioCard[] }) {
+export function PortfolioManager({ items, embedded = false }: { items: PortfolioCard[]; /** Inside profile completion: section heading + an always-open add card. */ embedded?: boolean }) {
   const { t } = useI18n();
   const usable = items.filter((i) => !i.pending);
   const unfinished = items.filter((i) => i.pending);
+  // Embedded: the add card starts CLOSED; the button opens it, and Cancel or a finished upload collapses it again.
+  const [addOpen, setAddOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-xl" data-testid="portfolio-manager">
-      <div className="flex flex-wrap items-start justify-between gap-md">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h1 className="text-headline text-fg">{t("portfolio.title")}</h1>
-          <p className="max-w-prose text-body text-fg-secondary">{t("portfolio.subtitle")}</p>
+      {embedded ? (
+        <>
+          <header className="portfolio-section-head">
+            <span className="portfolio-section-icon" aria-hidden="true"><BriefcaseIcon size={26} /></span>
+            <div className="min-w-0">
+              <h2 className="portfolio-section-title">{t("portfolio.title")}</h2>
+              <p className="portfolio-section-sub">{t("portfolio.section.subtitle")}</p>
+            </div>
+          </header>
+          {addOpen ? (
+            <section className="portfolio-add-card" aria-labelledby="portfolio-add-title">
+              <header className="portfolio-add-head">
+                <span className="portfolio-add-plus" aria-hidden="true"><PlusIcon size={18} /></span>
+                <h3 id="portfolio-add-title" className="portfolio-add-title">{t("portfolio.form.heading")}</h3>
+              </header>
+              <AddWorkForm onDone={() => setAddOpen(false)} onCancel={() => setAddOpen(false)} />
+            </section>
+          ) : (
+            <div>
+              <Button type="button" variant="primary" onClick={() => setAddOpen(true)}>
+                {t("portfolio.add")}
+              </Button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="flex flex-wrap items-start justify-between gap-md">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h1 className="text-headline text-fg">{t("portfolio.title")}</h1>
+            <p className="max-w-prose text-body text-fg-secondary">{t("portfolio.subtitle")}</p>
+          </div>
+          <AddWork />
         </div>
-        <AddWork />
-      </div>
+      )}
 
       {/* The one rule a person needs before they upload anything, said once and
           kept short. It is not a warning — private is the good default — so it
@@ -148,6 +182,27 @@ function WorkCard({
             <VisibilityBadge isPublic={item.isPublic} />
           </span>
         </MediaFrame>
+
+        {item.extras && item.extras.length > 0 ? (
+          <ul className="portfolio-extras" data-testid="work-extras">
+            {item.extras.map((extra) =>
+              extra.previewUrl ? (
+                <li key={extra.id} className="portfolio-extra">
+                  {extra.kind === "video" ? (
+                    <>
+                      <video src={`${extra.previewUrl}#t=0.1`} muted playsInline preload="metadata" />
+                      <span className="portfolio-extra-badge" aria-hidden="true"><PlayIcon size={14} /></span>
+                      {extra.durationSeconds ? <span className="sr-only">{formatClock(extra.durationSeconds)}</span> : null}
+                    </>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
+                    <img src={extra.previewUrl} alt="" loading="lazy" />
+                  )}
+                </li>
+              ) : null,
+            )}
+          </ul>
+        ) : null}
 
         {editing ? (
           <EditForm item={item} onDone={() => setEditing(false)} />
@@ -324,78 +379,12 @@ function EditForm({ item, onDone }: { item: PortfolioCard; onDone: () => void })
   );
 }
 
-/**
- * Adding work: validate, create the row, upload, finalize.
- *
- * A plain `onSubmit` rather than a server action, because the bytes go straight
- * from this browser to Storage and never through the Next server. `uploadAsset`
- * owns the sequence and its recovery rules; this component owns the form.
- */
+/** Adding work from the standalone Portfolio page: the same form, inside the usual collapsible panel. */
 function AddWork() {
   const { t } = useI18n();
-  const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
   return (
     <AddPanel label={t("portfolio.add")} title={t("portfolio.form.heading")}>
-      {(close) => (
-        <form
-          className="flex flex-col gap-md"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            const form = event.currentTarget;
-            const data = new FormData(form);
-            const title = String(data.get("title") ?? "");
-            const description = String(data.get("description") ?? "");
-            if (!file) {
-              setError("portfolio.errors.fileRequired");
-              return;
-            }
-            setBusy(true);
-            setError(null);
-            const result = await uploadAsset(
-              "portfolio",
-              file,
-              () =>
-                startPortfolioUpload({
-                  title,
-                  description: description || null,
-                  contentType: file.type,
-                  size: file.size,
-                }),
-              finishPortfolioUpload,
-            );
-            setBusy(false);
-            if (!result.ok) {
-              setError(result.code);
-              return;
-            }
-            form.reset();
-            setFile(null);
-            close();
-            router.refresh();
-          }}
-        >
-          <LabeledField label={t("portfolio.form.title")} htmlFor="new-title">
-            <Input id="new-title" name="title" required maxLength={120} dir="auto" />
-          </LabeledField>
-          <LabeledField label={t("portfolio.form.description")} htmlFor="new-description">
-            <PortfolioDescription id="new-description" initial="" />
-          </LabeledField>
-          <AssetFileField namespace="portfolio" onPick={setFile} />
-          {error ? <InlineError>{t(error)}</InlineError> : null}
-          <div className="flex items-center gap-2">
-            <Button type="submit" variant="primary" disabled={busy}>
-              {busy ? t("portfolio.form.uploading") : t("portfolio.form.upload")}
-            </Button>
-            <Button type="button" variant="ghost" onClick={close} disabled={busy}>
-              {t("portfolio.form.cancel")}
-            </Button>
-          </div>
-        </form>
-      )}
+      {(close) => <AddWorkForm onDone={close} onCancel={close} />}
     </AddPanel>
   );
 }

@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { readPublicEnv } from "@/lib/env";
+import {
+  DEVICE_COOKIE,
+  DEVICE_COOKIE_MAX_AGE_SECONDS,
+  DEVICE_SEEN_COOKIE,
+  deviceSeenMarker,
+  isUuid,
+  sessionIdFromAccessToken,
+} from "@/lib/auth/known-device";
 
 /**
  * Refreshes the Supabase session cookie on every navigation and guards the B2B
@@ -14,6 +22,10 @@ export async function middleware(request: NextRequest) {
   if (phoneAuthRoute && request.method === "POST" && contentLength && Number(contentLength) > 65536) {
     return new NextResponse("Request too large", { status: 413 });
   }
+  // A random id per browser for the "known devices" list; created once, kept ~13 months.
+  const existingDevice = request.cookies.get(DEVICE_COOKIE)?.value;
+  const deviceId = isUuid(existingDevice) ? existingDevice : crypto.randomUUID();
+  if (deviceId !== existingDevice) request.cookies.set(DEVICE_COOKIE, deviceId);
   let response = NextResponse.next({ request });
   const env = readPublicEnv();
 
@@ -46,6 +58,29 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+
+  // Record this browser against the account once per session per day (best effort, never blocks).
+  let seenMarker: string | null = null;
+  if (user) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const sessionId = sessionIdFromAccessToken(sessionData.session?.access_token);
+    if (sessionId) {
+      const marker = deviceSeenMarker(sessionId);
+      if (request.cookies.get(DEVICE_SEEN_COOKIE)?.value !== marker) {
+        const { error: touchError } = await supabase.rpc("touch_known_device", {
+          p_device_id: deviceId,
+          p_user_agent: request.headers.get("user-agent") ?? "",
+        });
+        if (!touchError) seenMarker = marker;
+      }
+    }
+  }
+  const withDeviceCookies = (res: NextResponse): NextResponse => {
+    const base = { httpOnly: true, sameSite: "lax" as const, secure: env.NEXT_PUBLIC_APP_ENV !== "local", path: "/", maxAge: DEVICE_COOKIE_MAX_AGE_SECONDS };
+    res.cookies.set(DEVICE_COOKIE, deviceId, base);
+    if (seenMarker) res.cookies.set(DEVICE_SEEN_COOKIE, seenMarker, base);
+    return res;
+  };
 
   // Authenticated-only surfaces: the workspace, the admin console, the consumer
   // home, and the post-registration handoff. Authorization within each (platform
@@ -103,7 +138,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return response;
+  return withDeviceCookies(response);
 }
 
 // Vercel Services cannot host Edge Function output, and this middleware has no

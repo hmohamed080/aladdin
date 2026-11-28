@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { useI18n } from "@/lib/i18n/context";
 import { startEntryOAuth } from "@/server/actions/entry-oauth";
+import { startGeneralOAuth } from "@/server/actions/general-oauth";
 import type { EntryKind } from "@/server/auth/entry-email";
 import type { OAuthAvailability, OAuthProvider } from "@/server/auth/entry-oauth";
 
@@ -29,6 +30,41 @@ function ProviderButton({ provider, label, icon }: { provider: OAuthProvider; la
       {icon}
       <span>{label}</span>
     </button>
+  );
+}
+
+/**
+ * Google / Facebook for `/auth/sign-in` and `/auth/sign-up`, followed by an
+ * "or" divider before the email form. Registered people sign in; a first-time
+ * person continues into the normal registration steps. Renders nothing when
+ * no provider is switched on.
+ */
+export function GeneralOAuthButtons({ next, providers }: { next?: string; providers: OAuthAvailability }) {
+  const { t } = useI18n();
+  if (!providers.google && !providers.facebook) return null;
+  return (
+    <div className="flex flex-col gap-md" data-general-oauth>
+      <form action={startGeneralOAuth} className="flex flex-col gap-sm">
+        {next ? <input type="hidden" name="next" value={next} /> : null}
+        {providers.google ? <ProviderButton provider="google" label={t("entryAuth.continueWithGoogle")} icon={<ProviderMark provider="google" />} /> : null}
+        {providers.facebook ? <ProviderButton provider="facebook" label={t("entryAuth.continueWithFacebook")} icon={<ProviderMark provider="facebook" />} /> : null}
+        <p className="text-center text-label text-fg-muted">
+          {t("entryAuth.oauthConsentPrefix")}{" "}
+          <Link href="/legal/terms" target="_blank" className="underline underline-offset-4">
+            {t("entryAuth.terms")}
+          </Link>{" "}
+          {t("entryAuth.and")}{" "}
+          <Link href="/legal/privacy" target="_blank" className="underline underline-offset-4">
+            {t("entryAuth.privacy")}
+          </Link>
+        </p>
+      </form>
+      <div className="flex items-center gap-sm text-label text-fg-muted" aria-hidden="true">
+        <span className="flex-1 border-t border-strong" />
+        {t("entryAuth.or")}
+        <span className="flex-1 border-t border-strong" />
+      </div>
+    </div>
   );
 }
 

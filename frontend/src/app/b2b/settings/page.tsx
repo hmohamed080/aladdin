@@ -302,8 +302,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </Field>
             ) : null}
             {/* No password row, no "change password", no 2FA toggle: email accounts
-                are passwordless, and a phone + password account has no self-service
-                password management yet — offering controls that do not exist would
+                have no password control on this page, and a phone + password account has no
+                self-service password management yet — offering controls that do not exist would
                 misstate the security model. */}
             <p className="text-body text-fg-secondary">
               {phonePasswordAccount ? m.settings.signInBodyPhonePassword : m.settings.signInBody}

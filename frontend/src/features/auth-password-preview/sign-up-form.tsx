@@ -9,7 +9,9 @@ import {
   verifyPasswordSignUp,
   type PasswordAuthState,
 } from "@/server/actions/auth-password-preview";
+import type { OAuthAvailability } from "@/server/auth/entry-oauth";
 import { AuthCard } from "@/features/auth/auth-card";
+import { GeneralOAuthButtons } from "@/features/entry-auth/oauth-buttons";
 import { Input, LabeledField, SubmitButton, Checkbox, ResendButton, Button, Select } from "@/components/ui/controls";
 import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "./password-input";
@@ -50,7 +52,10 @@ const RESEND_COOLDOWN_SECONDS = 30;
  * (`/auth/invite/...`); it rides the verify step so a brand-new user returns to
  * the invitation after the email code instead of landing on generic onboarding.
  */
-export function PasswordSignUpForm({ next }: { next?: string } = {}) {
+export function PasswordSignUpForm({
+  next,
+  providers = { google: false, facebook: false },
+}: { next?: string; providers?: OAuthAvailability } = {}) {
   const { t } = useI18n();
   const [sendState, dispatchSend] = useActionState(requestPasswordSignUp, initial);
   const [resendState, dispatchResend] = useActionState(resendPasswordSignUpCode, initial);
@@ -112,8 +117,13 @@ export function PasswordSignUpForm({ next }: { next?: string } = {}) {
         </p>
       }
     >
+      {!codeSent ? <GeneralOAuthButtons next={next} providers={providers} /> : null}
       {!codeSent ? (
-        <form action={dispatchSend} className="flex flex-col gap-md" noValidate>
+        <form
+          action={dispatchSend}
+          className={providers.google || providers.facebook ? "mt-md flex flex-col gap-md" : "flex flex-col gap-md"}
+          noValidate
+        >
           <LabeledField
             label={t("authPasswordPreview.fullNameLabel")}
             htmlFor="displayName"

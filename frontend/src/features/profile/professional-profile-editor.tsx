@@ -11,7 +11,7 @@ import { FloatingMenu } from "@/components/ui/floating-menu";
 import { menuItemClass } from "@/components/ui/menu";
 import { useI18n } from "@/lib/i18n/context";
 import { Input, Select, LabeledField, Checkbox, Button } from "@/components/ui/controls";
-import { CalendarIcon, InfinityIcon, ChevronDownIcon, CheckIcon, PlusIcon, MinusCircleIcon, MapPinIcon, BuildingIcon } from "@/components/ui/icons";
+import { BoltIcon, CalendarIcon, InfinityIcon, ChevronDownIcon, CheckIcon, PlusIcon, MinusCircleIcon, MapPinIcon, BuildingIcon } from "@/components/ui/icons";
 import { CountedTextarea } from "@/components/ui/counted-textarea";
 import { DESCRIPTION_MAX_CHARS, isAcceptableEdit } from "@/lib/text/description-limit";
 import { Badge, Card } from "@/components/ui/primitives";
@@ -250,9 +250,10 @@ export function ProfessionalProfileEditor({
         <LabeledField
           label={t("onboarding.professional.identity.bioLabel")}
           htmlFor="bio"
-          optional={t("common.optional")}
+          optional={embedded ? undefined : t("common.optional")}
         >
           <CountedTextarea
+            aria-required={embedded || undefined}
             id="bio"
             value={state.bio}
             max={DESCRIPTION_MAX_CHARS}
@@ -303,10 +304,11 @@ export function ProfessionalProfileEditor({
         </LabeledField>
 
         <LabeledField
-          label={t("onboarding.professional.services.languagesLabel")}
+          label={embedded ? (locale === "ar" ? "اللغات التي تجيدها" : "Languages you speak") : t("onboarding.professional.services.languagesLabel")}
           htmlFor="langs"
           optional={t("common.optional")}
         >
+          {embedded && <p className="text-label text-fg-secondary">{locale === "ar" ? "تظهر في ملفك المهني لتوضيح اللغات التي يمكنك التواصل بها مع العملاء." : "Shown on your professional profile so clients know which languages you speak."}</p>}
           {embedded ? <ProfileMultiSelect id="langs" options={LANGUAGES} selected={state.languages} label={(key) => t(`onboarding.professional.languages.${key}`)} onToggle={(key) => toggle("languages", key)} placeholder={locale === "ar" ? "اختر كل ما ينطبق عليك" : "Choose all that apply"} /> : (
           <div id="langs" className="flex flex-wrap gap-2">
             {LANGUAGES.map((k) => (
@@ -324,19 +326,20 @@ export function ProfessionalProfileEditor({
         <EditorSlot enabled={embedded} target="engineer-availability-slot">        <LabeledField
           label={t("onboarding.professional.services.availabilityLabel")}
           htmlFor="avail"
-          optional={t("common.optional")}
+          optional={embedded ? undefined : t("common.optional")}
         >
-          <div id="avail" className="grid gap-2.5 tablet:grid-cols-3">
+          <div id="avail" className="grid grid-cols-2 gap-2.5 desktop:grid-cols-4">
             {AVAILABILITIES.map((k) => embedded ? (
               <button key={k} type="button" aria-pressed={state.availability === k} className="engineer-availability-choice" onClick={() => set({ availability: state.availability === k ? null : k })}>
-                {k === "flexible" ? <InfinityIcon size={24} /> : <CalendarIcon size={24} />}
-                <span>{k === "flexible" ? (locale === "ar" ? "حسب الطلب" : "On demand") : t(`onboarding.professional.availabilities.${k}`)}</span>
+                <span className="engineer-availability-radio" aria-hidden="true" />
+                {k === "flexible" ? <InfinityIcon size={28} /> : k === "immediate" ? <BoltIcon size={28} /> : <CalendarIcon size={28} />}
+                <span>{k === "flexible" ? (locale === "ar" ? "حسب الطلب" : "On demand") : (k === "immediate" ? (locale === "ar" ? "جاهز الآن" : "Ready now") : t(`onboarding.professional.availabilities.${k}`))}</span>
               </button>
             ) : (
               <ChoiceCard
                 key={k}
                 selected={state.availability === k}
-                title={t(`onboarding.professional.availabilities.${k}`)}
+                title={(k === "immediate" ? (locale === "ar" ? "جاهز الآن" : "Ready now") : t(`onboarding.professional.availabilities.${k}`))}
                 onSelect={() => set({ availability: state.availability === k ? null : k })}
               />
             ))}
@@ -350,7 +353,7 @@ export function ProfessionalProfileEditor({
           <div className="grid gap-md tablet:grid-cols-2 mt-md">
             {embedded ? <>
               <ProfileSelect id="gov" label={locale === "ar" ? "المحافظة" : "Governorate"} value={state.governorate ?? ""} placeholder={locale === "ar" ? "اختر المحافظة" : "Choose a governorate"} icon={<MapPinIcon size={18} />} options={GOVERNORATE_OPTIONS.map(option => ({ value: option.value, label: option[locale] }))} onChange={value => { setCustomCityMode(false); set({ governorate: value, city: null, otherGovernorates: state.otherGovernorates.filter(g => g !== value) }); }} />
-              <ProfileSelect id="engineer-city" label={locale === "ar" ? "المدينة" : "City"} value={customCity ? "other" : state.city ?? ""} placeholder={locale === "ar" ? "اختر المدينة" : "Choose a city"} icon={<BuildingIcon size={18} />} options={cityOptions.map(option => ({ value: option.value, label: option[locale] }))} onChange={value => { setCustomCityMode(value === "other"); set({ city: value === "other" ? "" : value }); }} customEntry={{ optionValue: "other", value: customCity ? state.city ?? "" : "", onChange: value => set({ city: value }), inputLabel: locale === "ar" ? "اسم المدينة" : "City name", placeholder: locale === "ar" ? "اكتب اسم المدينة" : "Enter your city", confirmLabel: locale === "ar" ? "تأكيد" : "Confirm" }} />
+              <ProfileSelect id="engineer-city" label={locale === "ar" ? "المدينة" : "City"} value={customCity ? "other" : state.city ?? ""} disabled={!state.governorate} placeholder={!state.governorate ? (locale === "ar" ? "اختر المحافظة أولًا" : "Choose a governorate first") : locale === "ar" ? "اختر المدينة" : "Choose a city"} icon={<BuildingIcon size={18} />} options={cityOptions.map(option => ({ value: option.value, label: option[locale] }))} onChange={value => { setCustomCityMode(value === "other"); set({ city: value === "other" ? "" : value }); }} customEntry={{ optionValue: "other", value: customCity ? state.city ?? "" : "", onChange: value => set({ city: value }), inputLabel: locale === "ar" ? "اسم المدينة" : "City name", placeholder: locale === "ar" ? "اكتب اسم المدينة" : "Enter your city", confirmLabel: locale === "ar" ? "تأكيد" : "Confirm" }} />
             </> : <LabeledField label={t("onboarding.professional.location.governorateLabel")} htmlFor="gov"><Select id="gov" value={state.governorate ?? ""} onChange={e => set({ governorate: e.target.value || null, serviceAreas: [], city: null })}><option value="">{t("onboarding.professional.location.choose")}</option>{GOVERNORATES.map(g => <option key={g} value={g}>{t(`onboarding.consumer.governorates.${g}`)}</option>)}</Select></LabeledField>}
           </div>
         </EditorSlot>

@@ -1,6 +1,7 @@
 import "@/styles/engineer.css";
-import { EngineerNavigation } from "@/features/engineer/navigation";
+import { EngineerSidebar } from "@/features/engineer/navigation";
 import { isEngineer } from "@/features/engineer/links";
+import { MobileNavProvider } from "@/features/showroom-shell/mobile-nav-context";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -130,16 +131,46 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
     ? personalNavKeys({ variant: home.variant, isSalesPersona: showConnectShowroom, canCreateBusiness: showSwitcher })
     : [];
 
+  if (isEngineer(home) && navKeys.length > 0) {
+    const location = installerLocationLabel(home!.professional, locale);
+    // The Engineer wears the Showroom sidebar: same modes, hover reveal and mobile drawer.
+    return (
+      <I18nProvider locale={locale} dir={dir}>
+        <MobileNavProvider>
+          <div className="engineer-surface">
+            <AppShell
+              nav={<EngineerSidebar initialMode={sidebarMode} />}
+              header={
+                <AppHeader
+                  appName={m.common.appName}
+                  hasWorkspace={false}
+                  workspaceLabel={m.account.personal}
+                  variant="engineer"
+                  location={location}
+                  preferencesHref={navKeys.includes("settings") ? "/home/settings" : undefined}
+                  context={
+                    showSwitcher ? <WorkspaceSwitcher entries={entries} activeKey={PERSONAL_CONTEXT} /> : undefined
+                  }
+                />
+              }
+            >
+              {children}
+            </AppShell>
+          </div>
+        </MobileNavProvider>
+      </I18nProvider>
+    );
+  }
+
   return (
     <I18nProvider locale={locale} dir={dir}>
-      <div className={isEngineer(home) ? "engineer-surface" : undefined}>
       <AppShell
         nav={
           navKeys.length > 0 ? (
             <SidebarShell
               mode={sidebarMode}
               appName={m.common.appName}
-              nav={isEngineer(home) ? <EngineerNavigation /> : <PersonalNavPanel keys={navKeys} />}
+              nav={<PersonalNavPanel keys={navKeys} />}
               /* No separate Settings/Upgrade footer block. Settings is a real
                  route now (`/home/settings`, Increment 14), but it is a normal
                  row inside `personalNavKeys`' own "account" group rather than
@@ -162,7 +193,7 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
                once, at the head of the sidebar — so on a personal account with
                no navigation at all (a caller mid-redirect) the header falls back
                to carrying it itself. */
-            variant={isEngineer(home) ? "engineer" : navKeys.length > 0 ? "card" : "bar"}
+            variant={navKeys.length > 0 ? "card" : "bar"}
             /* The account menu's "Account preferences" link. Points at the
                same route the nav's own Settings row does — one destination,
                reached two ways, never two different pages for the same
@@ -174,12 +205,11 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
           />
         }
         mobileNav={
-          navKeys.length > 0 ? isEngineer(home) ? <EngineerNavigation mobile /> : <PersonalMobileNav keys={personalMobileNavKeys(navKeys)} /> : undefined
+          navKeys.length > 0 ? <PersonalMobileNav keys={personalMobileNavKeys(navKeys)} /> : undefined
         }
       >
         {children}
       </AppShell>
-      </div>
     </I18nProvider>
   );
 }
