@@ -114,7 +114,7 @@ export function WaybillView({ waybill, backHref }: { waybill: OrderWaybill; back
         <dl className="grid gap-sm text-body">
           <div><dt className="text-label text-fg-secondary">{w.recipient}</dt><dd className="font-medium">{waybill.recipient.name}</dd></div>
           {waybill.recipient.phone ? <div><dt className="text-label text-fg-secondary">{w.phone}</dt><dd><bdi dir="ltr" className="font-medium">{waybill.recipient.phone}</bdi></dd></div> : null}
-          <div><dt className="text-label text-fg-secondary">{w.address}</dt><dd>{waybill.address_text}</dd></div>
+          <div><dt className="text-label text-fg-secondary">{w.address}</dt><dd>{addressLine(waybill.address_parts, waybill.address_text, locale)}</dd></div>
           {gov ? <div><dt className="text-label text-fg-secondary">{w.area}</dt><dd>{[governorateName(gov, locale), area].filter(Boolean).join(" — ")}</dd></div> : null}
           {hasPin ? <div><dt className="text-label text-fg-secondary">{w.location}</dt><dd><bdi dir="ltr">{Number(waybill.latitude).toFixed(5)}, {Number(waybill.longitude).toFixed(5)}</bdi></dd></div> : null}
           {waybill.tracking_number ? <div><dt className="text-label text-fg-secondary">{w.tracking}</dt><dd><bdi dir="ltr" className="font-medium">{waybill.tracking_number}</bdi></dd></div> : null}

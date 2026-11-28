@@ -21,6 +21,8 @@ export type LandingMarket = { open: boolean; live: PublicCard[]; images: Marketp
 
 export function LandingBrand({ stats, market = { open: false, live: [], images: {} }, signedIn = false }: { stats: LandingStats; market?: LandingMarket; signedIn?: boolean }) {
   const c = brandContent;
+  // A signed-in visitor already has an account: every "create account" action leads to it instead.
+  const joinHref = signedIn ? "/home" : "/auth/sign-up";
   const pills = (
     [
       ["users", stats.users, c.hero.stats.users],
@@ -45,7 +47,7 @@ export function LandingBrand({ stats, market = { open: false, live: [], images: 
               <p>{c.hero.body}</p>
               <div className={styles.heroButtons}>
                 <a className={styles.btnLight} href="#market"><BrandIcon name="grid" size={25} />{c.hero.discover}</a>
-                <a className={styles.btnOutline} href="/auth/sign-up"><BrandIcon name="user-plus" size={25} />{c.hero.create}</a>
+                <a className={styles.btnOutline} href={joinHref}><BrandIcon name="user-plus" size={25} />{signedIn ? c.nav.account : c.hero.create}</a>
               </div>
             </div>
             <div className={styles.videoSlot}><LandingBrandVideo /></div>
@@ -79,14 +81,14 @@ export function LandingBrand({ stats, market = { open: false, live: [], images: 
               <div className={styles.roleBody}>
                 <h3>{r.title}</h3>
                 <p>{r.body}</p>
-                <a href="/auth/sign-up" className={styles.more}>{c.roles.more}<BrandIcon name="arrow" size={16} className={styles.flip} /></a>
+                <a href={joinHref} className={styles.more}>{c.roles.more}<BrandIcon name="arrow" size={16} className={styles.flip} /></a>
               </div>
             </article>
           ))}
         </div>
       </section>
       </div>
-      <div className={styles.onlyMobile}><MobileRoles /></div>
+      <div className={styles.onlyMobile}><MobileRoles signedIn={signedIn} /></div>
 
       <div className={styles.onlyDesktop}>
       <section id="services" className={styles.servicesWrap}>
@@ -189,14 +191,14 @@ export function LandingBrand({ stats, market = { open: false, live: [], images: 
             <p>{c.cta.body}</p>
             <div className={styles.heroButtons}>
               <a className={styles.btnLight} href="#market"><BrandIcon name="grid" size={20} />{c.cta.discover}</a>
-              <a className={styles.btnOutline} href="/auth/sign-up"><BrandIcon name="user-plus" size={18} />{c.cta.create}</a>
+              <a className={styles.btnOutline} href={joinHref}><BrandIcon name="user-plus" size={18} />{signedIn ? c.nav.account : c.cta.create}</a>
             </div>
           </div>
           <div className={styles.ctaImg}><Image src="/landing-brand/cta.jpg" alt="" fill sizes="(max-width: 900px) 100vw, 520px" /></div>
         </div>
       </section>
       </div>
-      <div className={styles.onlyMobile}><MobileCta /></div>
+      <div className={styles.onlyMobile}><MobileCta signedIn={signedIn} /></div>
 
       <div className={styles.onlyDesktop}>
       <footer id="footer" className={styles.footer}>

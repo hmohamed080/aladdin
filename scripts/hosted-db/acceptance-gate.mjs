@@ -22,6 +22,8 @@
  *   marketplace-v2  20261123090001, 100001, 120001, 130001, 150001, 160001, 160002 (PRs #238-#241, #246, #249) on top of Acceptance at 237 / 20261122090002. 237 -> 244. NOT function-only
  *             (6 tables, 24 columns on existing tables, 7 re-created constraints, seeded rows, one enum value): pinned "marketplace-v2" forward-fix and a fresh restore-verified
  *             backup taken at >= 237 migrations is MANDATORY (none is pinned yet: the newest, 232, is refused). See docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md.
+ *   marketplace-clarity  20261128090001 + 20261128120001 on top of Acceptance at 264 / 20261126120002. 264 -> 266. Functions, 3 CHECK constraints and 3 template rows:
+ *             pinned "marketplace-clarity" forward-fix, no fresh backup required. See docs/operations/MARKETPLACE_CLARITY_ACCEPTANCE_PLAN_20261128.md.
  *   marketplace-slug  20261124090001 (seller public slug, PR #252: 2 functions, 1 trigger, backfill of organizations.slug for approved sellers) on top of Acceptance at 244 / 20261123160002.
  *             + 20261124120001 (localized stock notifications, this stack): 2 migrations, 244 -> 246. No table DDL: no fresh backup required; pinned "marketplace-stock-notify" and
  *             "marketplace-slug" forward-fixes (slugs written are data and stay; undo order stock-notify, then slug). Applied to Acceptance BEFORE Production.
@@ -87,6 +89,8 @@ const MKT_PENDING = Array.from({ length: 14 }, (_, i) => `202611161000${String(i
 export const ORD_PENDING = ["20261125090001", "20261125090002", "20261125100001", "20261125110001", "20261125110002", "20261125110003", "20261125120001",
   "20261125120002", "20261125120003", "20261125130001", "20261125130002", "20261125130003", "20261125140001", "20261126090001", "20261126100001",
   "20261126110001", "20261126120001", "20261126120002"];
+// marketplace-clarity (PR 293 and the waybill fix): the two migrations merged after Acceptance reached 264.
+export const CLARITY_PENDING = ["20261128090001", "20261128120001"];
 export const PLANS = {
   media: { fixes: ["media"], recovery: "forward-fix", applied: 207, latest: BASE, pending: [MEDIA], preContract: BASE, postContract: MEDIA,
     changed: ["app.media_storage_key_assign", "public.media_migration_target_key", "public.media_migration_switch", "public.media_migration_rollback"] },
@@ -557,6 +561,36 @@ export const PLANS = {
   // "changed" was MEASURED by scripts/hosted-db/marketplace-slug-scratch-proof.mjs (scratch container, throwaway database), not written by hand.
   "marketplace-slug": { fixes: ["marketplace-stock-notify", "marketplace-slug"], recovery: "forward-fix", applied: 244, latest: ACC_244, pending: [...SLUG_PENDING, ...STOCK_PENDING], preContract: ACC_244,
     postContract: STOCK_PENDING.at(-1), changed: [...SLUG_CHANGED, ...STOCK_CHANGED] },
+  // marketplace-clarity: the fixes of the 2026-11-28 test round on top of Acceptance at 264 / 20261126120002 (marketplace-orders applied). 264 -> 266, plain push.
+  // Functions replaced or added, 3 CHECK constraints re-created with more allowed values, 3 notification templates inserted. No table or column, no existing row
+  // is rewritten, so no fresh backup is required (a pinned label is only a historical reference). Recovery: the pinned "marketplace-clarity" forward-fix (refuses
+  // once the new behaviour wrote data). The second migration adds no function, so the permission contract stays the first one's.
+  // "changed" was MEASURED by scripts/hosted-db/marketplace-clarity-scratch-proof.mjs, not written by hand.
+  "marketplace-clarity": { fixes: ["marketplace-clarity"], recovery: "forward-fix", applied: 264, latest: ORD_PENDING.at(-1), pending: CLARITY_PENDING,
+    preContract: ORD_PENDING.at(-1), postContract: CLARITY_PENDING[0], changed: [
+      "app.marketplace_attribute_number",
+      "app.marketplace_date_range",
+      "app.marketplace_order_invoice_issue",
+      "app.marketplace_order_notify",
+      "app.marketplace_return_actions",
+      "app.marketplace_return_decide",
+      "app.marketplace_return_doc",
+      "app.marketplace_return_timer_tick",
+      "app.marketplace_timer_handle",
+      "app.marketplace_timer_open",
+      "app.marketplace_variant_label",
+      "public.marketplace_buyer_refund_confirm",
+      "public.marketplace_buyer_return_mark_shipped",
+      "public.marketplace_checkout_confirm",
+      "public.marketplace_order_reason_presets",
+      "public.marketplace_order_waybill_get",
+      "public.marketplace_public_cart",
+      "public.marketplace_return_complaint_file",
+      "public.marketplace_seller_refund_record",
+      "public.marketplace_return_requests.ck_mp_returns_escalated",
+      "public.marketplace_timers.ck_mp_timers_kind",
+      "public.notifications.ck_notifications_event_type_known"
+    ] },
   // marketplace-orders: the 18 migrations merged after Acceptance reached 246 (orders, invoices, payment complaints, timers, returns, cancelled-order refund,
   // publisher guard, return photos, upload limits, backup ledger, search_path). 246 -> 264, plain push. NOT function-only: 21 new tables, 27 columns on existing
   // tables, 8 re-created constraints, seeded rows, and the existing (finished) orders are mapped to the new payment values. So freshBackup: a restore-verified
@@ -954,6 +988,9 @@ export const PRODUCTION_RESTORE_VERIFIED_SNAPSHOTS = {
   "aladdin-production-20261124T133628Z": { backupRun: "45405013111", restoreRun: "45406400001", tables: 207, rows: 33001, migrations: 237 },
 };
 export const FORWARD_FIX = {
+  // marketplace-clarity: restores the definitions the two migrations replace, the 3 CHECK constraints, and removes the 2 helpers and 3 seeded templates. Refuses
+  // (RAISE, nothing changed) once a row uses the new values or a new template was edited. Proved by marketplace-clarity-scratch-proof.mjs.
+  "marketplace-clarity": { file: "forward-fix/marketplace-clarity-restore-previous.sql", sha256: "3694eb9f87591fbb0d797c359513e42923372d093975829278b31a10a400fa2e" },
   // marketplace: refuses (RAISE) while any seller/product/order/import/stock row or marketplace media object exists; never deletes user data.
   // It is the only recovery of the "marketplace" plan. It restores exactly the media functions and constraint the 14 Marketplace migrations
   // re-created, so it is valid at 218 too (the verification migrations never touch them).

@@ -1,3 +1,11 @@
+## Marketplace clarity apply plan prepared; Acceptance frontend ac701361 - 2026-11-28
+
+Supersedes the frontend version and the migration status of the entry below.
+
+- **Acceptance frontend** is `aladdin-frontend-preview` version `ac701361-fdd1-4931-81cd-3b6fc0eb4fec` (workflow run 46145935028, `main` `b2060bdc`, PR #293); smoke answered 200 (`/showroom` 307). Rollback target: `3fa20123-a84f-4e8c-836f-b49d4ca70412`.
+- Migration `20261128090001` is merged and **not applied**. `20261128120001` (waybill) is in a branch. Acceptance plan `marketplace-clarity` (264 -> 266) is prepared and not run: [runbook](MARKETPLACE_CLARITY_ACCEPTANCE_PLAN_20261128.md).
+- The timers Worker is still not deployed; deploy it only after this apply.
+
 ## Marketplace test-round fixes prepared; current Acceptance frontend - 2026-11-28
 
 - **Acceptance frontend** is now `aladdin-frontend-preview` version `3fa20123-a84f-4e8c-836f-b49d4ca70412` (workflow run 46131423561, `main` `89b147f6`); rollback target `75fd1b92-2915-4a60-9b46-11018f39dfa1`. Ordering is on.
