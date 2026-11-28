@@ -13,7 +13,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(91);
+select plan(93);
 
 update auth.users set email_confirmed_at = now()
   where id in ('70000001-0000-4000-8000-000000000001', '70000002-0000-4000-8000-000000000002',
@@ -253,6 +253,8 @@ select is(public.marketplace_public_cart(jsonb_build_array(jsonb_build_object('s
   'giza') -> 'sellers' -> 0 -> 'delivery' ->> 'fee_egp', '0.00', 'D11. a free delivery is a 0 fee, not "unavailable"');
 select is(public.marketplace_public_cart(jsonb_build_array(jsonb_build_object('slug', 'cart-wallpaper-a', 'sku', 'CART-A-BEIGE')),
   'giza') -> 'sellers' -> 0 -> 'delivery' ->> 'status', 'available', 'D12. ...with status available');
+select is(current_setting('t.cart')::jsonb -> 'lines' -> 0 ->> 'free_shipping', 'false', 'D12b. each line says whether the product ships free');
+select ok((current_setting('t.cart')::jsonb -> 'sellers' -> 0 -> 'delivery') ? 'free_min_egp', 'D12c. a deliverable showroom reports its free-delivery minimum');
 select is(public.marketplace_public_cart(jsonb_build_array(jsonb_build_object('slug', 'cart-wallpaper-a', 'sku', 'CART-A-BEIGE')),
   'alexandria') -> 'sellers' -> 0 -> 'delivery' ->> 'status', 'not_available', 'D13. no price for the place = the showroom does not deliver there');
 select is(public.marketplace_public_cart(jsonb_build_array(jsonb_build_object('slug', 'cart-wallpaper-a', 'sku', 'CART-A-BEIGE')),

@@ -10,6 +10,8 @@ import {
   ShieldIcon, ShoppingBagIcon, StorefrontIcon, TrashIcon, TruckIcon,
 } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
+import { placeLabel, toBuyerPlace, type SavedAddress } from "@/features/marketplace-addresses/address-model";
+
 import { CITIES_BY_GOVERNORATE, GOVERNORATE_OPTIONS } from "@/lib/installer/location-data";
 import { quoteMarketplaceCartAction } from "@/server/actions/marketplace-cart";
 import { cartCopy } from "../marketplace-cart-copy";
@@ -155,7 +157,7 @@ function LineRow({ line, locale, images, onQty, onRemove }: {
  * page never shows a number the showrooms did not set. The checkout button opens once every showroom
  * can serve the chosen way of receiving.
  */
-export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
+export function LiveCartPage({ suggestions, addresses = [] }: { suggestions: PublicCard[]; addresses?: SavedAddress[] }) {
   const { locale, dir } = useI18n();
   const t = cartCopy[locale];
   const l = liveCartCopy[locale];
@@ -166,9 +168,18 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
   const [signInOpen, setSignInOpen] = useState(false);
 
   const [method, setMethod] = useState<ReceivingMethod>("delivery");
-  const [gov, setGov] = useState("");
-  const [area, setArea] = useState("");
-  const [address, setAddress] = useState("");
+  // a signed-in buyer starts from their saved default address; "" means "price another area"
+  const initial = addresses.find((a) => a.is_default) ?? addresses[0];
+  const [savedId, setSavedId] = useState(initial?.id ?? "");
+  const [gov, setGov] = useState(initial ? toBuyerPlace(initial).gov : "");
+  const [area, setArea] = useState(initial ? toBuyerPlace(initial).area : "");
+  const pickSaved = (id: string) => {
+    const picked = addresses.find((a) => a.id === id);
+    const place = picked ? toBuyerPlace(picked) : { gov: "", area: "" };
+    setSavedId(id);
+    setGov(place.gov);
+    setArea(place.area);
+  };
   const [quote, setQuote] = useState<CartQuote | null>(null);
   const [status, setStatus] = useState<QuoteStatus>("idle");
   const [attempt, setAttempt] = useState(0);
@@ -216,6 +227,7 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
   const money = (n: number | null) => (n === null ? "—" : fmtEgp(n, locale));
   const names = (list: { name: string }[]) => list.map((s) => s.name).join(locale === "ar" ? "، " : ", ");
   const itemCount = totals ? totals.lines.length + totals.unavailable.length : cart.lines.length;
+  const delivery = totals?.deliveryEgp === 0 ? t.free : money(totals?.deliveryEgp ?? null);
   const pricesUnknown = method === "delivery" && totals?.deliveryEgp === null;
   // A sold-out or withdrawn item stays in the cart, marked, and blocks the order until the buyer removes it.
   const blocked = (totals?.blockingLines ?? 0) > 0;
@@ -313,7 +325,7 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
                 <div><dt>{t.itemsTotal(totals.lines.length)}</dt><dd>{money(totals.productsEgp)}</dd></div>
                 <div>
                   <dt>{t.deliveryFee}</dt>
-                  <dd>{method === "pickup" ? t.free : money(totals.deliveryEgp)}</dd>
+                  <dd>{method === "pickup" ? t.free : delivery}</dd>
                 </div>
               </dl>
               <div className={styles.grand}>
@@ -340,7 +352,20 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
               {method === "delivery" ? (
                 <div className={styles.details}>
                   <h3><MapPinIcon size={18} aria-hidden="true" />{t.deliveryDetails}</h3>
-                  <div className={styles.twoCols}>
+                  {addresses.length > 0 ? (
+                    <label className={styles.field}>
+                      <span>{l.savedAddress}</span>
+                      <Select id="mp-saved" value={savedId} onChange={(e) => pickSaved(e.target.value)}>
+                        {addresses.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {[a.nickname, placeLabel(a, locale), a.street].filter(Boolean).join(" - ")}
+                          </option>
+                        ))}
+                        <option value="">{l.otherArea}</option>
+                      </Select>
+                    </label>
+                  ) : null}
+                  {savedId ? null : <div className={styles.twoCols}>
                     <label className={styles.field}>
                       <span>{t.governorate}</span>
                       <Select id="mp-gov" value={gov} onChange={(e) => { setGov(e.target.value); setArea(""); }}>
@@ -355,11 +380,8 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
                         {cities.map((c) => <option key={c.value} value={c.value}>{locale === "ar" ? c.ar : c.en}</option>)}
                       </Select>
                     </label>
-                  </div>
-                  <label className={styles.field}>
-                    <span>{t.address}</span>
-                    <textarea rows={2} value={address} placeholder={t.addressPlaceholder} onChange={(e) => setAddress(e.target.value)} />
-                  </label>
+                  </div>}
+                  <p className={styles.hint}>{l.addressAtCheckout}</p>
 
                   {totals.perSeller.length > 1 ? (
                     <div>
@@ -368,7 +390,7 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
                         {totals.perSeller.map(({ seller, feeEgp }) => (
                           <li key={seller.index}>
                             <span><StorefrontIcon size={14} aria-hidden="true" />{seller.name}</span>
-                            <strong>{feeEgp === null ? l.noFee : fmtEgp(feeEgp, locale)}</strong>
+                            <strong>{feeEgp === null ? l.noFee : feeEgp === 0 ? t.free : fmtEgp(feeEgp, locale)}</strong>
                           </li>
                         ))}
                       </ul>
@@ -376,7 +398,7 @@ export function LiveCartPage({ suggestions }: { suggestions: PublicCard[] }) {
                   ) : null}
                   <p className={styles.feeRow}>
                     <span>{t.deliveryFee}</span>
-                    <strong>{money(totals.deliveryEgp)}</strong>
+                    <strong>{delivery}</strong>
                   </p>
                   {totals.state === "needs_area" ? <p className={styles.warn} role="status">{t.needArea}</p> : null}
                   {totals.state === "not_available" ? (

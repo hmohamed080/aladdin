@@ -2973,6 +2973,9 @@ export const en = {
           escalated: "Return escalated to the platform",
           admin_reminder: "Platform reminder about a return",
           admin_decided: "Platform decided a return",
+          shipped: "Return shipped back (to the showroom)",
+          complaint_filed: "Complaint on a return (to the other side)",
+          refund_confirm_reminder: "Reminder to confirm a return refund (to the buyer)",
         },
         stock: { low: "Product stock running low", out: "Product out of stock" },
         order: {
@@ -8149,7 +8152,6 @@ export const en = {
     review: { approved: "Approved", pending_review: "Pending review", rejected: "Not approved", no_image: "No image yet" },
     status: { draft: "Draft", published: "Published", unpublished: "Unpublished", archived: "Archived", low: "Low", out: "Out of stock" },
     moreSkus: "+{n}",
-    price: "EGP {amount}",
     action: { edit: "Edit", preview: "Preview on the Marketplace", previewUnavailable: "Preview is available for published products only", more: "More", publish: "Publish to Marketplace", unpublish: "Unpublish", checking: "Checking…", published: "Published — the product is now on the Marketplace.", unpublished: "Unpublished.", needsApproval: "Publishing opens once the platform team approves the product." },
     showing: "Showing {shown} of {total} products",
     pagination: "Pagination",

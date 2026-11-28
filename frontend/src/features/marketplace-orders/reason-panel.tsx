@@ -26,7 +26,7 @@ export function ReasonPanel({
   onSubmit,
   onCancel,
 }: {
-  action: Extract<ReasonAction, "order_cancel_seller" | "payment_issue">;
+  action: Extract<ReasonAction, "order_cancel_seller" | "payment_issue" | "return_reject">;
   title: string;
   intro: string;
   confirmLabel: string;

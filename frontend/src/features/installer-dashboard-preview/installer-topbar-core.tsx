@@ -1,7 +1,7 @@
 "use client";
 
 import { accountTypeLabel } from "@/lib/i18n/account-type-label";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
@@ -57,6 +57,7 @@ export function InstallerTopbarCore({
   location,
   production = false,
   searchJobs,
+  notifications,
 }: {
   theme: "light" | "dark";
   onMenuClick: () => void;
@@ -67,6 +68,8 @@ export function InstallerTopbarCore({
   /** Real, bounded opportunities for the shared search overlay — required in
    *  production; the preview falls back to its own mock list. */
   searchJobs?: readonly InstallerOpportunityVM[];
+  /** Production only: the shared notifications control, filled by the layout with the caller's own inbox. */
+  notifications?: ReactNode;
 }) {
   const { locale, t } = useI18n();
   const resolvedName = displayName || (locale === "ar" ? "حسابي" : "My account");
@@ -117,7 +120,7 @@ export function InstallerTopbarCore({
 
       <div className="flex shrink-0 items-center gap-0.5">
         {production ? (
-          <NotificationsButton locale={locale} />
+          notifications ? <div data-testid="installer-notifications">{notifications}</div> : <NotificationsButton locale={locale} />
         ) : (
           <button
             type="button"
@@ -239,8 +242,8 @@ function MenuLink({ href, icon: Icon, label }: { href: string; icon: typeof User
 }
 
 /**
- * The approved header's bell. Installers have no notification feed yet, so it opens an honest empty state and never
- * shows an unread dot it cannot back.
+ * The approved header's bell. Shown only where no inbox was passed in (the design previews); production passes the shared
+ * notifications control. It never shows an unread dot it cannot back.
  */
 function NotificationsButton({ locale }: { locale: string }) {
   const [open, setOpen] = useState(false);

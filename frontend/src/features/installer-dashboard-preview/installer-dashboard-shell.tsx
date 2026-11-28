@@ -16,6 +16,7 @@ export function InstallerDashboardShell({
   avatarUrl = null,
   location,
   searchJobs,
+  notifications,
 }: {
   children: ReactNode;
   theme: "light" | "dark";
@@ -26,6 +27,8 @@ export function InstallerDashboardShell({
   location: string | null;
   /** Real, bounded opportunities the shared search overlay can jump to. */
   searchJobs: readonly InstallerOpportunityVM[];
+  /** The caller's notifications control (server-loaded list and unread count). */
+  notifications?: ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -48,6 +51,7 @@ export function InstallerDashboardShell({
           avatarUrl={avatarUrl}
           location={location}
           searchJobs={searchJobs}
+          notifications={notifications}
           production
         />
         <main id="top" className={`${INSTALLER_CONTENT_FRAME_CLASS} flex flex-1 flex-col py-4 tablet:py-6 desktop:py-7`}>

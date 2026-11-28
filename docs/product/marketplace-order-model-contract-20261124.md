@@ -486,6 +486,8 @@ PR 13 owns **reads, documents, search and the invoice**; it does not add any sta
 
 ### 4.5 PR 15 - returns and exchanges (owner: PR 15)
 
+**Amendment, owner decision 2026-11-28 (migration `20261128090001`), return document only:** a reviewing admin sees the buyer's phone (`buyer.phone`) and the showroom's business phone (`seller.phone`, `organizations.contact_phone`) to follow a case up. The showroom sees its buyer's phone. The buyer never sees the showroom's phone. Invoices, notification texts and the admin order document still carry no phone.
+
 | Function | Signature | Returns |
 |---|---|---|
 | `public.marketplace_buyer_return_eligibility` | `(p_order_id uuid)` | `{ eligible, window: { general_ends_at, defect_ends_at }, lines: [ { item_id, name_ar, name_en, quantity, returnable_quantity, non_returnable } ], reasons: [ { id, label_ar, label_en, claim_type, requires_evidence } ] }` |

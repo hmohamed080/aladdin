@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
@@ -100,6 +100,7 @@ export function ProductForm({
   product,
   storeSetup,
   notice,
+  beforeActions,
 }: {
   organizationId: string;
   schemas: ProductTypeSchema[];
@@ -107,6 +108,8 @@ export function ProductForm({
   /** Payment / delivery facts for a product that does not exist yet (a saved product carries its own). */
   storeSetup?: StoreSetup;
   notice?: string;
+  /** Settings of the saved product that save on their own; shown with the other sections, above the action bar. */
+  beforeActions?: ReactNode;
 }) {
   const { t, locale } = useI18n();
   const ar = locale === "ar";
@@ -573,6 +576,8 @@ export function ProductForm({
           ) : null}
         </div>
       ) : null}
+
+      {beforeActions}
 
       {/* ---------------- Action bar ---------------- */}
       <div className="sticky bottom-20 z-10 flex flex-col gap-sm rounded-md border bg-surface/95 tablet:bottom-2 p-sm shadow-card backdrop-blur tablet:flex-row tablet:items-center tablet:justify-between">

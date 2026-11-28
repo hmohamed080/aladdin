@@ -13,6 +13,12 @@
 - Validation: pgTAP 390 = 237/237 on a local isolated Postgres, concurrency script PASS (3 races), vitest 117 in the touched folders, eslint clean on new files, tsc clean except the pre-existing `postgres` module error in `edge/media-worker`.
 - Not done: buyer request wizard with evidence upload UI (actions exist), seller settings page, non-returnable toggle on the product edit page, navigation entries, product page disclosure badge (PR 12 exposes `non_returnable` only in quote and order), browser run, clean replay of all migrations, CI permission gate.
 
+## 2026-11-28 - UI fixes from the signed-in Acceptance browser check (frontend only, nothing deployed)
+- A product that is free to ship only above an order value no longer says "free" before a place is chosen.
+- Seller product list shows the currency once; the returns toggle sits above Save; "1 product" in English.
+- Owner correction: sign-in and sign-up in the public headers are for guests only. A signed-in caller sees "My account" on `/` and `/market`, plus "My orders" while ordering is on.
+- Not checked in a browser. Test files: vitest on the marketplace, landing, seller, returns and i18n folders.
+
 ## 2026-11-26 - Admin backups console: what the owner sees now matches what ran (draft PR, not deployed)
 
 - Scope: branch `fix/admin-backups-console-20261126`, frontend only, no migration. History link derived from the configured repository (the background reporter stores no URL); history and tiles show the claim time instead of the later verification time; checks that took no backup are hidden behind a toggle; the system reason is translated; the schedule tile shows frequency and time; the weekday shows only for weekly; saving no longer clears a running pause; password managers get their own login field; Production activation is a closed section at the bottom; includes the #242 fix (form keyed on the settings version).
@@ -8024,3 +8030,34 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Found: slots, storage and hourly allowance stayed consumed after failed uploads; return photos could lock an order; the media cleanup is not scheduled anywhere.
 - Done: release RPC used by the browser uploader and the server grant/verify path; one-hour database expiry; `/admin/media-limits` allowances and exemptions; guards (pgTAP 410, upload-guard.test.ts).
 - Open: scheduling `media-storage.mjs cleanup` (bytes only) needs owner approval; apply with the next hosted plan.
+
+## 2026-11-26 - search_path pinned on the last nine functions (migration 20261126120002, nothing applied; first numbered 120001, taken by PR #279)
+- `set search_path = ''` on the nine `app` helpers the Supabase advisor named (same nine on Acceptance); settings only. pgTAP 420 refuses any new unpinned function.
+- Merge after 20261126110001 (PR #285). Last migration planned before the Acceptance apply plan.
+
+## 2026-11-26 - Restore test matches the hosted Auth schema again (no migration, nothing applied)
+- Acceptance restore run 45836920455 stopped at STACK MISMATCH: both hosted projects run gotrue v2.199.0; the newest CLI ships v2.198.0.
+- `restore-test.sh` pins the Auth image to v2.199.0 for its throwaway stack; the guard is unchanged.
+- Open: sync the kit to `aladdin-backups` (owner approval), then rerun the restore test.
+
+## 2026-11-26 - Acceptance apply plan "marketplace-orders" prepared (nothing applied)
+- 18 migrations, 246 -> 264. Snapshot pinned: aladdin-acceptance-20261126T140613Z (restore run 45847352834 PASS).
+- Forward-fix proved from the full plan and every partly applied state; live Acceptance function definitions equal the replayed pre-state.
+- Open: owner GO for preflight, apply, then the frontend deploy. Runbook: MARKETPLACE_ORDERS_ACCEPTANCE_PLAN_20261126.md.
+
+## 2026-11-28 - Marketplace orders applied to Acceptance and frontend deployed
+- Owner ran preflight and apply of `marketplace-orders` (246 -> 264): PASS. Frontend `d96b440e` deployed from `45e19ebb` on the owner's GO.
+- Open: enable ordering on Acceptance, timers Worker secrets and deploy, WhatsApp secrets, browser testing. Details in RUNTIME_STATE.md.
+
+## 2026-11-28 - Marketplace ordering switched on for Acceptance (configuration, not yet deployed)
+- Owner approved preparing it. Preview workflow and `wrangler.jsonc` set `NEXT_PUBLIC_MARKETPLACE_ORDERING`; a test keeps Production without it.
+- Open: merge and deploy (owner approval each), then the order test round with the three verified accounts. Timers Worker and its two secrets before testing reminders.
+
+## 2026-11-28 - Marketplace test-round fixes F01-F24 (migration 20261128090001, nothing applied)
+- Owner asked to fix every recorded note from the Acceptance order and return round. Test status: MARKETPLACE_ACCEPTANCE_TEST_LOG.md.
+- Frontend: cart free-delivery rule and saved address, return pages and forms, order and invoice display, installer bell, signed-in footer.
+- Database: return notifications for the other side, refund-confirmation timer (reminder 3 days, admin queue at 7 days), return timers now advance and close, rejection presets, readable variant, address and date text, invoice buyer address parts, cart quote free-delivery fields.
+- Decisions (owner accepted the suggestions, do NOT re-ask): showroom told when the buyer ships; other side told on a complaint; admin decision notification states the result; unconfirmed refund goes to the admin queue. Owner then decided: phones for the admin only - the admin return page shows the buyer's and the showroom's business phone; invoices stay without a phone.
+- Added the reviewed permission contract `supabase/permissions/20261128090001.json` (two internal helpers, no API role) after CI's permission gate refused them.
+- Validation: throwaway local stack `supabase test db` Files=202 Tests=10201 PASS; return and timer concurrency scripts PASS; vitest 5539 passed, one image-variant test timed out under load and passed alone; eslint 0 errors; tsc one error in `edge/media-worker` (module `postgres` not installed locally). Not checked in a browser.
+- Open: merge, Acceptance apply plan for the migration (owner applies), frontend deploy, retest, timers Worker secrets and deploy.

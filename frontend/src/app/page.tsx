@@ -4,6 +4,7 @@ import { readLandingStats } from "@/features/landing-brand/landing-brand-stats.s
 import { landingMessages } from "@/features/landing-preview/landing-messages";
 import { isMarketplacePreviewEnabled } from "@/lib/env";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getSessionIdentity } from "@/server/auth/session";
 import { marketplacePublicImageUrls } from "@/server/media/marketplace-public-images";
 import { loadPublicCatalogPage } from "@/server/queries/marketplace-public";
 
@@ -19,7 +20,8 @@ export const dynamic = "force-dynamic";
  * `landing-v2` components stay in the repo as reference only and are no longer mounted anywhere.
  */
 export default async function RootPage() {
-  // The landing page is Arabic-only: no language switch, no cookie lookup.
+  // The landing page is Arabic-only: no language switch, no locale cookie lookup. The session is read only so the header
+  // offers sign-in to guests alone (the anonymous edge cache skips every request that carries a cookie).
   // While the Marketplace is open (release flag) the header shows the cart and the product section shows the newest
   // real products with a working "Add to cart". Closed: the sample cards and no cart, and nothing is read.
   const open = isMarketplacePreviewEnabled();
@@ -27,7 +29,7 @@ export default async function RootPage() {
   const images = live.length > 0 ? await marketplacePublicImageUrls(await getServerSupabase(), live.map((item) => item.image_id)) : {};
   return (
     <I18nMessagesProvider locale="ar" dir="rtl" messages={landingMessages("ar")}>
-      <LandingBrand stats={await readLandingStats()} market={{ open, live, images }} />
+      <LandingBrand stats={await readLandingStats()} market={{ open, live, images }} signedIn={(await getSessionIdentity()) !== null} />
     </I18nMessagesProvider>
   );
 }

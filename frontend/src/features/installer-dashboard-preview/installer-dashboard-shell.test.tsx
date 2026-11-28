@@ -43,6 +43,16 @@ describe("InstallerDashboardShell (production installer chrome)", () => {
     expect(container.textContent).not.toMatch(/Sheikh Zayed|الشيخ زايد/);
   });
 
+  it("mounts the notifications control the layout passes in", () => {
+    renderWithI18n(
+      <InstallerDashboardShell theme="light" sidebarMode="expanded" displayName="Hossam" location={null} searchJobs={[]} notifications={<button type="button">inbox</button>}>
+        <p>page body</p>
+      </InstallerDashboardShell>,
+      "en",
+    );
+    expect(screen.getByTestId("installer-notifications").textContent).toBe("inbox");
+  });
+
   it("shows the approved bell without an unread dot it cannot back", () => {
     shell({ location: "Cairo" });
     const bell = screen.getByTestId("installer-notifications");

@@ -52,7 +52,9 @@ export function dateRangeText(earliest: string, latest: string | null, locale: L
 /** The delivery fee line for the chosen place: «Free», the fee, or null while no place is chosen. */
 export function feeText(terms: DeliveryTerms, locale: Locale): string | null {
   const t = deliveryCopy[locale];
-  if (terms.free_shipping && terms.status === "available") return t.free;
+  // Before a place is chosen, only a reason that holds in every place may answer "free": a threshold can be overridden per place.
+  const freeEverywhere = terms.free_reason === "product" || terms.free_reason === "free_delivery";
+  if (terms.free_shipping && (terms.status === "available" || (terms.status === "needs_area" && freeEverywhere))) return t.free;
   if (terms.status === "available" && terms.fee_egp !== null) return fmtEgp(Number(terms.fee_egp), locale);
   return null;
 }
