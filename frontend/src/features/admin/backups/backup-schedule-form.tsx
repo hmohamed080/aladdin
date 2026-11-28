@@ -1,22 +1,26 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { formatDateTime } from "@/lib/ui/format";
-import { AutofillGuard } from "./autofill-guard";
-import { isPaused } from "./backup-view";
+import { isPaused, needsStopConfirmation } from "./backup-view";
 import { Card, SectionTitle } from "@/components/ui/primitives";
-import { Checkbox, Input, LabeledField, Select, SubmitButton, Textarea } from "@/components/ui/controls";
+import { Button, Checkbox, Input, LabeledField, Select, SubmitButton } from "@/components/ui/controls";
 import { saveBackupScheduleAction } from "@/server/actions/admin-backups";
 import type { BackupEnvironment, BackupSettings } from "@/server/queries/admin-backups";
 import type { FormState } from "@/server/actions/sales-forms";
 
 const INITIAL: FormState = { ok: false };
+const CONFIRM_STOP = "confirm_stop";
 
 /**
  * The schedule form. The version the admin SAW is submitted; a stale version is
- * refused. The environment (and therefore the re-authentication target) is read
- * from the database by the action, never from this form.
+ * refused. The environment is read from the database by the action, never from
+ * this form.
+ *
+ * Saving needs no password or reason. A save that would stop something asks first,
+ * inside the same form: the answer then submits exactly what is on screen, and
+ * cancelling leaves the choices as they are.
  */
 export function BackupScheduleForm({
   environment,
@@ -32,13 +36,42 @@ export function BackupScheduleForm({
   const paused = isPaused(settings.paused_until);
   const [state, dispatch] = useActionState(saveBackupScheduleAction, INITIAL);
   const [restore, setRestore] = useState(settings.production_restore_schedule_enabled);
+  const [asking, setAsking] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const questionRef = useRef<HTMLDivElement>(null);
+
+  // The question itself takes focus, not its yes button: a second Enter must not answer it.
+  useEffect(() => {
+    if (asking) questionRef.current?.focus();
+  }, [asking]);
+
+  function cancel() {
+    setAsking(false);
+    // The first submit button is Save.
+    formRef.current?.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus();
+  }
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    // The confirm button is the answer; every other way of submitting asks again.
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    if (submitter?.getAttribute("name") === CONFIRM_STOP) return;
+    const data = new FormData(event.currentTarget);
+    const stops = needsStopConfirmation(settings, {
+      schedule: String(data.get("acceptance_schedule")) as BackupSettings["acceptance_schedule"],
+      pauseChoice: String(data.get("pause_hours")),
+      restore: data.get("production_restore_schedule_enabled") === "on",
+    });
+    if (!stops) return;
+    event.preventDefault();
+    setAsking(true);
+  }
 
   return (
     <Card>
       <SectionTitle>{t("backups.schedule.title")}</SectionTitle>
       <p className="mt-xs text-label text-fg-muted">{t("backups.schedule.description")}</p>
       {!canManage ? <p className="mt-md text-body text-fg-secondary">{t("backups.viewOnly")}</p> : null}
-      <form action={dispatch} className="mt-md flex flex-col gap-md" data-testid="backup-schedule-form">
+      <form ref={formRef} action={dispatch} onSubmit={onSubmit} onChange={() => setAsking(false)} className="mt-md flex flex-col gap-md" data-testid="backup-schedule-form">
         <input type="hidden" name="version" value={settings.version} />
         <div className="grid gap-md sm:grid-cols-2">
           <LabeledField label={t("backups.schedule.acceptance")} htmlFor="backup-acceptance-schedule" hint={t("backups.schedule.acceptanceHint")}>
@@ -87,26 +120,30 @@ export function BackupScheduleForm({
           </LabeledField>
         </div>
         {paused ? <p role="status">{t("backups.schedule.pausedUntil", {time: formatDateTime(settings.paused_until, locale)})}</p> : null}
-        {environment === "production" ? <LabeledField label={t("backups.run.confirmation")} htmlFor="backup-schedule-confirm">
-          <Input id="backup-schedule-confirm" name="confirmation" placeholder="change production schedule" autoComplete="off" dir="ltr" required disabled={!canManage} />
-        </LabeledField> : null}
-        <AutofillGuard />
-        <LabeledField label={t("backups.schedule.password")} htmlFor="backup-schedule-password" hint={t("backups.schedule.passwordHint")}>
-          <Input id="backup-schedule-password" name="password" type="password" autoComplete="current-password" required disabled={!canManage} />
-        </LabeledField>
-        <LabeledField label={t("backups.schedule.reason")} htmlFor="backup-schedule-reason" hint={t("backups.schedule.reasonHint")}>
-          <Textarea id="backup-schedule-reason" name="reason" rows={3} required minLength={10} maxLength={500} dir="auto" disabled={!canManage} />
-        </LabeledField>
         <p className="text-label text-fg-muted">{t("backups.schedule.versionNote", { version: settings.version })}</p>
         {state.code ? (
           <p role="status" className={state.ok ? "text-body text-success" : "text-body text-danger"} data-testid="backup-schedule-message">
             {t(state.code)}
           </p>
         ) : null}
+        {/* Always the first submit button: the Enter key presses it, so Enter can never answer the question below. */}
         {canManage ? (
           <SubmitButton pendingLabel={t("backups.schedule.saving")} className="self-start">
             {t("backups.schedule.save")}
           </SubmitButton>
+        ) : null}
+        {canManage && asking ? (
+          <div ref={questionRef} tabIndex={-1} role="alert" className="flex flex-col gap-sm rounded-sm border border-danger/40 bg-danger/10 px-md py-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" data-testid="backup-schedule-confirm-stop">
+            <p className="text-body text-fg">{t("backups.schedule.confirmStopBody")}</p>
+            <div className="flex flex-wrap gap-sm">
+              <SubmitButton variant="danger" name={CONFIRM_STOP} value="yes" pendingLabel={t("backups.schedule.saving")}>
+                {t("backups.schedule.confirmStop")}
+              </SubmitButton>
+              <Button type="button" variant="ghost" onClick={cancel}>
+                {t("common.cancel")}
+              </Button>
+            </div>
+          </div>
         ) : null}
       </form>
     </Card>

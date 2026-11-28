@@ -1,4 +1,4 @@
-import type { BackupEnvironment, BackupOutcome, BackupRun, BackupSettings } from "@/server/queries/admin-backups";
+import type { BackupEnvironment, BackupKind, BackupOutcome, BackupRun, BackupRunsFilter, BackupRunStatus, BackupSettings } from "@/server/queries/admin-backups";
 
 /** Display rules of `/admin/backups`. Pure: the database and the private runner stay authoritative. */
 
@@ -67,8 +67,41 @@ export function pauseHoursFor(choice: string, pausedUntil: string | null, now = 
   return /^\d{1,3}$/.test(choice) ? Number(choice) : -1;
 }
 
-/** A skipped run is a later check that found the day's backup already complete. */
-export function splitSkipped(runs: BackupRun[], includeSkipped: boolean): { shown: BackupRun[]; skippedCount: number } {
-  const skippedCount = runs.filter((r) => r.status === "skipped").length;
-  return { shown: includeSkipped ? runs : runs.filter((r) => r.status !== "skipped"), skippedCount };
+/** Saving asks "are you sure?" only when it would stop something that runs today. */
+export function needsStopConfirmation(current: BackupSettings, next: { schedule: BackupSettings["acceptance_schedule"]; pauseChoice: string; restore: boolean }): boolean {
+  if (next.schedule === "off" && current.acceptance_schedule !== "off") return true;
+  if (next.pauseChoice !== "keep" && next.pauseChoice !== "0") return true;
+  return current.production_restore_schedule_enabled && !next.restore;
+}
+
+export const BACKUP_KINDS: readonly BackupKind[] = ["backup", "restore_test"];
+export const BACKUP_STATUSES: readonly BackupRunStatus[] = ["succeeded", "failed", "running", "requested", "dispatched", "unknown", "skipped"];
+
+type Params = Record<string, string | string[] | undefined>;
+
+/** The history address is the state. Anything it cannot mean falls back to the first page with no filter. */
+export function historyFilterFrom(params: Params): BackupRunsFilter {
+  const one = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : "");
+  const page = one("page");
+  return {
+    // six digits is far past any real history and always fits the database's integer
+    page: /^[1-9]\d{0,5}$/.test(page) ? Number(page) : 1,
+    kind: BACKUP_KINDS.find((kind) => kind === one("kind")) ?? null,
+    status: BACKUP_STATUSES.find((status) => status === one("status")) ?? null,
+    includeSkipped: one("skipped") === "1",
+  };
+}
+
+export function historyHref(filter: BackupRunsFilter): string {
+  const query = new URLSearchParams();
+  if (filter.page > 1) query.set("page", String(filter.page));
+  if (filter.kind) query.set("kind", filter.kind);
+  if (filter.status) query.set("status", filter.status);
+  if (filter.includeSkipped) query.set("skipped", "1");
+  const text = query.toString();
+  return text ? `/admin/backups?${text}` : "/admin/backups";
+}
+
+export function pageCount(total: number, pageSize: number): number {
+  return Math.max(1, Math.ceil(total / pageSize));
 }

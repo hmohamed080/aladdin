@@ -9721,6 +9721,29 @@ export type Database = {
         Args: { p_actor: string; p_kind: string; p_reason: string; p_receipt: string }
         Returns: Json
       }
+      admin_backup_runs: {
+        Args: {
+          p_include_skipped?: boolean
+          p_kind?: string
+          p_page?: number
+          p_status?: string
+        }
+        Returns: Json
+      }
+      admin_backup_save_schedule: {
+        Args: {
+          p_acceptance_schedule: string
+          p_actor: string
+          p_config: Json
+          p_expected_version: number
+          p_production_restore_schedule_enabled: boolean
+        }
+        Returns: number
+      }
+      admin_backup_set_production: {
+        Args: { p_actor: string; p_enabled: boolean }
+        Returns: boolean
+      }
       admin_backup_status: { Args: never; Returns: Json }
       admin_backup_update_schedule: {
         Args: {

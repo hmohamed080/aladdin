@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/server/auth/session";
 import {
-  adminBackupActivate,
   adminBackupMarkDispatched,
   adminBackupRequest,
-  adminBackupUpdateSchedule,
+  adminBackupSaveSchedule,
+  adminBackupSetProduction,
 } from "@/lib/supabase/admin-server";
 import { pauseHoursFor } from "@/features/admin/backups/backup-view";
 import { dispatchBackupWorkflow } from "@/server/backups/github";
@@ -18,9 +18,9 @@ import type { FormState } from "@/server/actions/sales-forms";
 /**
  * `/admin/backups` mutations. Nothing is decided here: the server derives the
  * actor from the VERIFIED session, the database re-checks that actor's
- * effective permission, and every sensitive action spends a single-use
- * current-password receipt bound to (actor, operation, environment). The
- * environment itself always comes from the database — never from the form.
+ * effective permission. Starting a run also spends a single-use
+ * current-password receipt bound to (actor, operation, environment); the
+ * schedule and the Production switch do not. The environment itself always comes from the database — never from the form.
  *
  * GitHub dispatch is the only side effect outside the database. A dispatch that
  * cannot be confirmed is recorded as a FAILURE; it is never reported as a
@@ -31,7 +31,6 @@ import type { FormState } from "@/server/actions/sales-forms";
 const PASSWORD_OPERATION = {
   backup: "backup.execute",
   restore_test: "backup.restore_test",
-  schedule: "backup.schedule_manage",
 } as const;
 
 type Client = Awaited<ReturnType<typeof getServerSupabase>>;
@@ -131,12 +130,13 @@ export async function requestBackupAction(_prev: FormState, fd: FormData): Promi
   return { ok: true, code: "backups.done.requested" };
 }
 
-/** Change the schedule. The version the admin SAW must still be current. */
+/**
+ * Change the schedule. No password, phrase or reason (owner, 2026-11-26): the database still checks the verified
+ * actor's permission, refuses a version older than the current one, and audits the change.
+ */
 export async function saveBackupScheduleAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const schedule = text(fd, "acceptance_schedule");
   if (schedule !== "off" && schedule !== "daily" && schedule !== "weekly") return { ok: false, code: "backups.errors.invalid" };
-  const reason = text(fd, "reason");
-  if (reason.length < 10 || reason.length > 500) return { ok: false, code: "backups.errors.reason", fieldErrors: { reason: "backups.errors.reason" } };
   const version = Number(text(fd, "version"));
   if (!Number.isSafeInteger(version) || version < 0) return { ok: false, code: "backups.errors.stale" };
 
@@ -146,46 +146,27 @@ export async function saveBackupScheduleAction(_prev: FormState, fd: FormData): 
   const status = await loadBackupStatus(supabase);
   if (!status || !status.initialized || !status.environment) return { ok: false, code: "backups.errors.notInitialized" };
 
-  const confirmed = await confirmPassword(supabase, String(fd.get("password") ?? ""), PASSWORD_OPERATION.schedule, status.environment);
-  if (!confirmed.ok) return { ok: false, code: confirmed.code };
-
-  const result = await adminBackupUpdateSchedule({
+  const result = await adminBackupSaveSchedule({
     actor: user.id,
     acceptanceSchedule: schedule,
-    config: { time: text(fd, "schedule_time"), weekday: Number(text(fd, "schedule_weekday")),
-      pause_hours: pauseHoursFor(text(fd, "pause_hours"), status.settings.paused_until), confirmation: text(fd, "confirmation") },
     productionRestoreScheduleEnabled: fd.get("production_restore_schedule_enabled") === "on",
     expectedVersion: version,
-    reason,
-    receipt: confirmed.receipt,
+    config: { time: text(fd, "schedule_time"), weekday: Number(text(fd, "schedule_weekday")),
+      pause_hours: pauseHoursFor(text(fd, "pause_hours"), status.settings.paused_until) },
   });
   if (result.data === null) return { ok: false, code: mapBackupError(result.code, result.message) };
   revalidatePath("/admin/backups");
   return { ok: true, code: "backups.done.saved" };
 }
 
-/** Production-only activation switch. The typed phrase is part of the database check too. */
-export async function setProductionBackupActivationAction(_prev: FormState, fd: FormData): Promise<FormState> {
-  const enabled = text(fd, "enabled") === "true";
-  const reason = text(fd, "reason");
-  if (reason.length < 10 || reason.length > 500) return { ok: false, code: "backups.errors.reason", fieldErrors: { reason: "backups.errors.reason" } };
-
+/** The Production On/Off switch. */
+export async function setProductionBackupAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const choice = text(fd, "enabled");
+  if (choice !== "true" && choice !== "false") return { ok: false, code: "backups.errors.invalid" };
   const user = await getCurrentUser();
   if (!user) return { ok: false, code: "backups.errors.forbidden" };
-  const supabase = await getServerSupabase();
-  const status = await loadBackupStatus(supabase);
-  if (!status || !status.initialized || status.environment !== "production") return { ok: false, code: "backups.errors.notProduction" };
-
-  const confirmed = await confirmPassword(supabase, String(fd.get("password") ?? ""), PASSWORD_OPERATION.schedule, status.environment);
-  if (!confirmed.ok) return { ok: false, code: confirmed.code };
-
-  const result = await adminBackupActivate({
-    actor: user.id,
-    enabled,
-    confirmation: text(fd, "confirmation"),
-    reason,
-    receipt: confirmed.receipt,
-  });
+  const enabled = choice === "true";
+  const result = await adminBackupSetProduction({ actor: user.id, enabled });
   if (result.data === null) return { ok: false, code: mapBackupError(result.code, result.message) };
   revalidatePath("/admin/backups");
   return { ok: true, code: enabled ? "backups.done.activated" : "backups.done.deactivated" };
