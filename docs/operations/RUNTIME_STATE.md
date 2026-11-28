@@ -1,3 +1,9 @@
+## Marketplace test-round fixes prepared; current Acceptance frontend - 2026-11-28
+
+- **Acceptance frontend** is now `aladdin-frontend-preview` version `3fa20123-a84f-4e8c-836f-b49d4ca70412` (workflow run 46131423561, `main` `89b147f6`); rollback target `75fd1b92-2915-4a60-9b46-11018f39dfa1`. Ordering is on.
+- Migration `20261128090001` is in a branch only: **not merged, not applied** to Acceptance or Production, and has no apply plan yet. The frontend of that branch also runs against the current Acceptance database (new fields are optional).
+- The timers Worker is still not deployed, so no reminder, escalation or automatic cancellation runs.
+
 ## Engineer account port and registration opening (local branch, not pushed or deployed) - 2026-11-28
 
 - Branch `feat/engineer-account-port-20261128`: the Engineer account ported onto `main` `89b147f6`; migrations `20261128100001`-`20261128100007`; permission contracts `20261128100001`-`20261128100006`.

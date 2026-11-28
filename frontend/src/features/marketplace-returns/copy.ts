@@ -1,4 +1,4 @@
-import type { ReturnAction, ReturnStatus } from "./contract";
+import type { EscalationReason, ReturnAction, ReturnDocument, ReturnStatus } from "./contract";
 
 type L = { ar: string; en: string };
 
@@ -33,9 +33,39 @@ export const RETURN_COPY = {
   sellerTitle: { ar: "المرتجعات والاستبدال", en: "Returns and exchanges" },
   adminTitle: { ar: "قائمة مراجعة المرتجعات", en: "Returns review queue" },
   empty: { ar: "لا توجد طلبات.", en: "Nothing here yet." },
-  note: { ar: "ملاحظة", en: "Note" },
   noteInternal: { ar: "ملاحظة داخلية (لا تظهر للمشتري ولا للمعرض)", en: "Internal note (never shown to the buyer or the showroom)" },
-  amount: { ar: "المبلغ (جنيه)", en: "Amount (EGP)" },
+  required: { ar: "مطلوب", en: "required" },
+  order: { ar: "الطلب", en: "Order" },
+  buyer: { ar: "المشتري", en: "Buyer" },
+  showroom: { ar: "المعرض", en: "Showroom" },
+  sentAt: { ar: "تاريخ الطلب", en: "Requested on" },
+  buyerNote: { ar: "ملاحظة المشتري", en: "Buyer's note" },
+  decisionBy: { ar: "رد", en: "Reply of" },
+  actionNeeded: { ar: "مطلوب إجراء", en: "Action needed" },
+  tracking: { ar: "رقم التتبع (اختياري)", en: "Tracking number (optional)" },
+  trackingNumber: { ar: "رقم التتبع", en: "Tracking number" },
+  trackingHint: { ar: "من 3 إلى 64: حروف إنجليزية أو أرقام أو . _ / - بدون مسافات.", en: "3 to 64 English letters, digits or . _ / - with no spaces." },
+  trackingInvalid: { ar: "رقم التتبع غير صالح: استخدم حروفًا إنجليزية أو أرقامًا أو . _ / - بدون مسافات، أو اتركه فارغًا.", en: "That tracking number is not valid: use English letters, digits or . _ / - with no spaces, or leave it empty." },
+  adminNoteRequired: { ar: "اكتب الملاحظة الداخلية (3 أحرف على الأقل) قبل القرار.", en: "Write the internal note (at least 3 characters) before deciding." },
+  rejectTitle: { ar: "سبب الرفض (مطلوب)", en: "Reason for rejecting (required)" },
+  rejectIntro: { ar: "يظهر السبب للمشتري. اختر سببًا جاهزًا أو اكتب سببك.", en: "The buyer sees the reason. Pick a ready one or write your own." },
+  rejectConfirm: { ar: "تأكيد الرفض", en: "Confirm rejection" },
+  back: { ar: "رجوع", en: "Back" },
+  partialAmount: { ar: "المبلغ المقترح رده (جنيه)", en: "Proposed refund (EGP)" },
+  partialHint: { ar: "أكبر من صفر وأقل من قيمة المنتجات المرتجعة ({max}).", en: "More than zero and less than the value of the returned items ({max})." },
+  partialInvalid: { ar: "اكتب مبلغًا أكبر من صفر وأقل من {max}.", en: "Enter an amount above zero and below {max}." },
+  partialNote: { ar: "رسالة للمشتري (اختياري)", en: "Message to the buyer (optional)" },
+  partialSend: { ar: "إرسال الاقتراح", en: "Send the proposal" },
+  noteTooShort: { ar: "الرسالة 3 أحرف على الأقل، أو اتركها فارغة.", en: "Write at least 3 characters, or leave the message empty." },
+  partialProposed: { ar: "استرداد جزئي مقترح", en: "Proposed partial refund" },
+  complaintReason: { ar: "سبب الشكوى", en: "Complaint" },
+  complaintHint: { ar: "تراجعها إدارة المنصة.", en: "The platform team reviews it." },
+  complaintRequired: { ar: "اكتب سبب الشكوى (3 أحرف على الأقل).", en: "Write the complaint (at least 3 characters)." },
+  complaintSend: { ar: "إرسال الشكوى", en: "Send the complaint" },
+  refundToPay: { ar: "المبلغ المطلوب رده", en: "Amount to pay back" },
+  refundRecorded: { ar: "الاسترداد المسجّل", en: "Recorded refund" },
+  referenceNote: { ar: "رقم العملية أو ملاحظة (اختياري، يظهر للمشتري)", en: "Reference or note (optional, the buyer sees it)" },
+  exchangeNote: { ar: "ملاحظة التسليم (اختياري)", en: "Handover note (optional)" },
   sellable: { ar: "سليم ويرجع للمخزون", en: "In good condition: return to stock" },
   sellableHint: { ar: "حدّد القطع السليمة فقط. غير المحدد لا يعود للبيع.", en: "Tick only the items in good condition. Unticked items do not go back on sale." },
   partialAppeal: { ar: "شكوى على استرداد جزئي: «قبول» يمنح القيمة كاملة، و«رفض» يُبقي المبلغ المقترح.", en: "Complaint about a partial refund: approving grants the full value, rejecting keeps the proposed amount." },
@@ -103,6 +133,11 @@ export const RETURNABILITY_COPY = {
 } as const;
 
 const RETURN_ERRORS: Record<string, L> = {
+  reason_required: { ar: "اكتب السبب (من 3 أحرف على الأقل).", en: "Write the reason (at least 3 characters)." },
+  invalid_payload: { ar: "البيانات المدخلة غير صالحة. راجع الخانات ثم أعد المحاولة.", en: "Something entered is not valid. Check the fields and try again." },
+  invalid_transition: { ar: "تغيّرت حالة الطلب. حدّث الصفحة لرؤية الحالة الحالية.", en: "The request has moved on. Reload the page to see where it stands." },
+  preset_invalid: { ar: "لم يعد هذا السبب متاحًا. اختر سببًا آخر.", en: "That reason is no longer available. Pick another one." },
+  insufficient_stock: { ar: "لا يوجد مخزون كافٍ لتسليم البديل.", en: "There is not enough stock for the replacement." },
   auth_required: { ar: "سجّل الدخول ثم أعد المحاولة.", en: "Sign in and try again." },
   account_inactive: { ar: "حسابك غير مفعّل.", en: "Your account is not active." },
   not_permitted: { ar: "ليست لديك صلاحية لهذا الإجراء.", en: "You are not allowed to do this." },
@@ -132,6 +167,61 @@ export const RETURN_ROLE_LABEL: Record<string, L> = {
   admin: { ar: "إدارة المنصة", en: "Platform admin" },
   system: { ar: "النظام", en: "System" },
 };
+
+export const ESCALATION_LABEL: Record<EscalationReason, L> = {
+  complaint: { ar: "بسبب شكوى", en: "Because of a complaint" },
+  seller_silent: { ar: "لأن المعرض لم يتصرف في المهلة", en: "The showroom did not act in time" },
+  refund_unconfirmed: { ar: "لأن المشتري لم يؤكد استلام المبلغ", en: "The buyer did not confirm the refund" },
+};
+
+export const REFUND_METHOD_LABEL: Record<string, L> = {
+  cod: { ar: "نقدًا", en: "Cash" },
+  instapay_full: { ar: "إنستاباي", en: "InstaPay" },
+  instapay_deposit: { ar: "إنستاباي", en: "InstaPay" },
+  instapay: { ar: "إنستاباي", en: "InstaPay" },
+};
+
+/** One sentence saying where the request stands for this reader: who acts next, by when, and for how much. */
+export function returnStateText(
+  doc: ReturnDocument,
+  role: "buyer" | "seller" | "admin",
+  locale: "ar" | "en",
+  when: (iso: string) => string,
+  money: (n: number) => string,
+): string | null {
+  const ar = locale === "ar";
+  const ts = doc.timestamps;
+  if (doc.in_admin_queue) {
+    const why = doc.escalated_reason ? ` ${ESCALATION_LABEL[doc.escalated_reason][locale]}` : "";
+    return ar ? `قيد مراجعة المنصة.${why}.` : `Under review by the platform team.${why}.`;
+  }
+  if (doc.status === "requested") {
+    const by = when(ts.seller_due_at);
+    if (role === "seller") return ar ? `ردّ قبل ${by}، وإلا يُحال الطلب لإدارة المنصة.` : `Reply before ${by}, or the request goes to the platform team.`;
+    return ar ? `في انتظار رد المعرض قبل ${by}.` : `Waiting for the showroom to reply before ${by}.`;
+  }
+  if (doc.status === "approved") {
+    if (role === "buyer") return ar ? "تمت الموافقة. أرسل المنتج للمعرض ثم اضغط «تم شحن المنتج»." : "Approved. Send the items to the showroom, then press “I shipped it”.";
+    return ar ? "في انتظار وصول المنتج من المشتري." : "Waiting for the items from the buyer.";
+  }
+  if (doc.status === "in_transit") {
+    if (role === "seller") return ar ? "المنتج في الطريق إليك. أكّد الاستلام عند وصوله." : "The items are on their way. Mark them received when they arrive.";
+    return ar ? "المنتج في الطريق للمعرض." : "The items are on their way to the showroom.";
+  }
+  if (doc.status === "received") {
+    if (doc.refund?.state === "sent") {
+      const amount = money(Number(doc.refund.amount_egp));
+      if (role === "buyer") return ar ? `سجّل المعرض رد ${amount}. إذا وصلك المبلغ اضغط «تأكيد استلام المبلغ».` : `The showroom recorded a refund of ${amount}. If it reached you, press “Confirm refund received”.`;
+      return ar ? `سُجّل رد ${amount}. في انتظار تأكيد المشتري.` : `A refund of ${amount} is recorded. Waiting for the buyer to confirm it.`;
+    }
+    if (doc.remedy === "exchange") return ar ? "استلم المعرض المنتج. التالي: تسليم البديل." : "The showroom received the items. Next: hand over the replacement.";
+    const amount = money(Number(doc.max_refund_egp));
+    const by = ts.refund_due_at ? when(ts.refund_due_at) : "";
+    if (role === "seller") return ar ? `رد ${amount} للمشتري قبل ${by} ثم سجّله هنا.` : `Pay ${amount} back to the buyer before ${by}, then record it here.`;
+    return ar ? `استلم المعرض المنتج. موعد رد ${amount}: قبل ${by}.` : `The showroom received the items. ${amount} is due back before ${by}.`;
+  }
+  return null;
+}
 
 export const RETURN_EVENT_LABEL: Record<string, L> = {
   requested: { ar: "أُرسل الطلب", en: "Request sent" },

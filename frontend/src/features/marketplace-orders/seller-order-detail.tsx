@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { proofImageUrlAction } from "@/server/actions/marketplace-orders";
 import { sellerOrderActionPageAction, shipmentUpdateAction } from "@/server/actions/marketplace-order-pages";
 import { areaName, governorateName } from "@/features/marketplace-seller/place-label";
-import { formatEstimate, hoursLeft, isInstapay, isLegacy, isReadyForPickup, isValidCarrier, isValidTracking, knownActions, latestSubmittedReceipt, type SellerActionPayload, type SellerOrderActionName } from "./order-model";
+import { addressLine, formatEstimate, hoursLeft, isInstapay, isLegacy, isReadyForPickup, isValidCarrier, isValidTracking, knownActions, latestSubmittedReceipt, type SellerActionPayload, type SellerOrderActionName } from "./order-model";
 import type { OrderDocumentV2 } from "./order-types";
 import { dateTime, money, OrderLineRow, PaymentBadge, StatusBadge, Timeline, Totals } from "./order-parts";
 import { ReasonPanel, type ReasonValue } from "./reason-panel";
@@ -188,7 +188,7 @@ export function SellerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
             <p>{order.pickup?.address ?? order.seller.name}</p>
           ) : (
             <p>
-              {[place, order.place.address_text].filter(Boolean).join(" — ")}
+              {[place, addressLine(order.place.address_snapshot, order.place.address_text, locale)].filter(Boolean).join(" — ")}
             </p>
           )}
           {estimate && !["delivered", "cancelled"].includes(order.status) ? <p className="text-label text-fg-secondary">{t.estimate}: {estimate}</p> : null}

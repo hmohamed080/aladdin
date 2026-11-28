@@ -17,7 +17,7 @@ import { writeAccountCartLines } from "@/features/marketplace/live/live-cart-sto
 import { FileComplaintSlot } from "./order-slots";
 import { CancelRefund } from "./cancel-refund";
 import { OrderReturnLinks } from "./order-returns";
-import { formatEstimate, hoursLeft, isInstapay, isLegacy, isReadyForPickup, knownActions, reorderLines } from "./order-model";
+import { addressLine, formatEstimate, hoursLeft, isInstapay, isLegacy, isReadyForPickup, knownActions, reorderLines } from "./order-model";
 import type { OrderDocumentV2, ReasonPreset } from "./order-types";
 import { dateTime, OrderLineRow, PaymentBadge, ProgressBar, StatusBadge, Timeline, Totals } from "./order-parts";
 import { orderError, ordersCopy } from "./orders-copy";
@@ -246,7 +246,7 @@ export function BuyerOrderDetail({ initial }: { initial: OrderDocumentV2 }) {
               <p>{order.pickup?.address ?? order.seller.name}{order.pickup?.instructions ? <><br /><span className="text-label text-fg-secondary">{order.pickup.instructions}</span></> : null}</p>
             ) : (
               <p>
-                {[place, order.place.address_text].filter(Boolean).join(" — ")}
+                {[place, addressLine(order.place.address_snapshot, order.place.address_text, locale)].filter(Boolean).join(" — ")}
                 <br />
                 <span className="text-label text-fg-secondary">
                   {b.recipient}: {order.recipient.name}{order.recipient.phone ? <> · <bdi dir="ltr">{order.recipient.phone}</bdi></> : null}

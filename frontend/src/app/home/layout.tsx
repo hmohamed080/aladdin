@@ -28,6 +28,9 @@ import { InstallerDashboardShell } from "@/features/installer-dashboard-preview/
 import { getServerSupabase } from "@/lib/supabase/server";
 import { listJobOpportunities } from "@/server/queries/job-opportunities";
 import { toOpportunityVMs } from "@/features/home/installer-dashboard-data";
+import { listNotifications, countUnread } from "@/server/queries/notifications";
+import { toNotificationViews } from "@/features/notifications/view-model";
+import { NotificationsMenu } from "@/components/layout/header-panels";
 import { installerLocationLabel } from "@/lib/installer/opportunity-location";
 
 /** Bounded read backing the topbar's search overlay — a handful of recent,
@@ -109,6 +112,8 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
     const searchOpportunities = await listJobOpportunities(supabase, { limit: SEARCH_OPPORTUNITIES_LIMIT });
     const searchJobs = toOpportunityVMs(searchOpportunities, createTranslator(locale), locale);
     const identity = await loadMyIdentity().catch(() => null);
+    // The whole personal inbox (a buyer's order and return notices carry no organization).
+    const [rows, unread] = await Promise.all([listNotifications(supabase), countUnread(supabase)]);
     return (
       <I18nProvider locale={locale} dir={dir}>
         <InstallerDashboardShell
@@ -118,6 +123,7 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
           avatarUrl={identity?.avatarUrl ?? null}
           location={location}
           searchJobs={searchJobs}
+          notifications={<NotificationsMenu items={toNotificationViews(rows, createTranslator(locale), locale)} unreadCount={unread} />}
         >
           {children}
         </InstallerDashboardShell>

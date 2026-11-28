@@ -8280,6 +8280,15 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Owner approved preparing it. Preview workflow and `wrangler.jsonc` set `NEXT_PUBLIC_MARKETPLACE_ORDERING`; a test keeps Production without it.
 - Open: merge and deploy (owner approval each), then the order test round with the three verified accounts. Timers Worker and its two secrets before testing reminders.
 
+## 2026-11-28 - Marketplace test-round fixes F01-F24 (migration 20261128090001, nothing applied)
+- Owner asked to fix every recorded note from the Acceptance order and return round. Test status: MARKETPLACE_ACCEPTANCE_TEST_LOG.md.
+- Frontend: cart free-delivery rule and saved address, return pages and forms, order and invoice display, installer bell, signed-in footer.
+- Database: return notifications for the other side, refund-confirmation timer (reminder 3 days, admin queue at 7 days), return timers now advance and close, rejection presets, readable variant, address and date text, invoice buyer address parts, cart quote free-delivery fields.
+- Decisions (owner accepted the suggestions, do NOT re-ask): showroom told when the buyer ships; other side told on a complaint; admin decision notification states the result; unconfirmed refund goes to the admin queue. Owner then decided: phones for the admin only - the admin return page shows the buyer's and the showroom's business phone; invoices stay without a phone.
+- Added the reviewed permission contract `supabase/permissions/20261128090001.json` (two internal helpers, no API role) after CI's permission gate refused them.
+- Validation: throwaway local stack `supabase test db` Files=202 Tests=10201 PASS; return and timer concurrency scripts PASS; vitest 5539 passed, one image-variant test timed out under load and passed alone; eslint 0 errors; tsc one error in `edge/media-worker` (module `postgres` not installed locally). Not checked in a browser.
+- Open: merge, Acceptance apply plan for the migration (owner applies), frontend deploy, retest, timers Worker secrets and deploy.
+
 ## 2026-11-28 - Engineer account ported onto main and registration opened (local commit; not pushed or deployed)
 - Owner asked to port the whole account. Branch `feat/engineer-account-port-20261128` merges `main` `89b147f6` into `feature/engineer-account` `da4367de` (the original branch is unchanged). Migrations renumbered to `20261128100001`-`20261128100007`.
 - Owner decisions: no date of birth anywhere (the date picker and birth-date storage were not ported; gender stays); uploads go to R2 only with Admin-controlled size limits (the request composer now uses the shared upload grant path); Engineer registration open (also opens the Engineering Office application).

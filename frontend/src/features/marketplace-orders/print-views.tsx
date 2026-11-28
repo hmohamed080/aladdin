@@ -4,7 +4,7 @@ import { Button, ButtonLink } from "@/components/ui/controls";
 import { useI18n } from "@/lib/i18n/context";
 import { areaName, governorateName } from "@/features/marketplace-seller/place-label";
 import { dateOnly, money } from "./order-parts";
-import { itemName } from "./order-model";
+import { addressLine, itemName, variantText } from "./order-model";
 import { ordersCopy } from "./orders-copy";
 import type { OrderInvoice, OrderWaybill } from "./order-types";
 
@@ -28,6 +28,9 @@ export function InvoiceView({ invoice, backHref }: { invoice: OrderInvoice; back
   const { locale } = useI18n();
   const c = ordersCopy[locale];
   const t = c.invoice;
+  const { governorate_key: gov, area_key: areaKey } = invoice.buyer;
+  const buyerPlace = gov ? [governorateName(gov, locale), areaKey ? areaName(gov, areaKey, locale) : ""].filter(Boolean).join(" — ") : "";
+  const buyerAddress = [buyerPlace, addressLine(invoice.buyer.address_parts, invoice.buyer.address, locale)].filter(Boolean).join(" — ");
   return (
     <div className="grid gap-md py-md">
       <PrintBar backHref={backHref} backLabel={t.back} printLabel={t.print} />
@@ -53,7 +56,7 @@ export function InvoiceView({ invoice, backHref }: { invoice: OrderInvoice; back
           <div>
             <h2 className="text-label font-semibold text-fg-secondary" data-plain>{t.buyer}</h2>
             <p className="font-medium">{invoice.buyer.name}</p>
-            {invoice.buyer.address ? <p className="text-label text-fg-secondary">{invoice.buyer.address}</p> : null}
+            {buyerAddress ? <p className="text-label text-fg-secondary">{buyerAddress}</p> : null}
           </div>
         </section>
         <table className="w-full text-body">
@@ -69,7 +72,7 @@ export function InvoiceView({ invoice, backHref }: { invoice: OrderInvoice; back
           <tbody>
             {invoice.lines.map((l) => (
               <tr key={l.sku} className="border-b last:border-0">
-                <td className="p-xs">{itemName(l, locale)}</td>
+                <td className="p-xs">{itemName(l, locale)}{l.variant_label && variantText(l.variant_label, locale) ? <span className="block text-caption text-fg-secondary">{variantText(l.variant_label, locale)}</span> : null}</td>
                 <td className="p-xs"><bdi dir="ltr">{l.sku}</bdi></td>
                 <td className="p-xs tabular-nums">{l.quantity}</td>
                 <td className="p-xs tabular-nums">{money(l.unit_price_egp, locale)}</td>
@@ -80,7 +83,7 @@ export function InvoiceView({ invoice, backHref }: { invoice: OrderInvoice; back
         </table>
         <dl className="ms-auto grid min-w-64 gap-xs text-body">
           <div className="flex justify-between gap-md"><dt className="text-fg-secondary">{t.subtotal}</dt><dd className="tabular-nums">{money(invoice.subtotal_egp, locale)}</dd></div>
-          <div className="flex justify-between gap-md"><dt className="text-fg-secondary">{t.delivery}</dt><dd className="tabular-nums">{money(invoice.delivery_fee_egp, locale)}</dd></div>
+          <div className="flex justify-between gap-md"><dt className="text-fg-secondary">{t.delivery}</dt><dd className="tabular-nums">{Number(invoice.delivery_fee_egp) === 0 ? c.free : money(invoice.delivery_fee_egp, locale)}</dd></div>
           <div className="flex justify-between gap-md border-t pt-xs font-semibold"><dt>{t.grand}</dt><dd className="tabular-nums">{money(invoice.total_egp, locale)}</dd></div>
           <div className="flex justify-between gap-md text-label"><dt className="text-fg-secondary">{t.paymentMethod}</dt><dd>{c.method[invoice.payment_method]}</dd></div>
           {Number(invoice.paid_now_egp ?? 0) > 0 ? <div className="flex justify-between gap-md text-label"><dt className="text-fg-secondary">{t.paid}</dt><dd className="tabular-nums">{money(invoice.paid_now_egp, locale)}</dd></div> : null}

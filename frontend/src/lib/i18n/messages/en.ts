@@ -2972,6 +2972,9 @@ export const en = {
           escalated: "Return escalated to the platform",
           admin_reminder: "Platform reminder about a return",
           admin_decided: "Platform decided a return",
+          shipped: "Return shipped back (to the showroom)",
+          complaint_filed: "Complaint on a return (to the other side)",
+          refund_confirm_reminder: "Reminder to confirm a return refund (to the buyer)",
         },
         stock: { low: "Product stock running low", out: "Product out of stock" },
         order: {

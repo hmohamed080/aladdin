@@ -6,9 +6,9 @@ import { CheckIcon, PackageIcon } from "@/components/ui/icons";
 import { useMarketplaceImageSrc } from "@/features/marketplace/live/image-urls";
 import type { Locale } from "@/lib/i18n/locales";
 import { cn } from "@/lib/ui/cn";
-import { formatEgp } from "@/lib/ui/egp-format";
+import { fmtEgp } from "@/features/marketplace/live/live-copy";
 import { EVENT_LABELS, ordersCopy } from "./orders-copy";
-import { isReadyForPickup, itemName, PROGRESS_STEPS, progressIndex, timelineRows, variantText } from "./order-model";
+import { balanceStillDue, isReadyForPickup, itemName, PROGRESS_STEPS, progressIndex, timelineRows, variantText } from "./order-model";
 import type { OrderDocumentV2, OrderLineV2, OrderStatusV2, PaymentStatusV2 } from "./order-types";
 
 export const dateTime = (iso: string, locale: Locale) =>
@@ -16,7 +16,7 @@ export const dateTime = (iso: string, locale: Locale) =>
 export const dateOnly = (iso: string, locale: Locale) =>
   new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en-GB", { dateStyle: "medium" }).format(new Date(iso));
 
-export const money = (n: number | null | undefined, locale: Locale) => (n === null || n === undefined ? "—" : formatEgp(Number(n), locale));
+export const money = (n: number | null | undefined, locale: Locale) => (n === null || n === undefined ? "—" : fmtEgp(Number(n), locale));
 
 /** A product photo from the order snapshot; a removed or unreachable image falls back to a neutral tile. */
 export function OrderThumb({ imageId, label, size = 64 }: { imageId: string | null; label: string; size?: number }) {
@@ -125,7 +125,7 @@ export function Totals({ doc, locale }: { doc: OrderDocumentV2; locale: Locale }
           <dd className="tabular-nums">{money(t.paid_now_egp, locale)}</dd>
         </div>
       ) : null}
-      {t.balance_due_egp !== null && Number(t.balance_due_egp) > 0 ? (
+      {balanceStillDue(doc) && t.balance_due_egp !== null && Number(t.balance_due_egp) > 0 ? (
         <div className="flex justify-between gap-md text-label text-fg-secondary">
           <dt>{c.balanceDue}</dt>
           <dd className="tabular-nums">{money(t.balance_due_egp, locale)}</dd>
