@@ -340,7 +340,7 @@ select is(
       -- app.job_match_rows READS it, to score availability in the Overall Match presentation signal (test 74).
       -- It is read-only, writes nothing, expires nothing, and gates nothing.
       and p.proname <> 'job_match_rows'
-      -- app.profile_completion READS it for the Engineer's informational completion steps (20261128100005).
+      -- app.profile_completion READS it for the Engineer's informational completion steps (20261128130005).
       -- Read-only, gates nothing, expires nothing.
       and p.proname <> 'profile_completion'),
   0, 'no other function in app/public writes or reads available_for_work — no expiry job exists');

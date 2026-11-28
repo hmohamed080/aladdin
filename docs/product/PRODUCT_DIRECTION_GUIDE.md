@@ -382,7 +382,7 @@ During every account review, Landing Page review, Registration review, and featu
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
 
 ### 2026-11-28 — Engineer registration opens
-- **What:** Engineer is no longer *Coming Soon* in the app, the landing pages or the database gate (`20261128100007`). This also opens the Engineer's registration-time Engineering Office (`design_office`) application. Contractor and Personal Account stay *Coming Soon*. The `independent_commerce` flag is unchanged (off). The Engineer account collects no date of birth. Supersedes the Engineer part of the *Coming Soon* wording in older entries below. Takes effect only where the migration and the app are deployed.
+- **What:** Engineer is no longer *Coming Soon* in the app, the landing pages or the database gate (`20261128130007`). This also opens the Engineer's registration-time Engineering Office (`design_office`) application. Contractor and Personal Account stay *Coming Soon*. The `independent_commerce` flag is unchanged (off). The Engineer account collects no date of birth. Supersedes the Engineer part of the *Coming Soon* wording in older entries below. Takes effect only where the migration and the app are deployed.
 - **Why:** The Engineer account is being shipped.
 - **Approved by:** Owner, 2026-11-28.
 

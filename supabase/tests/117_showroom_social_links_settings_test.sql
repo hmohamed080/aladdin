@@ -285,7 +285,7 @@ select ok(not (app.profile_completion('11700002-0000-4000-8000-000000000117')->'
 -- Before/after proof: everyone who does not manage a showroom gets exactly the previous result.
 select is((select count(*)::int from public.users u
             where not pg_temp.manages_showroom(u.id)
-              -- the Engineer has its own saved-requirements formula (20261128100005)
+              -- the Engineer has its own saved-requirements formula (20261128130005)
               and coalesce(app.effective_persona(u.id)::text, (select o.selected_persona::text from public.onboarding_progress o where o.user_id = u.id), '') <> 'engineer'
               and app.profile_completion(u.id) is distinct from pg_temp.profile_completion_before(u.id)), 0,
   'profile_completion is identical to the previous definition for every non-showroom, non-engineer user');

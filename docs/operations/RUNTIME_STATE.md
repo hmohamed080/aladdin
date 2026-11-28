@@ -6,9 +6,9 @@
 
 ## Engineer account port and registration opening (local branch, not pushed or deployed) - 2026-11-28
 
-- Branch `feat/engineer-account-port-20261128`: the Engineer account ported onto `main` `89b147f6`; migrations `20261128100001`-`20261128100007`; permission contracts `20261128100001`-`20261128100006`.
+- Branch `feat/engineer-account-port-20261128`: the Engineer account ported onto `main` `89b147f6`; migrations `20261128130001`-`20261128130007`; permission contracts `20261128130001`-`20261128130006`.
 - **No hosted change.** Acceptance and Production still refuse a fresh Engineer registration.
-- When released: apply the migrations, then promote the app immediately (see the review marker in `20261128100005`).
+- When released: apply the migrations, then promote the app immediately (see the review marker in `20261128130005`).
 
 ## Acceptance: UI fixes deployed; ordering switched on in the repository - 2026-11-28
 
