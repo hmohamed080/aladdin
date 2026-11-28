@@ -4,7 +4,7 @@ export type IconName =
   | "chart" | "diamond" | "sofa" | "heart" | "chevron";
 
 type Copy = {
-  nav: { label: string; items: [string, string][]; signIn: string; register: string; registerTitle: string; soon: string; menu: string };
+  nav: { label: string; items: [string, string][]; signIn: string; myOrders: string; account: string; register: string; registerTitle: string; soon: string; menu: string };
   hero: { title: string; accent: string; titleTail: string; body: string; discover: string; create: string; video: string; stats: { users: string; orgs: string; products: string } };
   roles: { eyebrow: string; title: string; more: string; items: { icon: IconName; img: string; title: string; body: string }[] };
   services: { eyebrow: string; title: string; body: string; items: { icon: IconName; title: string; body: string }[] };
@@ -19,7 +19,7 @@ type Copy = {
 };
 
 export const brandContent: Copy = {
-  nav: { label: "التنقل الرئيسي", items: [["الرئيسية", "#top"], ["المتجر", "/market"], ["الشركات والمعارض", "#roles"], ["المحترفون", "#roles"], ["عن علاء الدين", "#why"], ["تواصل معنا", "#footer"]], signIn: "دخول", register: "أنشئ حسابك", registerTitle: "اختر نوع حسابك", soon: "قريبًا", menu: "القائمة" },
+  nav: { label: "التنقل الرئيسي", items: [["الرئيسية", "#top"], ["المتجر", "/market"], ["الشركات والمعارض", "#roles"], ["المحترفون", "#roles"], ["عن علاء الدين", "#why"], ["تواصل معنا", "#footer"]], signIn: "دخول", myOrders: "طلباتي", account: "حسابي", register: "أنشئ حسابك", registerTitle: "اختر نوع حسابك", soon: "قريبًا", menu: "القائمة" },
   hero: { title: "ارتقِ بمشروعك مع منصة", accent: "علاء الدين", titleTail: "للتشطيبات والديكور", body: "منصة متكاملة تساعدك على اكتشاف المنتجات، والتواصل مع أهم الشركات والمعارض، والوصول إلى نخبة من المحترفين في مجال التشطيبات والديكور، كل ذلك في مكان واحد.", discover: "اكتشف المنتجات", create: "أنشئ حسابك", video: "شاهد الفيديو", stats: { users: "مستخدم", orgs: "شركة ومعرض", products: "منتج" } },
   roles: { eyebrow: "لمن صُممت منصة علاء الدين؟", title: "حلول متكاملة لكل من يعمل في عالم التشطيبات والديكور", more: "اكتشف المزيد", items: [
     { icon: "home", img: "role_home", title: "الأفراد وأصحاب المشاريع", body: "اكتشف المنتجات، واستلهم الأفكار، وتواصل مع أفضل الشركات والمحترفين لتنفيذ مشروعك." },

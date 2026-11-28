@@ -88,6 +88,18 @@ export function parseStoredCart(raw: string | null): StoredCartLine[] {
   return out;
 }
 
+/**
+ * One showroom's delivery fee for its part of the cart, by the rule checkout applies: free when the area's fee is zero, when
+ * every product is marked free shipping, or when the products reach the showroom's free-delivery minimum.
+ */
+function sellerFee(seller: CartSeller, own: PricedLine[]): number | null {
+  const d = seller.delivery;
+  if (d.status !== "available") return null;
+  const subtotal = cents(own.reduce((n, l) => n + l.lineTotalEgp, 0));
+  const free = own.every((l) => l.free_shipping === true) || (d.free_min_egp != null && subtotal >= d.free_min_egp);
+  return free ? 0 : d.fee_egp;
+}
+
 /** Price the cart: products, per-showroom delivery, grand total (products + delivery). */
 export function priceCart(quote: CartQuote, stored: readonly StoredCartLine[], method: ReceivingMethod): CartTotals {
   const wanted = new Map(stored.map((l) => [`${l.slug}\u0000${l.sku}`, l.qty]));
@@ -111,7 +123,7 @@ export function priceCart(quote: CartQuote, stored: readonly StoredCartLine[], m
   const sellers = quote.sellers.filter((s) => active.has(s.index));
   const perSeller: SellerDelivery[] = sellers.map((seller) => ({
     seller,
-    feeEgp: seller.delivery.status === "available" ? seller.delivery.fee_egp : null,
+    feeEgp: sellerFee(seller, lines.filter((l) => l.seller === seller.index && !l.outOfStock)),
   }));
 
   const productsEgp = cents(lines.reduce((n, l) => n + l.lineTotalEgp, 0));

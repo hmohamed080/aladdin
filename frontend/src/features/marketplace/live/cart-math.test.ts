@@ -132,3 +132,21 @@ describe("quantity and stored cart hygiene", () => {
     expect(parseStoredCart(JSON.stringify(many))).toHaveLength(50);
   });
 });
+
+describe("free delivery in the cart (the rule checkout applies)", () => {
+  const withMin = (min: number): CartSeller => ({ ...seller(1, 50), delivery: { status: "available", fee_egp: 50, free_min_egp: min } });
+  const flagged = (sku: string, price: number): CartQuoteLine => ({ ...(line(sku, 1, price) as Extract<CartQuoteLine, { status: "ok" }>), free_shipping: true });
+
+  it("is free once the showroom's products reach its minimum", () => {
+    const quote: CartQuote = { lines: [line("A", 1, 100)], sellers: [withMin(200)] };
+    expect(priceCart(quote, stored(["A", 1]), "delivery").deliveryEgp).toBe(50);
+    expect(priceCart(quote, stored(["A", 2]), "delivery").deliveryEgp).toBe(0);
+  });
+
+  it("is free only when every product of that showroom ships free", () => {
+    const all: CartQuote = { lines: [flagged("A", 150)], sellers: [seller(1, 50)] };
+    expect(priceCart(all, stored(["A", 1]), "delivery")).toMatchObject({ deliveryEgp: 0, totalEgp: 150 });
+    const mixed: CartQuote = { lines: [flagged("A", 150), line("B", 1, 10)], sellers: [seller(1, 50)] };
+    expect(priceCart(mixed, stored(["A", 1], ["B", 1]), "delivery").deliveryEgp).toBe(50);
+  });
+});

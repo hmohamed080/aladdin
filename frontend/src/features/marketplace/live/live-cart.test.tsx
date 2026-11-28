@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SavedAddress } from "@/features/marketplace-addresses/address-model";
 import { I18nProvider } from "@/lib/i18n/provider";
 import type { CartQuote, CartQuoteLine, CartSeller, PublicCard } from "./public-contract";
 import { LIVE_CART_KEY, useLiveCart } from "./live-cart-store";
@@ -218,5 +219,20 @@ describe("live cart page", () => {
     await screen.findByText("Product A");
     expect(screen.getByText("Card p-z")).toBeInTheDocument();
     expect(screen.queryByText("Card p-a")).not.toBeInTheDocument();
+  });
+});
+
+describe("live cart with a saved address", () => {
+  it("prices delivery from the saved default address without asking for it again", async () => {
+    store([{ slug: "p-a", sku: "A", qty: 1 }]);
+    quoteAction.mockImplementation(answer([ok("A", 1, 100, 5)], [showroom(1, "Show A", { cairo: 40 })]));
+    const saved = { id: "s1", kind: "home", nickname: "Home", governorate_key: "cairo", area_key: "nasr-city", street: "Test Street", is_default: true };
+    render(wrap(<LiveCartPage suggestions={[]} addresses={[saved as unknown as SavedAddress]} />));
+    await waitFor(() => expect(quoteAction).toHaveBeenCalledWith(expect.anything(), "cairo", expect.any(String)));
+    expect(document.getElementById("mp-gov")).toBeNull();
+    expect(document.querySelector("textarea")).toBeNull();
+    // pricing another area brings the place selects back
+    fireEvent.change(document.getElementById("mp-saved")!, { target: { value: "" } });
+    expect(document.getElementById("mp-gov")).not.toBeNull();
   });
 });

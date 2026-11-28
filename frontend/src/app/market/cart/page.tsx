@@ -9,6 +9,7 @@ import { MarketplaceShell } from "@/features/marketplace/marketplace-shell";
 import { isMarketplaceOrderingEnabled, isMarketplacePreviewEnabled } from "@/lib/env";
 import { LOCALE_COOKIE, directionFor, resolveLocale } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/provider";
+import { loadBuyerAddresses } from "@/server/queries/marketplace-addresses";
 import { loadPublicCatalogPage } from "@/server/queries/marketplace-public";
 
 export const dynamic = "force-dynamic";
@@ -34,12 +35,16 @@ export default async function MarketplaceCartRoute() {
   // a few newest published products for the "you may also like" shelf (already-in-cart ones are hidden client-side)
   const page = await loadPublicCatalogPage({ sort: "newest", page: 1 });
   const suggestions = (page?.items ?? []).slice(0, 12);
-  const images = await marketplacePublicImageUrls(await getServerSupabase(), suggestions.map((item) => item.image_id));
+  const supabase = await getServerSupabase();
+  const images = await marketplacePublicImageUrls(supabase, suggestions.map((item) => item.image_id));
+  // the signed-in buyer's own saved addresses, so the cart prices delivery without asking again
+  const { data: auth } = await supabase.auth.getUser();
+  const saved = auth.user ? await loadBuyerAddresses() : null;
   return (
     <I18nProvider locale={locale} dir={directionFor(locale)}>
       <MarketplaceShell showTitle={false}>
         <MarketplaceImagesProvider images={images}>
-          <LiveCartPage suggestions={suggestions} />
+          <LiveCartPage suggestions={suggestions} addresses={saved?.addresses} />
         </MarketplaceImagesProvider>
       </MarketplaceShell>
     </I18nProvider>

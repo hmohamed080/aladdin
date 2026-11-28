@@ -96,7 +96,7 @@ export async function shipmentUpdateAction(orderId: string, carrier: string, tra
 }
 
 export async function reasonPresetsAction(action: ReasonAction): Promise<OrderPageResult<{ presets: ReasonPreset[] }>> {
-  if (!["order_cancel_seller", "order_cancel_buyer", "payment_issue"].includes(action)) return { ok: false, code: "invalid_action" };
+  if (!["order_cancel_seller", "order_cancel_buyer", "payment_issue", "return_reject"].includes(action)) return { ok: false, code: "invalid_action" };
   const { data, error } = await rpcOf(await getServerSupabase()).rpc("marketplace_order_reason_presets", { p_action: action });
   if (error || !Array.isArray(data)) return { ok: false, ...fail(error) };
   return { ok: true, presets: data as ReasonPreset[] };

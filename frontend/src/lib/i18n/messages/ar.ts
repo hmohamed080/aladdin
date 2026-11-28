@@ -2906,6 +2906,9 @@ export const ar: Messages = {
           escalated: "تم تصعيد طلب الإرجاع للمنصة",
           admin_reminder: "تذكير من المنصة بخصوص إرجاع",
           admin_decided: "قرار المنصة في طلب إرجاع",
+          shipped: "المرتجع في الطريق (للمعرض)",
+          complaint_filed: "شكوى على طلب إرجاع (للطرف الآخر)",
+          refund_confirm_reminder: "تذكير المشتري بتأكيد استلام مبلغ المرتجع",
         },
         stock: { low: "مخزون المنتج على وشك النفاد", out: "نفاد مخزون المنتج" },
         order: {
@@ -7911,7 +7914,6 @@ export const ar: Messages = {
     review: { approved: "معتمد", pending_review: "قيد المراجعة", rejected: "لم يُعتمد", no_image: "لا توجد صورة بعد" },
     status: { draft: "مسودة", published: "منشور", unpublished: "غير منشور", archived: "مؤرشف", low: "منخفض", out: "نفد المخزون" },
     moreSkus: "+{n}",
-    price: "{amount} جنيه",
     action: { edit: "تعديل", preview: "معاينة في الماركت", previewUnavailable: "المعاينة متاحة للمنتجات المنشورة فقط", more: "المزيد", publish: "نشر في الماركت", unpublish: "إلغاء النشر", checking: "جارٍ الفحص…", published: "تم النشر — المنتج ظاهر في الماركت الآن.", unpublished: "تم إلغاء النشر.", needsApproval: "يُتاح النشر بعد اعتماد المنتج من فريق المنصة." },
     showing: "عرض {shown} من {total} منتج",
     pagination: "ترقيم الصفحات",

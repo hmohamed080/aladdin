@@ -9,6 +9,8 @@ ck() { local d="$1"; shift; if "$@"; then pass=$((pass+1)); echo "PASS  $d"; els
 ck "the restore stack CLI is pinned to an exact version" grep -qE '^RESTORE_SUPABASE_CLI_VERSION=[0-9]+\.[0-9]+\.[0-9]+$' "$R"
 ck "the default CLI uses that pinned version, never latest" grep -q 'supabase@\$RESTORE_SUPABASE_CLI_VERSION' "$R"
 ck "the pin is 3.2.0 (gotrue v2.198.0 with one_time_tokens.link_token_hash and saml_providers.dedicated_scope, storage-api v1.96.0: matches Acceptance)" grep -q '^RESTORE_SUPABASE_CLI_VERSION=3.2.0$' "$R"
+ck "the Auth image is pinned to v2.199.0 (custom_oauth_providers.client_auth_method: matches Acceptance and Production)" grep -q '^RESTORE_GOTRUE_VERSION=v2.199.0$' "$R"
+ck "the pin is written where the CLI reads it, before the stack starts" bash -c "[ \$(grep -n 'supabase/.temp/gotrue-version\"' '$R' | tail -1 | cut -d: -f1) -lt \$(grep -n '^sb start' '$R' | cut -d: -f1) ]"
 ck "the mismatch guard still exists and exits 2" bash -c "grep -q 'STACK MISMATCH' '$R' && grep -A3 'STACK MISMATCH' '$R' | grep -q 'exit 2'"
 ck "the guard compares the full column list, filtering only marker lines" bash -c "grep -o \"grep -v '^marker '\" '$R' | wc -l | grep -qx 2"
 ck "the guard runs before any restore (step 3 precedes step 4)" bash -c "[ \$(grep -n 'STACK MISMATCH' '$R' | head -1 | cut -d: -f1) -lt \$(grep -n '^# 4. Restore' '$R' | cut -d: -f1) ]"

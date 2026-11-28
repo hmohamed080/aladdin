@@ -73,7 +73,7 @@ export const deliveryCopy = {
     unconfigured: "The showroom will confirm its delivery details soon.",
     soldBy: "Sold by",
     sellerPage: "All products from this showroom",
-    storeProducts: (n: string) => `${n} products`,
+    storeProducts: (n: string) => (n === "1" ? "1 product" : `${n} products`),
     closedTitle: "The store is temporarily closed",
     closedBody: "Browsing is not available right now. Please come back later.",
     sellerMissingTitle: "This showroom is not available",

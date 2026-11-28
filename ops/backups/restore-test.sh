@@ -29,7 +29,12 @@ for f in schema-fingerprint.sql rowcounts.sql auth-storage-columns.sql local-onl
 # 17.12.0.000. No v2 CLI can do this: the last one, 2.122.1, ships storage-api v1.84.19 (through 0074) and lacks both
 # lifecycle tables; 2.119.0 (v1.79.28) lacked them too, and 2.110.0 (gotrue v2.193.0, storage-api v1.66.4) more. Bump
 # this only together with the hosted project's Auth/Storage versions; db-backup.sh keeps its own dump-tool pin.
+# 2026-11-26: both hosted projects run gotrue v2.199.0 (auth migration 20261116120000: custom_oauth_providers
+# client_auth_method and client_assertion_audience) and no released CLI ships it yet, so the Auth image alone is pinned
+# through the CLI's own `supabase/.temp/gotrue-version` override. CLI 3.2.0 + that image: 346 Auth/Storage columns,
+# the same md5 as Acceptance and Production. Drop the override once the pinned CLI ships this image or a newer one.
 RESTORE_SUPABASE_CLI_VERSION=3.2.0
+RESTORE_GOTRUE_VERSION=v2.199.0
 read -r -a SB <<< "${SUPABASE_CLI:-npx --yes supabase@$RESTORE_SUPABASE_CLI_VERSION}"
 sb() { "${SB[@]}" "$@"; }
 umask 077
@@ -81,6 +86,7 @@ for f in roles.sql schema.sql data.sql security-tail.out.sql fingerprint.txt row
 R="$W/stack"; mkdir -p "$R/supabase/migrations"; cp -r "$REPO_ROOT/supabase/templates" "$R/supabase/" 2>/dev/null || true
 sed 's/^project_id = .*/project_id = "aladdin_restore_test"/; s/543\([0-9][0-9]\)/645\1/g; s/^sql_paths = .*/sql_paths = []/' \
   "$REPO_ROOT/supabase/config.toml" > "$R/supabase/config.toml"
+mkdir -p "$R/supabase/.temp"; printf '%s' "$RESTORE_GOTRUE_VERSION" > "$R/supabase/.temp/gotrue-version"
 C="supabase_db_aladdin_restore_test"
 [ -n "${KEEP_STACK:-}" ] || trap 'sb stop --workdir "$R" --no-backup >/dev/null 2>&1 || true' EXIT
 sb start --workdir "$R" -x edge-runtime,logflare,vector,studio,supavisor,imgproxy,realtime,mailpit,postgres-meta > "$OUT/stack-start.log" 2>&1 \

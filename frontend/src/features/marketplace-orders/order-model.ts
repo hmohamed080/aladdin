@@ -241,8 +241,32 @@ export function reorderLines(items: readonly Pick<OrderLineV2, "slug" | "sku" | 
 export const itemName = (i: { name_ar: string; name_en: string }, locale: "ar" | "en") =>
   (locale === "ar" ? i.name_ar || i.name_en : i.name_en || i.name_ar) || "";
 
+/** The snapshot label; numbers stored by earlier orders as `10.0000` are shown as `10`. */
 export const variantText = (v: { ar: string; en: string } | null, locale: "ar" | "en") =>
-  v ? (locale === "ar" ? v.ar || v.en : v.en || v.ar) : "";
+  (v ? (locale === "ar" ? v.ar || v.en : v.en || v.ar) : "")
+    .split(" / ")
+    .map((part) => (/^-?\d+\.\d+$/.test(part) ? String(Number(part)) : part))
+    .join(" / ");
+
+/** Nothing is left to pay once the money was collected or is going back, or the order will not be handed over. */
+export function balanceStillDue(o: { status: string; payment_status: string }): boolean {
+  return !["collected", "refund_due", "refunded"].includes(o.payment_status) && !["cancelled", "returned"].includes(o.status);
+}
+
+const ADDRESS_PARTS = {
+  en: [["street", ""], ["building", "Building"], ["floor", "Floor"], ["apartment", "Apartment"], ["landmark", "Landmark:"], ["district", ""]],
+  ar: [["street", ""], ["building", "عمارة"], ["floor", "دور"], ["apartment", "شقة"], ["landmark", "علامة مميزة:"], ["district", ""]],
+} as const;
+
+/** The delivery address with every number labelled; an order without the structured snapshot shows its stored line. */
+export function addressLine(snapshot: Record<string, unknown> | null | undefined, fallback: string | null | undefined, locale: "ar" | "en"): string {
+  const parts = ADDRESS_PARTS[locale].flatMap(([key, label]) => {
+    const v = snapshot?.[key];
+    const text = typeof v === "string" ? v.trim() : "";
+    return text ? [label ? `${label} ${text}` : text] : [];
+  });
+  return parts.length ? parts.join(locale === "ar" ? "، " : ", ") : (fallback ?? "");
+}
 
 /** Orders from before the new model carry old statuses; the pages show them but offer no buttons. */
 export function isLegacy(doc: Pick<OrderDocumentV2, "source">): boolean {

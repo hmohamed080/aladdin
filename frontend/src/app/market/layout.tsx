@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { CartViewerProvider } from "@/features/marketplace/live/cart-viewer";
+import { SignedInViewer } from "@/features/marketplace/live/viewer-context";
 import { isMarketplaceOrderingEnabled } from "@/lib/env";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/server/auth/session";
+import { getCurrentUser, getSessionIdentity } from "@/server/auth/session";
 
 /** An opaque, one-way tag of the account, so the browser can tell whose cart it holds without storing the account id. */
 async function ownerTagOf(userId: string): Promise<string> {
@@ -11,12 +12,14 @@ async function ownerTagOf(userId: string): Promise<string> {
 }
 
 /**
- * Every /market page. While ordering is off (the browse-only launch) this renders nothing extra: no cart, no sync, no
- * account lookup. While it is on, it tells the page who is looking (signed in or not, and which showrooms they work for)
+ * Every /market page. While ordering is off (the browse-only launch) there is no cart and no sync; a signed-in caller is
+ * only told apart from a guest (from the session token) so the header stops offering sign-in. While it is on, it tells the page who is looking (signed in or not, and which showrooms they work for)
  * and keeps the browser cart and the account cart together.
  */
 export default async function MarketplaceLayout({ children }: { children: ReactNode }) {
-  if (!isMarketplaceOrderingEnabled()) return children;
+  if (!isMarketplaceOrderingEnabled()) {
+    return (await getSessionIdentity()) ? <SignedInViewer>{children}</SignedInViewer> : children;
+  }
   const user = await getCurrentUser();
   if (!user) return <CartViewerProvider ownerTag={null} ownSellers={[]}>{children}</CartViewerProvider>;
   const { data } = await (await getServerSupabase()).rpc("marketplace_cart_own_sellers");

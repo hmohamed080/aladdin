@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { createTranslator } from "@/lib/i18n/translate";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
+import { SignedInViewer } from "@/features/marketplace/live/viewer-context";
 import { LandingHeader } from "./landing-header";
 
 vi.mock("@/lib/i18n/context", () => ({
@@ -52,5 +53,22 @@ describe("landing header: account type menu", () => {
     fireEvent.click(trigger);
     fireEvent.keyDown(trigger, { key: "Escape" });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+describe("landing header: signed-in caller", () => {
+  it("shows the account instead of sign-in and sign-up, and no orders link while ordering is off", () => {
+    render(<SignedInViewer><LandingHeader /></SignedInViewer>);
+    expect(screen.getByRole("link", { name: "حسابي" })).toHaveAttribute("href", "/home");
+    expect(screen.queryByRole("link", { name: "تسجيل الدخول" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /إنشاء حساب/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: "طلباتي" })).toBeNull();
+  });
+
+  it("adds the orders link once ordering is on", () => {
+    vi.stubEnv("NEXT_PUBLIC_MARKETPLACE_ORDERING", "true");
+    render(<SignedInViewer><LandingHeader /></SignedInViewer>);
+    expect(screen.getByRole("link", { name: "طلباتي" })).toHaveAttribute("href", "/market/orders");
+    vi.unstubAllEnvs();
   });
 });

@@ -2,8 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import RootPage from "./page";
 
-const state = vi.hoisted(() => ({ users: 1200 as number | null, open: false, ordering: false, items: [] as unknown[] }));
+const state = vi.hoisted(() => ({ users: 1200 as number | null, open: false, ordering: false, signedIn: false, items: [] as unknown[] }));
 vi.mock("server-only", () => ({}));
+vi.mock("@/server/auth/session", () => ({ getSessionIdentity: async () => (state.signedIn ? { id: "u1" } : null) }));
 vi.mock("@/lib/env", () => ({ isMarketplacePreviewEnabled: () => state.open, isMarketplaceOrderingEnabled: () => state.ordering }));
 vi.mock("@/server/queries/marketplace-public", () => ({ loadPublicCatalogPage: async () => ({ items: state.items }) }));
 vi.mock("@/server/media/marketplace-public-images", () => ({ marketplacePublicImageUrls: async () => ({}) }));
@@ -66,5 +67,18 @@ describe("homepage: one canonical Landing", () => {
     state.open = false;
     state.ordering = false;
     state.items = [];
+  });
+
+  it("offers sign-in and sign-up in the header to a guest only", async () => {
+    const guest = render(await RootPage());
+    expect(guest.container.querySelector('header a[href="/auth/sign-in"]')).not.toBeNull();
+    expect(guest.container.querySelector('header a[href="/home"]')).toBeNull();
+    guest.unmount();
+    state.signedIn = true;
+    const { container } = render(await RootPage());
+    expect(container.querySelector('header a[href="/auth/sign-in"]')).toBeNull();
+    expect(container.querySelector('header a[href="/home"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/market/orders"]')).toBeNull();
+    state.signedIn = false;
   });
 });
