@@ -8038,3 +8038,7 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - 18 migrations, 246 -> 264. Snapshot pinned: aladdin-acceptance-20261126T140613Z (restore run 45847352834 PASS).
 - Forward-fix proved from the full plan and every partly applied state; live Acceptance function definitions equal the replayed pre-state.
 - Open: owner GO for preflight, apply, then the frontend deploy. Runbook: MARKETPLACE_ORDERS_ACCEPTANCE_PLAN_20261126.md.
+
+## 2026-11-28 - Marketplace orders applied to Acceptance and frontend deployed
+- Owner ran preflight and apply of `marketplace-orders` (246 -> 264): PASS. Frontend `d96b440e` deployed from `45e19ebb` on the owner's GO.
+- Open: enable ordering on Acceptance, timers Worker secrets and deploy, WhatsApp secrets, browser testing. Details in RUNTIME_STATE.md.

@@ -1,3 +1,13 @@
+## Acceptance at 264: Marketplace orders applied and frontend deployed - 2026-11-28
+
+Supersedes, for Acceptance only, every older entry below that says the 2026-11-24/26 migrations are not applied there.
+
+- **Acceptance** (`nxossqhdfltcqdwvbewi`): 264 migrations, latest `20261126120002`. Plan `marketplace-orders` (246 -> 264, PR #289) applied by the owner from `main` `45e19ebb` with restore-verified snapshot `aladdin-acceptance-20261126T140613Z` (backup run 45835425956, restore run 45847352834). Preflight, post gate, contract `20261126120002`, catalog diff and `post` smoke passed. Read-only check afterwards: 11 orders, all `legacy` and finished; 36 notification templates; upload limits 50 / 150 / 1024 MB; no timers.
+- **Acceptance frontend**: `aladdin-frontend-preview` version `d96b440e-66fd-4ec4-b81b-0719186dd6aa` (workflow run 46124438330, `main` `45e19ebb`); `/api/health`, `/`, `/auth/sign-in`, `/legal/terms` answered 200 in the workflow smoke. Previous version (rollback target): `48d796b8-febc-4261-8058-41e2eca6fa67`.
+- Still off on Acceptance: ordering (`NEXT_PUBLIC_MARKETPLACE_ORDERING` unset), the timers Worker, WhatsApp sending, video. No signed-in browser check has run against this build.
+- **Production** is unchanged by this: 246 migrations, latest `20261124120001`.
+- Backups: both hosted projects run Auth `v2.199.0`; `restore-test.sh` pins that image (PR #288) and the kit in `aladdin-backups` was built from `main` `ef086fff` (carries PRs #277, #279, #288).
+
 ## Marketplace returns and exchanges, PR 15 (draft PR, not deployed) - 2026-11-25
 
 Migrations 20261125130001-150003 exist only in the branch. Nothing applied to Acceptance or Production. New permission `marketplace_returns.review` (grantable). Buyer pages stay behind `NEXT_PUBLIC_MARKETPLACE_ORDERING`.
