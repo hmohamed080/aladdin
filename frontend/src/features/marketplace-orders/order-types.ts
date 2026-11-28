@@ -217,6 +217,8 @@ export type OrderWaybill = {
   order_number: string;
   recipient: { name: string; phone: string | null };
   address_text: string | null;
+  /** Absent until migration 20261128120001 is applied; null for orders without a saved structured address. */
+  address_parts?: Record<string, unknown> | null;
   governorate_key: string | null;
   area_key: string | null;
   latitude: number | null;

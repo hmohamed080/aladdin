@@ -168,4 +168,13 @@ describe("print views", () => {
     expect(screen.getByText(/Collect on delivery/)).toHaveTextContent("360");
     expect(screen.getByText("Call first")).toBeInTheDocument();
   });
+
+  it("labels the waybill address from the saved parts", () => {
+    renderWithI18n(
+      <WaybillView backHref="/showroom/marketplace/orders/x" waybill={{ order_number: "MP-000124", recipient: { name: "Mona", phone: null }, address_text: "1 - 1 - 1", address_parts: { street: "Example Street", building: "1", floor: "2" }, governorate_key: null, area_key: null, latitude: null, longitude: null, items: [], payment: { method: "cod", collect_on_delivery_egp: 0 }, tracking_number: null, notes: null }} />,
+      "en",
+    );
+    expect(screen.getByText("Example Street, Building 1, Floor 2")).toBeInTheDocument();
+    expect(screen.queryByText(/Collect on delivery/)).not.toBeInTheDocument();
+  });
 });

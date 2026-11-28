@@ -81,4 +81,16 @@ describe("homepage: one canonical Landing", () => {
     expect(container.querySelector('a[href="/market/orders"]')).toBeNull();
     state.signedIn = false;
   });
+
+  it("offers a signed-in visitor their account instead of creating one, anywhere on the page", async () => {
+    const guest = render(await RootPage());
+    expect(guest.container.querySelector('a[href^="/auth/sign-up"]')).not.toBeNull();
+    guest.unmount();
+    state.signedIn = true;
+    const { container } = render(await RootPage());
+    expect(container.querySelector('a[href^="/auth/sign-up"]')).toBeNull();
+    // The "how it works" steps still describe signing up; no link or button may offer it.
+    expect([...container.querySelectorAll("a, button")].filter((el) => el.textContent?.includes("أنشئ حساب"))).toEqual([]);
+    state.signedIn = false;
+  });
 });

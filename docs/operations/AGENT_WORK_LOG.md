@@ -8061,3 +8061,8 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Added the reviewed permission contract `supabase/permissions/20261128090001.json` (two internal helpers, no API role) after CI's permission gate refused them.
 - Validation: throwaway local stack `supabase test db` Files=202 Tests=10201 PASS; return and timer concurrency scripts PASS; vitest 5539 passed, one image-variant test timed out under load and passed alone; eslint 0 errors; tsc one error in `edge/media-worker` (module `postgres` not installed locally). Not checked in a browser.
 - Open: merge, Acceptance apply plan for the migration (owner applies), frontend deploy, retest, timers Worker secrets and deploy.
+
+## 2026-11-28 - Landing sign-up actions, waybill after a refund, Acceptance plan "marketplace-clarity" (nothing applied)
+- Owner reported three notes. Fixed: a signed-in visitor of `/` gets "My account" instead of "create account" (F25); the waybill asks for no money after a refund and labels the address (F26, migration `20261128120001`). Expected, unchanged: issued invoice `INV-000001` keeps its stored data.
+- Prepared plan `marketplace-clarity` (264 -> 266) for `20261128090001` and `20261128120001`: gate, smoke, pinned forward-fix, scratch proof OK; live Acceptance function definitions equal the replayed pre-state (read-only).
+- Open: merge (owner), owner preflight and apply, frontend deploy, retest, timers Worker secrets and deploy.
