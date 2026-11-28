@@ -250,10 +250,10 @@ web3 = 30
 # Allow/disallow new user signups via email to your project.
 enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
-# addresses. If disabled, only the new email is required to confirm. Disabled here: the in-app change
-# flow (features/engineer/email-change.tsx) first re-checks the current password, then confirms the new
-# address with a 6-digit code, and the old address gets an email_changed notice instead.
-double_confirm_changes = false
+# addresses. If disabled, only the new email is required to confirm. Must stay ON: the app's password
+# re-check protects only its own Server Action, not GoTrue's `PUT /auth/v1/user`, so the code sent to the
+# OLD address is what stops a stolen session from moving the account (phone-login accounts also rely on it).
+double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
 # REVISION 4 — Architecture B is now the implemented registration flow for
 # the password-auth preview (docs/frontend/auth-password-preview.md
@@ -321,8 +321,8 @@ content_path = "./supabase/templates/recovery.html"
 subject = "رمز تأكيد إنشاء الحساب في علاء الدين"
 content_path = "./supabase/templates/confirmation.html"
 
-# Email-change template: the 6-digit {{ .Token }} sent to the NEW address, verified with
-# `verifyOtp({ type: "email_change" })` after the app has re-checked the account password.
+# Email-change template: a 6-digit {{ .Token }} sent to BOTH the current and the new address (each its own
+# code), each verified with `verifyOtp({ email, type: "email_change" })`.
 [auth.email.template.email_change]
 subject = "رمز تأكيد تغيير بريدك في علاء الدين"
 content_path = "./supabase/templates/email_change.html"

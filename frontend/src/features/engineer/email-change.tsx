@@ -26,7 +26,7 @@ function message(ar: boolean, code: EmailChangeState["code"]): string | null {
   }
 }
 
-/** Two steps: password + new email, then the 6-digit code mailed to the new address. */
+/** Two steps: password + new email, then two 6-digit codes: one mailed to the current address, one to the new. */
 export function EmailChange({ ar }: { ar: boolean }) {
   const [start, startAction] = useActionState(startEmailChangeAction, INITIAL);
   const [confirm, confirmAction] = useActionState(confirmEmailChangeAction, INITIAL);
@@ -40,8 +40,23 @@ export function EmailChange({ ar }: { ar: boolean }) {
     return (
       <form action={confirmAction} className="engineer-contact-form">
         <input type="hidden" name="email" value={start.email} />
-        <p className="engineer-contact-empty">{ar ? `أرسلنا رمزًا من 6 أرقام إلى ${start.email}. أدخله لتأكيد التغيير.` : `We sent a 6-digit code to ${start.email}. Enter it to confirm the change.`}</p>
-        <OtpInput name="token" autoFocus error={Boolean(error)} />
+        <p className="engineer-contact-empty">{ar ? `لتأكيد التغيير أرسلنا رمزًا من 6 أرقام إلى بريدك الحالي، ورمزًا آخر إلى ${start.email}.` : `To confirm the change we sent a 6-digit code to your current email and another to ${start.email}.`}</p>
+        {confirm.confirmed?.current ? (
+          <InlineSuccess>{ar ? "تم تأكيد رمز البريد الحالي." : "The current email's code is confirmed."}</InlineSuccess>
+        ) : (
+          <>
+            <label htmlFor="current-email-code">{ar ? "رمز البريد الحالي" : "Code from your current email"}</label>
+            <OtpInput id="current-email-code" name="currentToken" autoFocus error={Boolean(error)} />
+          </>
+        )}
+        {confirm.confirmed?.next ? (
+          <InlineSuccess>{ar ? "تم تأكيد رمز البريد الجديد." : "The new email's code is confirmed."}</InlineSuccess>
+        ) : (
+          <>
+            <label htmlFor="new-email-code">{ar ? "رمز البريد الجديد" : "Code from your new email"}</label>
+            <OtpInput id="new-email-code" name="token" error={Boolean(error)} />
+          </>
+        )}
         <SubmitButton size="sm" pendingLabel={ar ? "جارٍ التأكيد…" : "Confirming…"}>{ar ? "تأكيد التغيير" : "Confirm change"}</SubmitButton>
         {error ? <InlineError>{error}</InlineError> : null}
       </form>

@@ -8,16 +8,21 @@ import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
  * Changing the sign-in email, in two steps — never one:
  *   1. the caller proves they still hold the account PASSWORD (a fresh
  *      password check, whatever the age of the session), then Supabase Auth
- *      mails a 6-digit code to the NEW address;
- *   2. the code is verified. Only then does the email change, and every OTHER
- *      session of the account is signed out.
- * The old address gets Auth's "email changed" notice. Phone-registered
- * accounts have no real email (an internal login key stands in) and cannot use this.
+ *      mails a 6-digit code to the CURRENT address and another to the NEW one;
+ *   2. both codes are verified. Only then does the email change, and every
+ *      OTHER session of the account is signed out.
+ * The two-address confirmation is GoTrue's own setting (`double_confirm_changes`)
+ * and is the real protection: the password check here does not cover a direct
+ * call to Auth. The old address then gets Auth's "email changed" notice.
+ * Phone-registered accounts have no real email (an internal login key stands in)
+ * and cannot use this.
  */
 
 export type EmailChangeState = {
   step: "start" | "code" | "done";
   email?: string;
+  /** Which of the two codes Auth has already accepted; an accepted code cannot be sent again. */
+  confirmed?: { current: boolean; next: boolean };
   code?: "invalid" | "same" | "password" | "unavailable" | "throttled" | "phone_account" | "token" | "error";
 };
 
@@ -51,15 +56,34 @@ export async function startEmailChangeAction(_prev: EmailChangeState, fd: FormDa
   return { step: "code", email };
 }
 
-export async function confirmEmailChangeAction(_prev: EmailChangeState, fd: FormData): Promise<EmailChangeState> {
+export async function confirmEmailChangeAction(prev: EmailChangeState, fd: FormData): Promise<EmailChangeState> {
   const email = String(fd.get("email") ?? "").trim().toLowerCase();
-  const token = String(fd.get("token") ?? "").trim();
   if (!EMAIL.test(email)) return { step: "start", code: "error" };
-  if (!CODE.test(token)) return { step: "code", email, code: "token" };
+  const confirmed = { current: false, next: false, ...(prev.email === email ? prev.confirmed : undefined) };
+  const pending = (code: EmailChangeState["code"]): EmailChangeState => ({ step: "code", email, confirmed: { ...confirmed }, code });
+
+  const tokens = { current: String(fd.get("currentToken") ?? "").trim(), next: String(fd.get("token") ?? "").trim() };
+  const sides = (["current", "next"] as const).filter((side) => !confirmed[side]);
+  if (sides.some((side) => !CODE.test(tokens[side]))) return pending("token");
 
   const supabase = await getServerSupabase();
-  const { error } = await supabase.auth.verifyOtp({ email, token, type: "email_change" });
-  if (error) return { step: "code", email, code: error.status === 429 ? "throttled" : "token" };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) return { step: "start", code: "error" };
+
+  for (const side of sides) {
+    const address = side === "current" ? user.email : email;
+    const { error } = await supabase.auth.verifyOtp({ email: address, token: tokens[side], type: "email_change" });
+    if (error) return pending(error.status === 429 ? "throttled" : "token");
+    confirmed[side] = true;
+  }
+
+  // Auth is the authority on whether the change happened.
+  const {
+    data: { user: after },
+  } = await supabase.auth.getUser();
+  if (after?.email?.toLowerCase() !== email) return { step: "start", email, code: "error" };
 
   // The sign-in email changed: end every other session of this account.
   await supabase.auth.signOut({ scope: "others" });

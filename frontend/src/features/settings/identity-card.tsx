@@ -6,6 +6,7 @@ import { Card, InlineError, InlineSuccess } from "@/components/ui/primitives";
 import { Input, LabeledField, SubmitButton, Button } from "@/components/ui/controls";
 import { PhoneField } from "@/components/ui/phone-field";
 import type { CanonicalPhone } from "@/lib/contact/phone";
+import { announceFormSaved } from "@/lib/ui/form-saved";
 import { changeLoginPhoneAction, setDisplayNameAction, setPhoneAction, type IdentityFieldState } from "@/server/actions/profile-identity";
 import type { MyIdentity } from "@/server/queries/profile-identity";
 import { AvatarField } from "./avatar-field";
@@ -30,7 +31,10 @@ export function IdentityCard({ identity, compact = false, afterName, showSaveBar
   const [savedPhone, setSavedPhone] = useState(`${identity.phoneCountryIso2 ?? ""}:${identity.phoneNational ?? ""}`);
   const [nameState, submitName] = useActionState(async (previous: IdentityFieldState, data: FormData) => {
     const result = await setDisplayNameAction(previous, data);
-    if (result.ok) setSavedName(String(data.get("displayName")));
+    if (result.ok) {
+      setSavedName(String(data.get("displayName")));
+      announceFormSaved("display-name", data);
+    }
     return result;
   }, INITIAL);
   const [phoneState, submitPhone] = useActionState(async (previous: IdentityFieldState, data: FormData) => {

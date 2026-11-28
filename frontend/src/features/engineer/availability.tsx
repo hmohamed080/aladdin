@@ -38,7 +38,7 @@ export function EngineerAvailability({ availability, periods }: { availability: 
   const [removing, startRemoving] = useTransition();
   const [failed, setFailed] = useState(false);
   return <div className="engineer-avail space-y-md">
-    <Panel icon={<UserIcon size={22} />} title={ar ? "حالتك الحالية" : "Your current status"} hint={ar ? "تُعرض هذه الحالة للآخرين وتساعد في توجيه الفرص المناسبة لك." : "Your status helps people find the right professional for their project."}>
+    <Panel icon={<UserIcon size={22} />} title={ar ? "حالتك الحالية" : "Your current status"} hint={ar ? "تُعرض هذه الحالة للآخرين وتساعدهم في اختيار المحترف المناسب لمشروعهم." : "Your status helps people find the right professional for their project."}>
       <AvailabilityControl availability={availability} variant="cards" />
     </Panel>
     <fieldset disabled={disabled} className="engineer-avail-fieldset min-w-0 space-y-md" data-disabled={disabled}>
@@ -46,7 +46,7 @@ export function EngineerAvailability({ availability, periods }: { availability: 
         <div id="engineer-availability-slot" />
         {disabled && <Note>{ar ? "تصبح خيارات موعد الجاهزية متاحة بعد تغيير حالتك إلى متاح للعمل." : "Mark yourself available to choose when you can start."}</Note>}
       </Panel>
-      <Panel icon={<CalendarIcon size={22} />} title={ar ? "فترات عدم التوفر (اختياري)" : "Unavailable periods (optional)"} hint={ar ? "إذا كانت لديك إجازة أو فترة مشغولة، أضفها هنا حتى لا تظهر لك الفرص التي تقع خلالها." : "Add holidays or busy periods so opportunities that overlap these dates are not shown to you."}>
+      <Panel icon={<CalendarIcon size={22} />} title={ar ? "فترات عدم التوفر (اختياري)" : "Unavailable periods (optional)"} hint={ar ? "إذا كانت لديك إجازة أو فترة مشغولة، سجّلها هنا لتبقى محفوظة في حسابك." : "Record holidays or busy periods here; they are saved to your account."}>
         {periods.length > 0 && <ul className="space-y-sm">{periods.map(period => <li key={period.id} className="engineer-avail-period">
           <CalendarCheckIcon size={22} aria-hidden="true" />
           <span className="min-w-0 flex-1">{ar ? "من" : "From"} {formatDate(period.from, locale)} {period.to ? <>{ar ? "إلى" : "to"} {formatDate(period.to, locale)}</> : <>· {ar ? "بدون تاريخ انتهاء" : "No end date"}</>}</span>
@@ -59,7 +59,7 @@ export function EngineerAvailability({ availability, periods }: { availability: 
           <SubmitButton variant="accent" className="engineer-avail-add"><PlusIcon size={18} />{ar ? "إضافة الفترة" : "Add period"}</SubmitButton>
         </form>
         {(!state.ok || failed) && <InlineError>{ar ? "تعذر حفظ التغيير. راجع التواريخ وحاول مجددًا." : "Could not save. Check the dates and try again."}</InlineError>}
-        <Note>{ar ? "تؤثر فترات عدم التوفر فقط على الفرص التي تقع داخل هذه المواعيد، ولا تغير حالة جاهزيتك الأساسية." : "These periods only affect overlapping opportunities, not your overall availability."}</Note>
+        <Note>{ar ? "هذه الفترات لا تُخفي أي فرص حاليًا، ولا تغير حالة جاهزيتك الأساسية." : "These periods don't hide any opportunities yet, and don't change your overall availability."}</Note>
       </Panel>
     </fieldset>
   </div>;

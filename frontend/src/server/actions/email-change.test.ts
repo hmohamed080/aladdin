@@ -71,22 +71,59 @@ describe("startEmailChangeAction", () => {
 });
 
 describe("confirmEmailChangeAction", () => {
-  it("verifies the 6-digit code, then signs out every other session", async () => {
-    const res = await confirmEmailChangeAction(START, fd({ email: "new@example.test", token: "123456" }));
-    expect(verifyOtp).toHaveBeenCalledWith({ email: "new@example.test", token: "123456", type: "email_change" });
+  const BOTH = { email: "new@example.test", currentToken: "111111", token: "222222" };
+  const changed = () =>
+    getUser
+      .mockResolvedValueOnce({ data: { user: { email: "b-owner@example.test" } } })
+      .mockResolvedValueOnce({ data: { user: { email: "new@example.test" } } });
+
+  it("verifies the code of both addresses, then signs out every other session", async () => {
+    changed();
+    const res = await confirmEmailChangeAction(START, fd(BOTH));
+    expect(verifyOtp.mock.calls).toEqual([
+      [{ email: "b-owner@example.test", token: "111111", type: "email_change" }],
+      [{ email: "new@example.test", token: "222222", type: "email_change" }],
+    ]);
     expect(signOut).toHaveBeenCalledWith({ scope: "others" });
     expect(res).toEqual({ step: "done", email: "new@example.test" });
   });
 
-  it("keeps the old email and the other sessions when the code is wrong", async () => {
+  it("never reaches the new address when the current address's code is wrong", async () => {
     verifyOtp.mockResolvedValueOnce({ error: { status: 403 } });
-    const res = await confirmEmailChangeAction(START, fd({ email: "new@example.test", token: "123456" }));
-    expect(res).toMatchObject({ step: "code", code: "token" });
+    const res = await confirmEmailChangeAction(START, fd(BOTH));
+    expect(res).toMatchObject({ step: "code", code: "token", confirmed: { current: false, next: false } });
+    expect(verifyOtp).toHaveBeenCalledTimes(1);
     expect(signOut).not.toHaveBeenCalled();
   });
 
-  it("rejects a code that is not 6 digits before calling Auth", async () => {
-    expect(await confirmEmailChangeAction(START, fd({ email: "new@example.test", token: "12" }))).toMatchObject({ code: "token" });
+  it("remembers an accepted code, so a retry sends only the other one", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: null }).mockResolvedValueOnce({ error: { status: 403 } });
+    const first = await confirmEmailChangeAction(START, fd(BOTH));
+    expect(first).toMatchObject({ step: "code", code: "token", confirmed: { current: true, next: false } });
+    expect(signOut).not.toHaveBeenCalled();
+
+    verifyOtp.mockClear();
+    changed();
+    const res = await confirmEmailChangeAction(first, fd({ email: "new@example.test", token: "333333" }));
+    expect(verifyOtp.mock.calls).toEqual([[{ email: "new@example.test", token: "333333", type: "email_change" }]]);
+    expect(res).toEqual({ step: "done", email: "new@example.test" });
+  });
+
+  it("does not carry an accepted code over to a different new address", async () => {
+    const prev = { step: "code", email: "other@example.test", confirmed: { current: true, next: false } } as const;
+    expect(await confirmEmailChangeAction(prev, fd({ email: "new@example.test", token: "222222" }))).toMatchObject({ code: "token" });
+    expect(verifyOtp).not.toHaveBeenCalled();
+  });
+
+  it("does not report success while Auth still holds the old email", async () => {
+    const res = await confirmEmailChangeAction(START, fd(BOTH));
+    expect(res).toMatchObject({ step: "start", code: "error" });
+    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing or short code before calling Auth", async () => {
+    expect(await confirmEmailChangeAction(START, fd({ ...BOTH, token: "12" }))).toMatchObject({ code: "token" });
+    expect(await confirmEmailChangeAction(START, fd({ email: "new@example.test", token: "222222" }))).toMatchObject({ code: "token" });
     expect(verifyOtp).not.toHaveBeenCalled();
   });
 });

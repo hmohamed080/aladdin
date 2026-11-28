@@ -8301,3 +8301,9 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - `20261128130005` carries a migration-policy review marker: promote the app immediately after applying it.
 - Checks (local): CI's atomic upgrade permission gate with the pinned CLI, pgTAP, script tests, migration policy, doc links, typecheck, lint (0 errors), full vitest and production build. The first full vitest run had 8 failures (port defects, outdated expectations, one timeout under load); after the fixes the full suite passed. `db lint` has one error, in `marketplace_checkout_place`, which this branch does not change. No browser tests (recorded owner preference); no Playwright or Cloudflare bundle build.
 - Open: push, pull request, hosted migration apply and deploy each need owner approval. Hosted R2 state was not checked.
+
+## 2026-11-28 - Engineer PR #296: three review findings fixed
+- Email change keeps two-address confirmation (`double_confirm_changes = true`, as on `main`): the branch had turned it off, leaving only the app's password check, which does not cover a direct call to Auth. The flow now takes both codes and reports success only once Auth holds the new email. Verified on a throwaway local stack, both code orders; the new address's code alone returns no error and leaves the email unchanged.
+- Settings save bar clears only when a form announces a successful save; the gender choice is no longer reset on submit.
+- Unavailable periods: the UI no longer claims they hide opportunities; job discovery does not read them (filtering is an open owner decision).
+- Open before release: confirm on the hosted project that secure email change is on and that the email-change template carries `{{ .Token }}` (not checked).
