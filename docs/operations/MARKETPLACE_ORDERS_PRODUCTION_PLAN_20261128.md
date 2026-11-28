@@ -44,6 +44,7 @@ Open work that changes this plan if it lands on `main` before the apply (checked
 | PR | Adds | Effect |
 |---|---|---|
 | #296 (Engineer account) | `20261128130001`-`20261128130007` | newer than the plan: the `drift` check refuses until the plan (or a new one) lists them, with their contract, changed objects and forward-fix |
+| #298 (retest notes F07, F09, F27-F29; open, not merged) | `20261128150001` and permission contract `20261128150001`; replaces the functions `app.marketplace_money`, `app.marketplace_order_invoice_issue`, `public.marketplace_order_waybill_get` | newer than the plan: if merged first, the plan must become **246 -> 267** (pending list, post contract, measured catalog changes, a forward-fix that runs first, smoke counts, proof re-run). It has no Acceptance apply plan yet, so Acceptance must get one and pass before Production |
 | #284 (backup console) | `20261126130001` | falls inside the range: drift refuses; on Acceptance (already 266) it would be out of order |
 | #244 (draft, conflicting) | `20261123090001` | older than Production's latest: a plain push is not enough |
 
@@ -61,7 +62,7 @@ Live **before** any new frontend: the upload limits (today: fixed 50 per hour pe
 | C2 | Acceptance retest of the fixed findings (section 8) and the tests the owner marks mandatory; F27 decided | owner / test session | open |
 | C3 | Soak period on Acceptance, length chosen by the owner | owner | open |
 | C4 | New Production backup taken at 246, restore test `RESULT: PASS`, then a pin PR (below) | owner | **open, blocks the apply** |
-| C5 | `main` holds no migration outside the plan (#296, #284, #244) | owner (merge order) | open |
+| C5 | `main` holds no migration outside the plan (#298, #296, #284, #244) | owner (merge order) | open |
 | C6 | Rollback frontend version recorded from the live dashboard | owner | open |
 | C7 | Launch posture decided (flags, open switch, approvals) | owner | open |
 
@@ -195,7 +196,7 @@ Open owner decisions. Nothing below is assumed.
 | D4 | Timers Worker on Production (new approval), or ordering waits |
 | D5 | Phone verification / WhatsApp for checkout: confirm the live switches and the daily limit |
 | D6 | Who besides Super Admin gets complaints and returns review |
-| D7 | Merge order of #296 and #284 against this apply (apply first, or extend the plan) |
+| D7 | Merge order of #298, #296 and #284 against this apply (apply first, or extend the plan) |
 | D8 | Video: stays off, or start the separate enablement plan |
 | D9 | Leaked password protection |
 
