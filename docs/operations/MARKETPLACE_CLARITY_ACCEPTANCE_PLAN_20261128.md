@@ -1,6 +1,6 @@
 # Marketplace clarity fixes: gated Acceptance apply plan - 2026-11-28
 
-Status: **PLAN, prepared and NOT applied.** Nothing in this document or in the PR that carries it wrote to Acceptance (`nxossqhdfltcqdwvbewi`) or Production (`kkpkgjrweysgvhvkhzun`). The owner runs `acceptance-apply.sh` themself, on an explicit GO.
+Status: **APPLIED to Acceptance (`nxossqhdfltcqdwvbewi`) by the owner on 2026-11-28** from `main` `98f60d52`: post smoke OK, `PASS`. Frontend `c905580f` deployed afterwards. Production (`kkpkgjrweysgvhvkhzun`) was not touched.
 
 Plan name: **`marketplace-clarity`** (pinned in `scripts/hosted-db/acceptance-gate.mjs`). Acceptance **264 -> 266** migrations, plain push, no `--include-all`.
 
@@ -34,9 +34,9 @@ No fresh backup is required: nothing existing is rewritten or dropped. The recov
 - The PR carrying this plan is merged; no newer migration is on `main` (otherwise the preflight refuses).
 - Roll nothing back in the frontend: the deployed build already works with 264, and the new fields are optional.
 
-## Ordered checklist (nothing below has been executed)
+## Ordered checklist (executed 2026-11-28, except the retest in step 6)
 
-PowerShell, from a **real clone** (not a git worktree), on `main` equal to `origin/main` with a clean tree.
+PowerShell, from a **real clone** (not a git worktree), on `main` equal to `origin/main` with a clean tree. Run the scripts with Git Bash by its full path: plain `bash` opened WSL, which has no `node` (first preflight attempt, nothing changed).
 
 1. Update the clone:
 
@@ -47,7 +47,7 @@ PowerShell, from a **real clone** (not a git worktree), on `main` equal to `orig
 2. Preflight, read-only (owner GO):
 
    ```powershell
-   bash scripts/hosted-db/acceptance-preflight.sh marketplace-clarity
+   & "C:\Program Files\Git\bin\bash.exe" scripts/hosted-db/acceptance-preflight.sh marketplace-clarity
    ```
 
    Expected: 264 applied, exactly the two pending, history guard passes.
@@ -55,7 +55,7 @@ PowerShell, from a **real clone** (not a git worktree), on `main` equal to `orig
 3. Apply (owner GO, hidden password prompt, typed confirmation `APPLY marketplace-clarity TO ACCEPTANCE`):
 
    ```powershell
-   bash scripts/hosted-db/acceptance-apply.sh --plan marketplace-clarity --sha (git rev-parse origin/main)
+   & "C:\Program Files\Git\bin\bash.exe" scripts/hosted-db/acceptance-apply.sh --plan marketplace-clarity --sha (git rev-parse origin/main)
    ```
 
    Before the push: sha, clean tree, forward-fix sha256, link (Production refused), history, dry run, permissions against contract `20261126120002`, counts, structure, catalog fingerprint, `pre` smoke. After it: history 266 / `20261128120001`, permissions against contract `20261128090001`, catalog diff exactly the plan's list, `post` smoke.
@@ -79,7 +79,7 @@ The timers Worker (its two secrets and deploy come **after** this apply), WhatsA
 - Read-only on Acceptance, 2026-11-28: all application function definitions and the three constraints are identical to the replayed pre-state; the `pre` smoke facts hold (264 / `20261126120002`, 36 templates, no new template or helper, no refund-confirmation timer).
 - `node --test scripts/hosted-db/*.test.mjs scripts/*.test.mjs` passes.
 
-Not verified: the preflight and apply scripts have not been run for this plan (the first real run is the owner's); the `post` smoke has run only on a scratch database, which records no migration history.
+Verified after the apply (read-only, 2026-11-28): 266 / `20261128120001`, 39 templates, the new waybill read is in place.
 
 ## Related files
 
