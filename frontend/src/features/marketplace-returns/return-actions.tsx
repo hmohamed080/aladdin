@@ -39,6 +39,8 @@ export function ReturnActions({ doc, role, locale }: { doc: ReturnDocument; role
   const [partialNote, setPartialNote] = useState("");
   const [reference, setReference] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // an admin decision is final: it is sent only after a second, explicit press
+  const [adminAsk, setAdminAsk] = useState<"approve" | "reject" | null>(null);
   // nothing goes back into sellable stock unless the showroom says it is in good condition
   const [good, setGood] = useState<Record<string, boolean>>({});
   const t = (k: keyof typeof RETURN_COPY) => RETURN_COPY[k][locale];
@@ -53,6 +55,7 @@ export function ReturnActions({ doc, role, locale }: { doc: ReturnDocument; role
       setError(r.ok ? null : returnErrorText(locale, r.code ?? "unexpected"));
       if (r.ok) {
         setOpen(null);
+        setAdminAsk(null);
         router.refresh();
       }
     });
@@ -63,7 +66,7 @@ export function ReturnActions({ doc, role, locale }: { doc: ReturnDocument; role
     setError(null);
     if (adminDecides && (a === "approve" || a === "reject")) {
       if (adminNote.trim().length < 3) return refuse("adminNoteRequired");
-      return run(() => adminDecideReturnAction(doc.id, a, adminNote, "", ""));
+      return setAdminAsk(a);
     }
     if (HAS_FORM.includes(a)) return setOpen(a as FormAction);
     if (a === "mark_shipped") {
@@ -146,6 +149,17 @@ export function ReturnActions({ doc, role, locale }: { doc: ReturnDocument; role
         ))}
       </div>
 
+      {adminDecides && adminAsk ? (
+        <div className="grid gap-sm rounded-sm border p-md" role="group" aria-label={t(adminAsk === "approve" ? "adminApproveAsk" : "adminRejectAsk")}>
+          <p className="text-body">{t(adminAsk === "approve" ? "adminApproveAsk" : "adminRejectAsk")}</p>
+          <div className="flex flex-wrap gap-sm">
+            <Button size="sm" disabled={pending} onClick={() => run(() => adminDecideReturnAction(doc.id, adminAsk, adminNote, "", ""))}>
+              {t(adminAsk === "approve" ? "adminApproveConfirm" : "rejectConfirm")}
+            </Button>
+            <Button size="sm" variant="outline" disabled={pending} onClick={() => setAdminAsk(null)}>{t("back")}</Button>
+          </div>
+        </div>
+      ) : null}
       {open === "reject" && !adminDecides ? (
         <ReasonPanel
           action="return_reject"

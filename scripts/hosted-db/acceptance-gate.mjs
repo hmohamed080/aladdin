@@ -24,6 +24,8 @@
  *             backup taken at >= 237 migrations is MANDATORY (none is pinned yet: the newest, 232, is refused). See docs/operations/MARKETPLACE_V2_ACCEPTANCE_PLAN_20261123.md.
  *   marketplace-clarity  20261128090001 + 20261128120001 on top of Acceptance at 264 / 20261126120002. 264 -> 266. Functions, 3 CHECK constraints and 3 template rows:
  *             pinned "marketplace-clarity" forward-fix, no fresh backup required. See docs/operations/MARKETPLACE_CLARITY_ACCEPTANCE_PLAN_20261128.md.
+ *   marketplace-retest  20261128150001 on top of Acceptance at 266 / 20261128120001. 266 -> 267. FUNCTION-ONLY (6 replaced, 1 internal helper added; no table, row or
+ *             client grant): pinned "marketplace-retest" forward-fix, no fresh backup required. See docs/operations/MARKETPLACE_RETEST_ACCEPTANCE_PLAN_20261128.md.
  *   marketplace-slug  20261124090001 (seller public slug, PR #252: 2 functions, 1 trigger, backfill of organizations.slug for approved sellers) on top of Acceptance at 244 / 20261123160002.
  *             + 20261124120001 (localized stock notifications, this stack): 2 migrations, 244 -> 246. No table DDL: no fresh backup required; pinned "marketplace-stock-notify" and
  *             "marketplace-slug" forward-fixes (slugs written are data and stay; undo order stock-notify, then slug). Applied to Acceptance BEFORE Production.
@@ -91,6 +93,8 @@ export const ORD_PENDING = ["20261125090001", "20261125090002", "20261125100001"
   "20261126110001", "20261126120001", "20261126120002"];
 // marketplace-clarity (PR 293 and the waybill fix): the two migrations merged after Acceptance reached 264.
 export const CLARITY_PENDING = ["20261128090001", "20261128120001"];
+// marketplace-retest (PR 298): the notes the Acceptance retest left.
+export const RETEST_PENDING = ["20261128150001"];
 export const PLANS = {
   media: { fixes: ["media"], recovery: "forward-fix", applied: 207, latest: BASE, pending: [MEDIA], preContract: BASE, postContract: MEDIA,
     changed: ["app.media_storage_key_assign", "public.media_migration_target_key", "public.media_migration_switch", "public.media_migration_rollback"] },
@@ -591,6 +595,20 @@ export const PLANS = {
       "public.marketplace_timers.ck_mp_timers_kind",
       "public.notifications.ck_notifications_event_type_known"
     ] },
+  // marketplace-retest: seller address on new invoices, one money format in notifications, payment status on the waybill. 266 -> 267, plain push.
+  // Function-only, so no fresh backup is required. Recovery: the pinned "marketplace-retest" forward-fix (restores the 6 definitions and drops the helper;
+  // invoices and notifications already written keep their text). The contract before it is 20261128090001 (clarity's second migration added none).
+  // "changed" was MEASURED by scripts/hosted-db/marketplace-retest-scratch-proof.mjs, not written by hand.
+  "marketplace-retest": { fixes: ["marketplace-retest"], recovery: "forward-fix", applied: 266, latest: CLARITY_PENDING.at(-1), pending: RETEST_PENDING,
+    preContract: CLARITY_PENDING[0], postContract: RETEST_PENDING[0], changed: [
+      "app.marketplace_money",
+      "app.marketplace_order_invoice_issue",
+      "app.marketplace_order_notify",
+      "app.marketplace_return_notify",
+      "public.marketplace_buyer_cancel_refund_confirm",
+      "public.marketplace_order_waybill_get",
+      "public.marketplace_seller_cancel_refund_record"
+    ] },
   // marketplace-orders: the 18 migrations merged after Acceptance reached 246 (orders, invoices, payment complaints, timers, returns, cancelled-order refund,
   // publisher guard, return photos, upload limits, backup ledger, search_path). 246 -> 264, plain push. NOT function-only: 21 new tables, 27 columns on existing
   // tables, 8 re-created constraints, seeded rows, and the existing (finished) orders are mapped to the new payment values. So freshBackup: a restore-verified
@@ -991,6 +1009,9 @@ export const FORWARD_FIX = {
   // marketplace-clarity: restores the definitions the two migrations replace, the 3 CHECK constraints, and removes the 2 helpers and 3 seeded templates. Refuses
   // (RAISE, nothing changed) once a row uses the new values or a new template was edited. Proved by marketplace-clarity-scratch-proof.mjs.
   "marketplace-clarity": { file: "forward-fix/marketplace-clarity-restore-previous.sql", sha256: "3694eb9f87591fbb0d797c359513e42923372d093975829278b31a10a400fa2e" },
+  // marketplace-retest: restores the 6 replaced definitions and drops the money helper. Refuses (RAISE, nothing changed) after a later migration or once another
+  // function uses the helper. Proved by marketplace-retest-scratch-proof.mjs.
+  "marketplace-retest": { file: "forward-fix/marketplace-retest-restore-previous.sql", sha256: "199ffa8b8f563cc75e833c2967862c9c69ce0206941952817b1fb3defca62b5c" },
   // marketplace: refuses (RAISE) while any seller/product/order/import/stock row or marketplace media object exists; never deletes user data.
   // It is the only recovery of the "marketplace" plan. It restores exactly the media functions and constraint the 14 Marketplace migrations
   // re-created, so it is valid at 218 too (the verification migrations never touch them).

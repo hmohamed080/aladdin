@@ -224,7 +224,8 @@ export type OrderWaybill = {
   latitude: number | null;
   longitude: number | null;
   items: { name: string; sku: string; quantity: number }[];
-  payment: { method: PaymentMethodV2; collect_on_delivery_egp: number };
+  /** `status` is absent until migration 20261128150001 is applied. */
+  payment: { method: PaymentMethodV2; status?: string; collect_on_delivery_egp: number };
   tracking_number: string | null;
   notes: string | null;
 };
