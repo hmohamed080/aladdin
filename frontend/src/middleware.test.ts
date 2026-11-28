@@ -21,6 +21,7 @@ let refreshOnRead = false;
 let networkUser: { id: string } | null = null;
 let accountStatus: { status: string; suspended: boolean; session_active?: boolean } | null = null;
 let adapter: CookieAdapter | null = null;
+let sessionToken: string | null = null;
 
 const rpc = vi.fn(async () => ({ data: accountStatus, error: null }));
 const getUser = vi.fn(async () => ({ data: { user: networkUser }, error: null }));
@@ -43,7 +44,15 @@ vi.mock("@/lib/env", () => ({
 vi.mock("@supabase/ssr", () => ({
   createServerClient: (_url: string, _key: string, options: { cookies: CookieAdapter }) => {
     adapter = options.cookies;
-    return { auth: { getUser, getClaims, signOut }, rpc };
+    return {
+      auth: {
+        getUser,
+        getClaims,
+        signOut,
+        getSession: async () => ({ data: { session: sessionToken ? { access_token: sessionToken } : null } }),
+      },
+      rpc,
+    };
   },
 }));
 
@@ -65,10 +74,38 @@ beforeEach(() => {
   networkUser = null;
   accountStatus = null;
   adapter = null;
+  sessionToken = null;
   rpc.mockClear();
   getUser.mockClear();
   getClaims.mockClear();
   signOut.mockClear();
+});
+
+describe("middleware — known-device cookies", () => {
+  const DEVICE = "11111111-1111-4111-8111-111111111111";
+  const SESSION = "22222222-2222-4222-8222-222222222222";
+  const token = `h.${Buffer.from(JSON.stringify({ session_id: SESSION })).toString("base64url")}.s`;
+  const written = (res: Response) => (res.headers.get("set-cookie") ?? "").match(/aladdin_device(_seen)?(?==)/g) ?? [];
+
+  beforeEach(() => {
+    claims = SIGNED_IN;
+    networkUser = { id: "u1" };
+    accountStatus = { status: "active", suspended: false };
+    sessionToken = token;
+  });
+
+  it("writes them on the first page load of the day, then leaves them alone", async () => {
+    expect(written(await at("/home"))).toEqual(["aladdin_device", "aladdin_device_seen"]);
+    const marker = `${SESSION}:${new Date().toISOString().slice(0, 10)}`;
+    const again = await at("/home", { headers: { cookie: `aladdin_device=${DEVICE}; aladdin_device_seen=${marker}` } });
+    expect(written(again)).toEqual([]);
+  });
+
+  // A cookie here would make Next re-render the page under the Server Action that is being served.
+  it("never writes them on a Server Action request", async () => {
+    expect(written(await at("/onboarding/business", { method: "POST", headers: { "next-action": "x" } }))).toEqual([]);
+    expect(rpc).not.toHaveBeenCalledWith("touch_known_device", expect.anything());
+  });
 });
 
 describe("middleware — account suspension", () => {
@@ -287,5 +324,35 @@ describe("middleware — matcher", () => {
     for (const path of ["/", "/home", "/b2b/leads", "/admin/users", "/auth/sign-in", "/p/abc", "/api/other", "/p/mediakit"]) {
       expect(matcher.test(path), path).toBe(true);
     }
+  });
+});
+
+const SESSION_ID = "a0000000-0000-4000-8000-0000000000a1";
+const tokenFor = (sessionId: string) => `h.${btoa(JSON.stringify({ session_id: sessionId })).replace(/=+$/, "")}.s`;
+const cookieNames = (res: Response) => res.headers.getSetCookie().map((c) => c.split("=")[0]);
+
+describe("middleware — known devices", () => {
+  it("gives a browser a device id cookie and records it once per session", async () => {
+    claims = SIGNED_IN;
+    accountStatus = { status: "active", suspended: false };
+    sessionToken = tokenFor(SESSION_ID);
+    const res = await middleware(new NextRequest(new URL("/home", "http://localhost"), { headers: { "user-agent": "Mozilla/5.0 Chrome/126" } }));
+    expect(cookieNames(res)).toEqual(expect.arrayContaining(["aladdin_device", "aladdin_device_seen"]));
+    expect(rpc).toHaveBeenCalledWith("touch_known_device", expect.objectContaining({ p_user_agent: "Mozilla/5.0 Chrome/126" }));
+  });
+
+  it("does not record it again when the same session was already recorded today", async () => {
+    claims = SIGNED_IN;
+    accountStatus = { status: "active", suspended: false };
+    sessionToken = tokenFor(SESSION_ID);
+    const marker = `${SESSION_ID}:${new Date().toISOString().slice(0, 10)}`;
+    const device = "d0000000-0000-4000-8000-0000000000d1";
+    await middleware(new NextRequest(new URL("/home", "http://localhost"), { headers: { cookie: `aladdin_device=${device}; aladdin_device_seen=${marker}` } }));
+    expect(rpc).not.toHaveBeenCalledWith("touch_known_device", expect.anything());
+  });
+
+  it("records nothing for a signed-out visitor", async () => {
+    await at("/auth/sign-in");
+    expect(rpc).not.toHaveBeenCalledWith("touch_known_device", expect.anything());
   });
 });

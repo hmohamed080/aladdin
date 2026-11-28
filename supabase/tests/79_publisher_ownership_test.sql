@@ -143,7 +143,7 @@ select is(app.publisher_audience((select id from _ids where k = 'pc')), 'contrac
 select is(app.publisher_audience((select id from _ids where k = 'pe')), 'engineer', 'A19: independent Engineer audience');
 select is((select count(*)::int from public.audit_log where action = 'publisher.approved'), 2, 'A20: approvals are audited');
 select is((select organization_id from public.publishers where id = (select id from _ids where k = 'pc')), null, 'A21: no organization is created for an independent professional');
-select ok(app.coming_soon_account_types() @> array['contractor', 'engineer']::text[], 'A22: Contractor / Engineer registration stays Coming Soon');
+select ok(app.coming_soon_account_types() @> array['contractor']::text[] and not (app.coming_soon_account_types() @> array['engineer']::text[]), 'A22: Contractor registration stays Coming Soon; Engineer is open');
 
 -- ===========================================================================
 -- W. ownership and write authority

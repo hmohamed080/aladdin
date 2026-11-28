@@ -5,6 +5,8 @@ import { CATALOG_VIEW_COOKIE } from "@/lib/ui/catalog-view";
 import type { CatalogRow } from "@/server/queries/commerce";
 import { CatalogResults } from "./catalog-results";
 
+const eng = vi.hoisted(() => ({ change: vi.fn<(input: unknown) => Promise<{ ok: boolean; code?: string }>>(async () => ({ ok: true })) }));
+vi.mock("@/server/actions/engineer-collections", () => ({ changeEngineerCollection: eng.change }));
 vi.mock("@/server/actions/saved-products", () => ({
   toggleSavedProductAction: vi.fn(async () => ({ ok: true })),
 }));
@@ -202,5 +204,77 @@ describe("showroom catalog results", () => {
       await waitFor(() => expect(screen.getByTestId("showroom-catalog-load-error")).toBeTruthy());
       expect(screen.getAllByTestId("showroom-catalog-card")).toHaveLength(10);
     });
+  });
+});
+
+describe("engineer mode - the showroom's cards for an audience with no organization", () => {
+  const engineerRender = (props: Partial<React.ComponentProps<typeof CatalogResults>> = {}) =>
+    renderResults({ mode: "engineer", orgId: null, ...props });
+
+  beforeEach(() => eng.change.mockClear());
+
+  it("keeps the showroom design: same grid, same card fields", () => {
+    engineerRender();
+    expect(screen.getByTestId("showroom-catalog-grid")).toBeTruthy();
+    const card = screen.getAllByTestId("showroom-catalog-card")[0]!;
+    expect(within(card).getByText("Porcelain Floor Tile 60x60")).toBeTruthy();
+    expect(within(card).getByTestId("card-code").textContent).toContain("TILE-1");
+    expect(within(card).getByText("Cairo Ceramics Showroom")).toBeTruthy();
+  });
+
+  it("has no showroom detail page to open - it offers a quote request for that product instead", () => {
+    engineerRender();
+    const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
+    expect(hrefs.some((h) => h?.startsWith("/showroom"))).toBe(false);
+    expect(hrefs).toContain("/home/engineer/requests/new?product=p1");
+    expect(hrefs).toContain("/home/engineer/requests/new?product=p2");
+  });
+
+  it("uses the same quote action in list mode", () => {
+    engineerRender({ initialView: "list" });
+    const row = screen.getAllByTestId("showroom-catalog-row")[0]!;
+    expect(within(row).getByRole("link", { name: "Request quote" }).getAttribute("href")).toBe("/home/engineer/requests/new?product=p1");
+    expect(screen.getAllByRole("link").some((a) => a.getAttribute("href")?.startsWith("/showroom"))).toBe(false);
+  });
+
+  it("posts no organization - saving goes to the engineer's own collection", async () => {
+    engineerRender();
+    const card = screen.getAllByTestId("showroom-catalog-card")[0]!;
+    expect(card.querySelector("input[name=orgId]")).toBeNull();
+    fireEvent.click(within(card).getByRole("button", { name: /save|add/i }));
+    await waitFor(() => expect(eng.change).toHaveBeenCalledWith({ action: "save", entityType: "product", entityId: "p1" }));
+  });
+
+  it("starts from the engineer's saved products and unsaves them", async () => {
+    engineerRender();
+    const second = screen.getAllByTestId("showroom-catalog-card")[1]!;
+    const toggle = within(second).getByRole("button", { pressed: true });
+    fireEvent.click(toggle);
+    await waitFor(() => expect(eng.change).toHaveBeenCalledWith({ action: "unsave", entityType: "product", entityId: "p2" }));
+    await waitFor(() => expect(within(second).queryByRole("button", { pressed: true })).toBeNull());
+  });
+
+  it("leaves the card as it was when the save is refused, and says so", async () => {
+    eng.change.mockResolvedValueOnce({ ok: false, code: "states.genericRetry" });
+    engineerRender();
+    const card = screen.getAllByTestId("showroom-catalog-card")[0]!;
+    fireEvent.click(within(card).getByRole("button", { name: /save|add/i }));
+    await waitFor(() => expect(within(card).getByRole("alert")).toBeTruthy());
+    expect(within(card).queryByRole("button", { pressed: true })).toBeNull();
+  });
+
+  it("reads further batches through the loader it is given, never the showroom's", async () => {
+    const loadMore = vi.fn(async () => ({
+      ok: true as const,
+      products: [row({ id: "p9", name: "Extra Product" })],
+      total: 3,
+      imageUrls: {},
+      savedIds: [],
+    }));
+    engineerRender({ total: 3, filters: { q: "tile" }, loadMore });
+    fireEvent.click(screen.getByTestId("showroom-catalog-show-more"));
+    await waitFor(() => expect(screen.getAllByTestId("showroom-catalog-card")).toHaveLength(3));
+    expect(loadMore).toHaveBeenCalledWith({ q: "tile" }, 2);
+    expect(feed.load).not.toHaveBeenCalled();
   });
 });

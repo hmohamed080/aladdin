@@ -8,6 +8,7 @@ import { ThemeSync } from "@/components/layout/theme-sync";
 import { Toaster } from "@/components/ui/toast";
 import { createTranslator } from "@/lib/i18n/translate";
 import "./globals.css";
+import "@/styles/engineer-palette.css";
 
 // PRELOADING. `subsets` only decides which files next/font PRELOADS: the
 // generated CSS still declares every subset's @font-face (each with its own

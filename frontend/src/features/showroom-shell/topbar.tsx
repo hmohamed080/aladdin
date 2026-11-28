@@ -15,6 +15,7 @@ import {
   UserIcon,
 } from "@/components/ui/icons";
 import { ShowroomSearch } from "./search";
+import { useMobileNav } from "./mobile-nav-context";
 
 import { signOut } from "@/server/actions/auth";
 
@@ -52,9 +53,11 @@ export function ShowroomTopbar({
   displayName,
   location,
   capabilities, workspaceSwitch, notifications, chat, branchSwitch,
+  search, profileHref = "/showroom/settings", settingsHref = "/showroom/settings",
+  showLocation = true,
 }: {
   theme: "light" | "dark";
-  onMenuClick: () => void;
+  onMenuClick?: () => void;
   displayName?: string;
   location?: string | null;
   /** Real, bounded opportunities for the shared search overlay — required in
@@ -62,8 +65,14 @@ export function ShowroomTopbar({
   capabilities: readonly string[]; workspaceSwitch: ReactNode; notifications: ReactNode; chat: ReactNode;
   /** Only for an organization with several branches: choosing the active branch scope (single-branch shows the location). */
   branchSwitch?: ReactNode;
+  search?: ReactNode;
+  profileHref?: string;
+  settingsHref?: string;
+  showLocation?: boolean;
 }) {
   const { locale } = useI18n();
+  const mobileNav = useMobileNav();
+  const openMenu = onMenuClick ?? mobileNav?.openMenu;
   const resolvedName = displayName || (locale === "ar" ? "حسابي" : "My account");
   const initial = resolvedName.charAt(0);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -94,30 +103,30 @@ export function ShowroomTopbar({
         "h-auto min-h-14 flex-wrap py-1.5 tablet:h-14 tablet:min-h-0 tablet:flex-nowrap tablet:py-0",
       )}
     >
-      <button
+      {openMenu && <button
         type="button"
-        onClick={onMenuClick}
+        onClick={openMenu}
         aria-label={locale === "ar" ? "فتح القائمة" : "Open menu"}
         className="grid h-10 w-10 shrink-0 place-items-center rounded-sm text-fg-secondary hover:bg-surface-2 hover:text-fg desktop:hidden"
       >
         <MenuIcon size={19} />
-      </button>
+      </button>}
 
       {/* Location selector — the craftsman's own service area, not a filter. */}
       {branchSwitch ? (
         <div className="hidden shrink-0 tablet:block">{branchSwitch}</div>
-      ) : (
+      ) : showLocation ? (
         <div className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm px-1.5 py-1 text-label font-medium text-fg-secondary tablet:flex">
           <MapPinIcon size={15} className="text-fg-muted" />
           {location || (locale === "ar" ? "الموقع غير محدد" : "Location not set")}
         </div>
-      )}
+      ) : null}
 
       <div className={dividerClass} aria-hidden="true" />
 
       <div className="hidden min-w-0 shrink tablet:block">{workspaceSwitch}</div>
       <div className="min-w-0 flex-1">
-        <ShowroomSearch capabilities={capabilities} />
+        {search ?? <ShowroomSearch capabilities={capabilities} />}
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5">
@@ -158,22 +167,22 @@ export function ShowroomTopbar({
             role="menu"
             className="absolute end-0 top-[calc(100%+8px)] z-popover w-52 overflow-hidden rounded-md border bg-surface py-1 shadow-lg"
           >
-            <MenuLink href="/showroom/settings" icon={UserIcon} label={locale === "ar" ? "ملفي الشخصي" : "My profile"} />
-                <MenuLink href="/showroom/settings" icon={SettingsIcon} label={locale === "ar" ? "الإعدادات" : "Settings"} />
+            <MenuLink href={profileHref} icon={UserIcon} label={locale === "ar" ? "ملفي الشخصي" : "My profile"} />
+                <MenuLink href={settingsHref} icon={SettingsIcon} label={locale === "ar" ? "الإعدادات" : "Settings"} />
                 <div className="my-1 border-t" />
                 <form action={signOut}><MenuRow icon={LogOutIcon} label={locale === "ar" ? "تسجيل خروج" : "Sign out"} tone="danger" submit testId="profile-sign-out" /></form>
           </div>
         ) : null}
       </div>
       {/* Phones retain location, divider, and business switch in the second row. */}
-      <div className="order-last flex min-w-0 basis-full items-center gap-1.5 border-t pt-1.5 text-label font-medium text-fg-secondary tablet:hidden">
-        <MapPinIcon size={15} className="shrink-0 text-fg-muted" />
+      {(showLocation || workspaceSwitch) && <div className="order-last flex min-w-0 basis-full items-center gap-1.5 border-t pt-1.5 text-label font-medium text-fg-secondary tablet:hidden">
+        {showLocation && <><MapPinIcon size={15} className="shrink-0 text-fg-muted" />
         <span className="min-w-0 flex-1 truncate" title={location ?? undefined}>
           {location || (locale === "ar" ? "الموقع غير محدد" : "Location not set")}
         </span>
-        <span className="h-5 border-e" aria-hidden="true" />
+        <span className="h-5 border-e" aria-hidden="true" /></>}
         <div className="min-w-0 shrink-0">{workspaceSwitch}</div>
-      </div>
+      </div>}
     </header>
   );
 }

@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef, type ReactNode } from "react";
+import { ProfileSelect, CoverageSection } from "@/features/engineer/profile-location-controls";
+import { GOVERNORATE_OPTIONS, CITIES_BY_GOVERNORATE as INSTALLER_CITIES } from "@/lib/installer/location-data";
+import { setServiceAreasAction } from "@/server/actions/service-areas";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createPortal } from "react-dom";
+import { FloatingMenu } from "@/components/ui/floating-menu";
+import { menuItemClass } from "@/components/ui/menu";
 import { useI18n } from "@/lib/i18n/context";
 import { Input, Select, LabeledField, Checkbox, Button } from "@/components/ui/controls";
+import { BoltIcon, CalendarIcon, InfinityIcon, ChevronDownIcon, CheckIcon, PlusIcon, MinusCircleIcon, MapPinIcon, BuildingIcon } from "@/components/ui/icons";
 import { CountedTextarea } from "@/components/ui/counted-textarea";
 import { DESCRIPTION_MAX_CHARS, isAcceptableEdit } from "@/lib/text/description-limit";
 import { Badge, Card } from "@/components/ui/primitives";
@@ -52,10 +59,8 @@ import {
  * a profile form; offering it here would let someone rewrite a claim the platform
  * had already reviewed.
  *
- * `city` is CARRIED, not edited. The professional flow collects a governorate and
- * service areas and never a base city, but the column exists and may hold a value
- * from elsewhere — passing it back unchanged stops an edit of the headline from
- * silently erasing it.
+ * Base city is editable in the embedded basic-information panel; other editors
+ * preserve the saved value. All sections share one state and save payload.
  */
 
 type EditorState = {
@@ -70,21 +75,30 @@ type EditorState = {
   serviceAreas: string[];
   offersRemote: boolean;
   governorate: string | null;
+  city: string | null;
   maxTravelKm: number | null;
+  otherGovernorates: string[];
+  worksElsewhere: boolean;
 };
 
 export function ProfessionalProfileEditor({
   answers,
   concreteType,
+  embedded = false,
+  otherGovernorates = [],
 }: {
   answers: ProfessionalAnswers;
+  /** Keep the saved editor in the profile-completion workspace. */
+  embedded?: boolean;
+  otherGovernorates?: string[];
   /** The persona this profile belongs to — fixed, and the vocabulary key. */
   concreteType: string;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const [state, setState] = useState<EditorState>({
     headline: answers.headline ?? "",
@@ -98,8 +112,19 @@ export function ProfessionalProfileEditor({
     serviceAreas: answers.serviceAreas,
     offersRemote: answers.offersRemote,
     governorate: answers.governorate,
+    city: answers.city,
     maxTravelKm: answers.maxTravelKm,
+    otherGovernorates,
+    worksElsewhere: otherGovernorates.length > 0,
   });
+
+  const [customCityMode, setCustomCityMode] = useState(false);
+  const cityOptions = INSTALLER_CITIES[state.governorate ?? ""] ?? [];
+  const knownCity = cityOptions.some(option => option.value === state.city && option.value !== "other");
+  const customCity = customCityMode || Boolean(state.city && !knownCity);
+
+  const [baseline, setBaseline] = useState(() => JSON.stringify(state));
+  const dirty = JSON.stringify(state) !== baseline;
 
   const specOptions = SPECIALIZATIONS[concreteType] ?? [];
   const serviceOptions = SERVICES[concreteType] ?? [];
@@ -117,6 +142,8 @@ export function ProfessionalProfileEditor({
   const save = () =>
     start(async () => {
       setFailed(false);
+      setSaved(false);
+      if (embedded && state.worksElsewhere && !state.governorate) { setFailed(true); return; }
       const input: ProfessionalInput = {
         concreteType: concreteType as ProfessionalInput["concreteType"],
         headline: state.headline.trim() || null,
@@ -130,8 +157,7 @@ export function ProfessionalProfileEditor({
         serviceAreas: state.serviceAreas,
         offersRemote: state.offersRemote,
         governorate: state.governorate,
-        // Carried through untouched — see the note above.
-        city: answers.city,
+        city: state.city,
         maxTravelKm: state.maxTravelKm,
       };
       const result = await saveProfessional(input);
@@ -139,18 +165,30 @@ export function ProfessionalProfileEditor({
         setFailed(true);
         return;
       }
+      if (embedded && state.governorate) {
+        const data = new FormData();
+        data.set("primary", state.governorate);
+        data.set("areas", JSON.stringify([
+          { governorateKey: state.governorate, cityKey: knownCity ? state.city : null },
+          ...(state.worksElsewhere ? state.otherGovernorates : []).filter(g => g !== state.governorate).map(governorateKey => ({ governorateKey, cityKey: null })),
+        ]));
+        const coverage = await setServiceAreasAction({ ok: false }, data);
+        if (!coverage.ok) { setFailed(true); return; }
+      }
       // Back to the hub, which re-reads from the database — so what is shown after
       // a save is what was actually stored, never the form's own optimism.
-      router.push("/home/profile");
+      setBaseline(JSON.stringify(state));
+      setSaved(true);
+      if (!embedded) router.push("/home/profile");
       router.refresh();
     });
 
   return (
-    <div className="flex flex-col gap-xl" data-testid="profile-editor">
-      <header className="flex flex-col gap-1">
+    <div className={`flex flex-col gap-xl ${embedded ? "engineer-edit-professional" : ""}`} data-testid="profile-editor">
+      {!embedded && <header className="flex flex-col gap-1">
         <h1 className="text-headline text-fg">{t("profile.edit.title")}</h1>
         <p className="max-w-prose text-body text-fg-secondary">{t("profile.edit.body")}</p>
-      </header>
+      </header>}
 
       <Card className="flex flex-col gap-lg">
         <div className="flex flex-col gap-1">
@@ -174,7 +212,11 @@ export function ProfessionalProfileEditor({
         </LabeledField>
 
         <LabeledField label={t("onboarding.professional.identity.yearsLabel")} htmlFor="years">
-          <Input
+          {embedded ? <div className="grid min-h-11 grid-cols-3 overflow-hidden rounded-md border border-strong bg-canvas">
+            <button type="button" aria-label={locale === "ar" ? "تقليل سنوات الخبرة" : "Decrease years"} disabled={(state.yearsExperience ?? 0) === 0} onClick={() => set({ yearsExperience: Math.max(0, (state.yearsExperience ?? 0) - 1) })} className="grid place-items-center border-e disabled:opacity-40"><MinusCircleIcon size={20} /></button>
+            <output id="years" className="grid place-items-center font-semibold tabular-nums">{state.yearsExperience ?? 0}</output>
+            <button type="button" aria-label={locale === "ar" ? "زيادة سنوات الخبرة" : "Increase years"} disabled={state.yearsExperience === 70} onClick={() => set({ yearsExperience: Math.min(70, (state.yearsExperience ?? 0) + 1) })} className="grid place-items-center border-s disabled:opacity-40"><PlusIcon size={20} /></button>
+          </div> : (          <Input
             id="years"
             type="number"
             min={0}
@@ -187,7 +229,7 @@ export function ProfessionalProfileEditor({
                   e.target.value === "" ? null : Math.max(0, Math.min(70, Number(e.target.value))),
               })
             }
-          />
+          />) }
         </LabeledField>
 
         {specOptions.length ? (
@@ -208,9 +250,10 @@ export function ProfessionalProfileEditor({
         <LabeledField
           label={t("onboarding.professional.identity.bioLabel")}
           htmlFor="bio"
-          optional={t("common.optional")}
+          optional={embedded ? undefined : t("common.optional")}
         >
           <CountedTextarea
+            aria-required={embedded || undefined}
             id="bio"
             value={state.bio}
             max={DESCRIPTION_MAX_CHARS}
@@ -227,6 +270,7 @@ export function ProfessionalProfileEditor({
 
       <Card className="flex flex-col gap-lg">
         <LabeledField label={t("onboarding.professional.services.coreLabel")} htmlFor="core">
+          {embedded ? <ProfileMultiSelect id="core" options={serviceOptions} selected={state.services} label={(key) => t(`onboarding.professional.serviceItems.${key}`)} onToggle={(key) => toggle("services", key)} placeholder={locale === "ar" ? "اختر كل ما ينطبق عليك" : "Choose all that apply"} /> : (
           <div id="core" className="flex flex-wrap gap-2">
             {serviceOptions.map((k) => (
               <ChoiceChip
@@ -237,13 +281,15 @@ export function ProfessionalProfileEditor({
               />
             ))}
           </div>
+          )}
         </LabeledField>
 
         <LabeledField
-          label={t("onboarding.professional.services.additionalLabel")}
+          label={t(concreteType === "engineer" ? "onboarding.professional.services.toolsLabel" : "onboarding.professional.services.additionalLabel")}
           htmlFor="add"
           optional={t("common.optional")}
         >
+          {embedded ? <ProfileMultiSelect id="add" options={addServiceOptions} selected={state.additionalServices} label={(key) => t(`onboarding.professional.serviceItems.${key}`)} onToggle={(key) => toggle("additionalServices", key)} placeholder={locale === "ar" ? "اختر كل ما ينطبق عليك" : "Choose all that apply"} /> : (
           <div id="add" className="flex flex-wrap gap-2">
             {addServiceOptions.map((k) => (
               <ChoiceChip
@@ -254,13 +300,16 @@ export function ProfessionalProfileEditor({
               />
             ))}
           </div>
+          )}
         </LabeledField>
 
         <LabeledField
-          label={t("onboarding.professional.services.languagesLabel")}
+          label={embedded ? (locale === "ar" ? "اللغات التي تجيدها" : "Languages you speak") : t("onboarding.professional.services.languagesLabel")}
           htmlFor="langs"
           optional={t("common.optional")}
         >
+          {embedded && <p className="text-label text-fg-secondary">{locale === "ar" ? "تظهر في ملفك المهني لتوضيح اللغات التي يمكنك التواصل بها مع العملاء." : "Shown on your professional profile so clients know which languages you speak."}</p>}
+          {embedded ? <ProfileMultiSelect id="langs" options={LANGUAGES} selected={state.languages} label={(key) => t(`onboarding.professional.languages.${key}`)} onToggle={(key) => toggle("languages", key)} placeholder={locale === "ar" ? "اختر كل ما ينطبق عليك" : "Choose all that apply"} /> : (
           <div id="langs" className="flex flex-wrap gap-2">
             {LANGUAGES.map((k) => (
               <ChoiceChip
@@ -271,43 +320,50 @@ export function ProfessionalProfileEditor({
               />
             ))}
           </div>
+          )}
         </LabeledField>
 
-        <LabeledField
+        <EditorSlot enabled={embedded} target="engineer-availability-slot">        <LabeledField
           label={t("onboarding.professional.services.availabilityLabel")}
           htmlFor="avail"
-          optional={t("common.optional")}
+          optional={embedded ? undefined : t("common.optional")}
         >
-          <div id="avail" className="grid gap-2.5 tablet:grid-cols-3">
-            {AVAILABILITIES.map((k) => (
+          <div id="avail" className="grid grid-cols-2 gap-2.5 desktop:grid-cols-4">
+            {AVAILABILITIES.map((k) => embedded ? (
+              <button key={k} type="button" aria-pressed={state.availability === k} className="engineer-availability-choice" onClick={() => set({ availability: state.availability === k ? null : k })}>
+                <span className="engineer-availability-radio" aria-hidden="true" />
+                {k === "flexible" ? <InfinityIcon size={28} /> : k === "immediate" ? <BoltIcon size={28} /> : <CalendarIcon size={28} />}
+                <span>{k === "flexible" ? (locale === "ar" ? "حسب الطلب" : "On demand") : (k === "immediate" ? (locale === "ar" ? "جاهز الآن" : "Ready now") : t(`onboarding.professional.availabilities.${k}`))}</span>
+              </button>
+            ) : (
               <ChoiceCard
                 key={k}
                 selected={state.availability === k}
-                title={t(`onboarding.professional.availabilities.${k}`)}
+                title={(k === "immediate" ? (locale === "ar" ? "جاهز الآن" : "Ready now") : t(`onboarding.professional.availabilities.${k}`))}
                 onSelect={() => set({ availability: state.availability === k ? null : k })}
               />
             ))}
           </div>
         </LabeledField>
+        </EditorSlot>
       </Card>
 
       <Card className="flex flex-col gap-lg">
-        <LabeledField label={t("onboarding.professional.location.governorateLabel")} htmlFor="gov">
-          <Select
-            id="gov"
-            value={state.governorate ?? ""}
-            onChange={(e) => set({ governorate: e.target.value || null, serviceAreas: [] })}
-          >
-            <option value="">{t("onboarding.professional.location.choose")}</option>
-            {GOVERNORATES.map((g) => (
-              <option key={g} value={g}>
-                {t(`onboarding.consumer.governorates.${g}`)}
-              </option>
-            ))}
-          </Select>
-        </LabeledField>
-
-        {areaCities.length ? (
+        <EditorSlot enabled={embedded} target="engineer-location-slot">
+          <div className="grid gap-md tablet:grid-cols-2 mt-md">
+            {embedded ? <>
+              <ProfileSelect id="gov" label={locale === "ar" ? "المحافظة" : "Governorate"} value={state.governorate ?? ""} placeholder={locale === "ar" ? "اختر المحافظة" : "Choose a governorate"} icon={<MapPinIcon size={18} />} options={GOVERNORATE_OPTIONS.map(option => ({ value: option.value, label: option[locale] }))} onChange={value => { setCustomCityMode(false); set({ governorate: value, city: null, otherGovernorates: state.otherGovernorates.filter(g => g !== value) }); }} />
+              <ProfileSelect id="engineer-city" label={locale === "ar" ? "المدينة" : "City"} value={customCity ? "other" : state.city ?? ""} disabled={!state.governorate} placeholder={!state.governorate ? (locale === "ar" ? "اختر المحافظة أولًا" : "Choose a governorate first") : locale === "ar" ? "اختر المدينة" : "Choose a city"} icon={<BuildingIcon size={18} />} options={cityOptions.map(option => ({ value: option.value, label: option[locale] }))} onChange={value => { setCustomCityMode(value === "other"); set({ city: value === "other" ? "" : value }); }} customEntry={{ optionValue: "other", value: customCity ? state.city ?? "" : "", onChange: value => set({ city: value }), inputLabel: locale === "ar" ? "اسم المدينة" : "City name", placeholder: locale === "ar" ? "اكتب اسم المدينة" : "Enter your city", confirmLabel: locale === "ar" ? "تأكيد" : "Confirm" }} />
+            </> : <LabeledField label={t("onboarding.professional.location.governorateLabel")} htmlFor="gov"><Select id="gov" value={state.governorate ?? ""} onChange={e => set({ governorate: e.target.value || null, serviceAreas: [], city: null })}><option value="">{t("onboarding.professional.location.choose")}</option>{GOVERNORATES.map(g => <option key={g} value={g}>{t(`onboarding.consumer.governorates.${g}`)}</option>)}</Select></LabeledField>}
+          </div>
+        </EditorSlot>
+        {embedded ? <CoverageSection locale={locale} form={{ governorate: state.governorate ?? "", otherAreas: state.worksElsewhere, areas: state.otherGovernorates }} set={(key, value) => {
+          setState(previous => {
+            const old = { governorate: previous.governorate ?? "", otherAreas: previous.worksElsewhere, areas: previous.otherGovernorates };
+            const next = { ...old, [key]: typeof value === "function" ? value(old[key]) : value };
+            return { ...previous, governorate: next.governorate, worksElsewhere: next.otherAreas, otherGovernorates: next.areas };
+          });
+        }} /> : <>        {areaCities.length ? (
           <LabeledField label={t("onboarding.professional.location.areasLabel")} htmlFor="areas">
             <div id="areas" className="flex flex-wrap gap-2">
               {areaCities.map((c) => (
@@ -351,25 +407,59 @@ export function ProfessionalProfileEditor({
               <option key={km} value={km}>{`${km} ${t("onboarding.professional.location.km")}`}</option>
             ))}
           </Select>
-        </LabeledField>
+        </LabeledField></>}
+
       </Card>
 
-      {failed ? (
+      <EditorSlot enabled={embedded} target="engineer-save-slot">
+      {embedded && saved && !dirty && <p role="status" className="text-label text-success">{locale === "ar" ? "تم حفظ بياناتك." : "Your details have been saved."}</p>}
+      {(!embedded || dirty || failed) && <>      {failed ? (
         <p role="alert" className="text-body text-danger">
           {t("profile.edit.saveFailed")}
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-sm">
+      <div className={embedded ? "engineer-profile-savebar flex flex-wrap items-center gap-sm" : "flex flex-wrap items-center gap-sm"}>
+        {embedded && <span className="me-auto">{locale === "ar" ? "لديك تغييرات غير محفوظة" : "You have unsaved changes"}</span>}
         <Button type="button" variant="primary" onClick={save} disabled={pending || !isAcceptableEdit(state.bio, answers.bio)}>
           {pending ? t("profile.edit.saving") : t("profile.edit.save")}
         </Button>
-        <Link href="/home/profile">
+        {!embedded && <Link href="/home/profile">
           <Button type="button" variant="ghost">
             {t("profile.edit.cancel")}
           </Button>
-        </Link>
-      </div>
+        </Link>}
+      </div></>}
+      </EditorSlot>
     </div>
   );
+}
+
+
+function EditorSlot({ enabled, target, children }: { enabled: boolean; target: string; children: ReactNode }) {
+  const [container, setContainer] = useState<HTMLElement | null>(null);
+  useEffect(() => { if (enabled) setContainer(document.getElementById(target)); }, [enabled, target]);
+  return enabled ? (container ? createPortal(children, container) : null) : children;
+}
+
+function ProfileMultiSelect({ id, options, selected, label, onToggle, placeholder }: {
+  id: string; options: readonly string[]; selected: string[];
+  label: (key: string) => string; onToggle: (key: string) => void; placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const chosen = options.filter(key => selected.includes(key));
+  return <div>
+    <button id={id} ref={trigger} type="button" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)} className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-md border border-strong bg-canvas p-1.5 text-start">
+      <span className="flex min-w-0 flex-1 flex-wrap gap-1.5">{chosen.length ? chosen.map(key => <span key={key} className="rounded-pill border bg-surface-2 px-2.5 py-1 text-label font-medium">{label(key)}</span>) : <span className="px-2 text-label text-fg-secondary">{placeholder}</span>}</span>
+      <ChevronDownIcon size={18} className="mx-2 shrink-0" />
+    </button>
+    <FloatingMenu open={open} onClose={() => setOpen(false)} anchorRef={trigger} role="dialog" placement="bottom-start" matchAnchorWidth>
+      <div className="grid max-h-64 gap-1 overflow-y-auto p-2 tablet:grid-cols-2">
+        {options.map(key => <button key={key} type="button" data-menu-item role="checkbox" aria-checked={selected.includes(key)} onClick={() => onToggle(key)} className={menuItemClass(selected.includes(key), "min-h-10 rounded-sm text-label")}>
+          <span className={`grid size-5 shrink-0 place-items-center rounded-xs border border-strong ${selected.includes(key) ? "bg-accent-solid text-on-accent" : ""}`}>{selected.includes(key) && <CheckIcon size={13} />}</span>{label(key)}
+        </button>)}
+      </div>
+    </FloatingMenu>
+  </div>;
 }

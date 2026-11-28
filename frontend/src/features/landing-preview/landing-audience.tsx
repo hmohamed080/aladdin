@@ -28,7 +28,7 @@ const items = [
   { icon: UserIcon, ar: "حساب شخصي", en: "Personal Account", comingSoon: true },
   { icon: BriefcaseIcon, ar: "فريق المبيعات", en: "Sales Team", comingSoon: false },
   { icon: WrenchIcon, ar: "الصنايعية والفنيون", en: "Technicians & Installers", comingSoon: false },
-  { icon: PencilIcon, ar: "المهندسون", en: "Engineers", comingSoon: true },
+  { icon: PencilIcon, ar: "المهندسون", en: "Engineers", comingSoon: false },
   { icon: BuildingIcon, ar: "المقاولون", en: "Contractors", comingSoon: true },
   { icon: PackageIcon, ar: "المستوردون", en: "Importers", comingSoon: false },
   { icon: LayersIcon, ar: "المصنّعون", en: "Manufacturers", comingSoon: false },

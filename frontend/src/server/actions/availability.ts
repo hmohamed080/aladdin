@@ -4,25 +4,25 @@ import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 
 /**
- * Setting your own availability (§8).
+ * Setting your own availability (Â§8).
  *
  * THIS FILE DECIDES NOTHING. It writes one boolean to the caller's own row and
  * forwards whatever the database says. Every rule that matters lives there:
  *
- *   * WHICH ROW — `profiles_update_self` restricts the row to its owner, so the
- *     `eq("user_id", …)` below is a filter, not a permission. Passing someone
+ *   * WHICH ROW â€” `profiles_update_self` restricts the row to its owner, so the
+ *     `eq("user_id", â€¦)` below is a filter, not a permission. Passing someone
  *     else's id would match no row rather than write theirs.
- *   * WHO MAY — `app.stamp_availability` refuses a non-professional identity
+ *   * WHO MAY â€” `app.stamp_availability` refuses a non-professional identity
  *     (42501). A consumer reaching this action gets the same refusal a consumer
  *     reaching the column by any other route gets.
- *   * WHEN IT CHANGED — the same trigger stamps `availability_updated_at`. It is
+ *   * WHEN IT CHANGED â€” the same trigger stamps `availability_updated_at`. It is
  *     not in the client's update grant and is deliberately not written here: a
  *     freshness signal a caller can supply is worth less than none, because the
  *     whole point of keeping the timestamp (O3) is that a reader can weigh the
  *     claim's age themselves.
  *
  * So there is no RPC. The narrow column grant IS the write path, which is what
- * §8.1 specifies, and adding a security-definer wrapper over a single boolean
+ * Â§8.1 specifies, and adding a security-definer wrapper over a single boolean
  * would move the rule further from the column without making it stricter.
  */
 export type AvailabilityState = { ok: boolean; code?: string };
@@ -57,6 +57,6 @@ export async function setAvailabilityAction(
 
   // The hub renders the control, and the public page renders the result.
   revalidatePath("/home/profile");
-  revalidatePath("/home");
+  revalidatePath("/home", "layout");
   return { ok: true };
 }

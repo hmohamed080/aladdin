@@ -43,6 +43,8 @@ const identity = {
   phoneE164: null,
   phoneIsLoginKey: false,
   avatarUrl: null,
+  coverUrl: null,
+  gender: null,
   phoneLogin: false,
   secondaryPhone: null,
 };

@@ -1,5 +1,23 @@
 # UI/UX System Guide
 
+## Engineer theme extension — 2026-10-20
+
+Subsequent explicit owner direction permits reference-driven geometry and
+component styling changes within the engineer surface, retaining the palette.
+This exception includes left navigation, compact top completion strip, photo
+cards and smaller page gutters; it does not change other account themes.
+Populated local fixtures require local environment plus loopback database and
+are labelled on screen. They must not become production business records.
+
+The owner supplied four Arabic engineer account references and explicitly
+requested sand `#D8C7A6`, terracotta `#B96F52`, cream `#F2E9D8` and navy
+`#071A2D`. The named engineer theme is recorded in
+[`engineer.json`](../design/tokens/engineer.json) and scoped to
+`.engineer-surface`; canonical shell geometry, components and typography remain.
+Feature components consume semantic tokens. Real project imagery, verification
+and metrics remain authoritative; missing content uses actionable empty states.
+Frontend visual review is in progress and is not release approval.
+
 <!-- CANONICAL PROJECT MEMORY — read before any UI or design change. -->
 
 | | |
@@ -254,6 +272,23 @@ The **design language** is global. The **navigation content and the modules are 
 - **Row-action icons:** the eye always means **View on platform** (public page, new tab, only when a valid destination exists — otherwise a disabled icon that says why); **Manage** opens Admin details. Never impersonation.
 
 ## Forms & Validation
+
+### Engineer RFQ composition — 2026-10-25
+
+The owner-reference request page combines a compact architectural hero and four
+benefits with numbered product, location, notes and image sections. The live
+summary is on the right in Arabic, mirrored in English, and below the form on
+mobile. Summary controls focus their corresponding fields. Showroom checkboxes
+use real directory results; an empty selection reaches eligible showrooms only
+after explicit publication. Keep the existing engineer palette.
+
+The primary action saves a draft for review; it never sends the request. Reference
+images attach only to saved items through existing private media controls: JPEG,
+PNG or WebP, at most two per item and 5 MB each. The initial image section explains
+the save-first requirement; do not imply PDF support or pre-save uploading.
+The labelled four-item example requires the existing local-environment plus
+loopback-Supabase gate. Production starts empty unless a real product or saved
+draft supplies content. This frontend review does not establish release readiness.
 - **React Hook Form + Zod**; the Zod schema is the single validation source shared client/server. Validate at boundaries, trust internal state.
 - Field anatomy: label `$fs-label`, value `$fs-body-lg`, `20` icon, `$radius-md`, height ≈ `64`, `$border-strong` stroke; consistent across the app.
 - **Inline, specific, non-blaming** errors next to the field; summarize only for long forms. Validate on blur/submit, not on every keystroke.
@@ -390,3 +425,7 @@ Authentication/onboarding UI approved with 2026 derived brand assets, vertically
 ## Showroom Suite V2 is the design authority (2026-10-13)
 
 The user approved `/preview/showroom-suite-v2` (the `.installer-surface` theme: Deep Navy `#071A2D`, Warm Sand `#D8C7A6`, Soft Cream `#F2E9D8`, Muted Terracotta `#B96F52`, Readex Pro) as the visual language for every new or modified user-facing page, including future Supplier, Manufacturer, Importer, Contractor and Engineer interfaces (adapted to their needs). New pages consume the semantic token utilities and the shared V2 shell (`features/showroom-shell`); do not build a third shell and do not continue developing the legacy `/b2b` visual design. Third-party reference screenshots inform content and information architecture only, never branding.
+
+## Public portfolio tabs — 2026-10-24
+
+The public engineer profile's five sections use accessible tabs with a single visible panel, roving focus, RTL-aware arrow keys and Home/End navigation. Switching panels leaves the URL unchanged. The desktop project/review rails show navigation only when overflow exists and disable end controls; mobile rails use horizontal swipe. Public sample content requires a conspicuous local-only notice.

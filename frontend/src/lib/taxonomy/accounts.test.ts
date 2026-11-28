@@ -85,12 +85,12 @@ describe("registration and labels follow the canonical taxonomy", () => {
   it("shows available registration choices first and Coming Soon choices last", () => {
     expect(REGISTRATION_CHOICE_ORDER).toEqual([
       "showroom_dealer", "supplier", "manufacturer", "importer",
-      "installer_technician", "salesperson",
-      "contractor", "engineer", "end_consumer",
+      "engineer", "installer_technician", "salesperson",
+      "contractor", "end_consumer",
     ]);
     const choicesByKey = new Map(ACCOUNT_TYPE_CHOICES.map((choice) => [choice.key, choice]));
     const firstComingSoon = REGISTRATION_CHOICE_ORDER.findIndex((key) => choicesByKey.get(key)?.comingSoon);
-    expect(firstComingSoon).toBe(6);
+    expect(firstComingSoon).toBe(7);
     expect(REGISTRATION_CHOICE_ORDER.slice(0, firstComingSoon).every((key) => !choicesByKey.get(key)?.comingSoon)).toBe(true);
     expect(REGISTRATION_CHOICE_ORDER.slice(firstComingSoon).every((key) => choicesByKey.get(key)?.comingSoon)).toBe(true);
   });

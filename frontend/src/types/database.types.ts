@@ -2049,6 +2049,33 @@ export type Database = {
           },
         ]
       }
+      known_devices: {
+        Row: {
+          device_id: string
+          first_seen_at: string
+          last_seen_at: string
+          last_session_id: string | null
+          user_agent: string
+          user_id: string
+        }
+        Insert: {
+          device_id: string
+          first_seen_at?: string
+          last_seen_at?: string
+          last_session_id?: string | null
+          user_agent?: string
+          user_id: string
+        }
+        Update: {
+          device_id?: string
+          first_seen_at?: string
+          last_seen_at?: string
+          last_session_id?: string | null
+          user_agent?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           assigned_membership_id: string | null
@@ -6655,6 +6682,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          gender: string | null
           availability_updated_at: string | null
           available_for_work: boolean
           avatar_media_id: string | null
@@ -6684,6 +6712,7 @@ export type Database = {
           username_normalized: string | null
         }
         Insert: {
+          gender?: string | null
           availability_updated_at?: string | null
           available_for_work?: boolean
           avatar_media_id?: string | null
@@ -6713,6 +6742,7 @@ export type Database = {
           username_normalized?: string | null
         }
         Update: {
+          gender?: string | null
           availability_updated_at?: string | null
           available_for_work?: boolean
           avatar_media_id?: string | null
@@ -9839,6 +9869,21 @@ export type Database = {
       admin_marketplace_payment_complaint_get: { Args: { p_complaint_id: string }; Returns: Json }
       admin_marketplace_payment_complaint_take: { Args: { p_complaint_id: string }; Returns: Json }
       admin_marketplace_payment_complaints: { Args: { p_limit?: number; p_offset?: number; p_state?: string }; Returns: Json }
+      engineer_collection_change: {
+        Args: { p_action: string; p_collection_id?: string; p_name?: string; p_entity_type?: string; p_entity_id?: string }
+        Returns: string
+      }
+      engineer_collections_read: { Args: Record<PropertyKey, never>; Returns: Json }
+      engineer_request_context_read: { Args: { p_request_id: string }; Returns: Json }
+      engineer_request_location: { Args: { p_request_id: string; p_org_id: string }; Returns: string }
+      engineer_request_save: {
+        Args: { p_request_id: string; p_expected_version: number; p_title: string; p_notes: string; p_needed_by: string; p_items: Json; p_location: string; p_showroom_ids: string[] }
+        Returns: string
+      }
+      forget_known_device: {
+        Args: { p_device_id: string }
+        Returns: boolean
+      }
       marketplace_payment_complaint_file: { Args: { p_note?: string; p_order_id: string; p_reason: string }; Returns: Json }
       admin_marketplace_product_review_summary: { Args: never; Returns: Json }
       admin_marketplace_product_videos: {
@@ -10148,6 +10193,26 @@ export type Database = {
           title: string
           width: number
         }[]
+      }
+      my_active_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          user_agent: string | null
+          ip: string | null
+          created_at: string | null
+          last_active_at: string | null
+          is_current: boolean
+        }[]
+      }
+      profile_set_gender: { Args: { p_gender: string }; Returns: undefined }
+      revoke_my_session: {
+        Args: { p_session_id: string }
+        Returns: boolean
+      }
+      touch_known_device: {
+        Args: { p_device_id: string; p_user_agent: string }
+        Returns: undefined
       }
       whatsapp_otp_notification_record: {
         Args: { p_event_key: string; p_kind: string; p_source_env: string; p_occurred_at: number; p_stats: Json }

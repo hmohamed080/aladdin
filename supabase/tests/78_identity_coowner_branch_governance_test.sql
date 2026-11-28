@@ -4,7 +4,7 @@
 --   I. a verified organization's name/slug changes only through Admin review
 --   C. a co-owner is recognised only through an Admin-verified record
 --   B. branches: internal on creation, publicly verified only through review
---   R. registration: Contractor / Engineer stay Coming Soon
+--   R. registration: Contractor stays Coming Soon; Engineer is open
 --
 -- Every call is made as `authenticated` with the caller's own JWT claims.
 create extension if not exists pgtap;
@@ -510,8 +510,8 @@ select is(app.can_create_or_complete_business('78000004-0000-4000-8000-000000000
 -- R. Registration
 -- ===========================================================================
 reset role;
-select ok(app.coming_soon_account_types() @> array['contractor', 'engineer']::text[],
-  'R1: Contractor and Engineer registration stays Coming Soon');
+select ok(app.coming_soon_account_types() @> array['contractor']::text[] and not (app.coming_soon_account_types() @> array['engineer']::text[]),
+  'R1: Contractor registration stays Coming Soon; Engineer is open');
 select ok(not (app.coming_soon_account_types() @> array['showroom_dealer']::text[]),
   'R2: other account types are not blocked');
 

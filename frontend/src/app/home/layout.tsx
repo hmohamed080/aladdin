@@ -1,3 +1,7 @@
+import "@/styles/engineer.css";
+import { EngineerSidebar } from "@/features/engineer/navigation";
+import { isEngineer } from "@/features/engineer/links";
+import { MobileNavProvider } from "@/features/showroom-shell/mobile-nav-context";
 import { loadMyIdentity } from "@/server/queries/profile-identity";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
@@ -135,6 +139,37 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
   const navKeys = home
     ? personalNavKeys({ variant: home.variant, isSalesPersona: showConnectShowroom, canCreateBusiness: showSwitcher })
     : [];
+
+  if (isEngineer(home) && navKeys.length > 0) {
+    const location = installerLocationLabel(home!.professional, locale);
+    // The Engineer wears the Showroom sidebar: same modes, hover reveal and mobile drawer.
+    return (
+      <I18nProvider locale={locale} dir={dir}>
+        <MobileNavProvider>
+          <div className="engineer-surface">
+            <AppShell
+              nav={<EngineerSidebar initialMode={sidebarMode} />}
+              header={
+                <AppHeader
+                  appName={m.common.appName}
+                  hasWorkspace={false}
+                  workspaceLabel={m.account.personal}
+                  variant="engineer"
+                  location={location}
+                  preferencesHref={navKeys.includes("settings") ? "/home/settings" : undefined}
+                  context={
+                    showSwitcher ? <WorkspaceSwitcher entries={entries} activeKey={PERSONAL_CONTEXT} /> : undefined
+                  }
+                />
+              }
+            >
+              {children}
+            </AppShell>
+          </div>
+        </MobileNavProvider>
+      </I18nProvider>
+    );
+  }
 
   return (
     <I18nProvider locale={locale} dir={dir}>

@@ -153,6 +153,7 @@ describe("PersonalSettings", () => {
     phoneVerified: false,
     avatarUrl: null,
     coverUrl: null,
+    gender: null,
     phoneLogin: false,
     secondaryPhone: null,
   };

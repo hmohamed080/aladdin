@@ -31,7 +31,7 @@ const items = [
   // The one tile with its own registration entry: installers/technicians sign
   // up on the main sign-up with that type chosen. Every other tile stays text.
   { icon: WrenchIcon, ar: "الصنايعية والفنيون", en: "Technicians & Installers", comingSoon: false, href: "/auth/sign-up?type=installer_technician" },
-  { icon: PencilIcon, ar: "المهندسون", en: "Engineers", comingSoon: true },
+  { icon: PencilIcon, ar: "المهندسون", en: "Engineers", comingSoon: false, href: "/auth/sign-up?type=engineer" },
   { icon: BuildingIcon, ar: "المقاولون", en: "Contractors", comingSoon: true },
   { icon: PackageIcon, ar: "المستوردون", en: "Importers", comingSoon: false },
   { icon: LayersIcon, ar: "المصنّعون", en: "Manufacturers", comingSoon: false },

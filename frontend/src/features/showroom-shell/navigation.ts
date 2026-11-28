@@ -15,7 +15,11 @@ export type ShowroomNavItem = InstallerNavItem & {
    * primary navigation leads to "This page is not available yet".
    */
   hidden?: boolean;
+  /** Owns only its own path, not the routes beneath it (a section's overview). */
+  exact?: boolean;
 };
+
+export type ShowroomNavGroup = { label: { ar: string; en: string }; items: readonly ShowroomNavItem[] };
 
 const v2 = (id: string, ar: string, en: string, Icon: InstallerNavItem["Icon"], capabilities: string[] = []): ShowroomNavItem =>
   ({ id, label: { ar, en }, Icon, href: `${SHOWROOM_ROOT}/${id}`, capabilities });
@@ -112,7 +116,7 @@ export function activeShowroomItem(pathname: string, search: string, items: read
   let bestScore = -1;
   for (const item of items) {
     const [path = "", query] = item.href.split("?");
-    if (pathname !== path && !pathname.startsWith(`${path}/`)) continue;
+    if (pathname !== path && (item.exact || !pathname.startsWith(`${path}/`))) continue;
     const wantsView = new URLSearchParams(query ?? "").get("view");
     const view = params.get("view");
     // An item pinned to a view only owns that view; an unpinned item owns the rest.

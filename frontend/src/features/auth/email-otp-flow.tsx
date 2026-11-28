@@ -13,8 +13,8 @@ const RESEND_COOLDOWN_SECONDS = 30;
 type SendAction = (prev: AuthState, formData: FormData) => Promise<AuthState>;
 
 /**
- * The one shared passwordless Email-OTP flow used by Sign In, Sign Up, and
- * Recovery. Two SIBLING forms (never nested — nested <form> is invalid HTML): a
+ * The shared Email-OTP flow used by Recovery (Forgot Password). Sign-in and
+ * sign-up with a password live in `features/auth-password-preview`. Two SIBLING forms (never nested — nested <form> is invalid HTML): a
  * send form and a verify form, with a plain "use a different email" button and a
  * cooldown-gated resend. Sign Up additionally renders the required consent block
  * inside the send form and gates sending on all three boxes being checked; that

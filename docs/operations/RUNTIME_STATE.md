@@ -1,3 +1,11 @@
+## Hosted Auth email-change template switched to codes (Acceptance and Production) - 2026-11-28
+
+- **Changed in the Supabase dashboard on the owner's GO, on Acceptance (`nxossqhdfltcqdwvbewi`) and Production (`kkpkgjrweysgvhvkhzun`):** the "Change email address" subject and body now match `subject` in `supabase/config.toml` and `supabase/templates/email_change.html` on PR #296 (`{{ .Token }}`, no link). After a reload, each stored body matched the repository file by SHA-256 and the subject matched.
+- Before the change both projects had Supabase's default link-only template (subject "Confirm your new email address"); "Reset template" is the dashboard's way back to the default (not exercised). No email-change call was found on `main` or in its history (searched `frontend/src` and `supabase/functions`).
+- Read on both, unchanged: secure email change **on**, email code length 6, expiry 3600 s.
+- **"Email address changed" notification, turned on later the same day on both (owner request):** subject and body now match `[auth.email.notification.email_changed]` in `supabase/config.toml` and `supabase/templates/email_changed.html`; after a reload the toggle was on, the body matched by SHA-256 and the subject matched. Before: off, with Supabase's default content (subject "Your email address was changed"). To undo, turn the toggle off. This is a notice after an email change, whichever client made it; it does not confirm or block the change.
+- **No test email was sent.** The code screen is not deployed anywhere; delivery is unverified until PR #296 is released.
+
 ## Acceptance at 266: marketplace-clarity applied, frontend c905580f - 2026-11-28
 
 Supersedes, for Acceptance only, the migration count and frontend version in the entries below.
@@ -20,6 +28,12 @@ Supersedes the frontend version and the migration status of the entry below.
 - **Acceptance frontend** is now `aladdin-frontend-preview` version `3fa20123-a84f-4e8c-836f-b49d4ca70412` (workflow run 46131423561, `main` `89b147f6`); rollback target `75fd1b92-2915-4a60-9b46-11018f39dfa1`. Ordering is on.
 - Migration `20261128090001` is in a branch only: **not merged, not applied** to Acceptance or Production, and has no apply plan yet. The frontend of that branch also runs against the current Acceptance database (new fields are optional).
 - The timers Worker is still not deployed, so no reminder, escalation or automatic cancellation runs.
+
+## Engineer account port and registration opening (PR #296 open; not merged or deployed) - 2026-11-28
+
+- Branch `feat/engineer-account-port-20261128`: the Engineer account ported onto `main` `98f60d52` (through #294); migrations `20261128130001`-`20261128130007`; permission contracts `20261128130001`-`20261128130006`.
+- **No hosted change.** Acceptance and Production still refuse a fresh Engineer registration.
+- When released: apply the migrations, then promote the app immediately (see the review marker in `20261128130005`).
 
 ## Acceptance: UI fixes deployed; ordering switched on in the repository - 2026-11-28
 

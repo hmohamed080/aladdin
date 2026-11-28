@@ -30,8 +30,8 @@ describe("Coming Soon parity: server actions ⇄ database", () => {
     .filter((v): v is NonNullable<typeof v> => v !== null)
     .sort();
 
-  it("the frontend closes Personal Account, Engineer and Contractor", () => {
-    expect(frontend).toEqual(["contractor", "end_consumer", "engineer"]);
+  it("the frontend closes Personal Account and Contractor (Engineer is open since 2026-11-28)", () => {
+    expect(frontend).toEqual(["contractor", "end_consumer"]);
   });
 
   it("the database closes exactly the same account types", () => {

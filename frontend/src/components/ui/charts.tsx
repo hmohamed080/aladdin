@@ -362,8 +362,10 @@ export function DonutSplit({
     return arc;
   });
 
+  // Wraps on the SPACE the panel gives it, not on the screen size: beside the ring when there is room for
+  // readable labels, under it when there is not (a narrow side panel used to squeeze every label to nothing).
   return (
-    <figure className="m-0 flex flex-col items-center gap-lg tablet:flex-row tablet:items-center">
+    <figure className="m-0 flex flex-wrap items-center justify-center gap-lg">
       <div className="relative shrink-0">
         <svg viewBox="0 0 36 36" role="img" aria-label={ariaLabel} className="h-36 w-36">
           <circle cx="18" cy="18" r="15.9155" fill="none" className="stroke-surface-2" strokeWidth="4" />
@@ -391,7 +393,7 @@ export function DonutSplit({
         </div>
       </div>
 
-      <ul className="flex w-full min-w-0 flex-col gap-1.5">
+      <ul className="flex w-full min-w-[12rem] flex-1 flex-col gap-1.5">
         {arcs.map((a) => (
           <li key={a.label} className="flex items-center gap-2 text-label">
             <span className={cn("h-2.5 w-2.5 shrink-0 rounded-[3px]", BG[a.series])} aria-hidden="true" />

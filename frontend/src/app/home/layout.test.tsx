@@ -11,7 +11,8 @@ const state = vi.hoisted(() => ({
 
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/home",
+  usePathname: () => "/home/engineer/requests",
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: vi.fn() }),
   redirect: (to: string) => {
     throw new Error(`REDIRECT:${to}`);
@@ -167,7 +168,7 @@ describe("/home layout — workspace switcher scope and account label", () => {
     });
 
     it("does not offer Connect a showroom to a non-sales account", async () => {
-      state.home = home("engineer");
+      state.home = home("contractor");
       state.isSales = false;
       await renderLayout();
       expect(screen.getByTestId("nav-keys").textContent!.split(",")).not.toContain("connectShowroom");
@@ -185,7 +186,7 @@ describe("/home layout — workspace switcher scope and account label", () => {
   });
 
   describe("approved categories", () => {
-    it.each(["engineer", "contractor", "showroom_dealer", "supplier", "manufacturer", "importer"])(
+    it.each(["contractor", "showroom_dealer", "supplier", "manufacturer", "importer"])(
       "%s keeps the generic switcher with Add business activity",
       async (accountType) => {
         state.home = home(accountType);
@@ -194,6 +195,28 @@ describe("/home layout — workspace switcher scope and account label", () => {
         expect(screen.getByTestId("nav-keys").textContent!.split(",")).toContain("addBusiness");
       },
     );
+
+    it("engineer keeps the generic switcher with Add business activity", async () => {
+      state.home = home("engineer");
+      await renderLayout();
+      expect(screen.getByTestId("workspace-switcher").textContent).toContain("Add business activity");
+    });
+  });
+
+  describe("engineer navigation", () => {
+    it("wears the Showroom sidebar: display-mode control, Engineer destinations, points and sign-out", async () => {
+      state.home = home("engineer");
+      await renderLayout();
+      const sidebar = document.querySelector("[data-preview-sidebar]");
+      expect(sidebar).not.toBeNull();
+      expect(screen.getAllByTestId("showroom-sidebar-control").length).toBeGreaterThan(0);
+      const hrefs = [...document.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+      expect(hrefs).toEqual(expect.arrayContaining(["/home", "/home/engineer/requests", "/home/profile", "/home/points"]));
+      // The current section is the active row; the overview (exact) is not.
+      expect(document.querySelector('a[aria-current="page"][href="/home/engineer/requests"]')).not.toBeNull();
+      expect(document.querySelector('a[aria-current="page"][href="/home"]')).toBeNull();
+      expect(screen.getAllByTitle(/sign out|تسجيل خروج/i).length).toBeGreaterThan(0);
+    });
   });
 });
 

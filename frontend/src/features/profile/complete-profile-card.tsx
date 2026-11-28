@@ -38,6 +38,13 @@ export const ITEM_HREF: Record<ProfileCompletionItem, string> = {
   availability: "/home/profile#availability",
   location: "/home/profile#basic",
   portfolio: "/home/profile#portfolio",
+  // Returned only for an Engineer, whose steps are completed on one page.
+  governorate: "/home/profile/complete",
+  city: "/home/profile/complete",
+  specialization: "/home/profile/complete",
+  services: "/home/profile/complete",
+  work_status: "/home/profile/complete",
+  readiness: "/home/profile/complete",
 };
 
 /**

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Cropper, { type Area } from "react-easy-crop";
 import { useI18n } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/controls";
+import { CameraIcon, UserIcon } from "@/components/ui/icons";
 import { InlineError, InlineSuccess } from "@/components/ui/primitives";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { encodeCanvasWithin, ImagePrepareError } from "@/lib/media/resize-image";
@@ -57,7 +58,8 @@ async function cropToBlob(src: string, area: Area): Promise<Blob> {
  * A failed upload leaves only an invisible pending row and the current avatar
  * untouched; Cancel discards everything local and uploads nothing.
  */
-export function AvatarField({ avatarUrl, displayName }: { avatarUrl: string | null; displayName: string }) {
+export function AvatarField({ avatarUrl, displayName, variant = "default" }: { avatarUrl: string | null; displayName: string; /** "hero": large circle with a camera badge, centred (engineer profile header). Same upload flow. */ variant?: "default" | "hero" }) {
+  const hero = variant === "hero";
   const { t } = useI18n();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -124,9 +126,10 @@ export function AvatarField({ avatarUrl, displayName }: { avatarUrl: string | nu
   const initial = displayName.trim().charAt(0).toUpperCase() || "?";
 
   return (
-    <div className="flex flex-col gap-sm" data-testid="avatar-field">
-      <span className="text-label font-medium text-fg-secondary">{t("profileIdentity.avatar.label")}</span>
-      <div className="flex flex-wrap items-center gap-md">
+    <div className={hero ? "flex flex-col items-center gap-sm" : "flex flex-col gap-sm"} data-testid="avatar-field">
+      {hero ? null : <span className="text-label font-medium text-fg-secondary">{t("profileIdentity.avatar.label")}</span>}
+      <div className={hero ? "flex flex-col items-center gap-sm" : "flex flex-wrap items-center gap-md"}>
+        <div className={hero ? "relative" : "contents"}>
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not a static asset
           <img
@@ -135,17 +138,19 @@ export function AvatarField({ avatarUrl, displayName }: { avatarUrl: string | nu
             width={80}
             height={80}
             decoding="async"
-            className="h-20 w-20 rounded-full border object-cover"
+            className={hero ? "engineer-basics-avatar object-cover" : "h-20 w-20 rounded-full border object-cover"}
             data-testid="avatar-current"
           />
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-20 w-20 items-center justify-center rounded-full bg-surface-2 text-title text-fg-muted"
+            className={hero ? "engineer-basics-avatar text-fg-muted" : "flex h-20 w-20 items-center justify-center rounded-full bg-surface-2 text-title text-fg-muted"}
           >
-            {initial}
+            {hero ? <UserIcon size={64} /> : initial}
           </span>
         )}
+        {hero ? <button type="button" className="engineer-basics-avatar-badge" onClick={() => inputRef.current?.click()} aria-label={avatarUrl ? t("profileIdentity.avatar.change") : t("profileIdentity.avatar.add")}><CameraIcon size={18} /></button> : null}
+        </div>
         <input
           ref={inputRef}
           type="file"

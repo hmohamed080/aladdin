@@ -18,7 +18,7 @@ const initial: PasswordAuthState = { ok: false };
  * (see `changePassword`), never the existing session alone: a long-lived
  * session is not proof of intent for a sensitive account-security change.
  */
-export function ChangePasswordForm({ email }: { email: string }) {
+export function ChangePasswordForm({ email, embedded = false }: { email: string; /** Inside the settings frame: no card of its own, the page supplies the title. */ embedded?: boolean }) {
   const { t } = useI18n();
   const [state, dispatch] = useActionState(changePassword, initial);
   const [newPassword, setNewPassword] = useState("");
@@ -26,6 +26,7 @@ export function ChangePasswordForm({ email }: { email: string }) {
   const mismatch = confirmNewPassword.length > 0 && newPassword !== confirmNewPassword;
 
   if (state.ok) {
+    if (embedded) return <p role="status" className="engineer-link-notice">{t("authPasswordPreview.changePassword.done")}</p>;
     return (
       <AuthCard title={t("authPasswordPreview.changePassword.title")} subtitle={t("authPasswordPreview.changePassword.done")}>
         <></>
@@ -33,8 +34,13 @@ export function ChangePasswordForm({ email }: { email: string }) {
     );
   }
 
+  const Frame = embedded
+    ? ({ children }: { children: React.ReactNode }) => <div className="engineer-password-embed">{children}</div>
+    : ({ children }: { children: React.ReactNode }) => (
+        <AuthCard title={t("authPasswordPreview.changePassword.title")} subtitle={t("authPasswordPreview.changePassword.subtitle")}>{children}</AuthCard>
+      );
   return (
-    <AuthCard title={t("authPasswordPreview.changePassword.title")} subtitle={t("authPasswordPreview.changePassword.subtitle")}>
+    <Frame>
       <form action={dispatch} className="flex flex-col gap-md" noValidate>
         <LabeledField
           label={t("authPasswordPreview.changePassword.currentPasswordLabel")}
@@ -80,6 +86,6 @@ export function ChangePasswordForm({ email }: { email: string }) {
           {t("authPasswordPreview.changePassword.submit")}
         </SubmitButton>
       </form>
-    </AuthCard>
+    </Frame>
   );
 }

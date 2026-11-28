@@ -1,5 +1,18 @@
 # Architecture Guide
 
+## Engineer account composition — 2026-10-20
+
+The engineer account composes the existing personal `/home` shell, caller-JWT
+purchase requests, public directory projections, portfolio and review services.
+It does not introduce another application or preview routes. Private saved
+records and team lists are owner-scoped collections; a team list confers no
+organization membership or permissions. The branch-local migration
+`20261019084212` adds collection/context RPCs and declared-engineer audience
+eligibility without promoting verification or canonical persona.
+
+Frontend review precedes resuming full-stack verification. Production migration
+application and deployment remain deferred to review; see
+[engineer scope](../product/engineer-account.md).
 ## 2026-10-28 — WhatsApp OTP architecture PREPARATION (not active)
 
 Proposed target: Supabase Auth issues/verifies Phone OTP → signed HTTPS Send SMS Hook → isolated `aladdin-whatsapp-otp-preview` Cloudflare Worker → Meta WhatsApp Cloud API using approved Arabic `aladdin_otp` template. **No Send SMS Hook enabled, no Worker deployment, no new phone identity or live flows.** Current installer/showroom phone+password sign-in relies on synthetic email aliases and remains unchanged. Account/phone identity compatibility and durable webhook replay/idempotency are release blockers before anyone may enable delivery. See [ADR-0025](../decisions/ADR-0027-whatsapp-otp-worker-transport.md).
@@ -284,3 +297,7 @@ ADR-0014 retains Installer identity/session architecture for Showroom. ADR-0015 
 # PR #84 pending expand/contract correction — 2026-10-14
 
 Business creation keeps its deployed nine-argument draft-save and draft-submit RPCs; extended Showroom callers use separately named v2 RPCs over the same transactional organization engine. Pending PR migrations add private generated country metadata and triggers so direct contact writes share application numbering rules. Historical address exceptions remain separate from current approval: expiry, rejection, revocation and suspension deny seller eligibility. These corrections are pending clean CI acceptance and are not deployed. [ADR-0016](../decisions/ADR-0016-business-phone-database-validation.md) records metadata provenance and refresh procedure. [Provider security research](../security/showroom-auth-provider-security-options.md) remains decision-only; no authentication provider or paid plan was changed.
+
+## Public profile handles — 2026-10-24
+
+[ADR-0017](../decisions/ADR-0017-public-profile-handles.md) adds canonical `/p/{persona}/{username}` paths through a read-only public projection derived from the existing publication reader. Legacy UUID links redirect only after a public lookup; wrong-type and unavailable handles remain not found. The existing page/media authorization boundaries still apply. No new account audience is published and no hosted migration has been applied.

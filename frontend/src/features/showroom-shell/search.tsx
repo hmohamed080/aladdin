@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
 import { CommandIcon, EnterKeyIcon, SearchIcon, XIcon } from "@/components/ui/icons";
 import { pick } from "@/features/installer-dashboard-preview/localized";
-import { showroomNavigation } from "./navigation";
+import { showroomNavigation, type ShowroomNavGroup } from "./navigation";
 import type { InstallerNavItem } from "@/features/installer-dashboard-preview/installer-nav";
 import type { InstallerOpportunityVM } from "@/features/installer-dashboard-preview/view-model";
 import styles from "@/features/installer-dashboard-preview/installer-search.module.css";
@@ -36,10 +36,13 @@ type Hit = {
 export function ShowroomSearch({
   jobs = [],
   capabilities,
+  groups,
   production = true,
 }: {
   jobs?: readonly InstallerOpportunityVM[];
   capabilities: readonly string[];
+  /** Another account's destinations to search instead of the Showroom's (the Engineer's). */
+  groups?: readonly ShowroomNavGroup[];
   production?: boolean;
 }) {
   const { locale, dir } = useI18n();
@@ -53,7 +56,7 @@ export function ShowroomSearch({
 
   const navHits: Hit[] = useMemo(
     () =>
-      showroomNavigation(capabilities).flatMap((group) => group.items)
+      (groups ?? showroomNavigation(capabilities)).flatMap((group) => group.items)
         .filter((item: InstallerNavItem) => !production || Boolean(item.href))
         .map((item: InstallerNavItem) => ({
           id: `nav-${item.id}`,
@@ -62,7 +65,7 @@ export function ShowroomSearch({
           anchor: item.anchor,
           href: item.href,
         })),
-    [locale, production, capabilities],
+    [locale, production, capabilities, groups],
   );
 
   const jobHits: Hit[] = useMemo(

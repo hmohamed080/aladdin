@@ -99,6 +99,10 @@ const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   "certificates.fileType.pdf",
   // Same reasoning, for the avatar upload's accepted image formats.
   "profileIdentity.avatar.errorType",
+  "profileIdentity.cover.errorType",
+  // Software product names, written in Latin in Arabic usage.
+  "onboarding.professional.serviceItems.tool_autocad",
+  "onboarding.professional.serviceItems.tool_3ds_max",
   "showroomSettings.image.errorType",
   // HDF is a board-material name, written HDF in Arabic trade usage.
   "onboarding.professional.specializations.hdf_flooring_installation",
@@ -232,6 +236,7 @@ describe("Sprint 7.4 individual onboarding copy", () => {
 
   it("every persona Arabic value is present, non-empty, and real Arabic", () => {
     const bad = all
+      .filter(([key]) => !LATIN_IN_ARABIC_WHITELIST.has(key))
       .map(([key]) => [key, arMap.get(key)] as const)
       .filter(([, v]) => !v || v.trim().length === 0 || !ARABIC.test(v))
       .map(([key]) => key);

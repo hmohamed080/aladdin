@@ -107,7 +107,7 @@ export function businessOrgTypeFromAccountType(
  * names are unchanged from before to avoid a wider blast radius — only the
  * MEMBERSHIP of this list and its i18n labels changed:
  *
- *   1. Showroom (showroom_dealer, business)      6. Engineer — Coming Soon
+ *   1. Showroom (showroom_dealer, business)      6. Engineer
  *   2. Supplier (business)                       7. Tradespeople & Technicians
  *   3. Manufacturer (business)                       (key: installer_technician —
  *   4. Importer (business)                            relabeled only, never a
@@ -120,7 +120,7 @@ export function businessOrgTypeFromAccountType(
 export const ACCOUNT_TYPE_CHOICES: AccountTypeChoice[] = [
   // ---- Personal: a persona the person claims for themselves. ----
   { key: "end_consumer", track: "consumer", accountType: "end_consumer", comingSoon: true },
-  { key: "engineer", track: "professional", accountType: "engineer", comingSoon: true },
+  { key: "engineer", track: "professional", accountType: "engineer" },
   { key: "installer_technician", track: "professional", accountType: "installer_technician" },
   { key: "contractor", track: "professional", accountType: "contractor", comingSoon: true },
   { key: "salesperson", track: "professional", accountType: "sales" },

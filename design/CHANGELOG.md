@@ -9,6 +9,30 @@ Each entry uses: Added · Changed · Fixed · Deprecated · Removed · Migration
 
 ---
 
+## Unreleased — 2026-10-25 — Engineer RFQ page composition
+
+Changed: owner-reference compact architectural hero, four task benefits,
+numbered product/location/notes/images sections, live summary (right in Arabic,
+mirrored in English; stacked on mobile) and real showroom selection.
+
+Added: explicitly labelled local four-requirement example behind the existing
+local-environment and loopback-database gate. Production retains real product,
+saved draft or empty input.
+
+Migration notes: existing engineer palette, save-draft → review → explicit-publish
+flow and private saved-item images are preserved. JPEG/PNG/WebP only, two images
+per item, 5 MB each; PDF and pre-save uploading remain unsupported. No token,
+shared-shell, schema or deployment change belongs to this entry. TypeScript, focused lint and six composer tests pass; this is not a release-readiness claim.
+
+## 1.3.0 — 2026-11-28 — Engineer account theme (authored 2026-10-19)
+
+Added: owner-approved engineer palette in `tokens/engineer.json` and its scoped semantic CSS mapping. The colors are sand `#D8C7A6`, terracotta `#B96F52`, cream `#F2E9D8`, and navy `#071A2D`.
+
+Changed: engineer home/profile/navigation, quotation composer, discovery and personal collections compose the canonical shell, cards and controls. The existing Aladdin showroom architectural artwork supplies decorative hero imagery; real records never receive fabricated photos, ratings or reviews.
+
+Fixed: explicit hero text contrast and complete shell/canvas token mapping. Both theme variants retain the same four brand primitives.
+
+Migration notes: the theme applies only within `.engineer-surface`; other account surfaces keep their existing token values. New business response screens reuse the business theme. Browser responsive and theme checks must pass before the feature is marked ready.
 ## 1.2.0 — 2026-11-15 — Brand-landing palette registered
 
 ### Added
@@ -58,3 +82,7 @@ First approved, hardened Design System foundation. No product components impleme
 
 ### Changed
 - `UI_UX_SYSTEM_GUIDE.md` and `PRODUCT.md` reconciled from "brand not approved" to the approved identity + artifact-authority chain.
+
+## 2026-10-24 — Public portfolio reference correction
+
+Rebuilt public portfolio composition around supplied references, added generated service imagery and explicitly guarded local sample content. Replaced section anchors with isolated accessible tabs. Preserved the four-color palette and public-data restrictions.

@@ -514,7 +514,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
 });
 
 describe("requestPasswordSignUp — account type is resolved on the SERVER, never trusted from the client", () => {
-  it.each(["end_consumer", "engineer", "contractor", "organization_owner_manager", "wholesaler", "interior_designer", "not_a_type"])(
+  it.each(["end_consumer", "contractor", "organization_owner_manager", "wholesaler", "interior_designer", "not_a_type"])(
     "refuses %s (Coming Soon / transitional / not offered) before signUp() or any staging",
     async (accountType) => {
       const res = await requestPasswordSignUp(
@@ -529,6 +529,7 @@ describe("requestPasswordSignUp — account type is resolved on the SERVER, neve
 
   it.each([
     ["installer_technician", "persona_type", "installer_technician"],
+    ["engineer", "persona_type", "engineer"],
     ["salesperson", "persona_type", "sales"],
     ["showroom_dealer", "organization_type", "showroom_dealer"],
     ["supplier", "organization_type", "supplier"],

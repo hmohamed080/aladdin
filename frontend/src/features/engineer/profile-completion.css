@@ -1,0 +1,341 @@
+/* Only the editing canvas changes; the approved completion navigator is untouched. */
+.engineer-edit-hero {
+  min-height: 13rem;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+}
+
+.engineer-edit-hero > div { width: 100%; }
+.engineer-edit-hero > img {
+  opacity: .38;
+  mask-image: linear-gradient(to right, transparent, #000);
+}
+[dir="rtl"] .engineer-edit-hero > img {
+  mask-image: linear-gradient(to left, transparent, #000);
+}
+.engineer-edit-hero h1,
+.engineer-edit-hero p { color: var(--fg); }
+
+.engineer-edit-section,
+.engineer-edit-footer {
+  padding: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--accent-solid) 50%, var(--border));
+  border-radius: 0.75rem;
+  background: var(--surface-2);
+}
+
+.engineer-edit-section-heading {
+  border-color: color-mix(in srgb, var(--accent-solid) 45%, var(--border));
+  margin-bottom: 1rem;
+}
+
+/* Existing forms keep their save/error behavior; the section provides the frame. */
+.engineer-surface .engineer-edit-content .engineer-edit-section .shadow-card {
+  background: transparent;
+  box-shadow: none !important; /* beats .workspace-body .bg-surface */
+  border: 0;
+  padding: 0;
+}
+
+.engineer-surface .engineer-edit-content input:not([type="checkbox"]):not([type="file"]),
+.engineer-surface .engineer-edit-content select,
+.engineer-surface .engineer-edit-content button[aria-haspopup="listbox"],
+.engineer-surface .engineer-edit-content textarea {
+  background: var(--surface-2);
+  border-color: color-mix(in srgb, var(--accent-solid) 50%, var(--border));
+}
+
+.engineer-availability-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .75rem;
+  min-height: 6rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent-solid) 50%, var(--border));
+  border-radius: .65rem;
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.engineer-availability-choice svg { color: var(--accent); }
+.engineer-availability-choice[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
+.engineer-availability-choice[aria-pressed="true"] svg { color: inherit; }
+.engineer-availability-choice:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 3px; }
+
+.engineer-edit-section textarea { min-height: 7rem; }
+.engineer-edit-section [data-testid="profile-editor"] { gap: 1.25rem; }
+.engineer-edit-section #identity { gap: 1rem; }
+.engineer-edit-section [data-testid="avatar-field"] {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-strong);
+}
+.engineer-edit-section [data-testid="avatar-field"] span[aria-hidden="true"] {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+}
+.engineer-edit-content .engineer-edit-username {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border-strong);
+  border-radius: 0;
+  padding: 1rem 0 0;
+  box-shadow: none;
+}
+.engineer-edit-section #display-name,
+.engineer-edit-section #phone { border: 0; padding-top: 0; }
+.engineer-edit-section #identity > form { justify-content: space-between; }
+.engineer-edit-professional > .shadow-card + .shadow-card {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-strong);
+  border-radius: 0;
+}
+
+@media (min-width: 768px) {
+  .engineer-edit-section #identity {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .engineer-edit-section [data-testid="avatar-field"] { grid-column: 1 / -1; }
+  .engineer-edit-professional > .shadow-card:first-of-type {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+  .engineer-edit-professional > .shadow-card:first-of-type > :first-child,
+  .engineer-edit-professional > .shadow-card:first-of-type > :has(#spec),
+  .engineer-edit-professional > .shadow-card:first-of-type > :has(#bio) { grid-column: 1 / -1; }
+}
+
+@media (max-width: 767px) {
+  .engineer-edit-section,
+  .engineer-edit-footer { padding: 1rem; }
+  .engineer-edit-hero { min-height: 0; }
+}
+
+
+/* Match the installer cream canvas without changing the navigator geometry. */
+.engineer-surface.engineer-completion-overlay,
+.engineer-surface:has(.engineer-completion-workspace) {
+  --canvas: var(--engineer-cream);
+  --surface: var(--engineer-cream);
+  --surface-2: var(--engineer-cream);
+  --workspace: var(--engineer-cream);
+}
+.dark .engineer-surface.engineer-completion-overlay,
+.dark .engineer-surface:has(.engineer-completion-workspace) {
+  --canvas: var(--engineer-navy);
+  --surface: var(--engineer-navy);
+  --surface-2: var(--engineer-navy);
+  --workspace: var(--engineer-navy);
+}
+.engineer-profile-savebar {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 20;
+  padding: 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: .75rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+}
+#engineer-save-slot { position: sticky; bottom: 1rem; z-index: 20; }
+.engineer-coverage-switch { width: 2.75rem; height: 1.5rem; padding: .15rem; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--engineer-sand); }
+.engineer-coverage-switch span { display: block; width: 1.1rem; height: 1.1rem; border-radius: 999px; background: var(--engineer-cream); }
+.engineer-coverage-switch[aria-checked="true"] { background: var(--accent-solid); }
+.engineer-coverage-switch[aria-checked="true"] span { margin-inline-start: auto; }
+
+/* Step 1 hero: cover banner + overlapping avatar (matches the approved basics mock). */
+.engineer-basics-hero { display: flex; flex-direction: column; align-items: stretch; }
+.engineer-cover {
+  position: relative;
+  height: 9rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent-solid) 40%, var(--border));
+}
+.engineer-cover-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.engineer-cover-fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-solid) 38%, var(--surface-2)), var(--surface-2));
+}
+.engineer-cover-button {
+  position: absolute;
+  inset-block-start: 1rem;
+  inset-inline-end: 1rem;
+  background: var(--surface);
+}
+.engineer-cover-error { position: absolute; inset-block-end: .75rem; inset-inline: 1rem; }
+.engineer-basics-hero > [data-testid="avatar-field"],
+.engineer-basics-avatar-slot { margin-top: -4.25rem; position: relative; z-index: 1; }
+.engineer-basics-avatar {
+  display: grid;
+  place-items: center;
+  width: 8.5rem;
+  height: 8.5rem;
+  border-radius: 999px;
+  border: 3px solid color-mix(in srgb, var(--accent-solid) 60%, var(--surface));
+  background: var(--surface);
+  color: var(--fg-muted);
+  overflow: hidden;
+}
+.engineer-basics-avatar-badge {
+  position: absolute;
+  inset-block-end: .25rem;
+  inset-inline-start: .25rem;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  border: 3px solid var(--surface);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.engineer-basics-avatar-badge:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 2px; }
+.engineer-edit-section .engineer-basics-hero [data-testid="avatar-field"] { padding-bottom: 0; border-bottom: 0; }
+.engineer-edit-section [data-testid="identity-header"] { grid-column: 1 / -1; }
+@media (min-width: 768px) {
+  .engineer-cover { height: 11rem; }
+}
+
+/* Thin divider between the identity row and the location row (as in the approved mock). */
+#engineer-location-slot {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--accent-solid) 45%, var(--border));
+}
+#engineer-location-slot:empty { display: none; }
+
+/* ===== Step 3 — work availability (approved mock: framed panels, choice cards) ===== */
+.engineer-avail-panel {
+  container-type: inline-size;
+  padding: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--accent-solid) 30%, var(--border));
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.engineer-avail-panel-head { display: flex; align-items: flex-start; gap: .85rem; }
+.engineer-avail-icon {
+  display: grid; place-items: center; flex: none;
+  width: 2.75rem; height: 2.75rem; border-radius: 999px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent-solid) 16%, var(--surface));
+}
+.engineer-avail-title { font-size: 1.15rem; font-weight: 700; line-height: 1.4; color: var(--fg); }
+.engineer-avail-hint { margin-top: .15rem; font-size: .9rem; color: var(--fg-secondary); }
+.engineer-avail-note {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .7rem 1rem; border-radius: .6rem;
+  font-size: .9rem; color: var(--fg-secondary);
+  background: color-mix(in srgb, var(--engineer-sand) 45%, var(--surface));
+}
+.engineer-avail-note svg { flex: none; color: var(--fg); }
+
+/* The fieldset's own box is invisible; disabled state fades the panels like the mock. */
+.engineer-avail-fieldset { border: 0; padding: 0; margin: 0; }
+.engineer-avail-fieldset[data-disabled="true"] .engineer-avail-panel { opacity: .6; }
+
+/* Status choice cards */
+.engineer-status-grid { display: grid; gap: .85rem; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .engineer-status-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
+.engineer-status-card {
+  position: relative;
+  display: flex; align-items: center; gap: .9rem;
+  min-height: 5.5rem; padding: 1rem 1.25rem;
+  border: 1px solid var(--border-strong); border-radius: .75rem;
+  background: var(--surface); color: var(--fg);
+  text-align: start; font: inherit;
+}
+button.engineer-status-card { cursor: pointer; transition: background-color .15s, border-color .15s; }
+button.engineer-status-card:hover:not(:disabled) { background: var(--surface-2); }
+button.engineer-status-card:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 2px; }
+button.engineer-status-card:disabled { cursor: progress; opacity: .7; }
+.engineer-status-text { display: flex; flex-direction: column; gap: .35rem; min-width: 0; }
+.engineer-status-title { display: flex; align-items: center; gap: .6rem; font-size: 1.2rem; font-weight: 700; }
+.engineer-status-sub { display: flex; align-items: center; gap: .45rem; font-size: .9rem; color: var(--fg-secondary); }
+.engineer-status-dot { width: .8rem; height: .8rem; border-radius: 999px; background: var(--success); flex: none; }
+.engineer-status-ring {
+  flex: none; width: 1.6rem; height: 1.6rem; border-radius: 999px;
+  border: 2px solid var(--border-strong); background: var(--surface);
+}
+.engineer-status-ring[data-on="true"] { border-color: var(--danger); background: radial-gradient(circle, var(--danger) 0 45%, transparent 48%); }
+/* Available: chosen = soft green; not chosen = muted. */
+.engineer-status-card[data-tone="available"][data-selected="true"] {
+  border-color: color-mix(in srgb, var(--fg) 45%, var(--border));
+  background: color-mix(in srgb, var(--engineer-sand) 45%, var(--surface));
+}
+.engineer-status-card[data-tone="available"][data-selected="false"] { color: var(--fg-secondary); }
+.engineer-status-card[data-tone="available"][data-selected="false"] .engineer-status-dot { opacity: .55; }
+/* Unavailable: outline action; chosen = soft red. */
+.engineer-status-card[data-tone="unavailable"] .engineer-status-title { font-size: 1.05rem; }
+.engineer-status-card[data-tone="unavailable"] { color: var(--danger); justify-content: center; border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+.engineer-status-card[data-tone="unavailable"][data-selected="true"] {
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  border-color: var(--danger);
+}
+.engineer-status-card[data-tone="unavailable"] .engineer-status-ring { position: absolute; inset-inline-start: 1.25rem; }
+.engineer-status-card[data-tone="unavailable"]:has(.engineer-status-ring) { padding-inline-start: 3.5rem; }
+
+/* Readiness choice cards (portaled in from the profile editor) */
+.engineer-avail-panel .engineer-availability-choice { position: relative; min-height: 7rem; border-radius: .75rem; font-size: 1.1rem; font-weight: 700; gap: .6rem; }
+.engineer-availability-radio {
+  position: absolute; top: .85rem; inset-inline-end: .85rem;
+  width: 1.5rem; height: 1.5rem; border-radius: 999px;
+  border: 2px solid var(--border-strong); background: var(--surface);
+}
+.engineer-availability-choice[aria-pressed="true"] .engineer-availability-radio {
+  border-color: var(--primary-foreground);
+  background: radial-gradient(circle, var(--accent-solid) 0 42%, transparent 46%), var(--primary);
+}
+/* The portal's own "availability" label repeats the panel title. */
+#engineer-availability-slot label[for="avail"] {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Unavailable periods */
+.engineer-avail-period {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .75rem 1rem; border-radius: .7rem;
+  border: 1px solid color-mix(in srgb, var(--accent-solid) 30%, var(--border));
+  background: var(--surface);
+}
+.engineer-avail-period > svg { color: var(--accent-solid); flex: none; }
+.engineer-avail-remove { width: 2.75rem; height: 2.75rem; padding: 0; justify-content: center; color: var(--danger); }
+.engineer-avail-period { font-size: 1.05rem; }
+.engineer-avail-form {
+  display: grid; gap: .85rem; align-items: end;
+  padding: 1rem; border-radius: .7rem;
+  border: 1px solid color-mix(in srgb, var(--accent-solid) 30%, var(--border));
+  background: var(--surface);
+  grid-template-columns: 1fr;
+}
+/* Sized by the PANEL, not the screen: narrow = stacked, medium = 2x2, wide = the single row from the mock. */
+@container (min-width: 34rem) {
+  .engineer-avail-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .engineer-avail-add { justify-self: end; }
+}
+@container (min-width: 58rem) {
+  .engineer-avail-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 1.25rem; padding: 1.25rem 1.5rem; }
+  .engineer-avail-add { min-width: 15rem; }
+}
+.engineer-avail-check { display: flex; align-items: center; gap: .6rem; min-height: 3rem; font-size: 1rem; white-space: nowrap; }
+.engineer-avail-check input { width: 1.5rem; height: 1.5rem; accent-color: var(--accent-solid); border-radius: .3rem; }
+.engineer-avail-add { gap: .6rem; white-space: nowrap; justify-content: center; min-height: 3.25rem; padding-inline: 1.5rem; font-size: 1.05rem; font-weight: 700; }
+
+/* Step 4 (work history): the heading is its own framed box, the content sits below it unframed (approved mock). */
+.engineer-edit-section[data-step="3"] { padding: 0; border: 0; background: transparent; }
+.engineer-edit-section[data-step="3"] > .engineer-edit-section-heading {
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--accent-solid) 45%, var(--border));
+  border-radius: .85rem;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}

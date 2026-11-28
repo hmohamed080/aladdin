@@ -5,6 +5,7 @@ import type { CatalogRow } from "@/server/queries/commerce";
 import { SavedResults } from "./saved-results";
 
 const actions = vi.hoisted(() => ({ toggle: vi.fn(), feed: vi.fn() }));
+vi.mock("@/server/actions/engineer-collections", () => ({ changeEngineerCollection: vi.fn(async () => ({ ok: true })) }));
 vi.mock("@/server/actions/saved-products", () => ({ toggleSavedProductAction: actions.toggle }));
 vi.mock("@/server/actions/showroom-saved-feed", () => ({ loadShowroomSavedBatchAction: actions.feed }));
 

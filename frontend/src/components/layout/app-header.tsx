@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ShowroomTopbar } from "@/features/showroom-shell/topbar";
 import { cn } from "@/lib/ui/cn";
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -6,6 +7,7 @@ import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { Brand } from "@/components/layout/brand";
 import { GlobalSearch } from "@/components/layout/global-search";
+import { EngineerSearch } from "@/features/engineer/navigation";
 import { ProfileMenu } from "@/components/layout/profile-menu";
 import { ThemeSwitch } from "@/components/layout/switchers";
 import { loadAccountIdentity, initialsOf } from "@/server/queries/identity";
@@ -101,6 +103,7 @@ export async function AppHeader({
   workspaceLabel,
   preferencesHref,
   orgId,
+  location,
   variant = "bar",
 }: {
   appName: string;
@@ -123,7 +126,7 @@ export async function AppHeader({
    * data is identical in both — this switch must never become a place where one
    * surface quietly gets a feature another does not.
    */
-  variant?: "bar" | "card";
+  variant?: "bar" | "card" | "engineer";
   /** Workspace/branch switchers, an Admin badge — whatever names the context. */
   context?: ReactNode;
   /**
@@ -144,6 +147,8 @@ export async function AppHeader({
   /** Localized name of the active work context, shown in the profile menu. */
   workspaceLabel?: string | null;
   preferencesHref?: string;
+  /** The reader's service area, shown beside the workspace switcher (engineer variant). */
+  location?: string | null;
   /**
    * The active organization, for scoping the notification list to the work
    * context the reader is actually in. UX ONLY — `notifications` is governed by
@@ -194,6 +199,22 @@ export async function AppHeader({
     orgId,
   );
 
+  if (variant === "engineer") {
+    return (
+      <ShowroomTopbar
+        theme={resolveTheme(themePreference)}
+        displayName={identity?.displayName ?? undefined}
+        capabilities={capabilities}
+        workspaceSwitch={context}
+        profileHref="/home/profile"
+        settingsHref="/home/settings"
+        location={location}
+        search={<EngineerSearch />}
+        notifications={<NotificationsMenu items={notifications} unreadCount={unreadCount} orgId={orgId} />}
+        chat={<ChatMenu items={conversations} unreadCount={chatUnread} activeOrgId={orgId} activeOrgName={workspaceLabel} currentUserId={identity?.userId ?? null} />}
+      />
+    );
+  }
   const card = variant === "card";
 
   /* Declared once and placed twice. In the bar it follows the brand, on the

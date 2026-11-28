@@ -22,6 +22,7 @@ export type MyIdentity = {
   coverUrl: string | null;
   /** A phone + password (Craftsman) account: its main phone is its login and cannot be moved here. */
   phoneLogin: boolean;
+  gender: "female" | "male" | null;
   /** The current unverified second phone reservation (V1, no OTP), or null. */
   secondaryPhone: SecondaryPhone | null;
 };
@@ -48,7 +49,7 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "display_name, display_name_confirmed_at, phone_country_iso2, phone_national, phone_e164, phone_verified_at, avatar_media_id, cover_media_id",
+      "display_name, display_name_confirmed_at, phone_country_iso2, phone_national, phone_e164, phone_verified_at, avatar_media_id, cover_media_id, gender",
     )
     .eq("user_id", user.id)
     .maybeSingle();
@@ -95,6 +96,7 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
     phoneIsLoginKey: isCraftsmanLoginAlias(user.email),
     avatarUrl,
     coverUrl,
+    gender: profile.gender === "female" || profile.gender === "male" ? profile.gender : null,
     phoneLogin: isCraftsmanLoginAlias(user.email),
     secondaryPhone: mapSecondaryPhone(secondary),
   };
@@ -119,10 +121,17 @@ export const PROFILE_COMPLETION_ITEMS = [
   "availability",
   "location",
   "portfolio",
+  // Engineer items (20261128130005_engineer_completion_steps.sql).
+  "governorate",
+  "city",
+  "specialization",
+  "services",
+  "work_status",
+  "readiness",
 ] as const;
 export type ProfileCompletionItem = (typeof PROFILE_COMPLETION_ITEMS)[number];
 
-export type ProfileCompletion = { percent: number; missing: ProfileCompletionItem[] };
+export type ProfileCompletion = { percent: number; missing: ProfileCompletionItem[]; sections?: boolean[] };
 
 function isCompletionItem(value: unknown): value is ProfileCompletionItem {
   return typeof value === "string" && (PROFILE_COMPLETION_ITEMS as readonly string[]).includes(value);
@@ -139,9 +148,10 @@ export const loadMyProfileCompletion = cache(async function loadMyProfileComplet
   const { data, error } = await supabase.rpc("my_profile_completion");
   if (error || !data || typeof data !== "object" || Array.isArray(data)) return null;
 
-  const raw = data as { percent?: unknown; missing?: unknown };
+  const raw = data as { percent?: unknown; missing?: unknown; sections?: unknown };
   const percent = typeof raw.percent === "number" ? raw.percent : Number(raw.percent);
   if (!Number.isFinite(percent)) return null;
   const missing = Array.isArray(raw.missing) ? raw.missing.filter(isCompletionItem) : [];
-  return { percent: Math.max(0, Math.min(100, Math.round(percent))), missing };
+  const sections = Array.isArray(raw.sections) && raw.sections.length === 4 && raw.sections.every((v) => typeof v === "boolean") ? (raw.sections as boolean[]) : undefined;
+  return { percent: Math.max(0, Math.min(100, Math.round(percent))), missing, sections };
 });

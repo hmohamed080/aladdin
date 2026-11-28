@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "scope": "Owner-requested engineer account theme, 2026-10-19",
+  "sand": "#D8C7A6",
+  "terracotta": "#B96F52",
+  "cream": "#F2E9D8",
+  "navy": "#071A2D",
+  "light": { "canvas": "cream", "primary": "navy", "primaryForeground": "cream", "accentSolid": "terracotta", "onAccent": "navy", "border": "sand" },
+  "dark": { "canvas": "navy", "primary": "cream", "primaryForeground": "navy", "accentSolid": "terracotta", "onAccent": "navy", "foreground": "cream" }
+}

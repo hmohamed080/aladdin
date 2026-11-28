@@ -205,6 +205,17 @@ components:
 
 # Design System: Aladdin
 
+### Engineer homepage reference exception — owner approval, 2026-10-20
+
+For the engineer account only, the owner explicitly authorized matching the
+supplied screenshot over earlier shell geometry restrictions. Keep the four
+engineer palette primitives; use left navigation, a compact completion strip,
+a photo-led hero with inset identity card, five shortcuts and dense four-column
+discovery cards. Engineer-scoped CSS owns these adaptations and reduced bottom
+spacing. The showroom header component is reused with personal destinations.
+Local illustrative fixtures and generated imagery support design review only;
+hosted data remains authoritative. See `docs/product/engineer-account.md`.
+
 <!-- Established with the founder from the "Brand Toolkit v1" plate and approved 2026-08-01. -->
 <!-- Visual source of truth remains UI-UX/design.pen (Pencil); this file is the token/rule
      record the .pen file and the frontend Tailwind theme both extract from. Product truth
@@ -215,9 +226,9 @@ components:
 | | |
 |---|---|
 | **Design System** | Aladdin — "The Aperture" |
-| **Version** | `1.2.0` |
+| **Version** | `1.3.0` |
 | **Status** | Approved · foundation hardened (pre-feature). Ready to build product UI against. |
-| **Last updated** | 2026-11-15 |
+| **Last updated** | 2026-11-28 |
 | **Maintainer** | Design-system foundation (agent-maintained under founder approval) |
 | **Changelog** | [`design/CHANGELOG.md`](design/CHANGELOG.md) |
 | **Governance** | [`design/GOVERNANCE.md`](design/GOVERNANCE.md) — source-of-truth, versioning, component & AI-agent rules |
@@ -359,6 +370,16 @@ The form language is **precise and chamfered**, echoing the Aperture: corners ar
 
 ## Components
 
+### Engineer quotation composer — 2026-10-25
+
+The owner-reference composition uses a compact architectural photo hero, four
+task benefits, and numbered requirements, location, notes and reference-image
+sections. A live summary sits on the right in Arabic and mirrors to the left
+in English; on mobile it follows the form. Category thumbnails are illustrative,
+not supplier product photography. Retain the existing engineer palette and
+semantic surfaces. This is a page-specific composition, not a shared-shell or
+global token revision; see [engineer account](docs/product/engineer-account.md).
+
 ### Buttons
 - **Shape:** Gently rounded (10px, `rounded.sm`).
 - **Primary (light):** Ink (#17191A) fill, Limestone text, label type, 11px 16px padding. **Primary (dark):** inverts to Limestone fill, Basalt text.
@@ -410,3 +431,35 @@ Bronze concentric ring (one solid + one dashed) around the monochrome Aperture; 
 - **Don't** surface technical/implementation copy ("WhatsApp Business API", "reCAPTCHA verified", "canonical account", stack jargon) in the UI.
 - **Don't** hardcode raw hex in components — add or adjust a token. Don't treat Dark as an inverted Light filter.
 - **Don't** use cream/warm-white grounds with a serif-italic display — that default is explicitly not this brand; the ground is low-chroma Limestone stone.
+# Engineer profile reference extension — 2026-10-21
+
+Engineer settings reference extension: four sand navigation tiles alongside
+compact identity/security/notifications/account panels. Dark mode uses navy
+surfaces and cream text. Mobile navigation becomes a horizontal strip. Reuse
+existing identity actions; unavailable security operations must be stated rather
+than represented by working-looking toggles. Avatar editing is a disclosure.
+
+Owner interaction revision: section navigation is a tablist, not page anchors.
+Render one panel at a time, with the selected tab visibly marked. Overview owns
+about, status, statistics and services; other tabs isolate their named sections.
+
+Owner revision (2026-10-22): portrait belongs on the right in Arabic and on the
+left in English, with actions on the opposite side. Verified accounts use a blue filled check seal with a white checkmark;
+this is an explicit owner-approved exception to the four-color palette.
+Unverified accounts retain their truthful status and do not show the blue seal.
+
+The owner-provided profile screenshot governs `/home/profile` composition:
+wide architectural cover, overlapping portrait on the left, actions on the right,
+horizontal section links, then paired content rows (about/status and statistics,
+projects/services, showrooms/craftspeople, teams/reviews). Preserve Arabic text
+direction inside this spatial arrangement. Use the established engineer palette,
+existing icons and controls. At narrow widths stack content in source order;
+section navigation scrolls horizontally. Sample content is local-only and labelled;
+verification and actual account statistics must never be invented.
+
+
+Public portfolio reference (2026-10-22): standalone navy header, architectural hero, language-aware identity alignment, actual published statistics and content sections, cream light/navy dark surfaces, compact footer and mobile stacking. Public content must come only from public projections; omit missing data instead of borrowing private owner examples. Copy links exclude query strings and fragments.
+
+## Public portfolio reference correction — 2026-10-24
+
+Owner references govern the navy public header/search, architectural cover fading behind identity, compact statistics strip, four photographic project cards, paired about/specialty content, service photography, reviews and contact banner. Latest steering supersedes the long-page layout: Overview, Projects, Services, Reviews and Contact are real tabs; only the selected panel is mounted, with no URL fragment. Light/dark and language direction share one component. Local visual data is explicitly approved and labelled, gated by local app environment, loopback database, loopback request host and one designated profile ID; it does not alter real public records or appear on hosted builds. Sample contact actions explicitly keep drafts for the current visit without sending.

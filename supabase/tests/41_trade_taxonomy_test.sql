@@ -392,7 +392,9 @@ select is(
                             '_job_applicants', 'profile_completion',
                             'job_match_rows', 'job_opportunities_page',
                             'user_trade_specialties_set',
-                            'account_basics_set', 'my_account_basics')),
+                            'account_basics_set', 'my_account_basics',
+                            -- the unchanged completion formula, renamed when the Engineer steps wrapped it (20261128130005)
+                            'profile_completion_before_engineer_steps')),
   0::bigint,
   'and the ONLY functions that mention it are its writer and two DISPLAY projections — no capability, no can_* predicate');
 

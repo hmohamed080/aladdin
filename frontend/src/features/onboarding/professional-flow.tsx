@@ -187,7 +187,7 @@ export function ProfessionalFlow({ persona, answers }: { persona: ProfessionalPe
               ))}
             </div>
           </LabeledField>
-          <LabeledField label={t("onboarding.professional.services.additionalLabel")} htmlFor="add" optional={t("common.optional")}>
+          <LabeledField label={t(concrete === "engineer" ? "onboarding.professional.services.toolsLabel" : "onboarding.professional.services.additionalLabel")} htmlFor="add" optional={t("common.optional")}>
             <div id="add" className="flex flex-wrap gap-2">
               {addServiceOptions.map((k) => (
                 <ChoiceChip key={k} selected={state.additionalServices.includes(k)} label={t(`onboarding.professional.serviceItems.${k}`)} onToggle={() => toggle("additionalServices", k)} />

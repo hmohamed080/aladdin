@@ -66,3 +66,19 @@ The register of reusable UI components. **Search this file before creating any c
 - No component is implemented yet; all `Ready` criteria (keyboard, focus-trap, SR labels, touch targets, responsive) are **pending first implementation**.
 - Icon library not yet installed (policy decided — see [`icons/README.md`](./icons/README.md)).
 - PDF/document component fonts (Arabic shaping) unresolved — see `DESIGN.md` Typography.
+
+## Public engineer portfolio — 2026-10-24
+
+`PublicPortfolioTabs`: selected-only panels, ARIA tab relationships, keyboard navigation, LTR/RTL. `PortfolioRail`: overflow-aware controls and scroll snapping. `PortfolioSearch`: current-section-only search. `PortfolioSampleActions`: labelled native dialog, local draft only; not a production communication workflow. Light/dark desktop and mobile reviewed; production contact integration is outstanding.
+
+## Engineer quotation composer — 2026-10-25
+
+`RequestComposer` extends the existing request form and shared controls with a
+compact architectural hero, four benefits, numbered sections and live summary.
+Arabic right-side summary mirrors in English and stacks after the form on mobile.
+Summary buttons focus fields; add/remove, pending, invalid-quantity and save-error
+states retain the existing behavior. Real showroom results provide checkboxes
+and an honest empty state. Category thumbnails are decorative illustrations.
+Image controls remain private and saved-item-only (JPEG/PNG/WebP, two per item,
+5 MB each); PDF and pre-save uploads are unsupported. Both themes consume the
+existing engineer tokens. Status: reviewed on Arabic desktop/mobile with no horizontal overflow; TypeScript, lint and six composer tests pass. Full production save/upload journey remains deferred. No new primitive.

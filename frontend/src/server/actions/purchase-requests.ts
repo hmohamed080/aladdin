@@ -92,7 +92,18 @@ export async function savePurchaseRequestAction(_prev: RequestFormState, fd: For
   }
 
   const supabase = await getServerSupabase();
-  const { data, error } = await supabase.rpc("purchase_request_save", {
+  const engineer = fd.get("engineer") === "true";
+  const location = str(fd, "location") ?? "";
+  const showroomIds = readJson(fd, "showroomIds");
+  if (engineer && (location.length > 200 || !showroomIds || showroomIds.length > 30 || !showroomIds.every(isUuid))) {
+    return { ok: false, code: "states.genericRetry" };
+  }
+  const { data, error } = engineer ? await supabase.rpc("engineer_request_save", {
+    p_request_id: (requestId ?? null) as string,
+    p_expected_version: (version ?? null) as number,
+    p_title: title, p_notes: notes, p_needed_by: (neededBy || null) as string,
+    p_items: payload, p_location: location, p_showroom_ids: showroomIds as string[],
+  }) : await supabase.rpc("purchase_request_save", {
     p_org_id: (orgId ?? null) as string,
     p_request_id: (requestId ?? null) as string,
     p_expected_version: (version ?? null) as number,

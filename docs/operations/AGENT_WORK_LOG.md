@@ -1,3 +1,218 @@
+## 2026-11-28 — Owner-requested full worktree checkpoint
+
+- Owner explicitly requested committing all current work in this worktree, including existing auth/settings, engineer, portfolio, showroom, SQL and test changes.
+- Saved as a work-in-progress checkpoint, not a production-readiness claim. Earlier unfinished profile work and deferred WhatsApp OTP integration still require review. No deployment or push performed.
+- Validation limited to changed-file credential-pattern screening and Git whitespace checks. No full test suite or browser tests run for this checkpoint.
+
+## 2026-11-28 — Remove username from engineer account UI
+
+- User requested removing username throughout the account. Removed the remaining username editor from engineer settings; completion and profile no longer render a username field. Display name stays editable.
+- Retained stored public slugs and route resolution so existing shared portfolio links continue to work. This is a presentation change, not deletion of identity data or onboarding infrastructure.
+- Validation: focused ESLint on settings; no browser tests, per user preference. Other unfinished profile changes remain outside this change.
+
+## 2026-10-29 — Contact WhatsApp verification explicitly deferred
+
+- Owner approved deferring the WhatsApp OTP integration while the shared integration is being prepared.
+- Deployment handoff: [engineer contact WhatsApp handoff](./engineer-contact-whatsapp-handoff.md). Reuse the other accounts' canonical verification flow and enforce disclosure only to signed-in parties after work starts.
+- This documentation change does not implement OTP or contact disclosure. New numbers must not be considered verified merely because they were saved.
+- Existing profile-completion revisions in the working tree remain unfinished, including completion calculation, cover/media and availability changes. They are outside this documentation-only commit.
+- Validation: documentation diff and referenced-path checks only; no browser tests or deployment.
+## 2026-10-29 — Engineer location, coverage and initial-step correction
+
+- Completion initializes its selected step from server searchParams; portaled location/availability fields stay hidden until placed in their correct sections, preventing first-load misplaced fields.
+- Matched installer ProfileSelect and coverage controls from fetched origin/main: full Egypt catalog, custom city entry and additional governorate chips. Removed embedded travel-distance UI while preserving stored travel/remote data. Coverage uses existing owner-scoped service-area action.
+- Professional saves invalidate the home layout. Profile reads real location, named coverage, tools and availability; removed sample fallbacks from editable biography/details.
+- Engineer semantic palette now mirrors installer palette, including portaled menus; completion retains cream sections. Coverage thumb has contrasting primary ink and sand off-track.
+- Checks: typecheck and focused lint passed before the last small portal/thumb changes; 17 focused tests passed; editor's 12 tests passed again after hiding unplaced portals. Local browser save confirmed Cairo/Nasr City and header update; reload retained expertise step. Additional Giza save was initiated, but not subsequently verified after user requested manual-only page testing.
+- User preference: do not perform page-experience/browser tests. Provide concise manual steps and await their report. Keep code checks narrow. No production deployment.
+
+## 2026-10-29 — Engineer profile editor refinement
+
+- Reused installer-style service menus and experience stepper; removed the duplicate activity selector.
+- Base governorate/city render in Basic information; availability renders in Work availability, with “On demand / حسب الطلب”. A coverage switch uses the existing travel-distance field (off = 0, on = configurable distance); remote-consultation data is preserved.
+- Professional sections share one draft/save payload across mounted step slots. Dirty professional and identity edits expose save notices; failure does not clear dirty state. Step selection persists in the URL without a refresh per click.
+- Cream palette also follows portaled menus. The approved navigator structure is preserved. Public portfolio reuses LandingHeader with landing-target links; account settings label shortened.
+- Validation: typecheck and focused ESLint passed; 14 editor/navigation tests passed after updating the status-message assertion for the new experience output. Browser confirmed current step after reload and dirty-save notice. No production deployment or migration.
+
+
+## 2026-10-28 — Engineer profile completion
+
+Reference correction: embedded services, tools and languages now use rectangular
+multi-choice disclosures; availability uses icon cards. Inputs, biography and
+listbox triggers share the cream canvas. The approved progress navigator stays
+unchanged. Focused save-payload test passed (one test, nine skipped), ESLint passed,
+and the live browser confirmed the updated controls and backgrounds.
+
+Follow-up: unified engineer edit links and legacy edit route with the completion
+workspace. Preserved the owner-approved progress navigator; restyled only the
+inner form canvas to the installer reference. Focused ESLint passed; browser
+confirmed the legacy URL redirects and the new layout renders. No broad test run.
+
+- **Request:** reuse the installer's full completion experience for engineers.
+- **Delivered:** guarded `/home/profile/complete`, four sections with existing
+  identity, professional, availability and portfolio editors; saved-data progress,
+  in-place professional save, retained inputs across steps, home/profile entry links.
+- **Boundary:** no schema, hosted data, verification or public-sharing changes.
+  Username still edits in settings; each form has its own save operation.
+- **Owner refinement:** architecture/civil single selection, six multi-select
+  services, and AutoCAD/3ds Max multi-select tools in the existing supplemental
+  skills array. Shared onboarding catalog updated. One targeted save-payload
+  test passed for this refinement; no repeated broad suite.
+- **Validation:** 12 focused component tests pass. Browser checked Arabic and
+  English desktop, selected-only sections, mobile English dark; corrected narrow
+  mobile hero and contrasting text. Typecheck and focused lint run before finish.
+- **Deferred:** full-stack release verification and production deployment remain
+  subject to the existing visual/PR review. Concurrent auth/settings work preserved.
+
+## 2026-10-25 — Engineer RFQ reference redesign
+
+- **Purpose / scope:** document the owner-reference RFQ page only. Compact
+  architectural hero, four benefits, numbered product/location/notes/images
+  sections, live Arabic right-side summary mirrored in English, mobile stacking
+  and real showroom selection reuse the existing composer. Engineer palette
+  unchanged; concurrent shared-shell/auth/settings edits are outside this work.
+- **Behavior / boundaries:** labelled four-requirement examples use the existing
+  local-app plus loopback-Supabase gate; production remains empty unless a real
+  product or draft supplies input. Save draft → review → explicit publish and
+  private saved-item image handling remain intact. JPEG/PNG/WebP only, two per
+  item, 5 MB each; no PDF or upload before the first save.
+- **Evidence:** `.impeccable/review/request-desktop.png`,
+  `.impeccable/review/request-mobile-top.png` and
+  `.impeccable/review/request-mobile-fields.png` are the desktop and corrected
+  mobile viewport captures. Earlier malformed long mobile capture is excluded.
+- **Validation:** TypeScript, focused ESLint and six composer tests pass. Reviewer scored corrected mobile evidence and saved-draft upload guidance resolved. English desktop and dark theme also checked in browser; Arabic/light restored. Summary-to-field focus verified in browser; mobile document width380 within viewport390. Documenter wrote scoped docs before hitting its usage limit; parent reviewed and finished the documentation.
+- **Runtime / release:** local dev session `58754`, port `3350`, as reported by
+  parent. No hosted data/schema, deployment or PR changes; no commit in this pass.
+- **Related files:** `DESIGN.md`, `UI-UX/UI_UX_SYSTEM_GUIDE.md`,
+  `design/COMPONENT_INVENTORY.md`, `design/CHANGELOG.md`,
+  `docs/product/engineer-account.md`; implementation is
+  `frontend/src/features/engineer/request-composer.tsx`, its CSS and
+  `frontend/src/app/home/engineer/requests/new/page.tsx`.
+
+## 2026-10-24 — Public portfolio fidelity, actual tabs and readable links
+
+User rejected the sparse initial result, approved clearly labelled local sample content, then requested isolated tab panels and account-type/username URLs. Rebuilt the public portfolio around the supplied light/dark references, generated service photography, preserved production public projections, and added a four-condition local fixture guard. No real account fields were changed. Contact/sample favorite actions are illustrative; no messages or quotes are sent.
+
+Implemented `/p/{persona}/{username}` for already-published professional personas; UUID links redirect after a publication-guarded lookup, wrong persona and unavailable handles return not found. New additive migration 20261024100000 applied only to dedicated local `supabase_db_aladdin_engineer`; 13 new rollback pgTAP assertions pass plus 40 existing public-profile assertions. No hosted schema/data change, push, merge or deployment.
+
+Validation: TypeScript and focused ESLint pass; 39 component/query/media/fixture tests pass. Browser verified canonical URL, selected-only Projects/Services/Contact panels, local contact dialog naming and no-send wording, Arabic light/dark desktop, mobile rail and compact action row. Reviewer passed the public-portfolio revision and route boundary scope, not the entire application. Desktop screenshots at D:/projects/portfolio-revision-light.png and dark.png; mobile and final action-row proof saved separately. Concurrent auth/settings changes remain untouched.
+
+Remaining: production profile-directed messaging/quote integration, hosted migration rollout and PR review. Profiles without a username retain their legacy link until an owner supplies one; consumers and business-only accounts are not newly made public.
+
+## 2026-10-22 — Profile portrait and verification revision
+
+Engineer settings reference composition added at `/home/settings`, scoped to
+engineers. Reuses identity save actions, availability, language/theme and sign-out.
+Unsupported security/preferences/destructive operations are labelled unavailable.
+Browser checked light/dark and 390px; restored light/default viewport. TypeScript,
+focused lint and 14 existing personal settings tests passed. Static reviewer
+findings on sign-out scope copy and phone recovery links corrected.
+
+Runtime recovery: reproduced the public profile's worker exception in the
+browser, confirmed a reload still failed, and restarted only this project's
+port-3350 Next.js process. Direct load and navigation via "View public profile"
+then both rendered successfully. No code/data changes. Screenshot evidence:
+`D:/projects/engineer-public-profile-recovered.png`. Worker exit root cause was
+not established; recovery verified in the live browser.
+
+Follow-up: replaced profile anchor navigation with accessible tabs that render
+only the selected section. Overview retains about/status/statistics/services;
+projects, showrooms, craftspeople, teams and reviews each have their own panel.
+TypeScript and focused lint pass; added interaction and RTL keyboard tests.
+
+Owner follow-up: English now mirrors Arabic, placing the portrait on the left
+and actions on the right. Scoped LTR CSS overrides preserve Arabic placement.
+
+Moved the profile portrait/identity to the right and actions to the left across
+locales. Verified accounts now show a blue filled check seal beside the name and
+in the verification panel; other account statuses remain unchanged. Owner
+explicitly requested blue as a palette exception. Browser visual check remains
+outstanding due to the previously reported browser access restriction.
+
+## 2026-10-21 — Reference-led engineer profile page
+
+Implemented the supplied profile composition at `/home/profile`: architecture
+cover, overlapping portrait, section navigation and paired about/status,
+projects/services, showrooms/craftspeople, teams/reviews sections. Reuses the
+existing account reads and editor/collection routes. Local-only illustrative
+content fills empty sections; its notice includes fictional profile details and
+portraits. Actual name, verification and quick statistics remain factual.
+
+Validation: TypeScript and focused ESLint pass. Static independent review found
+identity direction, contradictory sample counts and incomplete sample disclosure;
+all three were addressed. Browser access was previously security-blocked; visual
+desktop/mobile matching remains unverified. No hosted data or schema changes.
+Existing unrelated shell edits preserved. Full-stack phase remains paused.
+
+## 2026-10-20 — Apply owner homepage review
+
+**Second visual revision:** Owner explicitly authorized relaxing prior layout
+constraints except palette and requested populated data. Added guarded local
+sample cards (four showrooms, four projects, four professionals), two fictional
+ImageGen contact sheets, left sidebar, sidebar CTA, denser hero/cards and removal
+of stacked bottom paddings across the engineer shell. Samples are not inserted
+into any database and are not displayed with hosted Supabase. Favorite toggles
+on those samples are temporary UI state.
+
+**Independent review:** Confirmed local/loopback guard and correct personal
+header routes. Fixed its two findings: misleading missing-location header and
+unconditional LTR reversal. Original showroom defaults preserved. Full-stack
+integration remains paused; no production deployment or migration application.
+
+**Validation:** Typecheck exited 0 after fixes; lint exited 0 with seven
+pre-existing warnings. Browser confirmed populated Arabic homepage and compact
+page ending, with expanded and collapsed sidebar states. Screenshot saved
+outside the repository as `D:/projects/engineer-home-reference-review.png`.
+Mobile viewport and English/dark screenshots have not been captured; no claim
+of complete cross-device release validation.
+
+**Request:** Match the supplied Aladdin composition, put the profile completion
+strip at the top using the Wellfound reference, remove product and guidance
+sections, and use the showroom search header.
+
+**Implementation:** Reused ShowroomTopbar with optional personal destinations
+and a real personal search slot. Built a compact segmented completion strip,
+account card inside the architectural hero, five shortcuts, and reordered
+discovery sections. Removed the unused dashboard catalog fetch. Generated a
+decorative living-room hero with ImageGen; WebP is 260 KB and provenance is
+stored alongside it. No fabricated people, reviews or showroom photos.
+
+**Scope:** Frontend only; full-stack phase remains paused. Arabic desktop browser
+inspection confirmed the new hierarchy and removed sections. Shared showroom
+defaults remain unchanged. Typecheck/lint results recorded after completion.
+
+## 2026-10-20 — Resume engineer account audit and frontend phase
+
+**Purpose / decision:** Recover work after a session limit. The owner requested
+frontend completion and review before resuming full-stack integration. Preserve
+the existing branch, production paths, and isolated runtime.
+
+**Scope:** Dashboard, profile, quotation composer/list/detail, showroom/product/
+professional discovery, inspiration, private team lists and saved records.
+Four-colour semantic theme follows the supplied Arabic references. Current pass
+adds category/status navigation, contextual empty states, profile team summaries,
+architectural request banner and wrapping/scroll fixes.
+
+**Earlier validation recovered:** Typecheck passed; lint had zero errors and
+seven existing warnings; 45 focused unit/component tests passed; engineer pgTAP
+and the existing 188 shared purchase-request assertions passed locally. Local
+browser saved a draft successfully. No hosted database or deployment change.
+
+**Consequences / unfinished work:** Full-stack work is paused, not complete.
+Responsive/English/dark visual checks, production build, final schema replay and
+end-to-end response flow remain before a production-ready PR. Missing real
+photos/reviews are represented honestly rather than fabricated. This checkpoint
+must not be described as release-ready.
+
+**Related:** [Feature scope](../product/engineer-account.md),
+[runtime](RUNTIME_STATE.md). Subsequent validation is recorded below before commit.
+
+**Resumed validation:** `pnpm --filter @aladdin/frontend typecheck` exited 0;
+`lint` exited 0 with the same seven existing warnings. Five focused Vitest files
+passed (45 tests). Image layout warnings in the DOM-only composer test are not
+visual browser assertions. Browser inspected Arabic dashboard, profile, saved
+product filter and new request composer on port 3350. No mobile viewport or
+English/dark parity claim is made by this checkpoint.
 ## 2026-11-25 - Marketplace plan PR 15: returns and exchanges (draft PR, not applied anywhere hosted)
 
 - Scope: branch `feat/mkt-returns-exchanges-20261124`. Migrations `20261125130001` (tables, permission `marketplace_returns.review`), `150002` (rules, RPCs, seeds, media hooks), `150003` (patches PR 12's order document `return_window` / `returns` keys and wraps `app.marketplace_order_extra_actions` at apply time). Permission contract `supabase/permissions/20261125130003.json` (46 new functions).
@@ -7351,6 +7566,24 @@ Per instruction: no full E2E, no pgTAP, no Lighthouse, no persona matrix.
 Standards: CTA contrast and stale shared-module documentation corrected. Spec: quotation accepted transitions now enforce seller eligibility; RFQ remains open on denial and rejection allowed, verified by3newpgTAP assertions. Sequential taskDB119/119; focusedauth114/114. Direct business contact RPC country metadata validation remains missing, confirmed by rolled-back synthetic diagnostic; added as second merge blocker alongside native quota. No hosted writes. Reviewed build/renderedcontrast/screenshots checked before final push.
 
 Final packaging: implementation05c4eec8 and reviewfix4ae03891 pushed; [PR84](https://github.com/hmohamed080/aladdin/pull/84) verified OPEN/DRAFT targeting main. Additional journey rerun aborted due stalled Docker, not counted as pass; final non-mutating contrast/layout2/2passed and typecheckpassed. Preview3341HTTP200, localAPI63321; original14hashesunchanged. External untracked frontend/e2e/auth-captcha.spec.ts appeared and remains excluded/preserved. No merge/deployment/worktree cleanup. Native quota and direct contact metadata remain merge blockers.
+## 2026-10-21 — Harden engineer quotation composer
+
+User invoked Impeccable harden on the new-request route. Added shared-parser
+quantity validation with accessible field help and focus, guarded repeated saves,
+disabled fields during pending operations, protected the final item from removal,
+wrapped long summary content, and focused save errors without clearing input.
+Five focused composer tests pass, including invalid quantity boundaries, Arabic
+decimal input, duplicate submission, failure retention and publication confirmation.
+TypeScript passes. Browser access was refused by URL security policy, so no new
+visual/mobile verification is claimed. Existing uncommitted shell/navigation work
+was preserved. Full-stack work remains paused; no data published or deployed.
+
+
+## 2026-10-22 — Public engineer portfolio reference
+
+Public engineer profiles now use a standalone responsive portfolio with light/dark palette, architectural hero, published-work statistics, projects, specialties, services, reviews and clean-link sharing. Empty public sections are omitted. Identity placement follows language direction. No private owner fixtures, contact details, avatars or fabricated achievements are imported; direct profile chat/quotation controls await a supported destination model.
+
+Validated TypeScript, focused lint, 29 component/query/media tests and 196 rollback-based local pgTAP tests (public professional fields, portfolio/certificates, reviews). Browser verified English/light, Arabic/dark, mobile and copy-link success. Existing public projections, publication checks, media proxy and no-store boundaries retained. No hosted schema/data changes or deployment. Other concurrent settings/auth changes remain untouched.
 
 ### Cloudflare migration, PR #97 — 2026-10-22
 Merged five audit branches (cost, R2/DNS/credentials/cutover, video on Containers, security, Redis) into `claude/cloudflare-workers-2ibvgs`, fixed stale E2E specs and classified the 51 shared Node/Workers failures. Validated: frontend typecheck, lint (0 errors), targeted unit suites, `cf:build` + `wrangler deploy --dry-run`; backend pytest and ruff. Unfinished: everything hosted (preview unreachable on a workers.dev certificate), Sign In CAPTCHA decision, 17 Showroom RC2 spec drifts for product review. See [status report](cloudflare-migration-status-2026-10-22.md).
@@ -8065,3 +8298,26 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Owner ran preflight and apply (264 -> 266): PASS. Frontend `c905580f` deployed from `98f60d52` on the owner's GO.
 - Browser check: home actions (F25) and waybill (F26) confirmed. New: F27, waybill wording on a refunded order.
 - Open: retest the items in the test log, timers Worker secrets and deploy, WhatsApp secrets, Production plan.
+
+## 2026-11-28 - Engineer account ported onto main and registration opened (local commit; not pushed or deployed)
+- Owner asked to port the whole account. Branch `feat/engineer-account-port-20261128` merges `main` (through #294, `98f60d52`) into `feature/engineer-account` `da4367de` (the original branch is unchanged). Migrations are `20261128130001`-`20261128130007`: #293 took `20261128090001` and #294 added `20261128120001` while the port was in progress.
+- Owner decisions: no date of birth anywhere (the date picker and birth-date storage were not ported; gender stays); uploads go to R2 only with Admin-controlled size limits (the request composer now uses the shared upload grant path); Engineer registration open (also opens the Engineering Office application).
+- Fixed during the port: direct writes could skip the 50-period cap on unavailable periods; a client could spoof the forwarded IP; `20261128130004` had its own transaction, which the permission gate refuses; the two material-request pages sat outside the `(workspace)` layout; the branch had removed the country flags from the shared phone picker; test 100 compared an unordered list (`order by 1` inside `string_agg`), now ordered.
+- `20261128130005` carries a migration-policy review marker: promote the app immediately after applying it.
+- Checks (local): CI's atomic upgrade permission gate with the pinned CLI, pgTAP, script tests, migration policy, doc links, typecheck, lint (0 errors), full vitest and production build. The first full vitest run had 8 failures (port defects, outdated expectations, one timeout under load); after the fixes the full suite passed. `db lint` has one error, in `marketplace_checkout_place`, which this branch does not change. No browser tests (recorded owner preference); no Playwright or Cloudflare bundle build.
+- Open: push, pull request, hosted migration apply and deploy each need owner approval. Hosted R2 state was not checked.
+
+## 2026-11-28 - Engineer PR #296: three review findings fixed
+- Email change keeps two-address confirmation (`double_confirm_changes = true`, as on `main`): the branch had turned it off, leaving only the app's password check, which does not cover a direct call to Auth. The flow now takes both codes and reports success only once Auth holds the new email. Verified on a throwaway local stack, both code orders; the new address's code alone returns no error and leaves the email unchanged.
+- Settings save bar clears only when a form announces a successful save; the gender choice is no longer reset on submit.
+- Unavailable periods: the UI no longer claims they hide opportunities; job discovery does not read them (filtering is an open owner decision).
+- Open before release: confirm on the hosted project that secure email change is on and that the email-change template carries `{{ .Token }}` (not checked).
+
+## 2026-11-28 - Engineer PR #296: two failed e2e checks
+- Real defect from the port: the middleware set the device cookie on every response. Next treats that as a cookie mutation by the Server Action being served and re-renders the page; in business setup the finished basics step then vanished and the branch step was skipped. Device cookies are now written on page loads only, when something changed.
+- Outdated expectations: the sign-up list (Engineer is open) and the seeded Engineer's home (Engineer dashboard, no "Welcome" heading). Unit tests, typecheck and lint ran locally; the e2e suites run in CI only.
+
+## 2026-11-28 - Hosted email-change template set on Acceptance and Production
+- Owner asked for it. This closes the "confirm on the hosted project" item above: secure email change was already on; both templates were link-only and now carry the code. Details in `RUNTIME_STATE.md`.
+- Later, on the owner's request: the "Email address changed" notification was turned on for both projects with the repository subject and body.
+- Open: send a real two-address email change after the release (also checks the notice reaches the old address). The owner asked for an easier flow (code to the new address only); secure email change stays on, and nothing was built for that.

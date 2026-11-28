@@ -63,7 +63,7 @@ select throws_ok(
   $$ select public.individual_save_professional(
        'engineer'::public.persona_type, 'Engineer now', 1::smallint, null, 'changed bio') $$,
   '42501', 'the account type cannot be changed here',
-  'switching to Coming Soon ENGINEER is refused');
+  'switching to ENGINEER is refused: the persona lock holds although the type is open');
 select throws_ok(
   $$ select public.individual_save_professional(
        'contractor'::public.persona_type, 'Contractor now', 1::smallint, null, 'changed bio') $$,
@@ -101,7 +101,7 @@ select is((select primary_account_type::text from public.users where id = '61000
   null, 'S''s canonical persona is never written');
 
 -- ===========================================================================
--- L — a legacy canonical ENGINEER (now Coming Soon) keeps working
+-- L — a legacy canonical ENGINEER keeps working
 -- ===========================================================================
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"61000000-0000-4000-8000-000000000003","role":"authenticated"}';
@@ -124,7 +124,7 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"61000000-0000-4000-8000-000000000004","role":"authenticated"}';
 select throws_ok(
   $$ select public.individual_save_professional('engineer'::public.persona_type, 'x', 1::smallint) $$,
-  '42501', 'select an account type first', 'a track alone cannot pick a Coming Soon persona here');
+  '42501', 'select an account type first', 'a track alone cannot pick a persona here');
 select throws_ok(
   $$ select public.individual_save_professional('installer_technician'::public.persona_type, 'x', 1::smallint) $$,
   '42501', 'select an account type first', 'nor an active one');

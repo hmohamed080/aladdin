@@ -236,3 +236,20 @@ export async function deleteCoverAction(): Promise<AvatarConfirmResult> {
   revalidateIdentity();
   return { ok: true };
 }
+
+/** Gender is optional; an empty value clears it. */
+export async function setGenderAction(
+  _prev: IdentityFieldState,
+  fd: FormData,
+): Promise<IdentityFieldState> {
+  const gender = String(fd.get("gender") ?? "").trim();
+  if (gender && gender !== "female" && gender !== "male") return { ok: false, code: "profileIdentity.personal.error" };
+
+  const supabase = await getServerSupabase();
+  // The generated arg type is `string` (no nullability in codegen); the RPC takes NULL to clear the value.
+  const { error } = await supabase.rpc("profile_set_gender", { p_gender: (gender || null) as unknown as string });
+
+  if (error) return { ok: false, code: "profileIdentity.personal.error" };
+  revalidateIdentity();
+  return { ok: true };
+}

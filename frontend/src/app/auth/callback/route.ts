@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { completeEntryOAuth } from "@/server/auth/entry-oauth";
+import { completeIdentityLink } from "@/server/auth/link-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,16 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
+  // Settings → Sign-in methods: attach Google/Facebook to the account that is already signed in.
+  if (params.get("link") === "1") {
+    const path = await completeIdentityLink(await getServerSupabase(), {
+      code: params.get("code"),
+      provider: params.get("provider"),
+      providerError: params.get("error"),
+      errorCode: params.get("error_code"),
+    });
+    return NextResponse.redirect(new URL(path, request.url));
+  }
   const supabase = await getServerSupabase();
   const outcome = await completeEntryOAuth(supabase, {
     code: params.get("code"),

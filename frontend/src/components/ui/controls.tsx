@@ -103,15 +103,17 @@ export function ButtonLink({
   size = "md",
   className,
   children,
+  "aria-current": ariaCurrent,
 }: {
   href: string;
   variant?: keyof typeof variants;
   size?: keyof typeof sizes;
   className?: string;
   children: ReactNode;
+  "aria-current"?: "page";
 }) {
   return (
-    <a href={href} className={controlClass(variant, size, className)}>
+    <a href={href} aria-current={ariaCurrent} className={controlClass(variant, size, className)}>
       {children}
     </a>
   );
