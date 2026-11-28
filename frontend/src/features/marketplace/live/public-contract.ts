@@ -169,10 +169,12 @@ export type CartQuoteLine =
       seller: number;
       image_id: string | null;
       attributes: PublicAttribute[];
+      /** the showroom marked this product "free shipping" */
+      free_shipping?: boolean;
     } & CartRef);
 
 export type CartDelivery =
-  | { status: "available"; fee_egp: number }
+  | { status: "available"; fee_egp: number; free_min_egp?: number | null }
   | { status: "not_available" }
   | { status: "needs_area" };
 

@@ -2906,6 +2906,9 @@ export const ar: Messages = {
           escalated: "تم تصعيد طلب الإرجاع للمنصة",
           admin_reminder: "تذكير من المنصة بخصوص إرجاع",
           admin_decided: "قرار المنصة في طلب إرجاع",
+          shipped: "المرتجع في الطريق (للمعرض)",
+          complaint_filed: "شكوى على طلب إرجاع (للطرف الآخر)",
+          refund_confirm_reminder: "تذكير المشتري بتأكيد استلام مبلغ المرتجع",
         },
         stock: { low: "مخزون المنتج على وشك النفاد", out: "نفاد مخزون المنتج" },
         order: {

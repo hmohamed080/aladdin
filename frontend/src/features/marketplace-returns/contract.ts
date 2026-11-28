@@ -40,6 +40,11 @@ export const REFUND_DEADLINE_DAYS = 7;
 export const GENERAL_DAYS_FLOOR = 14;
 export const DEFECT_DAYS_FLOOR = 30;
 
+export type EscalationReason = "seller_silent" | "complaint" | "refund_unconfirmed";
+
+/** The tracking number the buyer may give (optional): the same rule the database applies. */
+export const isValidReturnTracking = (v: string) => v.trim() === "" || /^[A-Za-z0-9._/-]{3,64}$/.test(v.trim());
+
 export type ReturnSummary = {
   id: string;
   request_number: string;
@@ -52,7 +57,7 @@ export type ReturnSummary = {
   created_at: string;
   seller_due_at: string;
   in_admin_queue: boolean;
-  escalated_reason: "seller_silent" | "complaint" | null;
+  escalated_reason: EscalationReason | null;
   seller_name: string;
   buyer_name?: string | null;
   item_count: number;
@@ -107,7 +112,8 @@ export type ReturnDocument = {
   viewer: "buyer" | "seller" | "admin";
   payment_method: string;
   seller: { name: string };
-  buyer?: { name: string } | null;
+  /** The phone is filled for the showroom only. */
+  buyer?: { name: string; phone?: string | null } | null;
   reason: { label_ar: string; label_en: string; transit_damage: boolean };
   buyer_note: string | null;
   partial_refund_egp: number | null;
@@ -115,7 +121,7 @@ export type ReturnDocument = {
   return_shipping_payer: "seller" | "buyer";
   return_tracking: string | null;
   in_admin_queue: boolean;
-  escalated_reason: "seller_silent" | "complaint" | null;
+  escalated_reason: EscalationReason | null;
   decision: {
     by: "seller" | "admin";
     message_ar: string | null;

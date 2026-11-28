@@ -186,16 +186,25 @@ export type OrderDocumentV2 = {
 
 /** A preset reason (marketplace_order_reason_presets). */
 export type ReasonPreset = { id: string; label_ar: string; label_en: string; text_ar: string; text_en: string };
-export type ReasonAction = "order_cancel_seller" | "order_cancel_buyer" | "payment_issue";
+export type ReasonAction = "order_cancel_seller" | "order_cancel_buyer" | "payment_issue" | "return_reject";
 
-export type InvoiceParty = { name?: string | null; address?: string | null; registration_no?: string | null; tax_id?: string | null };
+export type InvoiceParty = {
+  name?: string | null;
+  address?: string | null;
+  registration_no?: string | null;
+  tax_id?: string | null;
+  /** Buyer only, on invoices issued since 20261128090001: the area and the structured address. */
+  governorate_key?: string | null;
+  area_key?: string | null;
+  address_parts?: Record<string, unknown> | null;
+};
 
 export type OrderInvoice = {
   invoice_number: string;
   issued_at: string;
   seller: InvoiceParty;
   buyer: InvoiceParty;
-  lines: { sku: string; name_ar: string; name_en: string; quantity: number; unit_price_egp: number; line_total_egp: number }[];
+  lines: { sku: string; name_ar: string; name_en: string; quantity: number; unit_price_egp: number; line_total_egp: number; variant_label?: { ar: string; en: string } | null }[];
   subtotal_egp: number;
   delivery_fee_egp: number;
   total_egp: number;

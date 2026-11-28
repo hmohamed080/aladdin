@@ -8046,3 +8046,11 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 ## 2026-11-28 - Marketplace ordering switched on for Acceptance (configuration, not yet deployed)
 - Owner approved preparing it. Preview workflow and `wrangler.jsonc` set `NEXT_PUBLIC_MARKETPLACE_ORDERING`; a test keeps Production without it.
 - Open: merge and deploy (owner approval each), then the order test round with the three verified accounts. Timers Worker and its two secrets before testing reminders.
+
+## 2026-11-28 - Marketplace test-round fixes F01-F24 (migration 20261128090001, nothing applied)
+- Owner asked to fix every recorded note from the Acceptance order and return round. Test status: MARKETPLACE_ACCEPTANCE_TEST_LOG.md.
+- Frontend: cart free-delivery rule and saved address, return pages and forms, order and invoice display, installer bell, signed-in footer.
+- Database: return notifications for the other side, refund-confirmation timer (reminder 3 days, admin queue at 7 days), return timers now advance and close, rejection presets, readable variant, address and date text, invoice buyer address parts, cart quote free-delivery fields.
+- Decisions (owner accepted the suggestions, do NOT re-ask): showroom told when the buyer ships; other side told on a complaint; admin decision notification states the result; unconfirmed refund goes to the admin queue. The recorded rule stands: no phone on invoices or the admin return page (owner may revisit).
+- Validation: throwaway local stack `supabase test db` Files=202 Tests=10198 PASS; return and timer concurrency scripts PASS; vitest 5539 passed, one image-variant test timed out under load and passed alone; eslint 0 errors; tsc one error in `edge/media-worker` (module `postgres` not installed locally). Not checked in a browser.
+- Open: merge, Acceptance apply plan for the migration (owner applies), frontend deploy, retest, timers Worker secrets and deploy.
