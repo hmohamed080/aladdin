@@ -8065,3 +8065,9 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Owner ran preflight and apply (264 -> 266): PASS. Frontend `c905580f` deployed from `98f60d52` on the owner's GO.
 - Browser check: home actions (F25) and waybill (F26) confirmed. New: F27, waybill wording on a refunded order.
 - Open: retest the items in the test log, timers Worker secrets and deploy, WhatsApp secrets, Production plan.
+
+## 2026-11-28 - Marketplace retest on Acceptance, then fixes for F07, F09, F27, F28, F29 (nothing hosted changed)
+- Retest with `MP-000014` / `INV-000002` / `RT-000002`; results in the test log. The admin rejection of `RT-000002` ran on the first press (F29), by the testing agent.
+- F07: new invoices fall back to the showroom branch address. F09: notifications and two pages write "EGP 150". F27: waybill says why nothing is collected. F28: thank-you page labels the address. F29: admin decisions ask for confirmation.
+- Validation: local `supabase test db` Files=202 Tests=10212 PASS; `node --test scripts/*.test.mjs scripts/hosted-db/*.test.mjs` 493 pass; vitest 5548 pass, 1 timeout under load that passed when run alone; tsc only the existing `edge/media-worker` `postgres` error. No browser check of these changes.
+- Open: owner merge, gated Acceptance plan for `20261128150001`, apply, frontend deploy, retest F18-F21 with an approved return, F30 decision.
