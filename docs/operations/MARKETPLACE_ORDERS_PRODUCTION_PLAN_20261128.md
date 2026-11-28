@@ -44,7 +44,7 @@ Open work that changes this plan if it lands on `main` before the apply (checked
 | PR | Adds | Effect |
 |---|---|---|
 | #296 (Engineer account) | `20261128130001`-`20261128130007` | newer than the plan: the `drift` check refuses until the plan (or a new one) lists them, with their contract, changed objects and forward-fix |
-| #298 (retest notes F07, F09, F27-F29; open, not merged) | `20261128150001` and permission contract `20261128150001`; replaces the functions `app.marketplace_money`, `app.marketplace_order_invoice_issue`, `public.marketplace_order_waybill_get` | newer than the plan: if merged first, the plan must become **246 -> 267** (pending list, post contract, measured catalog changes, a forward-fix that runs first, smoke counts, proof re-run). It has no Acceptance apply plan yet, so Acceptance must get one and pass before Production |
+| #298 (retest notes F07, F09, F27-F29; open, not merged, head `f7b7eeac`) | `20261128150001` and its permission contract; 6 functions replaced, 1 internal helper added, no table, row or client grant | newer than the plan: if merged first, the plan must become **246 -> 267** (pending list, post contract, catalog changes, forward-fix `marketplace-retest` first in the undo order, smoke counts, proof re-run). The PR carries the Acceptance plan `marketplace-retest` (266 -> 267, not applied), which must pass before Production |
 | #284 (backup console) | `20261126130001` | falls inside the range: drift refuses; on Acceptance (already 266) it would be out of order |
 | #244 (draft, conflicting) | `20261123090001` | older than Production's latest: a plain push is not enough |
 
