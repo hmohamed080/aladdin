@@ -27,7 +27,7 @@ import {
   ChevronRightIcon,
 } from "@/components/ui/icons";
 import { formatCount } from "@/lib/ui/format";
-import { formatEgp } from "@/lib/ui/egp-format";
+import { fmtEgp } from "@/features/marketplace/live/live-copy";
 import { cn } from "@/lib/ui/cn";
 import { sellerPageAccess } from "@/features/marketplace-seller/access";
 import {
@@ -309,7 +309,7 @@ export default async function MarketplaceProductsPage({
                         </td>
                         <td className="whitespace-nowrap px-md py-sm text-fg">
                           <div className="flex flex-col items-start gap-1">
-                            <span>{p.fromPrice === null ? "—" : formatEgp(p.fromPrice, locale)}</span>
+                            <span>{p.fromPrice === null ? "—" : fmtEgp(p.fromPrice, locale)}</span>
                             <span
                               data-testid="review-record"
                               className={cn("inline-flex rounded-pill px-2.5 py-0.5 text-label font-medium", REVIEW_CHIP[p.reviewState])}

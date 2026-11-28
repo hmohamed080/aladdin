@@ -26,6 +26,9 @@
 #              refund), one plain push 264 -> 266. Functions, 3 re-created CHECK constraints and 3 template rows; no existing row rewritten: no backup label required
 #              (the pinned forward-fix marketplace-clarity is the recovery). Before and after the push this script runs the read-only marketplace-clarity-smoke.sql.
 #              See docs/operations/MARKETPLACE_CLARITY_ACCEPTANCE_PLAN_20261128.md.
+#   marketplace-retest 20261128150001 (seller address on new invoices, money text in notifications, payment status on the waybill), one plain push 266 -> 267.
+#              Function-only: no backup label required (the pinned forward-fix marketplace-retest is the recovery). Before and after the push this script runs
+#              the read-only marketplace-retest-smoke.sql. See docs/operations/MARKETPLACE_RETEST_ACCEPTANCE_PLAN_20261128.md.
 # NOT to be run without the owner's separate explicit GO. Production is refused. Never uses --include-all, repair or reset.
 #   bash scripts/hosted-db/acceptance-apply.sh --plan <plan> --sha <full 40-char origin/main sha> [--backup-label <pinned restore-verified snapshot>]
 #   No backup label is required: every plan's migrations are function-only (no table DDL, no DML, no stored row rewritten) and each has a
@@ -51,7 +54,7 @@ export LC_ALL=C
 ACC="nxossqhdfltcqdwvbewi"; PROD="kkpkgjrweysgvhvkhzun"
 PLAN=""; SHA=""; LABEL=""
 while [ $# -gt 0 ]; do case "$1" in --plan) PLAN="${2:-}"; shift 2;; --sha) SHA="${2:-}"; shift 2;; --backup-label) LABEL="${2:-}"; shift 2;; *) echo "unknown argument $1"; exit 2;; esac; done
-[[ "$PLAN" =~ ^(media|m1|m3a|media\+m1|marketplace|marketplace-orders|marketplace-clarity|media-notify|registration-gate|marketplace-v2|marketplace-slug)$ ]] || { echo "usage: --plan media|m1|m3a|media+m1|marketplace|marketplace-orders|marketplace-clarity|media-notify|registration-gate|marketplace-v2|marketplace-slug --sha <40-char sha> [--backup-label <label>]"; exit 2; }
+[[ "$PLAN" =~ ^(media|m1|m3a|media\+m1|marketplace|marketplace-orders|marketplace-clarity|marketplace-retest|media-notify|registration-gate|marketplace-v2|marketplace-slug)$ ]] || { echo "usage: --plan media|m1|m3a|media+m1|marketplace|marketplace-orders|marketplace-clarity|marketplace-retest|media-notify|registration-gate|marketplace-v2|marketplace-slug --sha <40-char sha> [--backup-label <label>]"; exit 2; }
 [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: --plan <plan> --sha <40-char sha> [--backup-label <label>]"; exit 2; }
 [ -z "$LABEL" ] || [[ "$LABEL" =~ ^aladdin-acceptance-[0-9]{8}T[0-9]{6}Z$ ]] || { echo "--backup-label must look like aladdin-acceptance-YYYYMMDDTHHMMSSZ"; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -120,6 +123,10 @@ if [ "$PLAN" = "marketplace-clarity" ]; then
   run "pre: marketplace-clarity facts" "$OUT/mc-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-clarity-smoke.sql
   run "pre: marketplace-clarity smoke" "$OUT/mc-pre.out" -- node scripts/hosted-db/marketplace-clarity-smoke.mjs facts pre "$OUT/mc-pre.json"; cat "$OUT/mc-pre.out"
 fi
+if [ "$PLAN" = "marketplace-retest" ]; then
+  run "pre: marketplace-retest facts" "$OUT/mrt-pre.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-retest-smoke.sql
+  run "pre: marketplace-retest smoke" "$OUT/mrt-pre.out" -- node scripts/hosted-db/marketplace-retest-smoke.mjs facts pre "$OUT/mrt-pre.json"; cat "$OUT/mrt-pre.out"
+fi
 echo "pre-checks passed. Recovery: $RECOVERY${LABEL:+ (historical snapshot reference $LABEL, not a current recovery point)}"
 
 STEP="confirmation"
@@ -161,6 +168,11 @@ if [ "$PLAN" = "marketplace-clarity" ]; then
   run "post: marketplace-clarity facts" "$OUT/mc-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-clarity-smoke.sql
   run "post: marketplace-clarity smoke" "$OUT/mc-post.out" -- node scripts/hosted-db/marketplace-clarity-smoke.mjs facts post "$OUT/mc-post.json"; cat "$OUT/mc-post.out"
   echo "NEXT (owner GO): deploy the frontend matching main (docs/operations/MARKETPLACE_CLARITY_ACCEPTANCE_PLAN_20261128.md)"
+fi
+if [ "$PLAN" = "marketplace-retest" ]; then
+  run "post: marketplace-retest facts" "$OUT/mrt-post.json" -- sb db query --linked -o json -f scripts/hosted-db/marketplace-retest-smoke.sql
+  run "post: marketplace-retest smoke" "$OUT/mrt-post.out" -- node scripts/hosted-db/marketplace-retest-smoke.mjs facts post "$OUT/mrt-post.json"; cat "$OUT/mrt-post.out"
+  echo "NEXT (owner GO): deploy the frontend matching main (docs/operations/MARKETPLACE_RETEST_ACCEPTANCE_PLAN_20261128.md)"
 fi
 STEP="done"; PUSHED=0
 echo "PASS: plan $PLAN applied to Acceptance $ACC; history $POST_APPLIED, permissions match $POST_CONTRACT, catalog diff limited to the plan's functions, media/storage counts verified."

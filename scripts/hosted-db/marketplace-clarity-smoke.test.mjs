@@ -16,11 +16,12 @@ const pre = (o = {}) => ({ applied_migrations: 264, latest_migration: "202611261
   refund_confirm_timers: 0, return_reject_presets: 4, invoices: 1, ...o });
 const post = (o = {}) => pre({ applied_migrations: 266, latest_migration: "20261128120001", templates: 39, new_templates: 3, new_helpers: 2, ...o });
 
-test("the plan is exactly the 2 migrations after 264, the checkout holds nothing it does not list, and it follows marketplace-orders", () => {
+test("the plan is exactly the 2 migrations after 264, the checkout holds nothing it does not list up to its last one, and it follows marketplace-orders", () => {
   assert.equal(P().applied, PLANS["marketplace-orders"].applied + PLANS["marketplace-orders"].pending.length);
   assert.equal(P().latest, PLANS["marketplace-orders"].pending.at(-1));
   assert.deepEqual(P().pending, ["20261128090001", "20261128120001"]);
-  assert.deepEqual(pendingDrift({ plan: NAME, localVersions: versions() }), { unplanned: [], missing: [] });
+  assert.deepEqual(versions().filter((v) => v > P().latest && v <= P().pending.at(-1)).sort(), P().pending);
+  assert.deepEqual(pendingDrift({ plan: NAME, localVersions: versions() }).missing, []);
   assert.equal(P().preContract, PLANS["marketplace-orders"].postContract);
   for (const v of [P().preContract, P().postContract]) assert.ok(read(`../../supabase/permissions/${v}.json`).includes(`"${v}"`));
 });

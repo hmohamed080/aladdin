@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { fmtEgp } from "@/features/marketplace/live/live-copy";
 import { areaName, governorateName } from "@/features/marketplace-seller/place-label";
 import styles from "@/features/marketplace/marketplace-cart.module.css";
+import { addressLine } from "@/features/marketplace-orders/order-model";
 import type { OrderDocumentV2 } from "@/features/marketplace-orders/order-types";
 import { checkoutCopy } from "./checkout-copy";
 
@@ -53,7 +54,7 @@ export function ConfirmedView({ order }: { order: OrderDocumentV2 }) {
 
       <section className={styles.card} aria-labelledby="ty-where">
         <h2 id="ty-where" className={styles.cardTitle} data-plain><StorefrontIcon size={20} aria-hidden="true" />{order.fulfilment === "pickup" ? c.pickupAt : c.deliveryTo}</h2>
-        <p>{order.fulfilment === "pickup" ? (order.pickup?.address ?? order.seller.name) : [place, order.place.address_text].filter(Boolean).join(" — ")}</p>
+        <p>{order.fulfilment === "pickup" ? (order.pickup?.address ?? order.seller.name) : [place, addressLine(order.place.address_snapshot, order.place.address_text, locale)].filter(Boolean).join(" — ")}</p>
       </section>
 
       <section className={styles.card} aria-labelledby="ty-sum">

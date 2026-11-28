@@ -1,3 +1,11 @@
+## Marketplace retest fixes in a branch (F07, F09, F27-F29) - 2026-11-28
+
+Nothing hosted changed; the Acceptance versions in the entry below stay current.
+
+- Migration `20261128150001` (functions only: invoice seller address fallback, money text in notifications, waybill payment status; permission contract `20261128150001`) is **not applied**. Acceptance plan `marketplace-retest` (266 -> 267) is prepared and not run: [runbook](MARKETPLACE_RETEST_ACCEPTANCE_PLAN_20261128.md).
+- F28 and F29 are frontend only. F30 (no reason on an admin return decision) waits for an owner decision.
+- A Production plan prepared for 246 -> 266 must add this migration if it merges first.
+
 ## Acceptance at 266: marketplace-clarity applied, frontend c905580f - 2026-11-28
 
 Supersedes, for Acceptance only, the migration count and frontend version in the entries below.
