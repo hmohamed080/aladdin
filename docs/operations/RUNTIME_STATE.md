@@ -1,3 +1,9 @@
+## Acceptance: UI fixes deployed; ordering switched on in the repository - 2026-11-28
+
+- **Acceptance frontend**: `aladdin-frontend-preview` version `75fd1b92-2915-4a60-9b46-11018f39dfa1` (workflow run 46129164915, `main` `29ec0a98`, PR #291); smoke answered 200 (`/showroom` 307). Rollback target: `d96b440e-66fd-4ec4-b81b-0719186dd6aa`. A signed-in browser check confirmed the five fixes it covered (header account link, single currency, returns toggle above Save, "1 product", delivery fee of a free-shipping product).
+- `NEXT_PUBLIC_MARKETPLACE_ORDERING` = "true" for the preview only (workflow and `wrangler.jsonc`). It takes effect with the next preview deploy of this change; record that version here. Rollback of ordering alone: roll back to the version above.
+- Still off on Acceptance: the timers Worker (no reminders or automatic cancellation), WhatsApp sending, video. **Production** has neither Marketplace flag and is unchanged.
+
 ## Acceptance at 264: Marketplace orders applied and frontend deployed - 2026-11-28
 
 Supersedes, for Acceptance only, every older entry below that says the 2026-11-24/26 migrations are not applied there.

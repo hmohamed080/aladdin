@@ -44,6 +44,9 @@ jobs:
     environment: cloudflare-preview
     env:
       NEXT_PUBLIC_APP_ENV: staging
+      # Marketplace ordering (cart, checkout, orders, returns) is ON on this isolated preview only (owner approval 2026-11-28).
+      # Client components read it, so it must be set at BUILD time; frontend/wrangler.jsonc carries the same value for the server.
+      NEXT_PUBLIC_MARKETPLACE_ORDERING: "true"
       # aladdin-r2-acceptance (nxossqhdfltcqdwvbewi) unless the environment overrides it.
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://nxossqhdfltcqdwvbewi.supabase.co' }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54b3NzcWhkZmx0Y3Fkd3ZiZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MjYxMjMsImV4cCI6MjEwNzMwMjEyM30.bhRRGiQK3astY9HTAUKlQBtPKuqKvPGbOycoVo9QT64' }}

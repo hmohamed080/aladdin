@@ -56,6 +56,15 @@ describe("Cloudflare production config (committed Wrangler files)", () => {
     expect(config.env.preview.services.filter((s) => s.binding === "OTP_WORKER")).toHaveLength(1);
   });
 
+  it("turns Marketplace ordering on for the preview (build and server) and never for Production", () => {
+    const { env } = frontendConfig() as unknown as { env: Record<"preview" | "production", { vars: Record<string, string> }> };
+    expect(env.preview.vars.NEXT_PUBLIC_MARKETPLACE_ORDERING).toBe("true");
+    expect(env.production.vars.NEXT_PUBLIC_MARKETPLACE_ORDERING).toBeUndefined();
+    const workflow = (name: string) => readFileSync(join(FRONTEND, "..", ".github", "workflows", name), "utf8");
+    expect(workflow("cloudflare-frontend-preview.yml")).toContain('      NEXT_PUBLIC_MARKETPLACE_ORDERING: "true"');
+    expect(workflow("cloudflare-production.yml")).not.toContain("NEXT_PUBLIC_MARKETPLACE_ORDERING");
+  });
+
   it("refuses a frontend with no BACKEND binding", () => {
     const config = frontendConfig();
     config.env.production.services = config.env.production.services.filter((s) => s.binding !== "BACKEND");
