@@ -1,3 +1,9 @@
+## 2026-11-26 - pgTAP 100 compares its grant list in a guaranteed order (test only)
+
+- Scope: branch `fix/rls-test-aggregate-order-20261126`. `100_client_role_privileges_test.sql` assertion 3 used `string_agg(..., ',' order by 1)`; inside an aggregate `1` is a constant, so the order followed the catalog scan. It failed once in CI on a branch that changes no SQL, with the two expected grants reversed. It now sorts by schema, table and privilege.
+- Validation: the old clause keeps input order for either input on local Postgres; the fixed file 6/6 inside a rolled-back transaction.
+- Not changed: `tests/a2/phone_identity_a2_local.test.mjs` has the same clause in a local-only script where the list is only printed.
+
 ## 2026-11-25 - Marketplace plan PR 15: returns and exchanges (draft PR, not applied anywhere hosted)
 
 - Scope: branch `feat/mkt-returns-exchanges-20261124`. Migrations `20261125130001` (tables, permission `marketplace_returns.review`), `150002` (rules, RPCs, seeds, media hooks), `150003` (patches PR 12's order document `return_window` / `returns` keys and wraps `app.marketplace_order_extra_actions` at apply time). Permission contract `supabase/permissions/20261125130003.json` (46 new functions).
