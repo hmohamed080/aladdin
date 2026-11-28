@@ -1,11 +1,12 @@
 "use client";
 
-import { createContext, useContext, useSyncExternalStore } from "react";
+import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react";
 
 /**
- * Who is looking at the Marketplace, for the cart only (Marketplace PR 11). Provided by ./cart-viewer (rendered by the
- * /market layout while ordering is on); everywhere else, and for a guest, the default is "nobody special". Kept apart from
- * the provider so that the add-to-cart button does not pull the server action into its module graph.
+ * Who is looking at the Marketplace, for the header and the cart (Marketplace PR 11). Provided by the /market layout:
+ * ./cart-viewer while ordering is on, `SignedInViewer` for a signed-in caller while it is off. Everywhere else, and for a
+ * guest, the default is "nobody special". Kept apart from the cart provider so that the add-to-cart button does not pull
+ * the server action into its module graph.
  */
 export type Viewer = { signedIn: boolean; ownSellers: readonly string[] };
 export const GUEST: Viewer = { signedIn: false, ownSellers: [] };
@@ -13,6 +14,11 @@ export const ViewerContext = createContext<Viewer>(GUEST);
 
 export function useCartViewer(): Viewer {
   return useContext(ViewerContext);
+}
+
+/** A signed-in caller while ordering is off: the header shows their account; no cart and no cart sync. */
+export function SignedInViewer({ children }: { children: ReactNode }) {
+  return <ViewerContext.Provider value={{ signedIn: true, ownSellers: [] }}>{children}</ViewerContext.Provider>;
 }
 
 /** True when the signed-in viewer works for this showroom (so cannot buy from it). */

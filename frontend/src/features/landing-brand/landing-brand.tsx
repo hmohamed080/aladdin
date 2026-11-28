@@ -19,7 +19,7 @@ import styles from "./landing-brand.module.css";
 /** `market.open` shows the cart in the header; `market.live` (newest real products) replaces the sample cards in the product section. */
 export type LandingMarket = { open: boolean; live: PublicCard[]; images: MarketplaceImageMap };
 
-export function LandingBrand({ stats, market = { open: false, live: [], images: {} } }: { stats: LandingStats; market?: LandingMarket }) {
+export function LandingBrand({ stats, market = { open: false, live: [], images: {} }, signedIn = false }: { stats: LandingStats; market?: LandingMarket; signedIn?: boolean }) {
   const c = brandContent;
   const pills = (
     [
@@ -38,7 +38,7 @@ export function LandingBrand({ stats, market = { open: false, live: [], images: 
             <Image src="/landing-brand/hero.jpg" alt="" fill priority fetchPriority="high" quality={65} sizes={HERO_SIZES} className={styles.heroImg} />
             <div className={styles.heroShade} />
           </div>
-          <LandingBrandHeader showCart={market.open && isMarketplaceOrderingEnabled()} />
+          <LandingBrandHeader showCart={market.open && isMarketplaceOrderingEnabled()} signedIn={signedIn} />
           <div className={styles.heroBody}>
             <div className={styles.heroCopy}>
               <h1>{c.hero.title} <span>{c.hero.accent}</span> {c.hero.titleTail}</h1>
@@ -63,7 +63,7 @@ export function LandingBrand({ stats, market = { open: false, live: [], images: 
         </div>
       </section>
       </div>
-      <div className={styles.onlyMobile}><MobileHero stats={stats} showCart={market.open && isMarketplaceOrderingEnabled()} /></div>
+      <div className={styles.onlyMobile}><MobileHero stats={stats} showCart={market.open && isMarketplaceOrderingEnabled()} signedIn={signedIn} /></div>
 
       <div className={styles.onlyDesktop}>
       <section id="roles" className={styles.section}>

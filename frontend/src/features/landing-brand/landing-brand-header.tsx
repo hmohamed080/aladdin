@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { MenuIcon, XIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
@@ -10,8 +11,11 @@ import { LandingBrandCart } from "./landing-brand-cart";
 import { BrandIcon } from "./landing-brand-icons";
 import styles from "./landing-brand.module.css";
 
-/** Brand header: logo, anchor navigation, sign in, and the account-type dropdown (opens under its button). */
-export function LandingBrandHeader({ showCart = false }: { showCart?: boolean } = {}) {
+/**
+ * Brand header: logo and anchor navigation, then for a guest sign in and the account-type dropdown (opens under its button),
+ * and for a signed-in caller their account (and orders, when the cart is on).
+ */
+export function LandingBrandHeader({ showCart = false, signedIn = false }: { showCart?: boolean; signedIn?: boolean } = {}) {
   const { dir, t: tr } = useI18n();
   const t = brandContent.nav;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -51,39 +55,48 @@ export function LandingBrandHeader({ showCart = false }: { showCart?: boolean } 
       </nav>
       <div className={styles.actions}>
         {showCart ? <LandingBrandCart /> : null}
-        <div className={styles.registerWrap} ref={wrap}>
-          <button ref={trigger} type="button" className={styles.register} aria-haspopup="true" aria-expanded={signupOpen} aria-controls="brand-register" onClick={() => setSignupOpen(!signupOpen)}>
-            <BrandIcon name="user-plus" size={18} /><span>{t.register}</span>
-          </button>
-          {signupOpen ? (
-            <div id="brand-register" className={styles.registerMenu} dir={dir} role="group" aria-label={t.registerTitle}>
-              <p className={styles.registerTitle}>{t.registerTitle}</p>
-              <ul>
-                {REGISTRATION_CHOICE_ORDER.map((key) => {
-                  const soon = CHOICES_BY_KEY[key]?.comingSoon === true;
-                  const label = tr(`onboarding.accountType.types.${key}`);
-                  const desc = tr(`onboarding.accountType.types.${key}Desc`);
-                  return (
-                    <li key={key}>
-                      {soon ? (
-                        <span className={`${styles.registerItem} ${styles.registerSoon}`} aria-disabled="true">
-                          <span className={styles.registerLabel}>{label}<small>{t.soon}</small></span>
-                          <span className={styles.registerDesc}>{desc}</span>
-                        </span>
-                      ) : (
-                        <a className={styles.registerItem} href={`/auth/sign-up?type=${key}`} onClick={() => setSignupOpen(false)}>
-                          <span className={styles.registerLabel}>{label}</span>
-                          <span className={styles.registerDesc}>{desc}</span>
-                        </a>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+        {signedIn ? (
+          <>
+            {showCart ? <Link className={styles.signIn} href="/market/orders">{t.myOrders}</Link> : null}
+            <a className={styles.register} href="/home">{t.account}</a>
+          </>
+        ) : (
+          <>
+            <div className={styles.registerWrap} ref={wrap}>
+              <button ref={trigger} type="button" className={styles.register} aria-haspopup="true" aria-expanded={signupOpen} aria-controls="brand-register" onClick={() => setSignupOpen(!signupOpen)}>
+                <BrandIcon name="user-plus" size={18} /><span>{t.register}</span>
+              </button>
+              {signupOpen ? (
+                <div id="brand-register" className={styles.registerMenu} dir={dir} role="group" aria-label={t.registerTitle}>
+                  <p className={styles.registerTitle}>{t.registerTitle}</p>
+                  <ul>
+                    {REGISTRATION_CHOICE_ORDER.map((key) => {
+                      const soon = CHOICES_BY_KEY[key]?.comingSoon === true;
+                      const label = tr(`onboarding.accountType.types.${key}`);
+                      const desc = tr(`onboarding.accountType.types.${key}Desc`);
+                      return (
+                        <li key={key}>
+                          {soon ? (
+                            <span className={`${styles.registerItem} ${styles.registerSoon}`} aria-disabled="true">
+                              <span className={styles.registerLabel}>{label}<small>{t.soon}</small></span>
+                              <span className={styles.registerDesc}>{desc}</span>
+                            </span>
+                          ) : (
+                            <a className={styles.registerItem} href={`/auth/sign-up?type=${key}`} onClick={() => setSignupOpen(false)}>
+                              <span className={styles.registerLabel}>{label}</span>
+                              <span className={styles.registerDesc}>{desc}</span>
+                            </a>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-        <a className={styles.signIn} href="/auth/sign-in">{t.signIn}</a>
+            <a className={styles.signIn} href="/auth/sign-in">{t.signIn}</a>
+          </>
+        )}
       </div>
     </header>
   );
