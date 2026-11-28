@@ -8067,3 +8067,8 @@ Stacked on PR #233 (and #232 for the plan document); see [`PRODUCTION_CATCHUP_PL
 - Owner reported three notes. Fixed: a signed-in visitor of `/` gets "My account" instead of "create account" (F25); the waybill asks for no money after a refund and labels the address (F26, migration `20261128120001`). Expected, unchanged: issued invoice `INV-000001` keeps its stored data.
 - Prepared plan `marketplace-clarity` (264 -> 266) for `20261128090001` and `20261128120001`: gate, smoke, pinned forward-fix, scratch proof OK; live Acceptance function definitions equal the replayed pre-state (read-only).
 - Open: merge (owner), owner preflight and apply, frontend deploy, retest, timers Worker secrets and deploy.
+
+## 2026-11-28 - marketplace-clarity applied to Acceptance and frontend deployed
+- Owner ran preflight and apply (264 -> 266): PASS. Frontend `c905580f` deployed from `98f60d52` on the owner's GO.
+- Browser check: home actions (F25) and waybill (F26) confirmed. New: F27, waybill wording on a refunded order.
+- Open: retest the items in the test log, timers Worker secrets and deploy, WhatsApp secrets, Production plan.
