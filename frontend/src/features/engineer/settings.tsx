@@ -14,7 +14,6 @@ import { DevicesPanel, SessionsPanel } from "./devices-panels";
 import type { MyDevice, MySession } from "@/server/queries/account-devices";
 import { SettingsSaveBar } from "./settings-save-bar";
 import { PersonalDetailsForm } from "./personal-details-form";
-import { UsernameForm } from "./username-form";
 import "./settings.css";
 
 type Props = ComponentProps<typeof PersonalSettings> & {
@@ -89,7 +88,6 @@ export function EngineerSettings({ identity, signInEmail, signInMethod, locale, 
             </>} /> : <p>{ar ? "تعذر تحميل بياناتك. حدّث الصفحة للمحاولة مرة أخرى." : "Your details could not be loaded. Refresh to try again."}</p>}
           </div>
           <div className="engineer-settings-group"><h3>{ar ? "معلومات الحساب" : "Account info"}</h3>
-            <UsernameForm username={identity?.username ?? null} labels={{ username: ar ? "اسم المستخدم" : "Username", saved: ar ? "تم الحفظ." : "Saved.", unavailable: ar ? "اسم المستخدم هذا غير متاح." : "That username isn't available.", invalid: ar ? "استخدم 3–24 حرفًا: حروف وأرقام ونقطة أو شرطة سفلية، ويبدأ بحرف." : "Use 3–24 characters: letters, digits, . or _, starting with a letter." }} />
             {signInMethod === "phone_password"
               ? <div className="engineer-password-row" aria-disabled="true"><span>{ar ? "كلمة المرور" : "Password"}</span><span className="engineer-password-dots" aria-hidden="true">••••••••••</span></div>
               : <Link className="engineer-password-row" href="/home/settings/password?from=account"><span>{ar ? "كلمة المرور" : "Password"}</span><span className="engineer-password-dots" aria-hidden="true">••••••••••</span><span className="sr-only">{ar ? "تغيير كلمة المرور" : "Change password"}</span></Link>}

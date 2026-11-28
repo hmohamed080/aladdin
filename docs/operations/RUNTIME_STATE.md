@@ -1,3 +1,9 @@
+## 2026-11-28 — Remove username from engineer account UI
+
+- User requested removing username throughout the account. Removed the remaining username editor from engineer settings; completion and profile no longer render a username field. Display name stays editable.
+- Retained stored public slugs and route resolution so existing shared portfolio links continue to work. This is a presentation change, not deletion of identity data or onboarding infrastructure.
+- Validation: focused ESLint on settings; no browser tests, per user preference. Other unfinished profile changes remain outside this change.
+
 ## 2026-10-29 — Contact WhatsApp verification explicitly deferred
 
 - Owner approved deferring the WhatsApp OTP integration while the shared integration is being prepared.
