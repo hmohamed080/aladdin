@@ -239,6 +239,8 @@ node scripts/hosted-db/verify-frontend-upload.mjs --version=<UPLOADED_VERSION_ID
 
 **C. Production tests of the uploaded version (override header; no data change beyond the minimal live delivery check owned by PR #158)**
 
+**C0 (required first, learned 2026-11-15):** Cloudflare applies an override only to a version that is in the current deployment, and silently serves the live version otherwise (every check below would pass against the OLD code). Add the uploaded version at 0% and keep the live one at 100%: `wrangler versions deploy <UPLOADED_VERSION_ID>@0% <LIVE_VERSION_ID>@100% --env production` (live id: `wrangler deployments status --env production`). Then check one thing that differs between the two versions to prove the new one answered.
+
 ```bash
 V=<UPLOADED_VERSION_ID>; H="Cloudflare-Workers-Version-Overrides: aladdin-frontend-production=\"$V\""
 curl -s -o /dev/null -w '%{http_code}\n' -H "$H" https://aladdindecore.com/auth/sign-in                               # L4: 200
